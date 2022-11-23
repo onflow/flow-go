@@ -44,15 +44,13 @@ func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryCons
 
 func (t *TelemetryConsumer) OnStart(currentView uint64) {
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.Msg("OnStart")
+	t.pathHandler.NextStep().Msg("OnStart")
 }
 
 func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
@@ -73,27 +71,24 @@ func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *mode
 
 func (t *TelemetryConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.
+	t.pathHandler.NextStep().
 		Uint64("qc_view", qc.View).
-		Hex("qc_block_id", logging.ID(qc.BlockID))
-	step.Msg("OnReceiveQc")
+		Hex("qc_block_id", logging.ID(qc.BlockID)).
+		Msg("OnReceiveQc")
 }
 
 func (t *TelemetryConsumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.
+	t.pathHandler.NextStep().
 		Uint64("view", tc.View).
 		Uint64("newest_qc_view", tc.NewestQC.View).
-		Hex("newest_qc_block_id", logging.ID(tc.NewestQC.BlockID))
-	step.Msg("OnReceiveTc")
+		Hex("newest_qc_block_id", logging.ID(tc.NewestQC.BlockID)).
+		Msg("OnReceiveTc")
 }
 
 func (t *TelemetryConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("view", partialTc.View).
 		Uint64("newest_qc_view", partialTc.NewestQC.View).
 		Hex("newest_qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
@@ -111,8 +106,7 @@ func (t *TelemetryConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.
 
 func (t *TelemetryConsumer) OnLocalTimeout(currentView uint64) {
 	t.pathHandler.StartNextPath(currentView)
-	step := t.pathHandler.NextStep()
-	step.Msg("OnLocalTimeout")
+	t.pathHandler.NextStep().Msg("OnLocalTimeout")
 }
 
 func (t *TelemetryConsumer) OnEventProcessed() {
@@ -169,8 +163,7 @@ func (t *TelemetryConsumer) OnOwnVote(blockID flow.Identifier, view uint64, _ []
 }
 
 func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("block_view", proposal.View).
 		Hex("block_id", logging.ID(proposal.ID())).
 		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
@@ -189,8 +182,7 @@ func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicati
 }
 
 func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
-	step := t.pathHandler.NextStep()
-	step.
+	step := t.pathHandler.NextStep().
 		Uint64("view", timeout.View).
 		Uint64("timeout_tick", timeout.TimeoutTick).
 		Uint64("newest_qc_view", timeout.NewestQC.View).
@@ -252,7 +244,7 @@ func (p *PathHandler) CloseCurrentPath() *PathHandler {
 	return p
 }
 
-// IsCurrentPathClosed if and only is the most recently started path has been closed.
+// IsCurrentPathClosed if and only if the most recently started path has been closed.
 func (p *PathHandler) IsCurrentPathClosed() bool {
 	return p.currentPath == nil
 }
