@@ -157,7 +157,7 @@ func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []by
 }
 
 // SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
-func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub *pubsub.Subscription) {
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub p2p.Subscription) {
 	received := make(chan struct{})
 	go func() {
 		msg, err := sub.Next(ctx)
@@ -175,7 +175,7 @@ func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []
 }
 
 // SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
-func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []*pubsub.Subscription) {
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []p2p.Subscription) {
 	for _, sub := range subs {
 		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
 	}
@@ -280,7 +280,7 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
-	subs := make([]*pubsub.Subscription, len(nodes))
+	subs := make([]p2p.Subscription, len(nodes))
 	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 	for i, node := range nodes {
 		ps, err := node.Subscribe(

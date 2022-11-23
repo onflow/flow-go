@@ -27,11 +27,11 @@ func (m *CorruptGossipSubRouter) Attach(sub *pubsub.PubSub) {
 }
 
 func (m *CorruptGossipSubRouter) AddPeer(pid peer.ID, protocolId protocol.ID) {
-	m.AddPeer(pid, protocolId)
+	m.router.AddPeer(pid, protocolId)
 }
 
 func (m *CorruptGossipSubRouter) RemovePeer(pid peer.ID) {
-	m.RemovePeer(pid)
+	m.router.RemovePeer(pid)
 }
 
 func (m *CorruptGossipSubRouter) EnoughPeers(topic string, suggested int) bool {

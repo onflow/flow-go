@@ -13,18 +13,18 @@ func TestWorkerStatsTracker(t *testing.T) {
 	st := NewWorkerStatsTracker(context.Background())
 	st.AddWorkers(1)
 
-	stats := st.getStats()
-	assert.Equal(t, 0, stats.txsSent)
-	assert.Equal(t, 1, stats.workers)
+	stats := st.GetStats()
+	assert.Equal(t, 0, stats.TxsSent)
+	assert.Equal(t, 1, stats.Workers)
 
 	st.IncTxSent()
 	st.IncTxSent()
 	st.IncTxExecuted()
 
-	stats = st.getStats()
-	assert.Equal(t, 1, stats.txsExecuted)
-	assert.Equal(t, 2, stats.txsSent)
-	assert.Equal(t, 0., stats.txsSentMovingAverage)
+	stats = st.GetStats()
+	assert.Equal(t, 1, stats.TxsExecuted)
+	assert.Equal(t, 2, stats.TxsSent)
+	assert.Equal(t, 0., stats.TxsSentMovingAverage)
 
 	st.Stop()
 }

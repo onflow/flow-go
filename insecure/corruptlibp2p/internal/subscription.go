@@ -38,3 +38,7 @@ func (c *CorruptSubscription) Next(ctx context.Context) (*pubsub.Message, error)
 		Local:         m.Local,
 	}, nil
 }
+
+func (c *CorruptSubscription) Topic() string {
+	return c.s.Topic()
+}

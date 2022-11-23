@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
@@ -15,12 +17,40 @@ import (
 type CorruptGossipSubAdapter struct {
 	gossipSub *corrupt.PubSub
 	router    *internal.CorruptGossipSubRouter
+	logger    zerolog.Logger
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
 
-func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
-	return c.gossipSub.RegisterTopicValidator(topic, val, corrupt.WithValidatorInline(true))
+func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
+	var v corrupt.ValidatorEx = func(ctx context.Context, from peer.ID, message *corrupt.Message) corrupt.ValidationResult {
+		pubsubMsg := &pubsub.Message{
+			Message:       message.Message, // converting corrupt.Message to pubsub.Message
+			ID:            message.ID,
+			ReceivedFrom:  message.ReceivedFrom,
+			ValidatorData: message.ValidatorData,
+			Local:         message.Local,
+		}
+		result := topicValidator(ctx, from, pubsubMsg)
+
+		// overriding the corrupt.ValidationResult with the result from pubsub.TopicValidatorFunc
+		message.ValidatorData = pubsubMsg.ValidatorData
+		switch result {
+		case p2p.ValidationAccept:
+			return corrupt.ValidationAccept
+		case p2p.ValidationIgnore:
+			return corrupt.ValidationIgnore
+		case p2p.ValidationReject:
+			return corrupt.ValidationReject
+		default:
+			// should never happen, indicates a bug in the topic validator
+			c.logger.Fatal().Msgf("invalid validation result: %v", result)
+		}
+		// should never happen, indicates a bug in the topic validator, but we need to return something
+		c.logger.Warn().Msg("invalid validation result, returning reject")
+		return corrupt.ValidationReject
+	}
+	return c.gossipSub.RegisterTopicValidator(topic, v, corrupt.WithValidatorInline(true))
 }
 
 func (c *CorruptGossipSubAdapter) UnregisterTopicValidator(topic string) error {
@@ -40,15 +70,15 @@ func (c *CorruptGossipSubAdapter) GetTopics() []string {
 }
 
 func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
-	return c.ListPeers(topic)
+	return c.gossipSub.ListPeers(topic)
 }
 
 func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
 	return c.router
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-	gossipSubConfig, ok := cfg.(*internal.CorruptPubSubAdapterConfig)
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
@@ -65,6 +95,7 @@ func NewCorruptGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSub
 
 	return &CorruptGossipSubAdapter{
 		gossipSub: gossipSub,
-		router:    nil,
+		router:    corruptRouter,
+		logger:    logger,
 	}, nil
 }

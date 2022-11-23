@@ -244,10 +244,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// checks that the message is received by all nodes.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []*pubsub.Subscription{
-		p2pfixtures.MustBePubSubSubscription(t, conSub),
-		p2pfixtures.MustBePubSubSubscription(t, ver1SubBlocks),
-		p2pfixtures.MustBePubSubSubscription(t, ver2SubBlocks)})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []p2p.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
@@ -280,7 +277,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{
 		p2pfixtures.MustBePubSubSubscription(t, ver1SubChunks),
 		p2pfixtures.MustBePubSubSubscription(t, ver2SubChunks)})
 

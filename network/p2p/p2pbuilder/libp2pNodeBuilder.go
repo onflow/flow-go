@@ -42,7 +42,7 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
-type GossipSubFactoryFuc func(context.Context, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
+type GossipSubFactoryFuc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
 type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
@@ -84,7 +84,7 @@ type NodeBuilder interface {
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
-	SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder
+	SetGossipSubFactory(GossipSubFactoryFuc, GossipSubAdapterConfigFunc) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -127,8 +127,8 @@ func NewNodeBuilder(
 }
 
 func defaultGossipSubFactory() GossipSubFactoryFuc {
-	return func(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-		return p2pnode.NewGossipSubAdapter(ctx, h, cfg)
+	return func(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg)
 	}
 }
 
@@ -195,8 +195,9 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(f GossipSubFactoryFuc) NodeBuilder {
-	builder.gossipSubFactory = f
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFuc, cf GossipSubAdapterConfigFunc) NodeBuilder {
+	builder.gossipSubFactory = gf
+	builder.gossipSubConfigFunc = cf
 	return builder
 }
 
@@ -284,7 +285,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			}
 
 			// builds GossipSub with the given factory
-			gossipSub, err := builder.gossipSubFactory(ctx, h, gossipSubConfigs)
+			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
@@ -349,12 +350,12 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
 
-	// create a transport which disables port reuse and web socket.
+	// create a t which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	transport := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
 		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
 	})
 
@@ -362,7 +363,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	options := []config.Option{
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(libp2pKey),          // pass in the networking key
-		transport,                           // set the protocol
+		t,                                   // set the transport
 	}
 
 	return options, nil

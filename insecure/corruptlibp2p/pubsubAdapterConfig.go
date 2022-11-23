@@ -1,4 +1,4 @@
-package internal
+package corruptlibp2p
 
 import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -13,6 +13,14 @@ type CorruptPubSubAdapterConfig struct {
 	options []corrupt.Option
 }
 
+var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
+
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
+	return &CorruptPubSubAdapterConfig{
+		options: defaultCorruptPubsubOptions(base),
+	}
+}
+
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
 	c.options = append(c.options, corrupt.WithDiscovery(discoveryRouting.NewRoutingDiscovery(routing)))
 }
@@ -22,7 +30,7 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 }
 
 func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOption) {
-	panic("courrpted gossipsub does not support score option")
+	// Corrupt does not support score options. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
@@ -34,8 +42,6 @@ func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }
-
-var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 
 func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig) []corrupt.Option {
 	return []corrupt.Option{

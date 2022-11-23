@@ -13,7 +13,6 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/ipfs/go-datastore"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2pnetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -524,15 +523,18 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+
 			// msg type is not guaranteed to be correct since it is set by the client
 			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
 			if err != nil {
-				violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: err}
+				violation.Err = err
 				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 				return
 			}
 
-			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), MsgType: what, Channel: channel, IsUnicast: true, Err: ErrUnicastMsgWithoutSub}
+			violation.MsgType = what
+			violation.Err = ErrUnicastMsgWithoutSub
 			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
 			return
 		}
@@ -593,14 +595,9 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
-	sub, ok := s.(*pubsub.Subscription)
-	if !ok {
-		// from this point on, we assume that the subscription is a pubsub.Subscription
-		m.log.Fatal().Str("topic", topic.String()).Msg("could not cast subscription to pubsub.Subscription")
-	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, sub, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -637,13 +634,13 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
 	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
@@ -680,7 +677,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, true)
+		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, message.ProtocolUnicast)
 		if err != nil {
 			m.log.
 				Error().
