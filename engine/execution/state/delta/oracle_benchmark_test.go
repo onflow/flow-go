@@ -96,6 +96,9 @@ func benchmarkStorage(steps int, b *testing.B) {
 		keysToRead := make([]ledger.Key, 0)
 
 		for i := 0; i < steps; i++ {
+			if i%1000 == 0 {
+				b.Logf("progress: %d percent", i/steps*100)
+			}
 			// send seal info
 			if blockSealedIndex >= blockProductionIndex+sealLatency {
 				h := headers[blockSealedIndex]
