@@ -29,23 +29,25 @@ type NoopPartialConsumer struct{}
 
 func (*NoopPartialConsumer) OnEventProcessed() {}
 
-func (*NoopPartialConsumer) OnReceiveVote(uint64, *model.Vote) {}
+func (*NoopPartialConsumer) OnStart(uint64) {}
 
 func (*NoopPartialConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
-func (*NoopPartialConsumer) OnEnteringView(uint64, flow.Identifier) {}
+func (*NoopPartialConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
+
+func (*NoopPartialConsumer) OnReceiveTc(uint64, *flow.TimeoutCertificate) {}
+
+func (*NoopPartialConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
+
+func (*NoopPartialConsumer) OnLocalTimeout(uint64) {}
+
+func (*NoopPartialConsumer) OnViewChange(uint64, uint64) {}
 
 func (*NoopPartialConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
 
 func (*NoopPartialConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64) {}
 
-func (*NoopPartialConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
-
 func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
-
-func (*NoopPartialConsumer) OnReachedTimeout(model.TimerInfo) {}
-
-func (*NoopPartialConsumer) OnQcIncorporated(*flow.QuorumCertificate) {}
 
 func (*NoopPartialConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 

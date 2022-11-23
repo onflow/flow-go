@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -37,11 +38,6 @@ func (_m *Consumer) OnDoubleVotingDetected(_a0 *model.Vote, _a1 *model.Vote) {
 	_m.Called(_a0, _a1)
 }
 
-// OnEnteringView provides a mock function with given fields: viewNumber, leader
-func (_m *Consumer) OnEnteringView(viewNumber uint64, leader flow.Identifier) {
-	_m.Called(viewNumber, leader)
-}
-
 // OnEventProcessed provides a mock function with given fields:
 func (_m *Consumer) OnEventProcessed() {
 	_m.Called()
@@ -62,6 +58,11 @@ func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
 	_m.Called(_a0)
 }
 
+// OnLocalTimeout provides a mock function with given fields: currentView
+func (_m *Consumer) OnLocalTimeout(currentView uint64) {
+	_m.Called(currentView)
+}
+
 // OnOwnProposal provides a mock function with given fields: proposal, targetPublicationTime
 func (_m *Consumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	_m.Called(proposal, targetPublicationTime)
@@ -77,14 +78,9 @@ func (_m *Consumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []by
 	_m.Called(blockID, view, sigData, recipientID)
 }
 
-// OnQcConstructedFromVotes provides a mock function with given fields: curView, qc
-func (_m *Consumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
-	_m.Called(curView, qc)
-}
-
-// OnQcIncorporated provides a mock function with given fields: _a0
-func (_m *Consumer) OnQcIncorporated(_a0 *flow.QuorumCertificate) {
-	_m.Called(_a0)
+// OnPartialTc provides a mock function with given fields: currentView, partialTc
+func (_m *Consumer) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
+	_m.Called(currentView, partialTc)
 }
 
 // OnQcTriggeredViewChange provides a mock function with given fields: qc, newView
@@ -92,19 +88,24 @@ func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView 
 	_m.Called(qc, newView)
 }
 
-// OnReachedTimeout provides a mock function with given fields: timeout
-func (_m *Consumer) OnReachedTimeout(timeout model.TimerInfo) {
-	_m.Called(timeout)
-}
-
 // OnReceiveProposal provides a mock function with given fields: currentView, proposal
 func (_m *Consumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	_m.Called(currentView, proposal)
 }
 
-// OnReceiveVote provides a mock function with given fields: currentView, vote
-func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
-	_m.Called(currentView, vote)
+// OnReceiveQc provides a mock function with given fields: currentView, qc
+func (_m *Consumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
+	_m.Called(currentView, qc)
+}
+
+// OnReceiveTc provides a mock function with given fields: currentView, tc
+func (_m *Consumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
+	_m.Called(currentView, tc)
+}
+
+// OnStart provides a mock function with given fields: currentView
+func (_m *Consumer) OnStart(currentView uint64) {
+	_m.Called(currentView)
 }
 
 // OnStartingTimeout provides a mock function with given fields: _a0
@@ -115,6 +116,11 @@ func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
 // OnTcTriggeredViewChange provides a mock function with given fields: tc, newView
 func (_m *Consumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
 	_m.Called(tc, newView)
+}
+
+// OnViewChange provides a mock function with given fields: oldView, newView
+func (_m *Consumer) OnViewChange(oldView uint64, newView uint64) {
+	_m.Called(oldView, newView)
 }
 
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal

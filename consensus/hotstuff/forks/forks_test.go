@@ -459,7 +459,7 @@ func TestNewestView(t *testing.T) {
 
 func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
 	notifier := mocks.NewConsumer(t)
-	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
+	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Maybe()
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil).Maybe()
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil).Maybe()

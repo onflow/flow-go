@@ -31,6 +31,10 @@ func (lc *LogConsumer) OnEventProcessed() {
 	lc.log.Debug().Msg("event processed")
 }
 
+func (lc *LogConsumer) OnStart(currentView uint64) {
+	lc.log.Debug().Uint64("cur_view", currentView).Msg("starting event handler")
+}
+
 func (lc *LogConsumer) OnBlockIncorporated(block *model.Block) {
 	lc.logBasicBlockData(lc.log.Debug(), block).
 		Msg("block incorporated")
@@ -50,32 +54,73 @@ func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Bl
 		Msg("double proposal detected")
 }
 
-func (lc *LogConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
-	lc.log.Debug().
-		Uint64("cur_view", currentView).
-		Uint64("vote_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("processing vote")
-}
-
 func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
-	lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
-		Uint64("cur_view", currentView).
-		Msg("processing proposal")
+	logger := lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
+		Uint64("cur_view", currentView)
+	lastViewTC := proposal.LastViewTC
+	if lastViewTC != nil {
+		logger.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+
+	logger.Msg("processing proposal")
 }
 
-func (lc *LogConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
+func (lc *LogConsumer) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
-		Uint64("view", view).
-		Hex("leader", leader[:]).
-		Msg("view entered")
+		Uint64("cur_view", currentView).
+		Uint64("qc_view", qc.View).
+		Hex("qc_block_id", logging.ID(qc.BlockID)).
+		Msg("processing QC")
+}
+
+func (lc *LogConsumer) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
+	lc.log.Debug().
+		Uint64("cur_view", currentView).
+		Uint64("tc_view", tc.View).
+		Uint64("newest_qc_view", tc.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(tc.NewestQC.BlockID)).
+		Msg("processing TC")
+}
+
+func (lc *LogConsumer) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
+	logger := lc.log.With().
+		Uint64("cur_view", currentView).
+		Uint64("view", partialTc.View).
+		Uint64("qc_view", partialTc.NewestQC.View).
+		Hex("qc_block_id", logging.ID(partialTc.NewestQC.BlockID))
+
+	lastViewTC := partialTc.LastViewTC
+	if lastViewTC != nil {
+		logger.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+
+	log := logger.Logger()
+	log.Debug().Msg("processing partial TC")
+}
+
+func (lc *LogConsumer) OnLocalTimeout(currentView uint64) {
+	lc.log.Debug().
+		Uint64("cur_view", currentView).
+		Msg("processing local timeout")
+}
+
+func (lc *LogConsumer) OnViewChange(oldView, newView uint64) {
+	lc.log.Debug().
+		Uint64("old_view", oldView).
+		Uint64("new_view", newView).
+		Msg("entered new view")
 }
 
 func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
-		Hex("qc_id", qc.BlockID[:]).
+		Hex("qc_block_id", qc.BlockID[:]).
 		Uint64("new_view", newView).
 		Msg("QC triggered view change")
 }
@@ -88,33 +133,11 @@ func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newV
 		Msg("TC triggered view change")
 }
 
-func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
-	lc.log.Debug().
-		Uint64("cur_view", curView).
-		Uint64("qc_view", qc.View).
-		Hex("qc_id", qc.BlockID[:]).
-		Msg("QC constructed from votes")
-}
-
 func (lc *LogConsumer) OnStartingTimeout(info model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("timeout started")
-}
-
-func (lc *LogConsumer) OnReachedTimeout(info model.TimerInfo) {
-	lc.log.Debug().
-		Uint64("timeout_view", info.View).
-		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
-		Msg("timeout reached")
-}
-
-func (lc *LogConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
-	lc.log.Debug().
-		Uint64("qc_view", qc.View).
-		Hex("qc_id", qc.BlockID[:]).
-		Msg("QC incorporated")
 }
 
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
@@ -164,12 +187,10 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("proposer_id", logging.ID(block.ProposerID)).
-		Hex("payload_hash", logging.ID(block.PayloadHash))
-	if block.QC != nil {
-		loggerEvent.
-			Uint64("qc_view", block.QC.View).
-			Hex("qc_id", logging.ID(block.QC.BlockID))
-	}
+		Hex("payload_hash", logging.ID(block.PayloadHash)).
+		Uint64("qc_view", block.QC.View).
+		Hex("qc_block_id", logging.ID(block.QC.BlockID))
+
 	return loggerEvent
 }
 
