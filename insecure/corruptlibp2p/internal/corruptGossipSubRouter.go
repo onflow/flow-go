@@ -6,6 +6,8 @@ import (
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 )
 
+// CorruptGossipSubRouter is a wrapper around GossipSubRouter that allows us to access the internal
+// fields of the router for BFT testing and attack implementations. 
 type CorruptGossipSubRouter struct {
 	router *pubsub.GossipSubRouter
 }
