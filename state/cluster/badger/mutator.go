@@ -125,7 +125,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// otherwise we would compromise liveness of the cluster.
 		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
+			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
 		}
 		if err != nil {
 			return fmt.Errorf("could not check reference block: %w", err)
@@ -146,7 +146,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
 			if errors.Is(err, storage.ErrNotFound) {
 				// unknown reference blocks are invalid
-				return state.NewInvalidExtensionErrorf("unknown reference block (id=%x): %v", flowTx.ReferenceBlockID, err)
+				return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
 			}
 			if err != nil {
 				return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)

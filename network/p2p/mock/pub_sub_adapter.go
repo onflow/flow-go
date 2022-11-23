@@ -69,13 +69,13 @@ func (_m *PubSubAdapter) ListPeers(topic string) []peer.ID {
 	return r0
 }
 
-// RegisterTopicValidator provides a mock function with given fields: topic, val
-func (_m *PubSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
-	ret := _m.Called(topic, val)
+// RegisterTopicValidator provides a mock function with given fields: topic, topicValidator
+func (_m *PubSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
+	ret := _m.Called(topic, topicValidator)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, interface{}) error); ok {
-		r0 = rf(topic, val)
+	if rf, ok := ret.Get(0).(func(string, p2p.TopicValidatorFunc) error); ok {
+		r0 = rf(topic, topicValidator)
 	} else {
 		r0 = ret.Error(0)
 	}

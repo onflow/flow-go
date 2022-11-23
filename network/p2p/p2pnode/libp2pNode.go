@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -220,7 +219,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 
 // Subscribe subscribes the node to the given topic and returns the subscription
 // All errors returned from this function can be considered benign.
-func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (p2p.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 

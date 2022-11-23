@@ -4,7 +4,6 @@ import (
 	"context"
 
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -43,7 +42,7 @@ type LibP2PNode interface {
 	// ListPeers returns list of peer IDs for peers subscribed to the topic.
 	ListPeers(topic string) []peer.ID
 	// Subscribe subscribes the node to the given topic and returns the subscription
-	Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (Subscription, error)
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
 	// UnSubscribe cancels the subscriber and closes the topic.
 	UnSubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.

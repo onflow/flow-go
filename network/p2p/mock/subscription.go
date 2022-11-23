@@ -43,6 +43,20 @@ func (_m *Subscription) Next(_a0 context.Context) (*pubsub.Message, error) {
 	return r0, r1
 }
 
+// Topic provides a mock function with given fields:
+func (_m *Subscription) Topic() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewSubscription interface {
 	mock.TestingT
 	Cleanup(func())

@@ -22,23 +22,23 @@ import (
 // AcceptAllTopicValidator pubsub validator func that does not perform any validation, it will only attempt to decode the message and update the
 // rawMsg.ValidatorData needed for further processing by the middleware receive loop. Malformed messages that fail to unmarshal or decode will result
 // in a pubsub.ValidationReject result returned.
-func AcceptAllTopicValidator(lg zerolog.Logger, c network.Codec) pubsub.ValidatorEx {
+func AcceptAllTopicValidator(lg zerolog.Logger, c network.Codec) p2p.TopicValidatorFunc {
 	lg = lg.With().
 		Str("component", "corrupted_libp2pnode_topic_validator").
 		Logger()
 
-	return func(ctx context.Context, from peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
+	return func(ctx context.Context, from peer.ID, rawMsg *pubsub.Message) p2p.ValidationResult {
 		var msg message.Message
 		err := msg.Unmarshal(rawMsg.Data)
 		if err != nil {
 			lg.Err(err).Msg("could not unmarshal raw message data")
-			return pubsub.ValidationReject
+			return p2p.ValidationReject
 		}
 
 		decodedMsgPayload, err := c.Decode(msg.Payload)
 		if err != nil {
 			lg.Err(err).Msg("could not decode message payload")
-			return pubsub.ValidationReject
+			return p2p.ValidationReject
 		}
 
 		rawMsg.ValidatorData = validator.TopicValidatorData{
@@ -47,7 +47,7 @@ func AcceptAllTopicValidator(lg zerolog.Logger, c network.Codec) pubsub.Validato
 			From:              from,
 		}
 
-		return pubsub.ValidationAccept
+		return p2p.ValidationAccept
 	}
 }
 
@@ -60,8 +60,9 @@ type CorruptP2PNode struct {
 
 // Subscribe subscribes the node to the given topic with a noop topic validator.
 // All errors returned from this function can be considered benign.
-func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ pubsub.ValidatorEx) (p2p.Subscription, error) {
-	return n.Node.Subscribe(topic, AcceptAllTopicValidator(n.logger, n.codec))
+func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFunc) (p2p.Subscription, error) {
+	topicValidator := AcceptAllTopicValidator(n.logger, n.codec)
+	return n.Node.Subscribe(topic, topicValidator)
 }
 
 // NewCorruptLibP2PNode returns corrupted libP2PNode that will subscribe to topics using the AcceptAllTopicValidator.

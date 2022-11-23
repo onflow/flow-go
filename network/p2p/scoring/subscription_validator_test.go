@@ -277,7 +277,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{
 		p2pfixtures.MustBePubSubSubscription(t, ver1SubChunks),
 		p2pfixtures.MustBePubSubSubscription(t, ver2SubChunks)})
 

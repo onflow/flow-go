@@ -7,17 +7,19 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p"
 )
 
 type GossipSubAdapter struct {
 	gossipSub *pubsub.PubSub
+	logger    zerolog.Logger
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -29,11 +31,29 @@ func NewGossipSubAdapter(ctx context.Context, h host.Host, cfg p2p.PubSubAdapter
 	}
 	return &GossipSubAdapter{
 		gossipSub: gossipSub,
+		logger:    logger,
 	}, nil
 }
 
-func (g *GossipSubAdapter) RegisterTopicValidator(topic string, val interface{}) error {
-	return g.gossipSub.RegisterTopicValidator(topic, val, pubsub.WithValidatorInline(true))
+func (g *GossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
+	var v pubsub.ValidatorEx = func(ctx context.Context, from peer.ID, message *pubsub.Message) pubsub.ValidationResult {
+		switch result := topicValidator(ctx, from, message); result {
+		case p2p.ValidationAccept:
+			return pubsub.ValidationAccept
+		case p2p.ValidationIgnore:
+			return pubsub.ValidationIgnore
+		case p2p.ValidationReject:
+			return pubsub.ValidationReject
+		default:
+			// should never happen, indicates a bug in the topic validator
+			g.logger.Fatal().Msgf("invalid validation result: %v", result)
+		}
+		// should never happen, indicates a bug in the topic validator, but we need to return something
+		g.logger.Warn().Msg("invalid validation result, returning reject")
+		return pubsub.ValidationReject
+	}
+
+	return g.gossipSub.RegisterTopicValidator(topic, v, pubsub.WithValidatorInline(true))
 }
 
 func (g *GossipSubAdapter) UnregisterTopicValidator(topic string) error {

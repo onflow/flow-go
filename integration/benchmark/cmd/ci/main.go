@@ -212,6 +212,7 @@ func main() {
 		defer wg.Done()
 		dataSlices = recordTransactionData(
 			lg,
+			workerStatsTracker,
 			*sliceSize,
 			runStartTime,
 			gitSha,
@@ -224,6 +225,7 @@ func main() {
 		defer wg.Done()
 		err := adjustTPS(
 			lg,
+			workerStatsTracker,
 			log,
 			adjustInterval,
 			loadCase.tps,
@@ -260,6 +262,7 @@ func main() {
 
 func recordTransactionData(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	sliceDuration time.Duration,
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string,
@@ -271,17 +274,15 @@ func recordTransactionData(
 
 	for {
 		startTime := time.Now()
-		startExecutedTransactions := lg.GetTxExecuted()
-		startSentTransactions := lg.GetTxSent()
+		startStats := workerStatsTracker.GetStats()
 
 		select {
 		case endTime := <-t.C:
-			endExecutedTransaction := lg.GetTxExecuted()
-			endSentTransactions := lg.GetTxSent()
+			endStats := workerStatsTracker.GetStats()
 
 			// calculate this slice
-			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-			inputTps := float64(endSentTransactions-startSentTransactions) / sliceDuration.Seconds()
+			outputTps := float64(endStats.TxsExecuted-startStats.TxsExecuted) / sliceDuration.Seconds()
+			inputTps := float64(endStats.TxsSent-startStats.TxsSent) / sliceDuration.Seconds()
 			dataSlices = append(dataSlices,
 				dataSlice{
 					GitSha:              gitSha,
@@ -291,8 +292,8 @@ func recordTransactionData(
 					EndTime:             endTime,
 					InputTps:            inputTps,
 					OutputTps:           outputTps,
-					StartExecutionCount: startExecutedTransactions,
-					EndExecutionCount:   endExecutedTransaction,
+					StartExecutionCount: startStats.TxsExecuted,
+					EndExecutionCount:   endStats.TxsExecuted,
 					RunStartTime:        runStartTime,
 				})
 
@@ -333,6 +334,7 @@ func sendDataToBigQuery(
 // Target TPS is always bounded by [minTPS, maxTPS].
 func adjustTPS(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	log zerolog.Logger,
 	interval time.Duration,
 	minTPS uint,
@@ -340,34 +342,36 @@ func adjustTPS(
 	maxInflight uint,
 ) error {
 	targetTPS := minTPS
+
+	// Stats for the last round
 	lastTs := time.Now()
 	lastTPS := float64(minTPS)
-	lastTxs := uint(lg.GetTxExecuted())
-	lastTimedoutTxs := lg.GetTxTimedout()
+	lastStats := workerStatsTracker.GetStats()
+	lastTxsExecuted := uint(lastStats.TxsExecuted)
+	lastTxsTimedout := lastStats.TxsTimedout
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
 		// can take a while and lead to uneven feedback intervals.
 		case nowTs := <-time.After(interval):
-			currentSentTxs := lg.GetTxSent()
-			currentTxs := uint(lg.GetTxExecuted())
-			currentTimedoutTxs := lg.GetTxTimedout()
-			// number of timed out transactions in the last interval
-			timedoutTxs := currentTimedoutTxs - lastTimedoutTxs
+			currentStats := workerStatsTracker.GetStats()
 
-			inflight := currentSentTxs - int(currentTxs)
+			// number of timed out transactions in the last interval
+			txsTimedout := currentStats.TxsTimedout - lastTxsTimedout
+
+			inflight := currentStats.TxsSent - currentStats.TxsExecuted
 			inflightPerWorker := inflight / int(targetTPS)
 
 			skip, currentTPS, unboundedTPS := computeTPS(
-				lastTxs,
-				currentTxs,
+				lastTxsExecuted,
+				uint(currentStats.TxsExecuted),
 				lastTs,
 				nowTs,
 				lastTPS,
 				targetTPS,
 				inflight,
 				maxInflight,
-				timedoutTxs > 0,
+				txsTimedout > 0,
 			)
 
 			if skip {
@@ -378,7 +382,7 @@ func adjustTPS(
 					Int("inflightPerWorker", inflightPerWorker).
 					Msg("skipped adjusting TPS")
 
-				lastTxs = currentTxs
+				lastTxsExecuted = uint(currentStats.TxsExecuted)
 				lastTPS = currentTPS
 				lastTs = nowTs
 
@@ -394,7 +398,7 @@ func adjustTPS(
 				Uint("targetTPS", boundedTPS).
 				Int("inflight", inflight).
 				Int("inflightPerWorker", inflightPerWorker).
-				Int("timedoutTxs", timedoutTxs).
+				Int("txsTimedout", txsTimedout).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
@@ -403,11 +407,11 @@ func adjustTPS(
 			}
 
 			targetTPS = boundedTPS
-			lastTimedoutTxs = currentTimedoutTxs
-			//
+			lastTxsTimedout = currentStats.TxsTimedout
+
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
-			//
-			lastTxs = uint(lg.GetTxExecuted())
+			currentStats = workerStatsTracker.GetStats()
+			lastTxsExecuted = uint(currentStats.TxsExecuted)
 			lastTPS = currentTPS
 			lastTs = time.Now()
 		case <-lg.Done():
