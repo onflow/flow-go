@@ -24,13 +24,18 @@ var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
 
 func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
 	var v corrupt.ValidatorEx = func(ctx context.Context, from peer.ID, message *corrupt.Message) corrupt.ValidationResult {
-		switch result := topicValidator(ctx, from, &pubsub.Message{
+		pubsubMsg := &pubsub.Message{
 			Message:       message.Message, // converting corrupt.Message to pubsub.Message
 			ID:            message.ID,
 			ReceivedFrom:  message.ReceivedFrom,
 			ValidatorData: message.ValidatorData,
 			Local:         message.Local,
-		}); result {
+		}
+		result := topicValidator(ctx, from, pubsubMsg)
+
+		// overriding the corrupt.ValidationResult with the result from pubsub.TopicValidatorFunc
+		message.ValidatorData = pubsubMsg.ValidatorData
+		switch result {
 		case p2p.ValidationAccept:
 			return corrupt.ValidationAccept
 		case p2p.ValidationIgnore:
