@@ -359,14 +359,6 @@ func (lg *ContLoadGenerator) Done() <-chan struct{} {
 	return lg.stoppedChannel
 }
 
-func (lg *ContLoadGenerator) GetTxSent() int {
-	return lg.workerStatsTracker.GetTxSent()
-}
-
-func (lg *ContLoadGenerator) GetTxExecuted() int {
-	return lg.workerStatsTracker.GetTxExecuted()
-}
-
 func (lg *ContLoadGenerator) createAccounts(num int) error {
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
@@ -731,6 +723,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			Dur("duration", time.Since(startTime)).
 			Int("availableAccounts", len(lg.availableAccounts)).
 			Msg("transaction lost")
+		lg.workerStatsTracker.IncTxTimedout()
 	}
 	lg.workerStatsTracker.IncTxExecuted()
 }

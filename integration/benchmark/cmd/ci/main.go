@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/benchmark"
+	pb "github.com/onflow/flow-go/integration/benchmark/proto"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,15 +61,20 @@ const (
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
 	// Auto TPS scaling constants
-	additiveIncrease       = 50
-	multiplicativeDecrease = 0.8
+	additiveIncrease       = 100
+	multiplicativeDecrease = 0.9
 	adjustInterval         = 20 * time.Second
+
+	// gRPC constants
+	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
+	defaultGRPCAddress = "127.0.0.1:4777"
 )
 
 func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 
 	// CI relevant flags
+	grpcAddressFlag := flag.String("grpc-address", defaultGRPCAddress, "listen address for gRPC server")
 	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
 	maxTPSFlag := flag.Int("max-tps", *initialTPSFlag, "maximum transactions per second allowed")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
@@ -103,6 +110,26 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	grpcServerOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(defaultMaxMsgSize),
+		grpc.MaxSendMsgSize(defaultMaxMsgSize),
+	}
+	grpcServer := grpc.NewServer(grpcServerOptions...)
+	defer grpcServer.Stop()
+
+	pb.RegisterBenchmarkServer(grpcServer, &benchmarkServer{})
+
+	grpcListener, err := net.Listen("tcp", *grpcAddressFlag)
+	if err != nil {
+		log.Fatal().Err(err).Str("address", *grpcAddressFlag).Msg("failed to listen")
+	}
+
+	go func() {
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatal().Err(err).Msg("failed to serve")
+		}
+	}()
 
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
@@ -185,6 +212,7 @@ func main() {
 		defer wg.Done()
 		dataSlices = recordTransactionData(
 			lg,
+			workerStatsTracker,
 			*sliceSize,
 			runStartTime,
 			gitSha,
@@ -197,6 +225,7 @@ func main() {
 		defer wg.Done()
 		err := adjustTPS(
 			lg,
+			workerStatsTracker,
 			log,
 			adjustInterval,
 			loadCase.tps,
@@ -233,6 +262,7 @@ func main() {
 
 func recordTransactionData(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	sliceDuration time.Duration,
 	runStartTime time.Time,
 	gitSha, goVersion, osVersion string,
@@ -244,17 +274,15 @@ func recordTransactionData(
 
 	for {
 		startTime := time.Now()
-		startExecutedTransactions := lg.GetTxExecuted()
-		startSentTransactions := lg.GetTxSent()
+		startStats := workerStatsTracker.GetStats()
 
 		select {
 		case endTime := <-t.C:
-			endExecutedTransaction := lg.GetTxExecuted()
-			endSentTransactions := lg.GetTxSent()
+			endStats := workerStatsTracker.GetStats()
 
 			// calculate this slice
-			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-			inputTps := float64(endSentTransactions-startSentTransactions) / sliceDuration.Seconds()
+			outputTps := float64(endStats.TxsExecuted-startStats.TxsExecuted) / sliceDuration.Seconds()
+			inputTps := float64(endStats.TxsSent-startStats.TxsSent) / sliceDuration.Seconds()
 			dataSlices = append(dataSlices,
 				dataSlice{
 					GitSha:              gitSha,
@@ -264,8 +292,8 @@ func recordTransactionData(
 					EndTime:             endTime,
 					InputTps:            inputTps,
 					OutputTps:           outputTps,
-					StartExecutionCount: startExecutedTransactions,
-					EndExecutionCount:   endExecutedTransaction,
+					StartExecutionCount: startStats.TxsExecuted,
+					EndExecutionCount:   endStats.TxsExecuted,
 					RunStartTime:        runStartTime,
 				})
 
@@ -306,6 +334,7 @@ func sendDataToBigQuery(
 // Target TPS is always bounded by [minTPS, maxTPS].
 func adjustTPS(
 	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	log zerolog.Logger,
 	interval time.Duration,
 	minTPS uint,
@@ -313,29 +342,36 @@ func adjustTPS(
 	maxInflight uint,
 ) error {
 	targetTPS := minTPS
+
+	// Stats for the last round
 	lastTs := time.Now()
 	lastTPS := float64(minTPS)
-	lastTxs := uint(lg.GetTxExecuted())
+	lastStats := workerStatsTracker.GetStats()
+	lastTxsExecuted := uint(lastStats.TxsExecuted)
+	lastTxsTimedout := lastStats.TxsTimedout
 	for {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
 		// can take a while and lead to uneven feedback intervals.
 		case nowTs := <-time.After(interval):
-			currentSentTxs := lg.GetTxSent()
-			currentTxs := uint(lg.GetTxExecuted())
+			currentStats := workerStatsTracker.GetStats()
 
-			inflight := currentSentTxs - int(currentTxs)
+			// number of timed out transactions in the last interval
+			txsTimedout := currentStats.TxsTimedout - lastTxsTimedout
+
+			inflight := currentStats.TxsSent - currentStats.TxsExecuted
 			inflightPerWorker := inflight / int(targetTPS)
 
 			skip, currentTPS, unboundedTPS := computeTPS(
-				lastTxs,
-				currentTxs,
+				lastTxsExecuted,
+				uint(currentStats.TxsExecuted),
 				lastTs,
 				nowTs,
 				lastTPS,
 				targetTPS,
 				inflight,
 				maxInflight,
+				txsTimedout > 0,
 			)
 
 			if skip {
@@ -346,7 +382,7 @@ func adjustTPS(
 					Int("inflightPerWorker", inflightPerWorker).
 					Msg("skipped adjusting TPS")
 
-				lastTxs = currentTxs
+				lastTxsExecuted = uint(currentStats.TxsExecuted)
 				lastTPS = currentTPS
 				lastTs = nowTs
 
@@ -362,6 +398,7 @@ func adjustTPS(
 				Uint("targetTPS", boundedTPS).
 				Int("inflight", inflight).
 				Int("inflightPerWorker", inflightPerWorker).
+				Int("txsTimedout", txsTimedout).
 				Msg("adjusting TPS")
 
 			err := lg.SetTPS(boundedTPS)
@@ -370,10 +407,11 @@ func adjustTPS(
 			}
 
 			targetTPS = boundedTPS
-			//
+			lastTxsTimedout = currentStats.TxsTimedout
+
 			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
-			//
-			lastTxs = uint(lg.GetTxExecuted())
+			currentStats = workerStatsTracker.GetStats()
+			lastTxsExecuted = uint(currentStats.TxsExecuted)
 			lastTPS = currentTPS
 			lastTs = time.Now()
 		case <-lg.Done():
@@ -391,6 +429,7 @@ func computeTPS(
 	targetTPS uint,
 	inflight int,
 	maxInflight uint,
+	timedout bool,
 ) (bool, float64, uint) {
 	timeDiff := nowTs.Sub(lastTs).Seconds()
 	if timeDiff == 0 {
@@ -399,6 +438,12 @@ func computeTPS(
 
 	currentTPS := float64(currentTxs-lastTxs) / timeDiff
 	unboundedTPS := uint(math.Ceil(currentTPS))
+
+	// If there are timed out transactions we throttle regardless of anything else.
+	// We'll continue to throttle until the timed out transactions are gone.
+	if timedout {
+		return false, currentTPS, uint(float64(targetTPS) * multiplicativeDecrease)
+	}
 
 	// To avoid setting target TPS below current TPS,
 	// we decrease the former one by the multiplicativeDecrease factor.
