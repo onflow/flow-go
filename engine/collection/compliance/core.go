@@ -216,6 +216,12 @@ func (c *Core) processBlockAndDescendants(block *cluster.Block) error {
 			Msg("received invalid block from other node (potential slashing evidence?)")
 		return nil
 	}
+	if engine.IsUnverifiableInputError(err) {
+		c.log.Warn().
+			Err(err).
+			Msg("received unverifiable from other node")
+		return nil
+	}
 	if err != nil {
 		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("failed to process block %x: %w", blockID, err)

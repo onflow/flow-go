@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	DefaultMaxKeySize         = 16_000      // ~16KB
-	DefaultMaxValueSize       = 256_000_000 // ~256MB
-	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+	DefaultMaxKeySize   = 16_000      // ~16KB
+	DefaultMaxValueSize = 256_000_000 // ~256MB
 
 	// Service level keys (owner is empty):
 	UUIDKey         = "uuid"
@@ -91,6 +90,9 @@ func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParamet
 	return newParams
 }
 
+// TODO(patrick): rm once https://github.com/onflow/flow-emulator/pull/245
+// is integrated.
+//
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
 func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
 	newParams := params
