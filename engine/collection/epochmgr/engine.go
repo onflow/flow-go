@@ -192,7 +192,8 @@ func (e *Engine) Ready() <-chan struct{} {
 		finalSnapshot := e.state.Final()
 		phase, err := finalSnapshot.Phase()
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("could not check phase")
+			fmt.Println("fatal error:", "could not check phase", err)
+			panic("could not check phase" + ": " + err.Error())
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
@@ -240,7 +241,8 @@ func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
 		err := e.onEpochTransition(first)
 		if err != nil {
 			// failing to complete epoch transition is a fatal error
-			e.log.Fatal().Err(err).Msg("failed to complete epoch transition")
+			fmt.Println("fatal error:", "failed to complete epoch transition", err)
+			panic("failed to complete epoch transition" + ": " + err.Error())
 		}
 	})
 }

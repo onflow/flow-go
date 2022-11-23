@@ -240,7 +240,8 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.ProcessLocal(event)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -250,7 +251,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -281,7 +283,8 @@ func (e *Engine) loop() {
 		case <-e.messageHandler.GetNotifier():
 			err := e.processAvailableMessages()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				fmt.Println("fatal error:", "internal error processing queued message", err)
+				panic("internal error processing queued message" + ": " + err.Error())
 			}
 		}
 	}

@@ -196,7 +196,8 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.ProcessLocal(event)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -206,7 +207,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -338,7 +340,8 @@ CheckLoop:
 		case <-scan.C:
 			final, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not get last finalized header")
+				fmt.Println("fatal error:", "could not get last finalized header", err)
+				panic("could not get last finalized header" + ": " + err.Error())
 				continue
 			}
 			ranges, batches := e.core.ScanPending(final)

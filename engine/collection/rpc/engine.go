@@ -128,7 +128,8 @@ func (e *Engine) serve() {
 
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to start server")
+		fmt.Println("fatal error:", "failed to start server", err)
+		panic("failed to start server" + ": " + err.Error())
 		return
 	}
 

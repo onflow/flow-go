@@ -82,7 +82,8 @@ func NewRequestHandlerEngine(
 func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 	err := r.ProcessLocal(event)
 	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -92,7 +93,8 @@ func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := r.Process(channel, originID, event)
 	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
+		fmt.Println("fatal error:", "internal error processing event", err)
+		panic("internal error processing event" + ": " + err.Error())
 	}
 }
 
@@ -390,7 +392,8 @@ func (r *RequestHandlerEngine) requestProcessingLoop() {
 		case <-notifier:
 			err := r.processAvailableRequests()
 			if err != nil {
-				r.log.Fatal().Err(err).Msg("internal error processing queued requests")
+				fmt.Println("fatal error:", "internal error processing queued requests", err)
+				panic("internal error processing queued requests" + ": " + err.Error())
 			}
 		}
 	}
