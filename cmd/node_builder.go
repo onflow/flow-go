@@ -313,6 +313,12 @@ type DependencyList struct {
 	components []module.ReadyDoneAware
 }
 
+func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
+	return &DependencyList{
+		components: components,
+	}
+}
+
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.
 func (d *DependencyList) Add(component module.ReadyDoneAware) {
 	d.components = append(d.components, component)
