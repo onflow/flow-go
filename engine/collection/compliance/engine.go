@@ -468,7 +468,7 @@ func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
 			return
 		case err := <-hotstuffErrs:
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+				panic("encountered fatal error in HotStuff")
 			}
 		}
 	}
