@@ -409,8 +409,9 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
 
-		// others keeps the identifier of all nodes except ith node
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID))).NodeIDs()
+		// others keeps the identifier of all nodes except ith node and the node that unregistered from the topic.
+		// nodes without valid topic registration for a channel will reject messages on that channel via unicast.
+		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID, suite.ids[unregisterIndex].NodeID))).NodeIDs()
 
 		if i == unregisterIndex {
 			// assert that unsubscribed engine cannot publish on that topic

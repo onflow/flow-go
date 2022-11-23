@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -22,25 +22,18 @@ import (
 //
 // if KeyWeightThreshold is set to a negative number, signature verification is skipped
 type TransactionVerifier struct {
-	KeyWeightThreshold int
 }
 
-func NewTransactionVerifier(keyWeightThreshold int) *TransactionVerifier {
-	return &TransactionVerifier{
-		KeyWeightThreshold: keyWeightThreshold,
-	}
-}
-
-func (v *TransactionVerifier) Process(
-	ctx Context,
+func (v *TransactionVerifier) CheckAuthorization(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
+	keyWeightThreshold int,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
 	txnState.RunWithAllLimitsDisabled(func() {
-		err = v.verifyTransaction(proc, ctx, txnState)
+		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
 	})
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -50,11 +43,12 @@ func (v *TransactionVerifier) Process(
 }
 
 func (v *TransactionVerifier) verifyTransaction(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
-	ctx Context,
 	txnState *state.TransactionState,
+	keyWeightThreshold int,
 ) error {
-	span := proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMVerifyTransaction)
+	span := proc.StartSpanFromProcTraceSpan(tracer, trace.FVMVerifyTransaction)
 	span.SetAttributes(
 		attribute.String("transaction.ID", proc.ID.String()),
 	)
@@ -80,7 +74,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		return err
 	}
 
-	if v.KeyWeightThreshold < 0 {
+	if keyWeightThreshold < 0 {
 		return nil
 	}
 
@@ -126,22 +120,22 @@ func (v *TransactionVerifier) verifyTransaction(
 			continue
 		}
 		// hasSufficientKeyWeight
-		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
+		if !v.hasSufficientKeyWeight(payloadWeights, addr, keyWeightThreshold) {
 			return errors.NewAccountAuthorizationErrorf(
 				addr,
 				"authorizer account does not have sufficient signatures (%d < %d)",
 				payloadWeights[addr],
-				v.KeyWeightThreshold)
+				keyWeightThreshold)
 		}
 	}
 
-	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
+	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer, keyWeightThreshold) {
 		// TODO change this to payer error (needed for fees)
 		return errors.NewAccountAuthorizationErrorf(
 			tx.Payer,
 			"payer account does not have sufficient signatures (%d < %d)",
 			envelopeWeights[tx.Payer],
-			v.KeyWeightThreshold)
+			keyWeightThreshold)
 	}
 
 	return nil
@@ -219,8 +213,9 @@ func (v *TransactionVerifier) verifyAccountSignature(
 func (v *TransactionVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
 	address flow.Address,
+	keyWeightThreshold int,
 ) bool {
-	return weights[address] >= v.KeyWeightThreshold
+	return weights[address] >= keyWeightThreshold
 }
 
 func (v *TransactionVerifier) sigIsForProposalKey(

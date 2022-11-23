@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -158,12 +158,7 @@ type BaseConfig struct {
 	level                       string
 	metricsPort                 uint
 	BootstrapDir                string
-	profilerEnabled             bool
-	uploaderEnabled             bool
-	profilerDir                 string
-	profilerInterval            time.Duration
-	profilerDuration            time.Duration
-	profilerMemProfileRate      int
+	profilerConfig              profiler.ProfilerConfig
 	tracerEnabled               bool
 	tracerSensitivity           uint
 	MetricsEnabled              bool
@@ -291,18 +286,21 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsDBEnabled: true,
 		level:            "info",
 
-		metricsPort:            8080,
-		profilerEnabled:        false,
-		uploaderEnabled:        false,
-		profilerDir:            "profiler",
-		profilerInterval:       15 * time.Minute,
-		profilerDuration:       10 * time.Second,
-		profilerMemProfileRate: runtime.MemProfileRate,
-		tracerEnabled:          false,
-		tracerSensitivity:      4,
-		MetricsEnabled:         true,
-		receiptsCacheSize:      bstorage.DefaultCacheSize,
-		guaranteesCacheSize:    bstorage.DefaultCacheSize,
+		metricsPort:         8080,
+		tracerEnabled:       false,
+		tracerSensitivity:   4,
+		MetricsEnabled:      true,
+		receiptsCacheSize:   bstorage.DefaultCacheSize,
+		guaranteesCacheSize: bstorage.DefaultCacheSize,
+
+		profilerConfig: profiler.ProfilerConfig{
+			Enabled:         false,
+			UploaderEnabled: false,
+
+			Dir:      "profiler",
+			Interval: 15 * time.Minute,
+			Duration: 10 * time.Second,
+		},
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),
