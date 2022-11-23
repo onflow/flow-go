@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // readSubscriptionCB the callback called when a new message is received on the read subscription
@@ -80,7 +82,11 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		validatorData, ok := rawMsg.ValidatorData.(validator.TopicValidatorData)
 		if !ok {
-			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
+			r.log.Error().
+				Str("raw_msg", rawMsg.String()).
+				Bool(logging.KeySuspicious, true).
+				Str("received_validator_data_type", fmt.Sprintf("%T", rawMsg.ValidatorData)).
+				Msg("[BUG] validator data missing!")
 			return
 		}
 
