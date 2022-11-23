@@ -529,6 +529,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				node.Metrics.Engine,
 				node.State,
 			)
 

@@ -348,6 +348,7 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Log,
 		node.Net,
 		node.Me,
+		node.Metrics,
 		node.State,
 	)
 

@@ -2,6 +2,7 @@ package message_hub
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module/metrics"
 	"math/rand"
 	"sync"
 	"testing"
@@ -137,8 +138,10 @@ func (s *MessageHubSuite) SetupTest() {
 		nil,
 	)
 
+	engineMetrics := metrics.NewNoopCollector()
 	hub, err := NewMessageHub(
 		unittest.Logger(),
+		engineMetrics,
 		s.net,
 		s.me,
 		s.compliance,
