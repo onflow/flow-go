@@ -281,7 +281,7 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
-		debugLogLimit:    1000,
+		debugLogLimit:    2000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,
