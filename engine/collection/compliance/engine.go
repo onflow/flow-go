@@ -134,7 +134,6 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // It informs compliance.Core about finalization of the respective block.
-// We choose to possibly drop notifications rather than block the caller.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
