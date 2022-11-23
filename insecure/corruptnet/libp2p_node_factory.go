@@ -60,12 +60,16 @@ func NewCorruptLibP2PNodeFactory(
 	}
 }
 
+// corruptibleGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
+// github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func corruptibleGossipSubFactory() p2pbuilder.GossipSubFactoryFuc {
 	return func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		return corruptlibp2p.NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
 	}
 }
 
+// corruptibleGossipSubConfigFactory returns a factory function that creates a new instance of the forked gossipsub config
+// from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func corruptibleGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return corruptlibp2p.NewCorruptPubSubAdapterConfig(base)
