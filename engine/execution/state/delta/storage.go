@@ -250,7 +250,7 @@ func (s *RocksStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
 
 func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
 	defer s.wb.Clear()
-	batchSize := 100
+	batchSize := 1000
 	var endIndex int
 	for startIndex := 0; startIndex < len(registers); startIndex += batchSize {
 		endIndex = startIndex + batchSize
@@ -266,6 +266,7 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 			s.wb.Put(k, reg.Value[:])
 		}
 	}
+	time.Sleep(time.Millisecond * 100)
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, blockHeight)
 	s.wb.Put(BadgerStoreHeightKey, buf)
