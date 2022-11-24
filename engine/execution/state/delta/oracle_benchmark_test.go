@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -44,36 +44,36 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 	unittest.RunWithTempDir(b, func(dir string) {
 		b.Logf("badger dir: %s", dir)
-		opts := badger.
-			DefaultOptions(dir).
-			WithKeepL0InMemory(true).
+		// opts := badger.
+		// 	DefaultOptions(dir).
+		// 	WithKeepL0InMemory(true).
 
-			// the ValueLogFileSize option specifies how big the value of a
-			// key-value pair is allowed to be saved into badger.
-			// exceeding this limit, will fail with an error like this:
-			// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-			// Maximum value size is 10G, needed by execution node
-			// TODO: finding a better max value for each node type
-			WithValueLogFileSize(128 << 23).
-			WithValueLogMaxEntries(100000) // Default is 1000000
+		// 	// the ValueLogFileSize option specifies how big the value of a
+		// 	// key-value pair is allowed to be saved into badger.
+		// 	// exceeding this limit, will fail with an error like this:
+		// 	// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+		// 	// Maximum value size is 10G, needed by execution node
+		// 	// TODO: finding a better max value for each node type
+		// 	WithValueLogFileSize(128 << 23).
+		// 	WithValueLogMaxEntries(100000) // Default is 1000000
 
-		db, err := badger.Open(opts)
-		require.NoError(b, err)
-
-		storage, err := delta.NewBadgerStore(db)
-		require.NoError(b, err)
-
-		// bbto := grocksdb.NewDefaultBlockBasedTableOptions()
-		// bbto.SetBlockCache(grocksdb.NewLRUCache(3 << 30))
-
-		// opts := grocksdb.NewDefaultOptions()
-		// opts.SetBlockBasedTableFactory(bbto)
-		// opts.SetCreateIfMissing(true)
-
-		// db, err := grocksdb.OpenDb(opts, dir)
-
-		// storage, err := delta.NewRocksStore(db)
+		// db, err := badger.Open(opts)
 		// require.NoError(b, err)
+
+		// storage, err := delta.NewBadgerStore(db)
+		// require.NoError(b, err)
+
+		bbto := grocksdb.NewDefaultBlockBasedTableOptions()
+		bbto.SetBlockCache(grocksdb.NewLRUCache(3 << 30))
+
+		opts := grocksdb.NewDefaultOptions()
+		opts.SetBlockBasedTableFactory(bbto)
+		opts.SetCreateIfMissing(true)
+
+		db, err := grocksdb.OpenDb(opts, dir)
+
+		storage, err := delta.NewRocksStore(db)
+		require.NoError(b, err)
 
 		owners := testutils.RandomValues(bootstrapSize, keyPartMinByteSize, keyPartMaxByteSize)
 		keys := testutils.RandomValues(bootstrapSize, keyPartMinByteSize, keyPartMaxByteSize)
