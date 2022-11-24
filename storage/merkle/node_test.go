@@ -155,3 +155,28 @@ func TestFullHash(t *testing.T) {
 	// second time returns the cached value
 	require.Equal(t, ref, hex.EncodeToString(f.Hash(true)))
 }
+
+func TestMaxDepthOfDescendants(t *testing.T) {
+	//          full
+	//         /    \
+	//       short  leaf
+	//         |
+	//        full
+	//       /   \
+	//     leaf  short
+	//             |
+	//             leaf
+	f := full{
+		left: &short{
+			child: &full{
+				left: &leaf{},
+				right: &short{
+					child: &leaf{},
+				},
+			},
+		},
+		right: &leaf{},
+	}
+
+	require.Equal(t, f.MaxDepthOfDescendants(), uint(4))
+}
