@@ -591,7 +591,7 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	// parse config log level and apply to logger
 	lvl, err := zerolog.ParseLevel(strings.ToLower(fnb.BaseConfig.level))
 	if err != nil {
-		return fmt.Errorf("invalid log level")
+		return fmt.Errorf("invalid log level: %w", err)
 	}
 
 	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
