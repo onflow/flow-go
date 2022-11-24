@@ -139,6 +139,12 @@ type HotstuffMetrics interface {
 	// SetTCView reports last TC known to Pacemaker.
 	SetTCView(view uint64)
 
+	// CountSkipped counts the number of skips we did.
+	CountSkipped()
+
+	// CountTimeout counts the number of timeouts we had.
+	CountTimeout()
+
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
 

@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/onflow/flow-go/module"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,14 +32,19 @@ type HotstuffCollector struct {
 	waitDuration                  *prometheus.HistogramVec
 	curView                       prometheus.Gauge
 	qcView                        prometheus.Gauge
+	tcView                        prometheus.Gauge
 	skips                         prometheus.Counter
 	timeouts                      prometheus.Counter
 	timeoutDuration               prometheus.Gauge
+	voteProcessingDuration        prometheus.Histogram
+	timeoutProcessingDuration     prometheus.Histogram
 	committeeComputationsDuration prometheus.Histogram
 	signerComputationsDuration    prometheus.Histogram
 	validatorComputationsDuration prometheus.Histogram
 	payloadProductionDuration     prometheus.Histogram
 }
+
+var _ module.HotstuffMetrics = (*HotstuffCollector)(nil)
 
 func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
@@ -84,6 +90,14 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "The view of the newest known qc from HotStuff",
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
+
+		tcView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "tc_view",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "The view of the newest known tc from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -146,6 +160,22 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
+		voteProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "vote_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long VoteAggregator processes one message",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
+		timeoutProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "timeout_object_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long TimeoutAggregator processes one message",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
 	}
 
 	return hc
@@ -166,6 +196,16 @@ func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event 
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
+// CountSkipped counts the number of skips we did.
+func (hc *HotstuffCollector) CountSkipped() {
+	hc.skips.Inc()
+}
+
+// CountTimeout counts the number of timeouts we had.
+func (hc *HotstuffCollector) CountTimeout() {
+	hc.timeouts.Inc()
+}
+
 // SetCurView reports Metrics C8: Current View
 func (hc *HotstuffCollector) SetCurView(view uint64) {
 	hc.curView.Set(float64(view))
@@ -176,14 +216,16 @@ func (hc *HotstuffCollector) SetQCView(view uint64) {
 	hc.qcView.Set(float64(view))
 }
 
-// CountSkipped counts the number of skips we did.
-func (hc *HotstuffCollector) CountSkipped() {
-	hc.skips.Inc()
+func (hc *HotstuffCollector) SetTCView(view uint64) {
+	hc.tcView.Set(float64(view))
 }
 
-// CountTimeout counts the number of timeouts we had.
-func (hc *HotstuffCollector) CountTimeout() {
-	hc.timeouts.Inc()
+func (hc *HotstuffCollector) VoteProcessingDuration(duration time.Duration) {
+	hc.voteProcessingDuration.Observe(duration.Seconds())
+}
+
+func (hc *HotstuffCollector) TimeoutObjectProcessingDuration(duration time.Duration) {
+	hc.timeoutProcessingDuration.Observe(duration.Seconds())
 }
 
 // SetTimeout sets the current timeout duration.
