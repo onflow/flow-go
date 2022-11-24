@@ -1,4 +1,4 @@
-package corruptnet
+package corruptlibp2p
 
 import (
 	"time"
