@@ -727,6 +727,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	).Msg("could not register profiler setting")
 
 	// registering as a DependableComponent with no dependencies so that it's started immediately on startup
+	// without being blocked by other component's Ready()
 	fnb.DependableComponent("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	}, NewDependencyList())
