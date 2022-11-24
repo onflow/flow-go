@@ -148,7 +148,11 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		panic(err)
 	}
 
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
 
 	return &balanceProcessor{
 		vm:       vm,

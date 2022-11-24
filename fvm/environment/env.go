@@ -1,8 +1,6 @@
 package environment
 
 import (
-	"context"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -11,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -102,21 +99,4 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
 	}
-}
-
-func NewScriptEnvironment(
-	ctx context.Context,
-	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
-) Environment {
-	return newScriptFacadeEnvironment(ctx, params, txnState, derivedTxnData)
-}
-
-func NewTransactionEnvironment(
-	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
-) Environment {
-	return newTransactionFacadeEnvironment(params, txnState, derivedTxnData)
 }
