@@ -1018,7 +1018,12 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 	return func() (p2p.LibP2PNode, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
-		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+		libp2pNode, err := p2pbuilder.NewNodeBuilder(
+			builder.Logger,
+			builder.Metrics.Network,
+			builder.PublicNetworkConfig.BindAddress,
+			networkKey,
+			builder.SporkID).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(

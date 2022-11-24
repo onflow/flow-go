@@ -82,22 +82,6 @@ func (_m *Deltas) Has(blockID flow.Identifier) bool {
 	return r0
 }
 
-// Hash provides a mock function with given fields:
-func (_m *Deltas) Hash() flow.Identifier {
-	ret := _m.Called()
-
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Limit provides a mock function with given fields:
 func (_m *Deltas) Limit() uint {
 	ret := _m.Called()

@@ -108,8 +108,3 @@ func (b MapBackData) Entities() []flow.Entity {
 func (b *MapBackData) Clear() {
 	b.entities = make(map[flow.Identifier]flow.Entity)
 }
-
-// Hash returns the merkle root hash of all entities.
-func (b *MapBackData) Hash() flow.Identifier {
-	return flow.MerkleRoot(flow.GetIDs(b.All())...)
-}
