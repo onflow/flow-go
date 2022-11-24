@@ -272,7 +272,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
-			DNSCacheTTL:              dns.DefaultTimeToLive,
+			DNSCacheTTL:                     dns.DefaultTimeToLive,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
