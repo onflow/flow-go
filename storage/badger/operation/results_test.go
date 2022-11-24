@@ -41,60 +41,63 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		height3 := uint64(55)
 		eventType := flow.ServiceEventCommit
 
-		t.Run("inserting 3 results at different height each has a ServiceEventCommit", func(t *testing.T) {
+		// inserting 3 results at different height each has a ServiceEventCommit
+		err := db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result1.ID(), eventType, height1))
+		require.NoError(t, err)
 
-			err := db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result1.ID(), eventType, height1))
-			require.NoError(t, err)
+		err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result2.ID(), eventType, height2))
+		require.NoError(t, err)
 
-			err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result2.ID(), eventType, height2))
-			require.NoError(t, err)
-
-			err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result3.ID(), eventType, height3))
-			require.NoError(t, err)
-		})
+		err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result3.ID(), eventType, height3))
+		require.NoError(t, err)
 
 		t.Run("retrieve exact height match", func(t *testing.T) {
-			var actualResults flow.Identifier
-			err := db.View(LookupLastExecutionResultForServiceEventType(height1, eventType, &actualResults))
+			//t.Parallel()
+			var actualResult flow.Identifier
+			err := db.View(LookupLastExecutionResultForServiceEventType(height1, eventType, &actualResult))
 			require.NoError(t, err)
-			require.Equal(t, result1.ID(), actualResults)
+			require.Equal(t, result1.ID(), actualResult)
 
-			err = db.View(LookupLastExecutionResultForServiceEventType(height2, eventType, &actualResults))
+			err = db.View(LookupLastExecutionResultForServiceEventType(height2, eventType, &actualResult))
 			require.NoError(t, err)
-			require.Equal(t, result2.ID(), actualResults)
+			require.Equal(t, result2.ID(), actualResult)
 
-			err = db.View(LookupLastExecutionResultForServiceEventType(height3, eventType, &actualResults))
+			err = db.View(LookupLastExecutionResultForServiceEventType(height3, eventType, &actualResult))
 			require.NoError(t, err)
-			require.Equal(t, result3.ID(), actualResults)
+			require.Equal(t, result3.ID(), actualResult)
 		})
 
 		t.Run("different event type retrieve nothing", func(t *testing.T) {
-			var actualResults flow.Identifier
-			err := db.View(LookupLastExecutionResultForServiceEventType(height1, flow.ServiceEventSetup, &actualResults))
+			//t.Parallel()
+			var actualResult flow.Identifier
+			err := db.View(LookupLastExecutionResultForServiceEventType(height1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("finds highest but not higher than given", func(t *testing.T) {
-
-			var actualResults flow.Identifier
-			err := db.View(LookupLastExecutionResultForServiceEventType(height3-1, eventType, &actualResults))
+			//t.Parallel()
+			var actualResult flow.Identifier
+			err := db.View(LookupLastExecutionResultForServiceEventType(height3-1, eventType, &actualResult))
 			require.NoError(t, err)
-			require.Equal(t, result2.ID(), actualResults)
+			require.Equal(t, result2.ID(), actualResult)
 		})
 
 		t.Run("finds highest", func(t *testing.T) {
-
-			var actualResults flow.Identifier
-			err := db.View(LookupLastExecutionResultForServiceEventType(height3+1, eventType, &actualResults))
+			//t.Parallel()
+			var actualResult flow.Identifier
+			err := db.View(LookupLastExecutionResultForServiceEventType(height3+1, eventType, &actualResult))
 			require.NoError(t, err)
-			require.Equal(t, result3.ID(), actualResults)
+			require.Equal(t, result3.ID(), actualResult)
 		})
 
 		t.Run("height below lowest entry returns nothing", func(t *testing.T) {
-			var actualResults flow.Identifier
-			err := db.View(LookupLastExecutionResultForServiceEventType(height1-1, flow.ServiceEventSetup, &actualResults))
+			//t.Parallel()
+			var actualResult flow.Identifier
+			err := db.View(LookupLastExecutionResultForServiceEventType(height1-1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
+
+		t.Parallel()
 
 	})
 }
