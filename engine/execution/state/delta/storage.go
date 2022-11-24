@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/linxGnu/grocksdb"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -127,7 +127,7 @@ func (s *BadgerStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
 
 func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
 
-	batchSize := 100
+	batchSize := 1000
 	var endIndex int
 	for startIndex := 0; startIndex < len(registers); startIndex += batchSize {
 		endIndex = startIndex + batchSize
@@ -165,107 +165,108 @@ func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEnt
 		if err != nil {
 			return err
 		}
+		time.Sleep(time.Millisecond * 100)
 	}
 	return nil
 }
 
-type RocksStore struct {
-	db *grocksdb.DB
-	ro *grocksdb.ReadOptions
-	wo *grocksdb.WriteOptions
-	wb *grocksdb.WriteBatch
-}
+// type RocksStore struct {
+// 	db *grocksdb.DB
+// 	ro *grocksdb.ReadOptions
+// 	wo *grocksdb.WriteOptions
+// 	wb *grocksdb.WriteBatch
+// }
 
-var _ Storage = &RocksStore{}
+// var _ Storage = &RocksStore{}
 
-func NewRocksStore(db *grocksdb.DB) (*RocksStore, error) {
-	store := &RocksStore{db: db,
-		ro: grocksdb.NewDefaultReadOptions(),
-		wo: grocksdb.NewDefaultWriteOptions(),
-		wb: grocksdb.NewWriteBatch(),
-	}
-	err := store.initHeight()
-	return store, err
-}
+// func NewRocksStore(db *grocksdb.DB) (*RocksStore, error) {
+// 	store := &RocksStore{db: db,
+// 		ro: grocksdb.NewDefaultReadOptions(),
+// 		wo: grocksdb.NewDefaultWriteOptions(),
+// 		wb: grocksdb.NewWriteBatch(),
+// 	}
+// 	err := store.initHeight()
+// 	return store, err
+// }
 
-func (s *RocksStore) GetRegister(key flow.RegisterID) (val flow.RegisterValue, found bool, err error) {
-	k := []byte(key.String())
-	value, err := s.db.Get(s.ro, k)
-	if err != nil {
-		return
-	}
-	defer value.Free()
+// func (s *RocksStore) GetRegister(key flow.RegisterID) (val flow.RegisterValue, found bool, err error) {
+// 	k := []byte(key.String())
+// 	value, err := s.db.Get(s.ro, k)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer value.Free()
 
-	v := value.Data()
-	if len(v) == 0 {
-		found = false
-		return
-	}
-	val = flow.RegisterValue(v)
-	return
-}
+// 	v := value.Data()
+// 	if len(v) == 0 {
+// 		found = false
+// 		return
+// 	}
+// 	val = flow.RegisterValue(v)
+// 	return
+// }
 
-func (s *RocksStore) BlockHeight() (height uint64, err error) {
-	value, err := s.db.Get(s.ro, BadgerStoreHeightKey)
-	if err != nil {
-		return
-	}
-	defer value.Free()
+// func (s *RocksStore) BlockHeight() (height uint64, err error) {
+// 	value, err := s.db.Get(s.ro, BadgerStoreHeightKey)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer value.Free()
 
-	v := value.Data()
+// 	v := value.Data()
 
-	if len(v) == 0 {
-		err = errors.New("value not found for the block height")
-		return
-	}
-	height = uint64(binary.BigEndian.Uint64(v))
-	return
-}
+// 	if len(v) == 0 {
+// 		err = errors.New("value not found for the block height")
+// 		return
+// 	}
+// 	height = uint64(binary.BigEndian.Uint64(v))
+// 	return
+// }
 
-func (s *RocksStore) initHeight() error {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, 0)
-	return s.db.Put(s.wo, BadgerStoreHeightKey, buf)
-}
+// func (s *RocksStore) initHeight() error {
+// 	buf := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(buf, 0)
+// 	return s.db.Put(s.wo, BadgerStoreHeightKey, buf)
+// }
 
-func (s *RocksStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
-	defer s.wb.Clear()
-	for key, value := range delta.Data {
-		k := []byte(key.String())
-		if len(value) == 0 {
-			s.wb.Delete([]byte(k))
-			continue
-		}
-		s.wb.Put(k, value[:])
-	}
+// func (s *RocksStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
+// 	defer s.wb.Clear()
+// 	for key, value := range delta.Data {
+// 		k := []byte(key.String())
+// 		if len(value) == 0 {
+// 			s.wb.Delete([]byte(k))
+// 			continue
+// 		}
+// 		s.wb.Put(k, value[:])
+// 	}
 
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, blockHeight)
-	s.wb.Put(BadgerStoreHeightKey, buf)
+// 	buf := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(buf, blockHeight)
+// 	s.wb.Put(BadgerStoreHeightKey, buf)
 
-	return s.db.Write(s.wo, s.wb)
-}
+// 	return s.db.Write(s.wo, s.wb)
+// }
 
-func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
-	defer s.wb.Clear()
-	batchSize := 100
-	var endIndex int
-	for startIndex := 0; startIndex < len(registers); startIndex += batchSize {
-		endIndex = startIndex + batchSize
-		if endIndex > len(registers) {
-			endIndex = len(registers)
-		}
-		for _, reg := range registers[startIndex:endIndex] {
-			k := []byte(reg.Key.String())
-			if len(reg.Value) == 0 {
-				s.wb.Delete([]byte(k))
-				continue
-			}
-			s.wb.Put(k, reg.Value[:])
-		}
-	}
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, blockHeight)
-	s.wb.Put(BadgerStoreHeightKey, buf)
-	return s.db.Write(s.wo, s.wb)
-}
+// func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
+// 	defer s.wb.Clear()
+// 	batchSize := 100
+// 	var endIndex int
+// 	for startIndex := 0; startIndex < len(registers); startIndex += batchSize {
+// 		endIndex = startIndex + batchSize
+// 		if endIndex > len(registers) {
+// 			endIndex = len(registers)
+// 		}
+// 		for _, reg := range registers[startIndex:endIndex] {
+// 			k := []byte(reg.Key.String())
+// 			if len(reg.Value) == 0 {
+// 				s.wb.Delete([]byte(k))
+// 				continue
+// 			}
+// 			s.wb.Put(k, reg.Value[:])
+// 		}
+// 	}
+// 	buf := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(buf, blockHeight)
+// 	s.wb.Put(BadgerStoreHeightKey, buf)
+// 	return s.db.Write(s.wo, s.wb)
+// }
