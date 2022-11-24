@@ -344,7 +344,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
 
-	// create a t which disables port reuse and web socket.
+	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
