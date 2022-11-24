@@ -145,7 +145,7 @@ func (n *leaf) Hash(cacheEnabled bool) []byte {
 }
 
 func (n *leaf) MaxDepthOfDescendants() uint {
-	return 1
+	return 0
 }
 
 // Dummy Node
