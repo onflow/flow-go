@@ -61,6 +61,7 @@ func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error
 	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }
 
+// Returns storage.ErrNotFound if no service events for the given type exist at or below the given height.
 func LookupLastExecutionResultForServiceEventType(height uint64, eventType string, resultID *flow.Identifier) func(*badger.Txn) error {
 	return findOneHighestButNoHigher(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType)), height, resultID)
 }
