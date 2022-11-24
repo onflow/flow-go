@@ -229,7 +229,15 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// we expect 5 messages to be processed the rest will be rate limited
 	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
 
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, testutils.WithUnicastRateLimiters(rateLimiters), testutils.WithNetworkMetrics(netmet))
+	mws, providers := testutils.GenerateMiddlewares(
+		m.T(),
+		m.logger,
+		ids,
+		libP2PNodes,
+		unittest.NetworkCodec(),
+		m.slashingViolationsConsumer,
+		testutils.WithUnicastRateLimiters(rateLimiters),
+		testutils.WithNetworkMetrics(netmet))
 
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
