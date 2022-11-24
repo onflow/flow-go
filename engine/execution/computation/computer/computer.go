@@ -442,16 +442,6 @@ func (e *blockComputer) executeTransaction(
 			err)
 	}
 
-	txResult := flow.TransactionResult{
-		TransactionID:   tx.ID,
-		ComputationUsed: tx.ComputationUsed,
-		MemoryUsed:      tx.MemoryEstimate,
-	}
-
-	if tx.Err != nil {
-		txResult.ErrorMessage = tx.Err.Error()
-	}
-
 	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
 	defer postProcessSpan.End()
 
@@ -464,20 +454,15 @@ func (e *blockComputer) executeTransaction(
 			txID.String(), err)
 	}
 
-	res.AddEvents(collectionIndex, tx.Events)
-	res.AddServiceEvents(tx.ServiceEvents)
-	res.AddTransactionResult(&txResult)
-	if tx.IsSampled() {
-		res.MergeComputationEffortVector(tx.ComputationIntensities)
-	}
+	res.AddTransactionResult(collectionIndex, tx)
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
 	lg := e.log.With().
-		Hex("tx_id", txResult.TransactionID[:]).
+		Str("tx_id", txID.String()).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
-		Uint64("computation_used", txResult.ComputationUsed).
+		Uint64("computation_used", tx.ComputationUsed).
 		Uint64("memory_used", tx.MemoryEstimate).
 		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
@@ -485,9 +470,9 @@ func (e *blockComputer) executeTransaction(
 
 	if tx.Err != nil {
 		lg.Info().
-			Str("error_message", txResult.ErrorMessage).
+			Str("error_message", tx.Err.Error()).
 			Uint16("error_code", uint16(tx.Err.Code())).
-			Msg("transaction executed failed")
+			Msg("transaction execution failed")
 	} else {
 		lg.Info().Msg("transaction executed successfully")
 	}
