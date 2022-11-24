@@ -20,8 +20,8 @@ type node interface {
 	// when cacheEnabled is also set for the future calls.
 	Hash(cacheEnabled bool) []byte
 
-	// MaxDepthOfDescendants returns the maximum depth, length of longest path from this node to any of the leaf nodes
-	// stored under the subtree (having this node as root)
+	// MaxDepthOfDescendants returns the length of the longest path from this node to any of the decedent leaf nodes,
+	// i.e. it returns the maximum depth of the subtree under this node.
 	MaxDepthOfDescendants() uint
 }
 

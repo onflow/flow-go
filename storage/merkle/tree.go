@@ -72,8 +72,10 @@ func (t *Tree) MakeItReadOnly() {
 	t.readOnlyEnabled = true
 }
 
-// ComputeMaxDepth returns the maximum depth of the tree by traversing all
-// paths (this could be a very expensive operation for large trees)
+// ComputeMaxDepth returns the maximum depth of the tree by traversing all paths
+//
+// Warning: this could be a very expensive operation for large trees, as nodes
+// don't cache the depth of children and have to compute by traversing.
 func (t *Tree) ComputeMaxDepth() uint {
 	return t.root.MaxDepthOfDescendants()
 }
