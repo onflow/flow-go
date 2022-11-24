@@ -109,6 +109,10 @@ func NodeFixture(
 		builder.SetPeerManagerOptions(parameters.ConnectionPruning, parameters.UpdateInterval)
 	}
 
+	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
+		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -143,6 +147,8 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
+	GossipSubFactory   p2pbuilder.GossipSubFactoryFuc
+	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {

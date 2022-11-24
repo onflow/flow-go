@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
+	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -91,23 +91,23 @@ func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
 	return c.router
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *internal.CorruptGossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
-		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
+		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
 	// initializes a default gossipsub router and wraps it with the corrupt router.
 	router, err := corrupt.DefaultGossipSubRouter(h)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub router: %w", err)
+		return nil, nil, fmt.Errorf("failed to create gossipsub router: %w", err)
 	}
 	corruptRouter := internal.NewCorruptGossipSubRouter(router)
 
 	// injects the corrupt router into the gossipsub constructor
 	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, corruptRouter, gossipSubConfig.Build()...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
+		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
 	adapter := &CorruptGossipSubAdapter{
@@ -116,5 +116,5 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		logger:    logger,
 	}
 
-	return adapter, nil
+	return adapter, corruptRouter, nil
 }

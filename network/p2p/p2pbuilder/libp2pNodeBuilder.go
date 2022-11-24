@@ -9,7 +9,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -67,11 +66,6 @@ func DefaultLibP2PNodeFactory(
 		builder := DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
 		return builder.Build()
 	}
-}
-
-// DefaultMessageIDFunction returns a default message ID function based on the message's data
-func DefaultMessageIDFunction(msg *pb.Message) string {
-	return utils.MessageID(msg.Data)
 }
 
 type NodeBuilder interface {
