@@ -156,7 +156,9 @@ func TestFullHash(t *testing.T) {
 	require.Equal(t, ref, hex.EncodeToString(f.Hash(true)))
 }
 
+// TestMaxDepthOfDescendants validates the functionality of the max depth of the decendencts
 func TestMaxDepthOfDescendants(t *testing.T) {
+	////   consturcted trie
 	//          full
 	//         /    \
 	//       short  leaf
@@ -166,6 +168,8 @@ func TestMaxDepthOfDescendants(t *testing.T) {
 	//     leaf  short
 	//             |
 	//             leaf
+	////
+
 	f := full{
 		left: &short{
 			child: &full{
