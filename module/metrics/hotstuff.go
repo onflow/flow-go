@@ -11,11 +11,11 @@ import (
 
 // HotStuff Metrics
 const (
-	HotstuffEventTypeTimeout    = "timeout"
-	HotstuffEventTypeOnProposal = "onproposal"
-	HotstuffEventTypeOnVote     = "onvote"
-	HotstuffEventTypeOnQC       = "onqc"
-	HotstuffEventTypeOnTC       = "ontc"
+	HotstuffEventTypeLocalTimeout = "localtimeout"
+	HotstuffEventTypeOnProposal   = "onproposal"
+	HotstuffEventTypeOnQC         = "onqc"
+	HotstuffEventTypeOnTC         = "ontc"
+	HotstuffEventTypeOnPartialTc  = "onpartialtc"
 )
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
@@ -166,12 +166,12 @@ func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event 
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
-// HotstuffCollector reports Metrics C8: Current View
+// SetCurView reports Metrics C8: Current View
 func (hc *HotstuffCollector) SetCurView(view uint64) {
 	hc.curView.Set(float64(view))
 }
 
-// NewestKnownQC reports Metrics C9: View of Newest Known QC
+// SetQCView reports Metrics C9: View of Newest Known QC
 func (hc *HotstuffCollector) SetQCView(view uint64) {
 	hc.qcView.Set(float64(view))
 }

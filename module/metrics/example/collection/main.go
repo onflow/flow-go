@@ -37,8 +37,8 @@ func main() {
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())
-			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
-			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
+			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeLocalTimeout)
+			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffIdleDuration(10)
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))
