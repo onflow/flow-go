@@ -144,7 +144,11 @@ func newScriptExecutor(
 		proc:           proc,
 		txnState:       txnState,
 		derivedTxnData: derivedTxnData,
-		env:            NewScriptEnv(proc.RequestContext, ctx, txnState, derivedTxnData),
+		env: environment.NewScriptEnvironment(
+			proc.RequestContext,
+			ctx.EnvironmentParams,
+			txnState,
+			derivedTxnData),
 	}
 }
 

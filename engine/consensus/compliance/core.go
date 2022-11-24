@@ -241,7 +241,6 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 	if engine.IsInvalidInputError(err) {
 		c.log.Warn().
 			Err(err).
-			Bool(logging.KeySuspicious, true).
 			Msg("received invalid block from other node (potential slashing evidence?)")
 		return nil
 	}

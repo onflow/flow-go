@@ -108,13 +108,15 @@ func newTransactionExecutor(
 		trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	env := NewTransactionEnvironment(
-		ctx,
+	ctx.RootSpan = span
+	ctx.TxIndex = proc.TxIndex
+	ctx.TxId = proc.Transaction.ID()
+	ctx.TxBody = proc.Transaction
+
+	env := environment.NewTransactionEnvironment(
+		ctx.EnvironmentParams,
 		txnState,
-		derivedTxnData,
-		proc.Transaction,
-		proc.TxIndex,
-		span)
+		derivedTxnData)
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
