@@ -31,7 +31,7 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 	g.options = append(g.options, pubsub.WithSubscriptionFilter(filter))
 }
 
-func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOption) {
+func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
 	g.options = append(g.options, option.BuildFlowPubSubScoreOption())
 }
 

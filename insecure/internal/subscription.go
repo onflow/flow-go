@@ -43,7 +43,7 @@ func (c *CorruptSubscription) Next(ctx context.Context) (*pubsub.Message, error)
 	// we read a corrupt.Message from the corrupt.Subscription, however, we need to return
 	// a pubsub.Message to the caller of this function, so we need to convert the corrupt.Message.
 	// Flow codebase uses the original libp2p pubsub module, and the pubsub.Message is defined
-	// in the original libp2p pubsub module, so we cannot use the corrupt.Message in the Flow codebase. 
+	// in the original libp2p pubsub module, so we cannot use the corrupt.Message in the Flow codebase.
 	return &pubsub.Message{
 		Message:       m.Message,
 		ID:            m.ID,

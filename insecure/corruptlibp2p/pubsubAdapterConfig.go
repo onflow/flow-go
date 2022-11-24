@@ -38,7 +38,7 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 	c.options = append(c.options, corrupt.WithSubscriptionFilter(filter))
 }
 
-func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOption) {
+func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 	// Corrupt does not support score options. This is a no-op.
 }
 

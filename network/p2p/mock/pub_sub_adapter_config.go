@@ -25,7 +25,7 @@ func (_m *PubSubAdapterConfig) WithRoutingDiscovery(_a0 routing.ContentRouting) 
 }
 
 // WithScoreOption provides a mock function with given fields: _a0
-func (_m *PubSubAdapterConfig) WithScoreOption(_a0 p2p.ScoreOption) {
+func (_m *PubSubAdapterConfig) WithScoreOption(_a0 p2p.ScoreOptionBuilder) {
 	_m.Called(_a0)
 }
 
