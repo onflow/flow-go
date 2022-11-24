@@ -265,6 +265,8 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 			}
 			s.wb.Put(k, reg.Value[:])
 		}
+		s.db.Write(s.wo, s.wb)
+		s.wb.Clear()
 	}
 	time.Sleep(time.Millisecond * 300)
 	buf := make([]byte, 8)
