@@ -158,7 +158,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)

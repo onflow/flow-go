@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
+// ValueComputer is used by BlockDerivedData's GetOrCompute to compute the
+// derived value when the value is not in BlockDerivedData (i.e., "cache miss").
+type ValueComputer[TKey any, TVal any] interface {
+	Compute(txnState *state.TransactionState, key TKey) (TVal, error)
+}
+
 type invalidatableEntry[TVal any] struct {
 	Value TVal         // immutable after initialization.
 	State *state.State // immutable after initialization.
@@ -364,7 +370,7 @@ func (txn *TransactionDerivedData[TKey, TVal]) Set(
 func (txn *TransactionDerivedData[TKey, TVal]) GetOrCompute(
 	txnState *state.TransactionState,
 	key TKey,
-	valFunc func(txnState *state.TransactionState, key TKey) (TVal, error),
+	computer ValueComputer[TKey, TVal],
 ) (
 	TVal,
 	error,
@@ -388,7 +394,7 @@ func (txn *TransactionDerivedData[TKey, TVal]) GetOrCompute(
 		return defaultVal, fmt.Errorf("failed to start nested txn: %w", err)
 	}
 
-	val, err = valFunc(txnState, key)
+	val, err = computer.Compute(txnState, key)
 	if err != nil {
 		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}

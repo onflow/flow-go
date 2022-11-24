@@ -91,6 +91,8 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		lg := log.With().
 			Str("peer_id", from.String()).
 			Str("topic", rawMsg.GetTopic()).
+			Int("raw_msg_size", len(rawMsg.Data)).
+			Int("msg_size", msg.Size()).
 			Logger()
 
 		// verify sender is a known peer
