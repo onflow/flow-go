@@ -130,23 +130,28 @@ type HotstuffMetrics interface {
 	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffWaitDuration(duration time.Duration, event string)
 
-	// SetCurView reports Metrics C8: Current View
+	// SetCurView reports Metrics C8: Current View maintained by Pacemaker.
 	SetCurView(view uint64)
 
-	// SetQCView reports Metrics C9: View of Newest Known QC
+	// SetQCView reports Metrics C9: View of the newest QC known to Pacemaker.
 	SetQCView(view uint64)
 
-	// CountSkipped reports the number of times we skipped ahead.
-	CountSkipped()
-
-	// CountTimeout reports the number of times we timed out.
-	CountTimeout()
+	// SetTCView reports last TC known to Pacemaker.
+	SetTCView(view uint64)
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
 
+	// VoteProcessingDuration measures the time which the hotstuff.VoteAggregator
+	// spends to process one vote.
+	VoteProcessingDuration(duration time.Duration)
+
+	// TimeoutObjectProcessingDuration measures the time which the hotstuff.TimeoutAggregator
+	// spends to process one timeout object.
+	TimeoutObjectProcessingDuration(duration time.Duration)
+
 	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
-	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// spends in the hotstuff.Replicas component, i.e. the time determining consensus
 	// committee relations.
 	CommitteeProcessingDuration(duration time.Duration)
 

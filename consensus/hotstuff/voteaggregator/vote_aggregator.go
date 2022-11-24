@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -34,6 +35,7 @@ const defaultBlockQueueCapacity = 1000
 type VoteAggregator struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
+	hotstuffMetrics            module.HotstuffMetrics
 	notifier                   hotstuff.Consumer
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
@@ -52,8 +54,9 @@ var _ component.Component = (*VoteAggregator)(nil)
 // different voting formats of main Consensus vs Collector consensus.
 func NewVoteAggregator(
 	log zerolog.Logger,
-	notifier hotstuff.Consumer,
+	hotstuffMetrics module.HotstuffMetrics,
 	mempoolMetrics module.MempoolMetrics,
+	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
@@ -71,6 +74,7 @@ func NewVoteAggregator(
 
 	aggregator := &VoteAggregator{
 		log:                        log,
+		hotstuffMetrics:            hotstuffMetrics,
 		notifier:                   notifier,
 		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
 		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
@@ -161,7 +165,11 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 		msg, ok = va.queuedVotes.Pop()
 		if ok {
 			vote := msg.(*model.Vote)
+			startTime := time.Now()
 			err := va.processQueuedVote(vote)
+			// report duration of processing one vote
+			va.hotstuffMetrics.VoteProcessingDuration(time.Since(startTime))
+
 			if err != nil {
 				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
 			}

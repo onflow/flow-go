@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -32,6 +33,7 @@ type TimeoutAggregator struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
 	log                    zerolog.Logger
+	hotstuffMetrics        module.HotstuffMetrics
 	notifier               hotstuff.Consumer
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
@@ -47,6 +49,7 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
+	hotstuffMetrics module.HotstuffMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
@@ -59,6 +62,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 
 	aggregator := &TimeoutAggregator{
 		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
+		hotstuffMetrics:        hotstuffMetrics,
 		notifier:               notifier,
 		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:             collectors,
@@ -122,7 +126,12 @@ func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) err
 		}
 
 		timeoutObject := msg.(*model.TimeoutObject)
+		startTime := time.Now()
+
 		err := t.processQueuedTimeout(timeoutObject)
+		// report duration of processing one timeout object
+		t.hotstuffMetrics.TimeoutObjectProcessingDuration(time.Since(startTime))
+
 		if err != nil {
 			return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
 		}

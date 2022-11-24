@@ -22,16 +22,14 @@ func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	}
 }
 
-func (c *MetricsConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
+func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+	c.metrics.SetCurView(newView)
 	c.metrics.SetQCView(qc.View)
 }
 
-func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
-	c.metrics.CountSkipped()
-}
-
-func (c *MetricsConsumer) OnReachedTimeout(timeout model.TimerInfo) {
-	c.metrics.CountTimeout()
+func (c *MetricsConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	c.metrics.SetCurView(newView)
+	c.metrics.SetTCView(tc.View)
 }
 
 func (c *MetricsConsumer) OnStartingTimeout(info model.TimerInfo) {
