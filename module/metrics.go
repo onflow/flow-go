@@ -82,6 +82,7 @@ type EngineMetrics interface {
 	MessageSent(engine string, message string)
 	MessageReceived(engine string, message string)
 	MessageHandled(engine string, messages string)
+	MessageDropped(engine string, messages string)
 }
 
 type ComplianceMetrics interface {
