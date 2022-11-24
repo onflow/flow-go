@@ -583,6 +583,7 @@ func main() {
 			voteAggregator, err := consensus.NewVoteAggregator(
 				node.Logger,
 				mainMetrics,
+				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
@@ -597,6 +598,7 @@ func main() {
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
 				mainMetrics,
+				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				notifier,
 				timeoutProcessorFactory,

@@ -34,6 +34,7 @@ type HotStuffFactory struct {
 	me             module.Local
 	db             *badger.DB
 	protoState     protocol.State
+	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
 	createMetrics  HotStuffMetricsFunc
 	opts           []consensus.Option
@@ -44,6 +45,7 @@ func NewHotStuffFactory(
 	me module.Local,
 	db *badger.DB,
 	protoState protocol.State,
+	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	createMetrics HotStuffMetricsFunc,
 	opts ...consensus.Option,
@@ -54,6 +56,7 @@ func NewHotStuffFactory(
 		me:             me,
 		db:             db,
 		protoState:     protoState,
+		engineMetrics:  engineMetrics,
 		mempoolMetrics: mempoolMetrics,
 		createMetrics:  createMetrics,
 		opts:           opts,
@@ -118,6 +121,7 @@ func (f *HotStuffFactory) CreateModules(
 	voteAggregator, err := consensus.NewVoteAggregator(
 		f.log,
 		metrics,
+		f.engineMetrics,
 		f.mempoolMetrics,
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
@@ -136,6 +140,7 @@ func (f *HotStuffFactory) CreateModules(
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		f.log,
 		metrics,
+		f.engineMetrics,
 		f.mempoolMetrics,
 		notifier,
 		timeoutProcessorFactory,

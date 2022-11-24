@@ -36,7 +36,9 @@ const (
 	EngineSealing             = "sealing"
 	EngineSynchronization     = "sync"
 	// common
-	EngineFollower = "follower"
+	EngineFollower          = "follower"
+	EngineVoteAggregator    = "vote_aggregator"
+	EngineTimeoutAggregator = "timeout_aggregator"
 )
 
 const (

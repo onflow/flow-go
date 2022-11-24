@@ -34,6 +34,7 @@ type TimeoutAggregator struct {
 	notifications.NoopConsumer
 	log                    zerolog.Logger
 	hotstuffMetrics        module.HotstuffMetrics
+	engineMetrics          module.EngineMetrics
 	notifier               hotstuff.Consumer
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
@@ -49,6 +50,7 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
@@ -63,6 +65,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	aggregator := &TimeoutAggregator{
 		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
 		hotstuffMetrics:        hotstuffMetrics,
+		engineMetrics:          engineMetrics,
 		notifier:               notifier,
 		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:             collectors,
@@ -185,7 +188,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("drop stale timeouts")
-
+		t.engineMetrics.MessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 
@@ -196,6 +199,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("no queue capacity, dropping timeout")
+		t.engineMetrics.MessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 	t.queuedTimeoutsNotifier.Notify()

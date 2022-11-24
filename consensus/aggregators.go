@@ -20,6 +20,7 @@ import (
 func NewVoteAggregator(
 	log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
@@ -31,7 +32,15 @@ func NewVoteAggregator(
 	voteCollectors := voteaggregator.NewVoteCollectors(log, lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	aggregator, err := voteaggregator.NewVoteAggregator(log, hotstuffMetrics, mempoolMetrics, notifier, lowestRetainedView, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(
+		log,
+		hotstuffMetrics,
+		engineMetrics,
+		mempoolMetrics,
+		notifier,
+		lowestRetainedView,
+		voteCollectors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
@@ -44,6 +53,7 @@ func NewVoteAggregator(
 // No error returns are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	notifier *pubsub.Distributor,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
@@ -55,7 +65,15 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	collectors := timeoutaggregator.NewTimeoutCollectors(log, lowestRetainedView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	aggregator, err := timeoutaggregator.NewTimeoutAggregator(log, hotstuffMetrics, mempoolMetrics, notifier, lowestRetainedView, collectors)
+	aggregator, err := timeoutaggregator.NewTimeoutAggregator(
+		log,
+		hotstuffMetrics,
+		engineMetrics,
+		mempoolMetrics,
+		notifier,
+		lowestRetainedView,
+		collectors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}
