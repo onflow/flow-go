@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
@@ -44,7 +45,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
+		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
