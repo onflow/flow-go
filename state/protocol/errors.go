@@ -44,15 +44,15 @@ func IsIdentityNotFound(err error) bool {
 }
 
 type InvalidBlockTimestampError struct {
-	err error
+	error
 }
 
 func (e InvalidBlockTimestampError) Unwrap() error {
-	return e.err
+	return e.error
 }
 
 func (e InvalidBlockTimestampError) Error() string {
-	return e.err.Error()
+	return e.error.Error()
 }
 
 func IsInvalidBlockTimestampError(err error) bool {
@@ -62,21 +62,17 @@ func IsInvalidBlockTimestampError(err error) bool {
 
 func NewInvalidBlockTimestamp(msg string, args ...interface{}) error {
 	return InvalidBlockTimestampError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 // InvalidServiceEventError indicates an invalid service event was processed.
 type InvalidServiceEventError struct {
-	err error
+	error
 }
 
 func (e InvalidServiceEventError) Unwrap() error {
-	return e.err
-}
-
-func (e InvalidServiceEventError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsInvalidServiceEventError(err error) bool {
@@ -91,7 +87,7 @@ func NewInvalidServiceEventError(msg string, args ...interface{}) error {
 	return state.NewInvalidExtensionErrorf(
 		"cannot extend state with invalid service event: %w",
 		InvalidServiceEventError{
-			err: fmt.Errorf(msg, args...),
+			error: fmt.Errorf(msg, args...),
 		},
 	)
 }
