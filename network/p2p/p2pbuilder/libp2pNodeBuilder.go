@@ -119,7 +119,7 @@ func NewNodeBuilder(
 		createNode:          DefaultCreateNodeFunc,
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
-		metrics:    metrics,
+		metrics:             metrics,
 	}
 }
 

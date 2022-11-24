@@ -79,7 +79,12 @@ func NodeFixture(
 	connManager := connection.NewConnManager(logger, noopMetrics)
 	resourceManager := testutils.NewResourceManager(t)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		metrics.NewNoopCollector(),
+		parameters.Address,
+		parameters.Key,
+		sporkID).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
