@@ -15,10 +15,14 @@ type node interface {
 	// Hash computes recursively the hash of this respective sub trie.
 	// To simplify enforcing cryptographic security, we introduce the convention
 	// that hashing a nil node is an illegal operation, which panics.
-	// if cacheEnabled is set the node stores the computed hash value for future
+	// If cacheEnabled is set the node stores the computed hash value for future
 	// calls to the Hash function. Note that the cached value is only returned
 	// when cacheEnabled is also set for the future calls.
 	Hash(cacheEnabled bool) []byte
+
+	// MaxDepthOfDescendants returns the maximum depth, length of longest path from this node to any of the leaf nodes
+	// stored under the subtree (having this node as root)
+	MaxDepthOfDescendants() uint
 }
 
 // NodeTags encodes the type of node when hashing it. Required for cryptographic
@@ -63,6 +67,10 @@ func (n *short) Hash(cacheEnabled bool) []byte {
 	return n.cachedHashValue
 }
 
+func (n *short) MaxDepthOfDescendants() uint {
+	return n.child.MaxDepthOfDescendants() + 1
+}
+
 // serializedPathSegmentLength serializes the bitCount into two bytes.
 // We are able to represent key length of up to 65528 bits
 func serializedPathSegmentLength(bitCount int) [2]byte {
@@ -100,6 +108,15 @@ func (n *full) Hash(cacheEnabled bool) []byte {
 	return n.cachedHashValue
 }
 
+func (n *full) MaxDepthOfDescendants() uint {
+	left := n.left.MaxDepthOfDescendants()
+	right := n.right.MaxDepthOfDescendants()
+	if left < right {
+		return right + 1
+	}
+	return left + 1
+}
+
 // Leaf Node
 // Leaf represents a key-value pair. We only store the value, because the
 // key is implicitly stored as the merkle path through the tree.
@@ -127,6 +144,10 @@ func (n *leaf) Hash(cacheEnabled bool) []byte {
 	return n.cachedHashValue
 }
 
+func (n *leaf) MaxDepthOfDescendants() uint {
+	return 1
+}
+
 // Dummy Node
 // Dummy node type as substitute for `nil`. Not used in the trie, but as zero
 // value for auxiliary variables during trie update operations. This reduces
@@ -141,4 +162,8 @@ func (n *dummy) Hash(_ bool) []byte {
 	// Per convention, Hash should never be called by the business logic but
 	// is required to implement the node interface
 	panic("dummy node has no hash")
+}
+
+func (n *dummy) MaxDepthOfDescendants() uint {
+	return 0
 }

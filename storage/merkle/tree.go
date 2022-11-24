@@ -47,11 +47,8 @@ type Tree struct {
 	keyLength int
 	root      node
 	// setting this flag would prevent more writes to the trie
-	// but makes it more efficent for proof generation
+	// but makes it more efficient for proof generation
 	readOnlyEnabled bool
-	// maximum depth that has been reached while updating the trie,
-	//the actual depth of the trie might be smaller in case some paths are deleted.
-	maxDepthTouched int
 }
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
@@ -75,9 +72,10 @@ func (t *Tree) MakeItReadOnly() {
 	t.readOnlyEnabled = true
 }
 
-// MaxDepthTouched returns the maximum depth that has been reached while updating the trie
-func (t *Tree) MaxDepthTouched() int {
-	return t.maxDepthTouched
+// ComputeMaxDepth returns the maximum depth of the tree by traversing all
+// paths (this could be a very expensive operation for large trees)
+func (t *Tree) ComputeMaxDepth() uint {
+	return t.root.MaxDepthOfDescendants()
 }
 
 // Put stores the given value in the trie under the given key. If the key
@@ -93,7 +91,7 @@ func (t *Tree) MaxDepthTouched() int {
 //     No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	if t.readOnlyEnabled {
-		return false, errors.New("tree is readonly mode, no more put operation is accepted.")
+		return false, errors.New("tree is in readonly mode, no more put operation is accepted")
 	}
 	if len(key) != t.keyLength {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
@@ -116,9 +114,6 @@ func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// we use an index to keep track of the bit we are currently looking at
 	index := 0
 
-	// captures max depth when we insert a value (for short nodes its only incremented by 1)
-	depth := 0
-
 	// the for statement keeps running until we reach a leaf in the merkle tree
 	// if the leaf is nil, it was empty and we insert a new value
 	// if the leaf is a valid pointer, we overwrite the previous value
@@ -138,7 +133,6 @@ PutLoop:
 
 			// we forward the index by one to look at the next bit
 			index++
-			depth++
 
 			continue PutLoop
 
@@ -159,7 +153,6 @@ PutLoop:
 			if commonCount == n.count {
 				cur = &n.child
 				index += commonCount
-				depth++
 				continue PutLoop
 			}
 
@@ -174,7 +167,6 @@ PutLoop:
 				*cur = commonNode
 				cur = &commonNode.child
 				index += commonCount
-				depth++
 			}
 
 			// we then insert a full node that splits the tree after the shared
@@ -191,7 +183,6 @@ PutLoop:
 				remain = &splitNode.left
 			}
 			index++
-			depth++
 
 			// we can continue our insertion at this point, but we should first
 			// insert the correct node on the other side of the created full
@@ -214,7 +205,6 @@ PutLoop:
 		// if we have a leaf node, we reached a non-empty leaf
 		case *leaf:
 			n.val = append(make([]byte, 0, len(val)), val...)
-			n.cachedHashValue = nil
 			return true // return true to indicate that we overwrote
 
 		// if we have nil, we reached the end of any shared path
@@ -226,10 +216,6 @@ PutLoop:
 				// to protect the slices from external modification.
 				*cur = &leaf{
 					val: append(make([]byte, 0, len(val)), val...),
-				}
-
-				if depth > t.maxDepthTouched {
-					t.maxDepthTouched = depth
 				}
 				return false
 			}
@@ -244,7 +230,6 @@ PutLoop:
 			*cur = finalNode
 			cur = &finalNode.child
 			index += finalCount
-			depth++
 
 			continue PutLoop
 		}
@@ -415,7 +400,7 @@ ProveLoop:
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) (bool, error) {
 	if t.readOnlyEnabled {
-		return false, errors.New("tree is readonly mode, no more delete operation is accepted.")
+		return false, errors.New("tree is in readonly mode, no more delete operation is accepted")
 	}
 	if t.keyLength != len(key) {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
