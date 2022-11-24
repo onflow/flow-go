@@ -1,13 +1,13 @@
 package metrics
 
 import (
-	"github.com/onflow/flow-go/module"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // HotStuff Metrics

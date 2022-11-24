@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -16,9 +14,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator

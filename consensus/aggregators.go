@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
+	"github.com/onflow/flow-go/module"
 )
 
 // NewVoteAggregator creates new VoteAggregator and subscribes for finalization events.

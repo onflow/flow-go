@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/metrics"
 	"math/rand"
 	"sync"
 	"testing"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"

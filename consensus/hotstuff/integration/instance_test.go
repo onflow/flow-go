@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/metrics"
 	"sync"
 	"testing"
 	"time"
@@ -36,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/util"

@@ -2,7 +2,6 @@ package voteaggregator
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/metrics"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
