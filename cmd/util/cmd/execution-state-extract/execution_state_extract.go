@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	mig "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -85,8 +86,10 @@ func extractExecutionState(
 	newState := ledger.State(targetHash)
 
 	if migrate {
-		migrations = []ledger.Migration{}
-
+		// add migration here
+		migrations = []ledger.Migration{
+			mig.MigrateAccountUsage,
+		}
 	}
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.
