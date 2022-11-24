@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+
 	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +19,11 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -26,10 +32,11 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []network.Network // used to keep track of the networks
-	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
-	cancel         context.CancelFunc
+	testutils.ConduitWrapper                      // used as a wrapper around conduit methods
+	nets                     []network.Network    // used to keep track of the networks
+	mws                      []network.Middleware // used to keep track of the middlewares
+	ids                      flow.IdentityList    // used to keep track of the identifiers associated with networks
+	cancel                   context.CancelFunc
 }
 
 // Some tests are skipped in short mode to speedup the build.
@@ -46,36 +53,42 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
-		ctx,
+	var nodes []p2p.LibP2PNode
+	suite.ids, nodes, suite.mws, suite.nets, _ = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
+
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopNetworks(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestUnknownChannel evaluates that registering an engine with an unknown channel returns an error.
 // All channels should be registered as topics in engine.topicMap.
 func (suite *EchoEngineTestSuite) TestUnknownChannel() {
-	e := NewEchoEngine(suite.T(), suite.nets[0], 1, network.TestNetworkChannel, false, suite.Unicast)
+	e := NewEchoEngine(suite.T(), suite.nets[0], 1, channels.TestNetworkChannel, false, suite.Unicast)
 	_, err := suite.nets[0].Register("unknown-channel-id", e)
 	require.Error(suite.T(), err)
 }
 
 // TestClusterChannel evaluates that registering a cluster channel  is done without any error.
 func (suite *EchoEngineTestSuite) TestClusterChannel() {
-	e := NewEchoEngine(suite.T(), suite.nets[0], 1, network.TestNetworkChannel, false, suite.Unicast)
+	e := NewEchoEngine(suite.T(), suite.nets[0], 1, channels.TestNetworkChannel, false, suite.Unicast)
 	// creates a cluster channel
-	clusterChannel := network.ChannelSyncCluster(flow.Testnet)
+	clusterChannel := channels.SyncCluster(flow.Testnet)
 	// registers engine with cluster channel
 	_, err := suite.nets[0].Register(clusterChannel, e)
 	// registering cluster channel should not cause an error
@@ -85,11 +98,11 @@ func (suite *EchoEngineTestSuite) TestClusterChannel() {
 // TestDuplicateChannel evaluates that registering an engine with duplicate channel returns an error.
 func (suite *EchoEngineTestSuite) TestDuplicateChannel() {
 	// creates an echo engine, which registers it on test network channel
-	e := NewEchoEngine(suite.T(), suite.nets[0], 1, network.TestNetworkChannel, false, suite.Unicast)
+	e := NewEchoEngine(suite.T(), suite.nets[0], 1, channels.TestNetworkChannel, false, suite.Unicast)
 
 	// attempts to register the same engine again on test network channel which
 	// should cause an error
-	_, err := suite.nets[0].Register(network.TestNetworkChannel, e)
+	_, err := suite.nets[0].Register(channels.TestNetworkChannel, e)
 	require.Error(suite.T(), err)
 }
 
@@ -191,18 +204,18 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Multicast() 
 
 // duplicateMessageSequential is a helper function that sends duplicate messages sequentially
 // from a receiver to the sender via the injected send wrapper function of conduit.
-func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageSequential(send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, network.TestNetworkChannel, false, send)
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, channels.TestNetworkChannel, false, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, network.TestNetworkChannel, false, send)
+	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, false, send)
 
 	// allow nodes to heartbeat and discover each other if using PubSub
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -226,18 +239,18 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWra
 
 // duplicateMessageParallel is a helper function that sends duplicate messages concurrent;u
 // from a receiver to the sender via the injected send wrapper function of conduit.
-func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, network.TestNetworkChannel, false, send)
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, channels.TestNetworkChannel, false, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, network.TestNetworkChannel, false, send)
+	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -266,14 +279,14 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 
 // duplicateMessageDifferentChan is a helper function that sends the same message from two distinct
 // sender engines to the two distinct receiver engines via the send wrapper function of Conduits.
-func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send testutils.ConduitSendWrapperFunc) {
 	const (
 		sndNode = iota
 		rcvNode
 	)
 	const (
-		channel1 = network.TestNetworkChannel
-		channel2 = network.TestMetricsChannel
+		channel1 = channels.TestNetworkChannel
+		channel2 = channels.TestMetricsChannel
 	)
 	// registers engines in the network
 	// first type
@@ -292,7 +305,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 	receiver2 := NewEchoEngine(suite.Suite.T(), suite.nets[rcvNode], 10, channel2, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -331,19 +344,19 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 // singleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
-func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) singleMessage(echo bool, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, network.TestNetworkChannel, echo, send)
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, channels.TestNetworkChannel, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, network.TestNetworkChannel, echo, send)
+	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -362,7 +375,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 		assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
 		receiver.RUnlock()
 
-		assertMessageReceived(suite.T(), receiver, event, network.TestNetworkChannel)
+		assertMessageReceived(suite.T(), receiver, event, channels.TestNetworkChannel)
 
 	case <-time.After(10 * time.Second):
 		assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
@@ -384,7 +397,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 			echoEvent := &message.TestMessage{
 				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 			}
-			assertMessageReceived(suite.T(), sender, echoEvent, network.TestNetworkChannel)
+			assertMessageReceived(suite.T(), sender, echoEvent, channels.TestNetworkChannel)
 
 		case <-time.After(10 * time.Second):
 			assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -397,18 +410,18 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 // sender and receiver are sync over reception, i.e., sender sends one message at a time and
 // waits for its reception
 // count defines number of messages
-func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, network.TestNetworkChannel, echo, send)
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, channels.TestNetworkChannel, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, network.TestNetworkChannel, echo, send)
+	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -428,7 +441,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 			assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
 			receiver.RUnlock()
 
-			assertMessageReceived(suite.T(), receiver, event, network.TestNetworkChannel)
+			assertMessageReceived(suite.T(), receiver, event, channels.TestNetworkChannel)
 
 		case <-time.After(2 * time.Second):
 			assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
@@ -450,7 +463,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 				echoEvent := &message.TestMessage{
 					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
-				assertMessageReceived(suite.T(), sender, echoEvent, network.TestNetworkChannel)
+				assertMessageReceived(suite.T(), sender, echoEvent, channels.TestNetworkChannel)
 				receiver.RUnlock()
 				sender.RUnlock()
 
@@ -467,19 +480,19 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 // it evaluates the correctness of implementation against correct delivery of the messages.
 // sender and receiver are async, i.e., sender sends all its message at blast
 // count defines number of messages
-func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send ConduitSendWrapperFunc) {
+func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send testutils.ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, network.TestNetworkChannel, echo, send)
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, channels.TestNetworkChannel, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, network.TestNetworkChannel, echo, send)
+	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, channels.TestNetworkChannel, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
@@ -522,7 +535,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 				received[rcvEvent.Text] = struct{}{}
 
 				// evaluates channel that message was received on
-				assert.Equal(suite.T(), network.TestNetworkChannel, <-receiver.channel)
+				assert.Equal(suite.T(), channels.TestNetworkChannel, <-receiver.channel)
 			}, 100*time.Millisecond)
 
 		case <-time.After(2 * time.Second):
@@ -561,7 +574,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 					received[rcvEvent.Text] = struct{}{}
 
 					// evaluates channel that message was received on
-					assert.Equal(suite.T(), network.TestNetworkChannel, <-sender.channel)
+					assert.Equal(suite.T(), channels.TestNetworkChannel, <-sender.channel)
 				}, 100*time.Millisecond)
 
 			case <-time.After(10 * time.Second):
@@ -573,7 +586,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 
 // assertMessageReceived asserts that the given message was received on the given channel
 // for the given engine
-func assertMessageReceived(t *testing.T, e *EchoEngine, m *message.TestMessage, c network.Channel) {
+func assertMessageReceived(t *testing.T, e *EchoEngine, m *message.TestMessage, c channels.Channel) {
 	// wrap blocking channel reads with a timeout
 	unittest.AssertReturnsBefore(t, func() {
 		// evaluates proper reception of event

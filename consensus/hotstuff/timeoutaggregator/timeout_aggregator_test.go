@@ -109,14 +109,27 @@ func (s *TimeoutAggregatorTestSuite) TestPruneUpToView() {
 	s.aggregator.PruneUpToView(s.lowestRetainedView + 1)
 }
 
-// TestOnEnteringView tests if entering view event gets processed when send through `TimeoutAggregator`.
+// TestOnQcTriggeredViewChange tests if entering view event gets processed when send through `TimeoutAggregator`.
 // Tests the whole processing pipeline.
-func (s *TimeoutAggregatorTestSuite) TestOnEnteringView() {
+func (s *TimeoutAggregatorTestSuite) TestOnQcTriggeredViewChange() {
+	done := make(chan struct{})
+	s.collectors.On("PruneUpToView", s.lowestRetainedView+1).Run(func(args mock.Arguments) {
+		close(done)
+	}).Once()
+	qc := helper.MakeQC(helper.WithQCView(s.lowestRetainedView))
+	s.aggregator.OnViewChange(qc.View, qc.View+1)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestOnTcTriggeredViewChange tests if entering view event gets processed when send through `TimeoutAggregator`.
+// Tests the whole processing pipeline.
+func (s *TimeoutAggregatorTestSuite) TestOnTcTriggeredViewChange() {
 	view := s.lowestRetainedView + 1
 	done := make(chan struct{})
 	s.collectors.On("PruneUpToView", view).Run(func(args mock.Arguments) {
 		close(done)
 	}).Once()
-	s.aggregator.OnEnteringView(view, unittest.IdentifierFixture())
+	tc := helper.MakeTC(helper.WithTCView(s.lowestRetainedView))
+	s.aggregator.OnViewChange(tc.View, tc.View+1)
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }

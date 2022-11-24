@@ -64,11 +64,7 @@ func (s *Suite) MetricsPort() string {
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"
@@ -81,7 +77,6 @@ func (s *Suite) SetupSuite() {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 			testnet.WithAdditionalFlag(blockRateFlag),

@@ -7,6 +7,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var (
+	// ErrUnknownSnapshotReference indicates that the reference point for a queried
+	// snapshot cannot be resolved. The reference point is either a height above the
+	// finalized boundary, or a block ID that does not exist in the state.
+	ErrUnknownSnapshotReference = errors.New("reference block of the snapshot is not resolvable")
+)
+
 // InvalidExtensionError is an error for invalid extension of the state
 type InvalidExtensionError struct {
 	err error
@@ -65,32 +72,33 @@ func IsOutdatedExtensionError(err error) bool {
 	return errors.As(err, &OutdatedExtensionError{})
 }
 
-// NoValidChildBlockError is a sentinel error when the case where a certain block has
-// no valid child.
-type NoValidChildBlockError struct {
+// NoChildBlockError is returned where a certain block has no valid child.
+// Since all blocks are validated before being inserted to the state, this is
+// equivalent to have no stored child.
+type NoChildBlockError struct {
 	err error
 }
 
-func NewNoValidChildBlockError(msg string) error {
-	return NoValidChildBlockError{
+func NewNoChildBlockError(msg string) error {
+	return NoChildBlockError{
 		err: fmt.Errorf(msg),
 	}
 }
 
-func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
-	return NewNoValidChildBlockError(fmt.Sprintf(msg, args...))
+func NewNoChildBlockErrorf(msg string, args ...interface{}) error {
+	return NewNoChildBlockError(fmt.Sprintf(msg, args...))
 }
 
-func (e NoValidChildBlockError) Unwrap() error {
+func (e NoChildBlockError) Unwrap() error {
 	return e.err
 }
 
-func (e NoValidChildBlockError) Error() string {
+func (e NoChildBlockError) Error() string {
 	return e.err.Error()
 }
 
-func IsNoValidChildBlockError(err error) bool {
-	return errors.As(err, &NoValidChildBlockError{})
+func IsNoChildBlockError(err error) bool {
+	return errors.As(err, &NoChildBlockError{})
 }
 
 // UnknownBlockError is a sentinel error indicating that a certain block

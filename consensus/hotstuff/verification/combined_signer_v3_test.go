@@ -32,7 +32,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -99,7 +99,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -155,7 +155,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid
 func Test_VerifyQCV3(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
@@ -268,7 +268,7 @@ func Test_VerifyQC_EmptySignersV3(t *testing.T) {
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	sigData := unittest.QCSigDataFixture()
 
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)

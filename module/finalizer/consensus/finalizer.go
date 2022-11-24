@@ -52,10 +52,11 @@ func NewFinalizer(db *badger.DB,
 // included in a block proposal. Between entering the non-finalized chain state
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
+// No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	span, ctx, _ := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
-	defer span.Finish()
+	defer span.End()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to
 	// finalize a block that is already below finalized height, we want to do
@@ -124,14 +125,5 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		}
 	}
 
-	return nil
-}
-
-// MakeValid marks a block as having passed HotStuff validation.
-func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	err := f.state.MarkValid(blockID)
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
 	return nil
 }

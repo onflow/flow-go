@@ -4,23 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
 )
 
 const DefaultCacheSize = 1000
 const DefaultPathFinderVersion = 1
+const defaultTrieUpdateChanSize = 500
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -31,32 +31,28 @@ const DefaultPathFinderVersion = 1
 // Ledger is fork-aware which means any update can be applied at any previous state which forms a tree of tries (forest).
 // The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
 // In order to limit the memory usage and maintain the performance storage only keeps a limited number of
-// tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
+// tries and purge the old ones (FIFO-based); in other words, Ledger is not designed to be used
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest            *mtrie.Forest
-	wal               wal.LedgerWAL
+	wal               realWAL.LedgerWAL
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
+	trieUpdateCh      chan *WALTrieUpdate
 	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(
-	wal wal.LedgerWAL,
+	wal realWAL.LedgerWAL,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	logger := log.With().Str("ledger", "complete").Logger()
+	logger := log.With().Str("ledger_mod", "complete").Logger()
 
-	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
-		err := wal.RecordDelete(evictedTrie.RootHash())
-		if err != nil {
-			logger.Error().Err(err).Msg("failed to save delete record in wal")
-		}
-	})
+	forest, err := mtrie.NewForest(capacity, metrics, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
@@ -67,6 +63,7 @@ func NewLedger(
 		metrics:           metrics,
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
+		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
 	}
 
 	// pause records to prevent double logging trie removals
@@ -86,19 +83,34 @@ func NewLedger(
 	return storage, nil
 }
 
+// TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
+// This channel is closed when ledger component shutdowns down.
+func (l *Ledger) TrieUpdateChan() <-chan *WALTrieUpdate {
+	return l.trieUpdateCh
+}
+
 // Ready implements interface module.ReadyDoneAware
 // it starts the EventLoop's internal processing loop.
 func (l *Ledger) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	close(ready)
+	go func() {
+		defer close(ready)
+		// Start WAL component.
+		<-l.wal.Ready()
+	}()
 	return ready
 }
 
 // Done implements interface module.ReadyDoneAware
-// it closes all the open write-ahead log files.
 func (l *Ledger) Done() <-chan struct{} {
 	done := make(chan struct{})
-	close(done)
+	go func() {
+		defer close(done)
+
+		// Ledger is responsible for closing trieUpdateCh channel,
+		// so Compactor can drain and process remaining updates.
+		close(l.trieUpdateCh)
+	}()
 	return done
 }
 
@@ -182,8 +194,8 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	return values, err
 }
 
-// Set updates the ledger given an update
-// it returns the state after update and errors (if any)
+// Set updates the ledger given an update.
+// It returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	start := time.Now()
 
@@ -200,20 +212,9 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	l.metrics.UpdateCount()
 
-	walChan := make(chan error)
-
-	go func() {
-		walChan <- l.wal.RecordUpdate(trieUpdate)
-	}()
-
-	newRootHash, err := l.forest.Update(trieUpdate)
-	walError := <-walChan
-
+	newState, err = l.set(trieUpdate)
 	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
-	}
-	if walError != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
+		return ledger.State(hash.DummyHash), nil, err
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -229,10 +230,50 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	state := update.State()
 	l.logger.Info().Hex("from", state[:]).
-		Hex("to", newRootHash[:]).
+		Hex("to", newState[:]).
 		Int("update_size", update.Size()).
 		Msg("ledger updated")
-	return ledger.State(newRootHash), trieUpdate, nil
+	return newState, trieUpdate, nil
+}
+
+func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
+
+	// resultCh is a buffered channel to receive WAL update result.
+	resultCh := make(chan error, 1)
+
+	// trieCh is a buffered channel to send updated trie.
+	// trieCh can be closed without sending updated trie to indicate failure to update trie.
+	trieCh := make(chan *trie.MTrie, 1)
+	defer close(trieCh)
+
+	// There are two goroutines:
+	// 1. writing the trie update to WAL (in Compactor goroutine)
+	// 2. creating a new trie from the trie update (in this goroutine)
+	// Since writing to WAL is running concurrently, we use resultCh
+	// to receive WAL update result from Compactor.
+	// Compactor also needs new trie created here because Compactor
+	// caches new trie to minimize memory foot-print while checkpointing.
+	// `trieCh` is used to send created trie to Compactor.
+	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
+
+	newTrie, err := l.forest.NewTrie(trieUpdate)
+	walError := <-resultCh
+
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
+	}
+
+	err = l.forest.AddTrie(newTrie)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
+	}
+
+	trieCh <- newTrie
+
+	return ledger.State(newTrie.RootHash()), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any).
@@ -253,7 +294,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo := encoding.EncodeTrieBatchProof(batchProof)
+	proofToGo := ledger.EncodeTrieBatchProof(batchProof)
 
 	if len(paths) > 0 {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
@@ -273,8 +314,13 @@ func (l *Ledger) ForestSize() int {
 	return l.forest.Size()
 }
 
+// Tries returns the tries stored in the forest
+func (l *Ledger) Tries() ([]*trie.MTrie, error) {
+	return l.forest.GetTries()
+}
+
 // Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
+func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 	checkpointer, err := l.wal.NewCheckpointer()
 	if err != nil {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
@@ -290,6 +336,7 @@ func (l *Ledger) ExportCheckpointAt(
 	postCheckpointReporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
+	version int,
 ) (ledger.State, error) {
 
 	l.logger.Info().Msgf(
@@ -306,7 +353,7 @@ func (l *Ledger) ExportCheckpointAt(
 			Str("hash", rh.String()).
 			Msgf("Most recently touched root hash.")
 		return ledger.State(hash.DummyHash),
-			fmt.Errorf("cannot get try at the given state commitment: %w", err)
+			fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
@@ -316,59 +363,66 @@ func (l *Ledger) ExportCheckpointAt(
 			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
-	// TODO enable validity check of trie
-	// only check validity of the trie we are interested in
-	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
-	// if !t.IsAValidTrie() {
-	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
-	// }
-	// l.logger.Info().Msg("Trie is valid.")
+	var payloads []ledger.Payload
+	var newTrie *trie.MTrie
 
-	// get all payloads
-	payloads := t.AllPayloads()
-	payloadSize := len(payloads)
+	noMigration := len(migrations) == 0
 
-	// migrate payloads
-	for i, migrate := range migrations {
-		l.logger.Info().Msgf("migration %d is underway", i)
+	if noMigration {
+		// when there is no migration, reuse the trie without rebuilding it
+		newTrie = t
+		// when there is no migration, we don't generate the payloads here until later running the
+		// postCheckpointReporters, because the ExportReporter is currently the only
+		// preCheckpointReporters, which doesn't use the payloads.
+	} else {
+		// get all payloads
+		payloads = t.AllPayloads()
+		payloadSize := len(payloads)
 
-		start := time.Now()
-		payloads, err = migrate(payloads)
-		elapsed := time.Since(start)
+		// migrate payloads
+		for i, migrate := range migrations {
+			l.logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
 
+			start := time.Now()
+			payloads, err = migrate(payloads)
+			elapsed := time.Since(start)
+
+			if err != nil {
+				return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+			}
+
+			newPayloadSize := len(payloads)
+
+			if payloadSize != newPayloadSize {
+				l.logger.Warn().
+					Int("migration_step", i).
+					Int("expected_size", payloadSize).
+					Int("outcome_size", newPayloadSize).
+					Msg("payload counts has changed during migration, make sure this is expected.")
+			}
+			l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
+
+			payloadSize = newPayloadSize
+		}
+
+		l.logger.Info().Msgf("creating paths for %v payloads", len(payloads))
+
+		// get paths
+		paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+			return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 		}
 
-		newPayloadSize := len(payloads)
+		l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
 
-		if payloadSize != newPayloadSize {
-			l.logger.Warn().
-				Int("migration_step", i).
-				Int("expected_size", payloadSize).
-				Int("outcome_size", newPayloadSize).
-				Msg("payload counts has changed during migration, make sure this is expected.")
+		emptyTrie := trie.NewEmptyMTrie()
+
+		// no need to prune the data since it has already been prunned through migrations
+		applyPruning := false
+		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 		}
-		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
-
-		payloadSize = newPayloadSize
-	}
-
-	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
-
-	// get paths
-	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
-	}
-
-	emptyTrie := trie.NewEmptyMTrie()
-
-	// no need to prune the data since it has already been prunned through migrations
-	applyPruning := false
-	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	statecommitment := ledger.State(newTrie.RootHash())
@@ -387,15 +441,21 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
 
-	l.logger.Info().Msg("creating a checkpoint for the new trie")
-	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
+	l.logger.Info().Msg("creating a checkpoint for the new trie, storing the checkpoint to the file")
+
+	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
 	}
 
-	l.logger.Info().Msg("storing the checkpoint to the file")
-
-	err = wal.StoreCheckpoint(writer, newTrie)
+	switch version {
+	case 5:
+		err = realWAL.StoreCheckpointV5(outputDir, outputFile, &l.logger, newTrie)
+	case 6:
+		err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
+	default:
+		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
+	}
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.
@@ -407,11 +467,16 @@ func (l *Ledger) ExportCheckpointAt(
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
-	writer.Close()
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
 
-	l.logger.Info().Msgf("finished running post-checkpoint reporters")
+	l.logger.Info().Msgf("start running post-checkpoint reporters")
+
+	if noMigration {
+		// when there is no mgiration, we generate the payloads now before
+		// running the postCheckpointReporters
+		payloads = newTrie.AllPayloads()
+	}
 
 	// running post checkpoint reporters
 	for i, reporter := range postCheckpointReporters {
@@ -453,20 +518,7 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	// don't write things to WALs
 	l.wal.PauseRecord()
 	defer l.wal.UnpauseRecord()
-
-	allTries, err := l.forest.GetTries()
-	if err != nil {
-		return err
-	}
-
-	targetRootHash := ledger.RootHash(state)
-	for _, trie := range allTries {
-		trieRootHash := trie.RootHash()
-		if trieRootHash != targetRootHash {
-			l.forest.RemoveTrie(trieRootHash)
-		}
-	}
-	return nil
+	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
 }
 
 func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zerolog.Logger) error {
@@ -491,6 +543,6 @@ func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zer
 func writeStatusFile(fileName string, e error) error {
 	checkpointStatus := map[string]bool{"succeeded": e == nil}
 	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
-	err := ioutil.WriteFile(fileName, checkpointStatusJson, 0644)
+	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
 	return err
 }

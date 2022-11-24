@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -29,10 +29,16 @@ import (
 )
 
 func TestComplianceCore(t *testing.T) {
-	suite.Run(t, new(ComplianceCoreSuite))
+	suite.Run(t, new(CoreSuite))
 }
 
-type ComplianceCoreSuite struct {
+// CoreSuite tests the compliance core logic.
+type CoreSuite struct {
+	CommonSuite
+}
+
+// CommonSuite is shared between compliance core and engine testing.
+type CommonSuite struct {
 	suite.Suite
 
 	head *cluster.Block
@@ -50,6 +56,7 @@ type ComplianceCoreSuite struct {
 	pending           *module.PendingClusterBlockBuffer
 	hotstuff          *module.HotStuff
 	sync              *module.BlockRequester
+	validator         *hotstuff.Validator
 	voteAggregator    *hotstuff.VoteAggregator
 	timeoutAggregator *hotstuff.TimeoutAggregator
 
@@ -57,7 +64,7 @@ type ComplianceCoreSuite struct {
 	core *Core
 }
 
-func (cs *ComplianceCoreSuite) SetupTest() {
+func (cs *CommonSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
@@ -147,6 +154,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())
 
+	cs.validator = hotstuff.NewValidator(cs.T())
 	cs.voteAggregator = hotstuff.NewVoteAggregator(cs.T())
 	cs.timeoutAggregator = hotstuff.NewTimeoutAggregator(cs.T())
 
@@ -167,18 +175,18 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		cs.headers,
 		cs.state,
 		cs.pending,
+		cs.sync,
+		cs.validator,
+		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = core
-	// assign engine with consensus & synchronization
-	cs.core.hotstuff = cs.hotstuff
-	cs.core.sync = cs.sync
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
+func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 
 	// create a proposal that directly descends from the latest finalized header
 	originID := unittest.IdentifierFixture()
@@ -192,17 +200,46 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return()
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
+	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
+
+	// it should be processed without error
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err, "valid block proposal should pass")
+}
+
+func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
+
+	// create a proposal that has two ancestors in the cache
+	originID := unittest.IdentifierFixture()
+	ancestor := unittest.ClusterBlockWithParent(cs.head)
+	parent := unittest.ClusterBlockWithParent(&ancestor)
+	block := unittest.ClusterBlockWithParent(&parent)
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
+
+	// store the data for retrieval
+	cs.headerDB[parent.ID()] = &parent
+	cs.headerDB[ancestor.ID()] = &ancestor
+
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
+	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
-	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
+	// we should extend the state with the header
+	cs.state.AssertCalled(cs.T(), "Extend", &block)
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 
 	// create a proposal which is far enough ahead to be dropped
 	originID := unittest.IdentifierFixture()
@@ -218,72 +255,155 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
+// TestOnBlockProposal_FailsHotStuffValidation tests that a proposal which fails HotStuff validation.
+//   - should not go through protocol state validation
+//   - should not be added to the state
+//   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
+func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+	cs.Run("invalid block error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
-	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
-	require.NoError(cs.T(), err, "valid block proposal should pass")
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
-	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 
-	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
+	cs.Run("view for unknown epoch error", func() {
+		// the block fails HotStuff validation
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("unexpected error", func() {
+		// the block fails HotStuff validation
+		unexpectedErr := errors.New("generic unexpected error")
+		*cs.validator = *hotstuff.NewValidator(cs.T())
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
+
+		// the error should be propagated
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.ErrorIs(cs.T(), err, unexpectedErr)
+
+		// we should not extend the state with the header
+		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 }
 
-func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
+// TestOnBlockProposal_FailsProtocolStateValidation tests processing a proposal which passes HotStuff validation,
+// but fails protocol state validation.
+//   - should not be added to the state
+//   - we should not attempt to process its children
+//   - we should notify VoteAggregator, for known errors
+func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := unittest.IdentifierFixture()
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := unittest.ClusterProposalFromBlock(&block)
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	// make sure we fail to extend the state
-	*cs.state = clusterstate.MutableState{}
-	cs.state.On("Final").Return(
-		func() clusterint.Snapshot {
-			return cs.snapshot
-		},
-	)
-	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
+	// the block passes HotStuff validation
+	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 
-	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
-	require.Error(cs.T(), err, "proposal with invalid extension should fail")
+	cs.Run("invalid block", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
+		// we should notify VoteAggregator about the invalid block
+		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
-	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
-	// we should not submit the proposal to hotstuff
-	cs.hotstuff.AssertExpectations(cs.T())
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("outdated block", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionError(""))
+
+		// the expected error should be handled within the Core
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
+
+	cs.Run("unexpected error", func() {
+		// make sure we fail to extend the state
+		*cs.state = clusterstate.MutableState{}
+		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
+		unexpectedErr := errors.New("unexpected generic error")
+		cs.state.On("Extend", mock.Anything).Return(unexpectedErr)
+
+		// it should be processed without error
+		err := cs.core.OnBlockProposal(originID, proposal)
+		require.ErrorIs(cs.T(), err, unexpectedErr)
+
+		// we should extend the state with the header
+		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		// we should not pass the block to hotstuff
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+		// we should not attempt to process the children
+		cs.pending.AssertNotCalled(cs.T(), "ByParentID", mock.Anything)
+	})
 }
 
-func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
+func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.ClusterBlockWithParent(cs.head)
@@ -317,13 +437,15 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+	for _, block := range []cluster.Block{parent, block1, block2, block3} {
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
+		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
+	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal)
+	err := cs.core.processBlockAndDescendants(proposal, cs.head.Header)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -333,56 +455,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
 }
 
-func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-	// create a vote
-	originID := unittest.IdentifierFixture()
-	vote := messages.ClusterBlockVote{
-		BlockID: unittest.IdentifierFixture(),
-		View:    rand.Uint64(),
-		SigData: unittest.SignatureFixture(),
-	}
-
-	cs.voteAggregator.On("AddVote", &model.Vote{
-		View:     vote.View,
-		BlockID:  vote.BlockID,
-		SignerID: originID,
-		SigData:  vote.SigData,
-	}).Return()
-
-	// execute the vote submission
-	err := cs.core.OnBlockVote(originID, &vote)
-	require.NoError(cs.T(), err, "block vote should pass")
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
-}
-
-// TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
-// TimeoutAggregator.
-func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
-	// create a timeout
-	originID := unittest.IdentifierFixture()
-	timeout := messages.ClusterTimeoutObject{
-		View:       rand.Uint64(),
-		NewestQC:   helper.MakeQC(),
-		LastViewTC: helper.MakeTC(),
-		SigData:    unittest.SignatureFixture(),
-	}
-
-	cs.timeoutAggregator.On("AddTimeout", &model.TimeoutObject{
-		View:       timeout.View,
-		NewestQC:   timeout.NewestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}).Return()
-
-	// execute the timeout submission
-	err := cs.core.OnTimeoutObject(originID, &timeout)
-	require.NoError(cs.T(), err, "timeout object should pass")
-}
-
-func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
+func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := unittest.IdentifierFixture()
@@ -436,14 +509,16 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		proposals[1].Header.ID(),
 		proposals[2].Header.ID(),
 	}
-	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
+	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			header := args.Get(0).(*flow.Header)
-			assert.Equal(cs.T(), order[index], header.ID(), "should submit correct header to hotstuff")
+			header := args.Get(0).(*model.Proposal).Block
+			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
+			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
 		},
 	)
+	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
+	cs.validator.On("ValidateProposal", mock.Anything).Times(4).Return(nil)
 
 	missingProposal := &messages.ClusterBlockProposal{
 		Header:  missing.Header,

@@ -12,19 +12,20 @@ import (
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Handler handles the GRPC calls from a client
 type Handler struct {
 	log        zerolog.Logger
-	conduitMap map[network.Channel]network.Conduit
+	conduitMap map[channels.Channel]network.Conduit
 	msgChan    chan ghost.FlowMessage
 	codec      network.Codec
 }
 
 var _ ghost.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[network.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
+func NewHandler(log zerolog.Logger, conduitMap map[channels.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
 		log:        log.With().Str("component", "ghost_engine_handler").Logger(),
 		conduitMap: conduitMap,
@@ -38,7 +39,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	channelID := req.GetChannelId()
 
 	// find the conduit for the channel
-	conduit, found := h.conduitMap[network.Channel(channelID)]
+	conduit, found := h.conduitMap[channels.Channel(channelID)]
 
 	if !found {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel %v", channelID))
@@ -69,17 +70,16 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	// TODO: there is an issue in the Publish method for the ghost node,
 	// sometimes, it fails to deliver the message to the target without returning any error.
 	// This becomes one of the big factors contributing to the tests flakeiness.
-	// For now, we use Unicast here temporarily to pass around this problem.
-	// Should enable the next line again once Publish method has been fixed.
-	//
-	// err = conduit.Publish(event, flowIDs...)
-	//
+	err = conduit.Publish(event, flowIDs...)
+	if err != nil {
+		h.log.Error().
+			Err(err).
+			Interface("event", event).
+			Str("flow_ids", fmt.Sprintf("%v", flowIDs)).
+			Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+			Msg("error publishing message")
 
-	for _, flowID := range flowIDs {
-		err = conduit.Unicast(event, flowID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
-		}
+		return nil, err
 	}
 
 	return new(empty.Empty), nil

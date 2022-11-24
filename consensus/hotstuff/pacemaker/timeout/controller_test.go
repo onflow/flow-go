@@ -10,40 +10,38 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 120   // Milliseconds
-	minRepTimeout          float64 = 100   // Milliseconds
-	maxRepTimeout          float64 = 10000 // Milliseconds
-	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	multiplicativeDecrease float64 = 0.85  // multiplicative factor
+	minRepTimeout             float64 = 100   // Milliseconds
+	maxRepTimeout             float64 = 10000 // Milliseconds
+	timeoutAdjustmentFactor   float64 = 1.5   // timeout duration adjustment factor
+	happyPathMaxRoundFailures uint64  = 3     // number of failed rounds before increasing timeouts
 )
 
 func initTimeoutController(t *testing.T) *Controller {
 	tc, err := NewConfig(
-		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
 		time.Duration(maxRepTimeout*1e6),
-		multiplicativeIncrease,
-		multiplicativeDecrease,
-		0)
+		timeoutAdjustmentFactor,
+		happyPathMaxRoundFailures,
+		0,
+		time.Duration(maxRepTimeout*1e6))
 	if err != nil {
 		t.Fail()
 	}
 	return NewController(tc)
 }
 
-// Test_TimeoutInitialization timeouts are initialized ands reported properly
+// Test_TimeoutInitialization timeouts are initialized and reported properly
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
-	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(startRepTimeout))
+	assert.Equal(t, tc.replicaTimeout(), minRepTimeout)
 
-	// verify that returned timeout channel
+	// verify that initially returned timeout channel is closed and `nil` is returned as `TimerInfo`
 	select {
 	case <-tc.Channel():
 		break
 	default:
 		assert.Fail(t, "timeout channel did not return")
 	}
-	assert.True(t, tc.TimerInfo() == nil)
 	tc.Channel()
 }
 
@@ -51,11 +49,16 @@ func Test_TimeoutInitialization(t *testing.T) {
 func Test_TimeoutIncrease(t *testing.T) {
 	tc := initTimeoutController(t)
 
-	for i := 1; i < 10; i += 1 {
+	// advance failed rounds beyond `happyPathMaxRoundFailures`;
+	for r := uint64(0); r < happyPathMaxRoundFailures; r++ {
+		tc.OnTimeout()
+	}
+
+	for r := 1; r <= 10; r += 1 {
 		tc.OnTimeout()
 		assert.Equal(t,
-			tc.ReplicaTimeout().Milliseconds(),
-			int64(startRepTimeout*math.Pow(multiplicativeIncrease, float64(i))),
+			tc.replicaTimeout(),
+			minRepTimeout*math.Pow(timeoutAdjustmentFactor, float64(r)),
 		)
 	}
 }
@@ -63,16 +66,19 @@ func Test_TimeoutIncrease(t *testing.T) {
 // Test_TimeoutDecrease verifies that timeout decreases exponentially
 func Test_TimeoutDecrease(t *testing.T) {
 	tc := initTimeoutController(t)
-	tc.OnTimeout()
-	tc.OnTimeout()
-	tc.OnTimeout()
 
-	repTimeout := startRepTimeout * math.Pow(multiplicativeIncrease, 3.0)
-	for i := 1; i <= 6; i += 1 {
+	// failed rounds counter
+	r := uint64(0)
+
+	// advance failed rounds beyond `happyPathMaxRoundFailures`; subsequent progress should reduce timeout again
+	for ; r <= happyPathMaxRoundFailures*2; r++ {
+		tc.OnTimeout()
+	}
+	for ; r > happyPathMaxRoundFailures; r-- {
 		tc.OnProgressBeforeTimeout()
 		assert.Equal(t,
-			tc.ReplicaTimeout().Milliseconds(),
-			int64(repTimeout*math.Pow(multiplicativeDecrease, float64(i))),
+			tc.replicaTimeout(),
+			minRepTimeout*math.Pow(timeoutAdjustmentFactor, float64(r-1-happyPathMaxRoundFailures)),
 		)
 	}
 }
@@ -81,34 +87,38 @@ func Test_TimeoutDecrease(t *testing.T) {
 func Test_MinCutoff(t *testing.T) {
 	tc := initTimeoutController(t)
 
-	tc.OnTimeout()               // replica timeout increases 120 -> 1.5 * 120 = 180
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 180 -> 180 * 0.85 = 153
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 153 -> 153 * 0.85 = 130.05
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 130.05 -> 130.05 * 0.85 = 110.5425
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 110.5425 -> max(110.5425 * 0.85, 100) = 100
+	for r := uint64(0); r < happyPathMaxRoundFailures; r++ {
+		tc.OnTimeout() // replica timeout doesn't increase since r < happyPathMaxRoundFailures.
+	}
+
+	tc.OnTimeout()               // replica timeout increases 100 -> 3/2 * 100 = 150
+	tc.OnTimeout()               // replica timeout increases 150 -> 3/2 * 150 = 225
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 225 -> 180 * 2/3 = 150
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 150 -> 153 * 2/3 = 100
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 100 -> 100 * 2/3 = max(66.6, 100) = 100
 
 	tc.OnProgressBeforeTimeout()
-	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
+	assert.Equal(t, tc.replicaTimeout(), minRepTimeout)
 }
 
-// Test_MinCutoff verifies that timeout does not increase beyond timeout cap
+// Test_MaxCutoff verifies that timeout does not increase beyond timeout cap
 func Test_MaxCutoff(t *testing.T) {
-	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
-	c, err := NewConfig(
-		time.Duration(200*float64(time.Millisecond)),
-		time.Duration(minRepTimeout*float64(time.Millisecond)),
-		time.Duration(maxRepTimeout*float64(time.Millisecond)),
-		multiplicativeIncrease,
-		multiplicativeDecrease,
-		0)
-	if err != nil {
-		t.Fail()
-	}
-	tc := NewController(c)
+	tc := initTimeoutController(t)
 
-	for i := 1; i <= 50; i += 1 {
-		tc.OnTimeout() // after already 7 iterations we should have reached the max value
-		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= maxRepTimeout)
+	// we update the following two values here in the test, which is a naive reference implementation
+	unboundedReferenceTimeout := minRepTimeout
+	r := -1 * int64(happyPathMaxRoundFailures) // only start increasing `unboundedReferenceTimeout` when this becomes positive
+
+	// add timeouts until our `unboundedReferenceTimeout` exceeds the limit
+	for {
+		tc.OnTimeout()
+		if r++; r > 0 {
+			unboundedReferenceTimeout *= timeoutAdjustmentFactor
+		}
+		if unboundedReferenceTimeout > maxRepTimeout {
+			assert.True(t, tc.replicaTimeout() <= maxRepTimeout)
+			return // end of test
+		}
 	}
 }
 
@@ -118,8 +128,8 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 	increase, decrease := true, false
 	testDynamicSequence := func(seq []bool) {
 		tc := initTimeoutController(t)
-		var numberIncreases int = 0
-		var numberDecreases int = 0
+		tc.cfg.HappyPathMaxRoundFailures = 0 // set happy path rounds to zero to simplify calculation
+		numberIncreases, numberDecreases := 0, 0
 		for _, increase := range seq {
 			if increase {
 				numberIncreases += 1
@@ -130,24 +140,26 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 			}
 		}
 
-		expectedRepTimeout := startRepTimeout * math.Pow(multiplicativeIncrease, float64(numberIncreases)) * math.Pow(multiplicativeDecrease, float64(numberDecreases))
-		numericalError := math.Abs(expectedRepTimeout - float64(tc.ReplicaTimeout().Milliseconds()))
-		require.True(t, numericalError <= 1.0) // at most one millisecond numerical error
+		expectedRepTimeout := minRepTimeout * math.Pow(timeoutAdjustmentFactor, float64(numberIncreases-numberDecreases))
+		numericalError := math.Abs(expectedRepTimeout - tc.replicaTimeout())
+		require.LessOrEqual(t, numericalError, 1.0) // at most one millisecond numerical error
 	}
 
 	testDynamicSequence([]bool{increase, increase, increase, decrease, decrease, decrease})
 	testDynamicSequence([]bool{increase, decrease, increase, decrease, increase, decrease})
+	testDynamicSequence([]bool{increase, increase, increase, increase, increase, decrease})
 }
 
+// Test_BlockRateDelay check that correct block rate delay is returned
 func Test_BlockRateDelay(t *testing.T) {
-	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
+
 	c, err := NewConfig(
-		time.Duration(200*float64(time.Millisecond)),
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		time.Duration(maxRepTimeout*float64(time.Millisecond)),
-		10,
-		multiplicativeDecrease,
-		time.Second)
+		timeoutAdjustmentFactor,
+		happyPathMaxRoundFailures,
+		time.Second,
+		time.Duration(maxRepTimeout*float64(time.Millisecond)))
 	if err != nil {
 		t.Fail()
 	}

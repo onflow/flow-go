@@ -6,34 +6,43 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/runner"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// proposalTask struct used to send a proposal and done channel in one message
-type proposalTask struct {
-	*model.Proposal
-	done chan struct{} // closed when the proposal has finished being processed
-}
-
-// FollowerLoop implements interface FollowerLoop
+// FollowerLoop implements interface module.HotStuffFollower.
+// FollowerLoop buffers all incoming events to the hotstuff FollowerLogic, and feeds FollowerLogic one event at a time
+// using a worker thread.
+// Concurrency safe.
 type FollowerLoop struct {
+	*component.ComponentManager
 	log           zerolog.Logger
 	followerLogic FollowerLogic
-	proposals     chan *proposalTask
-
-	runner runner.SingleRunner // lock for preventing concurrent state transitions
+	proposals     chan *model.Proposal
 }
+
+var _ component.Component = (*FollowerLoop)(nil)
+var _ module.HotStuffFollower = (*FollowerLoop)(nil)
 
 // NewFollowerLoop creates an instance of EventLoop
 func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*FollowerLoop, error) {
-	return &FollowerLoop{
+	// TODO(active-pacemaker) add metrics for length of inbound channels
+	// we will use a buffered channel to avoid blocking of caller
+	proposals := make(chan *model.Proposal, 1000)
+
+	fl := &FollowerLoop{
 		log:           log,
 		followerLogic: followerLogic,
-		proposals:     make(chan *proposalTask),
-		runner:        runner.NewSingleRunner(),
-	}, nil
+		proposals:     proposals,
+	}
+
+	fl.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(fl.loop).
+		Build()
+
+	return fl, nil
 }
 
 // SubmitProposal feeds a new block proposal (header) into the FollowerLoop.
@@ -41,14 +50,14 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the FollowerLoop.
-func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) <-chan struct{} {
+func (fl *FollowerLoop) SubmitProposal(proposal *model.Proposal) {
 	received := time.Now()
-	proposal := &proposalTask{
-		Proposal: model.ProposalFromFlow(proposalHeader, parentView),
-		done:     make(chan struct{}),
-	}
 
-	fl.proposals <- proposal
+	select {
+	case fl.proposals <- proposal:
+	case <-fl.ComponentManager.ShutdownSignal():
+		return
+	}
 
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
@@ -57,16 +66,15 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 		Uint64("view", proposal.Block.View).
 		Dur("busy_duration", busyDuration).
 		Msg("busy duration to handle a proposal")
-
-	return proposal.done
 }
 
-// loop will synchronously processes all events.
+// loop will synchronously process all events.
 // All errors from FollowerLogic are fatal:
-//   * known critical error: some prerequisites of the HotStuff follower have been broken
-//   * unknown critical error: bug-related
-func (fl *FollowerLoop) loop() {
-	shutdownSignal := fl.runner.ShutdownSignal()
+//   - known critical error: some prerequisites of the HotStuff follower have been broken
+//   - unknown critical error: bug-related
+func (fl *FollowerLoop) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	shutdownSignal := fl.ComponentManager.ShutdownSignal()
 	for {
 		select { // to ensure we are not skipping over a termination signal
 		case <-shutdownSignal:
@@ -76,31 +84,17 @@ func (fl *FollowerLoop) loop() {
 
 		select {
 		case p := <-fl.proposals:
-			err := fl.followerLogic.AddBlock(p.Proposal)
-			close(p.done)
-
+			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
 				fl.log.Error().
 					Hex("block_id", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
 					Err(err).
-					Msg("terminating FollowerLoop")
-				return
+					Msg("irrecoverable follower loop error")
+				ctx.Throw(err)
 			}
 		case <-shutdownSignal:
 			return
 		}
 	}
-}
-
-// Ready implements interface module.ReadyDoneAware
-// Method call will starts the FollowerLoop's internal processing loop.
-// Multiple calls are handled gracefully and the follower will only start once.
-func (fl *FollowerLoop) Ready() <-chan struct{} {
-	return fl.runner.Start(fl.loop)
-}
-
-// Done implements interface module.ReadyDoneAware
-func (fl *FollowerLoop) Done() <-chan struct{} {
-	return fl.runner.Abort()
 }

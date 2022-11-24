@@ -6,15 +6,17 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/insecure/corruptible"
+	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptibleConduitFactoryPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
-const CorruptibleConduitFactoryPort = 4300
+// CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupted nodes is listening on.
+const CorruptNetworkPort = 4300
 
-// CorruptedNodeBuilder creates a general flow node builder with corruptible conduit factory.
+// CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }
@@ -30,13 +32,45 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 		return fmt.Errorf("could not initilized flow node builder: %w", err)
 	}
 
-	cnb.enqueueCorruptibleConduitFactory() // initializes corrupted conduit factory (ccf).
+	cnb.enqueueNetworkingLayer() // initializes corrupted networking layer.
 
 	return nil
 }
 
-func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.LibP2PNodeComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
+		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
+			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
+			cnb.Logger,
+			cnb.RootChainID,
+			myAddr,
+			cnb.NetworkKey,
+			cnb.SporkID,
+			cnb.IdentityProvider,
+			cnb.Metrics.Network,
+			cnb.Resolver,
+			cnb.PeerScoringEnabled,
+			cnb.BaseConfig.NodeRole,
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
+			// run peer manager with the specified interval and let it also prune connections
+			cnb.NetworkConnectionPruning,
+			cnb.PeerUpdateInterval,
+		)
+
+		libp2pNode, err := libP2PNodeFactory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+		}
+		cnb.LibP2PNode = libp2pNode
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", myAddr).Msg("corrupted libp2p node initialized")
+		return libp2pNode, nil
+	})
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
@@ -47,20 +81,30 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
-		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
+		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
+		ccf := corruptnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
-		ccf := corruptible.NewCorruptibleConduitFactory(
-			cnb.FlowNodeBuilder.Logger,
-			cnb.FlowNodeBuilder.RootChainID,
-			cnb.FlowNodeBuilder.Me,
-			cnb.FlowNodeBuilder.CodecFactory(), address)
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")
 
-		cnb.FlowNodeBuilder.ConduitFactory = ccf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Str("address", address).Msg("corrupted conduit factory initiated")
-		return ccf, nil
-	})
+		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf, ratelimit.NoopRateLimiters(), []p2p.PeerFilter{})
+		if err != nil {
+			return nil, fmt.Errorf("could not initiate flow network: %w", err)
+		}
 
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.FlowNodeBuilder.ConduitFactory)
+		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
+		// allowing a remote attacker to control the ingress and egress traffic of the node.
+		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
+			cnb.Logger,
+			cnb.RootChainID,
+			address,
+			cnb.Me,
+			cnb.CodecFactory(),
+			flowNetwork,
+			ccf)
+		if err != nil {
+			return nil, fmt.Errorf("could not create corruptible network: %w", err)
+		}
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
+		return corruptibleNetwork, nil
 	})
 }

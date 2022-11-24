@@ -17,10 +17,13 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 
 // ancestryChain encapsulates a block, its parent (oneChain) and its grand-parent (twoChain).
 // Given a chain structure like:
-//   b <~ b' <~ b*
+//
+//	b <~ b' <~ b*
+//
 // where the QC certifying b is qc_b, this data structure looks like:
-//   twoChain   oneChain     block
-//   [b<-qc_b]  [b'<-qc_b']  [b*]
+//
+//	twoChain   oneChain     block
+//	[b<-qc_b]  [b'<-qc_b']  [b*]
 type ancestryChain struct {
 	block    *BlockContainer
 	oneChain *BlockQC
@@ -70,7 +73,6 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
 	forks.forest.AddVertex(&BlockContainer{Proposal: trustedRootProposal})
-	forks.notifier.OnBlockIncorporated(trustedRoot.Block)
 	return &forks, nil
 }
 
@@ -103,7 +105,7 @@ func (f *Forks) GetProposalsForView(view uint64) []*model.Proposal {
 // We assume that all blocks are fully verified. A valid block must satisfy all consistency
 // requirements; otherwise we have a bug in the compliance layer.
 // Expected errors during normal operations:
-//  * model.ByzantineThresholdExceededError - new block results in conflicting finalized blocks
+//   - model.ByzantineThresholdExceededError - new block results in conflicting finalized blocks
 func (f *Forks) AddProposal(proposal *model.Proposal) error {
 	err := f.VerifyProposal(proposal)
 	if err != nil {
@@ -131,8 +133,9 @@ func (f *Forks) IsKnownBlock(block *model.Block) bool {
 // IsProcessingNeeded performs basic checks to determine whether block needs processing,
 // only considering the block's height and hash.
 // Returns false if any of the following conditions applies
-//  * block view is _below_ the most recently finalized block
-//  * the block already exists in the consensus state
+//   - block view is _below_ the most recently finalized block
+//   - the block already exists in the consensus state
+//
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 	if block.View < f.lastFinalized.Block.View || f.IsKnownBlock(block) {
@@ -170,11 +173,6 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)
 	}
-	// TODO(active-pacemaker) we can remove MakeValid when QC validation occurs in compliance layer
-	err = f.finalizationCallback.MakeValid(block.BlockID)
-	if err != nil {
-		return fmt.Errorf("MakeValid fails in other component: %w", err)
-	}
 	f.notifier.OnBlockIncorporated(block)
 	return nil
 }
@@ -184,9 +182,9 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 // We assume that all blocks are fully verified. A valid block must satisfy all consistency
 // requirements; otherwise we have a bug in the compliance layer.
 // Error returns:
-// * model.MissingBlockError if the parent of the input proposal does not exist in the forest
-//   (but is above the pruned view)
-// * generic error in case of unexpected bug or internal state corruption
+//   - model.MissingBlockError if the parent of the input proposal does not exist in the forest
+//     (but is above the pruned view)
+//   - generic error in case of unexpected bug or internal state corruption
 func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 	if block.View < f.forest.LowestLevel {
@@ -219,8 +217,9 @@ func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
-//     * q1.View == q2.View
-//     * q1.BlockID != q2.BlockID
+//   - q1.View == q2.View
+//   - q1.BlockID != q2.BlockID
+//
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per 'Observation 1' from the Jolteon paper https://arxiv.org/pdf/2106.10362v1.pdf, two
 // conflicting QCs can exist if and only if the Byzantine threshold is exceeded.
@@ -271,10 +270,10 @@ func (f *Forks) checkForDoubleProposal(container *BlockContainer) {
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
 // Error returns:
-// * model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
-//   This either indicates a critical internal bug / data corruption, or that the network Byzantine
-//   threshold was exceeded, breaking the safety guarantees of HotStuff.
-// * generic error in case of unexpected bug or internal state corruption
+//   - model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
+//     This either indicates a critical internal bug / data corruption, or that the network Byzantine
+//     threshold was exceeded, breaking the safety guarantees of HotStuff.
+//   - generic error in case of unexpected bug or internal state corruption
 func (f *Forks) updateFinalizedBlockQC(blockContainer *BlockContainer) error {
 	ancestryChain, err := f.getTwoChain(blockContainer)
 	if err != nil {
@@ -315,10 +314,10 @@ func (f *Forks) updateFinalizedBlockQC(blockContainer *BlockContainer) error {
 // See ancestryChain for documentation on the structure of the 2-chain.
 // Returns ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
 // Error returns:
-// * ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
-// * model.MissingBlockError if any block in the 2-chain does not exist in the forest
-//   (but is above the pruned view)
-// * generic error in case of unexpected bug or internal state corruption
+//   - ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
+//   - model.MissingBlockError if any block in the 2-chain does not exist in the forest
+//     (but is above the pruned view)
+//   - generic error in case of unexpected bug or internal state corruption
 func (f *Forks) getTwoChain(blockContainer *BlockContainer) (*ancestryChain, error) {
 	ancestryChain := ancestryChain{block: blockContainer}
 
@@ -338,10 +337,10 @@ func (f *Forks) getTwoChain(blockContainer *BlockContainer) (*ancestryChain, err
 // i.e. the parent block itself and the qc pointing to the parent, i.e. block.QC().
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 // Error returns:
-// * ErrPrunedAncestry if the input block's parent is below the pruned view.
-// * model.MissingBlockError if the parent block does not exist in the forest
-//   (but is above the pruned view)
-// * generic error in case of unexpected bug or internal state corruption
+//   - ErrPrunedAncestry if the input block's parent is below the pruned view.
+//   - model.MissingBlockError if the parent block does not exist in the forest
+//     (but is above the pruned view)
+//   - generic error in case of unexpected bug or internal state corruption
 func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	// The finalizer prunes all blocks in forest which are below the most recently finalized block.
 	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
@@ -377,10 +376,10 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in increasing height order.
 // Error returns:
-// * model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
-//   This either indicates a critical internal bug / data corruption, or that the network Byzantine
-//   threshold was exceeded, breaking the safety guarantees of HotStuff.
-// * generic error in case of bug or internal state corruption
+//   - model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
+//     This either indicates a critical internal bug / data corruption, or that the network Byzantine
+//     threshold was exceeded, breaking the safety guarantees of HotStuff.
+//   - generic error in case of bug or internal state corruption
 func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	if qc.View < f.lastFinalized.Block.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(

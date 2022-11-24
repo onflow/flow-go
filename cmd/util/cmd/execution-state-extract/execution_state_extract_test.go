@@ -2,10 +2,12 @@ package extract
 
 import (
 	"crypto/rand"
+	"math"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
@@ -63,6 +65,7 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				zerolog.Nop(),
 				flow.Emulator.Chain(),
+				6,
 				false,
 				false,
 			)
@@ -74,6 +77,11 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, _ string) {
 
+			const (
+				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+				checkpointsToKeep  = 1
+			)
+
 			db := common.InitStorage(datadir)
 			commits := badger.NewCommits(metr, db)
 
@@ -84,6 +92,9 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			require.NoError(t, err)
+			<-compactor.Ready()
 
 			var stateCommitment = f.InitialState()
 
@@ -120,8 +131,9 @@ func TestExtractExecutionState(t *testing.T) {
 				blocksInOrder[i] = blockID
 			}
 
-			<-diskWal.Done()
 			<-f.Done()
+			<-compactor.Done()
+
 			err = db.Close()
 			require.NoError(t, err)
 
@@ -152,6 +164,15 @@ func TestExtractExecutionState(t *testing.T) {
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
+					const (
+						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+						checkpointsToKeep  = 1
+					)
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+					require.NoError(t, err)
+
+					<-compactor.Ready()
+
 					data := keysValuesByCommit[string(stateCommitment[:])]
 
 					keys := make([]ledger.Key, 0, len(data))
@@ -181,8 +202,8 @@ func TestExtractExecutionState(t *testing.T) {
 						require.Error(t, err)
 					}
 
-					<-diskWal.Done()
 					<-storage.Done()
+					<-compactor.Done()
 				})
 			}
 		})

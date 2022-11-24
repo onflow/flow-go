@@ -411,6 +411,10 @@ type EpochStatus struct {
 	PreviousEpoch EventIDs // EpochSetup and EpochCommit events for the previous epoch
 	CurrentEpoch  EventIDs // EpochSetup and EpochCommit events for the current epoch
 	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
+	// InvalidServiceEventIncorporated encodes whether an invalid service event is
+	// incorporated in this fork. When this happens, epoch fallback is triggered
+	// AFTER the fork is finalized.
+	InvalidServiceEventIncorporated bool
 }
 
 // Copy returns a copy of the epoch status.
@@ -454,6 +458,7 @@ func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, 
 }
 
 // Check checks that the status is well-formed, returning an error if it is not.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Check() error {
 
 	if es == nil {
@@ -475,6 +480,7 @@ func (es *EpochStatus) Check() error {
 }
 
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Phase() (EpochPhase, error) {
 
 	err := es.Check()

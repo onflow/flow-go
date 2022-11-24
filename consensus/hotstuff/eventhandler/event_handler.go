@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -33,18 +33,17 @@ import (
 //     as well, but only when receiving proposal for view lower than active view.
 //     To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //     NewestQC.BlockID.
+//
+// Not concurrency safe.
 type EventHandler struct {
-	log               zerolog.Logger
-	paceMaker         hotstuff.PaceMaker
-	blockProducer     hotstuff.BlockProducer
-	forks             hotstuff.Forks
-	persist           hotstuff.Persister
-	communicator      hotstuff.Communicator
-	committee         hotstuff.Replicas
-	voteAggregator    hotstuff.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
-	safetyRules       hotstuff.SafetyRules
-	notifier          hotstuff.Consumer
+	log           zerolog.Logger
+	paceMaker     hotstuff.PaceMaker
+	blockProducer hotstuff.BlockProducer
+	forks         hotstuff.Forks
+	persist       hotstuff.Persister
+	committee     hotstuff.Replicas
+	safetyRules   hotstuff.SafetyRules
+	notifier      hotstuff.Consumer
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -56,25 +55,19 @@ func NewEventHandler(
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
-	communicator hotstuff.Communicator,
 	committee hotstuff.Replicas,
-	voteAggregator hotstuff.VoteAggregator,
-	timeoutAggregator hotstuff.TimeoutAggregator,
 	safetyRules hotstuff.SafetyRules,
 	notifier hotstuff.Consumer,
 ) (*EventHandler, error) {
 	e := &EventHandler{
-		log:               log.With().Str("hotstuff", "participant").Logger(),
-		paceMaker:         paceMaker,
-		blockProducer:     blockProducer,
-		forks:             forks,
-		persist:           persist,
-		communicator:      communicator,
-		safetyRules:       safetyRules,
-		committee:         committee,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
-		notifier:          notifier,
+		log:           log.With().Str("hotstuff", "participant").Logger(),
+		paceMaker:     paceMaker,
+		blockProducer: blockProducer,
+		forks:         forks,
+		persist:       persist,
+		safetyRules:   safetyRules,
+		committee:     committee,
+		notifier:      notifier,
 	}
 	return e, nil
 }
@@ -90,7 +83,7 @@ func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 		Hex("qc_block_id", qc.BlockID[:]).
 		Logger()
 	log.Debug().Msg("received QC")
-	e.notifier.OnQcConstructedFromVotes(curView, qc)
+	e.notifier.OnReceiveQc(curView, qc)
 	defer e.notifier.OnEventProcessed()
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
@@ -120,6 +113,7 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Logger()
 	log.Debug().Msg("received TC")
+	e.notifier.OnReceiveTc(curView, tc)
 	defer e.notifier.OnEventProcessed()
 
 	newViewEvent, err := e.paceMaker.ProcessTC(tc)
@@ -177,15 +171,6 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
 	}
 
-	// notify vote aggregator about a new block, so that it can start verifying
-	// votes for it.
-	err = e.voteAggregator.AddBlock(proposal)
-	if err != nil {
-		if !mempool.IsBelowPrunedThresholdError(err) {
-			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
-		}
-	}
-
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)
 	if err != nil {
@@ -212,7 +197,7 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 func (e *EventHandler) OnLocalTimeout() error {
 	curView := e.paceMaker.CurView()
 	e.log.Debug().Uint64("cur_view", curView).Msg("timeout received from event loop")
-	// TODO(active-pacemaker): update telemetry
+	e.notifier.OnLocalTimeout(curView)
 	defer e.notifier.OnEventProcessed()
 
 	err := e.broadcastTimeoutObjectIfAuthorized()
@@ -222,31 +207,48 @@ func (e *EventHandler) OnLocalTimeout() error {
 	return nil
 }
 
-// OnPartialTcCreated handles notification produces by the internal timeout aggregator. If the notification is for the current view,
-// a corresponding model.TimeoutObject is broadcast to the consensus committee.
+// OnPartialTcCreated handles notification produces by the internal timeout aggregator.
+// If the notification is for the current view, a corresponding model.TimeoutObject is broadcast to the consensus committee.
 // No errors are expected during normal operation.
 func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
-	// TODO(active-pacemaker): update telemetry
+	curView := e.paceMaker.CurView()
+	lastViewTC := partialTC.LastViewTC
+	logger := e.log.With().
+		Uint64("cur_view", curView).
+		Uint64("qc_view", partialTC.NewestQC.View)
+	if lastViewTC != nil {
+		logger.Uint64("last_view_tc_view", lastViewTC.View)
+	}
+	log := logger.Logger()
+	log.Debug().Msg("constructed partial TC")
+
+	e.notifier.OnPartialTc(curView, partialTC)
 	defer e.notifier.OnEventProcessed()
 
-	// process QC, this might trigger view change and any related logic(proposing, voting)
-	err := e.OnReceiveQc(partialTC.NewestQC)
+	// process QC, this might trigger view change
+	_, err := e.paceMaker.ProcessQC(partialTC.NewestQC)
 	if err != nil {
-		return fmt.Errorf("could not process QC: %w", err)
+		return fmt.Errorf("could not process newest QC: %w", err)
 	}
-	// process TC, this might trigger view change and any related logic(proposing, voting)
-	if partialTC.LastViewTC != nil {
-		err = e.OnReceiveTc(partialTC.LastViewTC)
-		if err != nil {
-			return fmt.Errorf("could not process TC: %w", err)
-		}
+
+	// process TC, this might trigger view change
+	_, err = e.paceMaker.ProcessTC(lastViewTC)
+	if err != nil {
+		return fmt.Errorf("could not process TC for view %d: %w", lastViewTC.View, err)
 	}
+
+	// NOTE: in other cases when we have observed a view change we will trigger proposing logic, this is desired logic
+	// for handling proposal, QC and TC. However, observing a partial TC means
+	// that superminority have timed out and there was at least one honest replica in that set. Honest replicas will never vote
+	// after timing out for current view meaning we won't be able to collect supermajority of votes for a proposal made after
+	// observing partial TC.
 
 	// by definition, we are allowed to produce timeout object if we have received partial TC for current view
 	if e.paceMaker.CurView() != partialTC.View {
 		return nil
 	}
 
+	log.Debug().Msg("partial TC generated for current view, broadcasting timeout")
 	err = e.broadcastTimeoutObjectIfAuthorized()
 	if err != nil {
 		return fmt.Errorf("unexpected exception while processing partial TC in view %d: %w", partialTC.View, err)
@@ -256,16 +258,23 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 
 // Start starts the event handler.
 // No errors are expected during normal operation.
-func (e *EventHandler) Start() error {
+// CAUTION: EventHandler is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
+func (e *EventHandler) Start(ctx context.Context) error {
+	// notify about commencing recovery procedure
+	e.notifier.OnStart(e.paceMaker.CurView())
+	defer e.notifier.OnEventProcessed()
+
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
+	e.paceMaker.Start(ctx)
 	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
-	e.paceMaker.Start()
 	return nil
 }
 
@@ -299,14 +308,8 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 		return fmt.Errorf("could not produce timeout: %w", err)
 	}
 
-	// contribute produced timeout to TC aggregation logic
-	e.timeoutAggregator.AddTimeout(timeout)
-
-	// broadcast timeout to participants
-	err = e.communicator.BroadcastTimeout(timeout)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to broadcast TimeoutObject")
-	}
+	// raise a notification to broadcast timeout
+	e.notifier.OnOwnTimeout(timeout)
 	log.Debug().Msg("broadcast TimeoutObject done")
 
 	return nil
@@ -386,7 +389,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	}
 
 	// attempt to generate proposal:
-	e.notifier.OnEnteringView(curView, currentLeader)
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()
 
@@ -422,11 +424,11 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		lastViewTC = nil
 	}
 
-	proposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
+	flowProposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	e.notifier.OnProposingBlock(proposal)
+	proposal := model.ProposalFromFlow(flowProposal) // turn the signed flow header into a proposal
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
@@ -445,20 +447,9 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Hex("signer", block.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
-	// broadcast the proposal
-	header := model.ProposalToFlow(proposal)
-	delay := e.paceMaker.BlockRateDelay()
-	elapsed := time.Since(start)
-	if elapsed > delay {
-		delay = 0
-	} else {
-		delay = delay - elapsed
-	}
-	err = e.communicator.BroadcastProposalWithDelay(header, delay)
-	if err != nil {
-		log.Warn().Err(err).Msg("could not forward proposal")
-	}
-
+	// raise a notification with proposal (also triggers broadcast)
+	targetPublicationTime := start.Add(e.paceMaker.BlockRateDelay())
+	e.notifier.OnOwnProposal(flowProposal, targetPublicationTime)
 	return nil
 }
 
@@ -530,19 +521,8 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		return nil
 	}
 
-	// The following code is only reached, if this replica has produced a vote.
-	// Send the vote to the next leader (or directly process it, if I am the next leader).
-	e.notifier.OnVoting(ownVote)
-
-	if e.committee.Self() == nextLeader { // I am the next leader
-		log.Debug().Msg("forwarding vote to vote aggregator")
-		e.voteAggregator.AddVote(ownVote)
-	} else {
-		log.Debug().Msg("forwarding vote to compliance engine")
-		err = e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-		if err != nil {
-			log.Warn().Err(err).Msg("could not forward vote")
-		}
-	}
+	log.Debug().Msg("forwarding vote to compliance engine")
+	// raise a notification to send vote
+	e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	return nil
 }

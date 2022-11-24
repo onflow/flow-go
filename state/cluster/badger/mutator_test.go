@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
@@ -255,6 +256,18 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	suite.Assert().Error(err)
 }
 
+// TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func (suite *MutatorSuite) TestExtend_InvalidParentView() {
+	block := suite.Block()
+	// change the block parent view
+	block.Header.ParentView--
+
+	err := suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
+
 func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
 	block := suite.Block()
 	// add the same transaction to a payload twice
@@ -297,7 +310,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
 
 	// the block should be indexed by its parent
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)

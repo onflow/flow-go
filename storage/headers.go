@@ -12,12 +12,12 @@ type Headers interface {
 	// Store will store a header.
 	Store(header *flow.Header) error
 
-	// ByBlockID returns the header with the given ID. It is available for
-	// finalized and ambiguous blocks.
+	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
+	// Error returns:
+	//  - ErrNotFound if no block header with the given ID exists
 	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
 
-	// ByHeight returns the block with the given number. It is only available
-	// for finalized blocks.
+	// ByHeight returns the block with the given number. It is only available for finalized blocks.
 	ByHeight(height uint64) (*flow.Header, error)
 
 	// ByParentID finds all children for the given parent block. The returned headers

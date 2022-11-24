@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module"
@@ -125,6 +124,7 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 	finishedJobs := make(map[uint64]bool, testJobsCount)
 
 	wg := sync.WaitGroup{}
+	mu := sync.Mutex{}
 
 	processor := func(_ irrecoverable.SignalerContext, _ module.Job, complete func()) { complete() }
 	notifier := func(jobID module.JobID) {
@@ -133,6 +133,8 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		index, err := JobIDToIndex(jobID)
 		assert.NoError(suite.T(), err)
 
+		mu.Lock()
+		defer mu.Unlock()
 		finishedJobs[index] = true
 
 		suite.T().Logf("job %d finished", index)
@@ -148,6 +150,8 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		})
 
 		// verify all jobs were run
+		mu.Lock()
+		defer mu.Unlock()
 		assert.Len(suite.T(), finishedJobs, len(jobData))
 		for index := range jobData {
 			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
@@ -164,6 +168,8 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		})
 
 		// verify all jobs were run
+		mu.Lock()
+		defer mu.Unlock()
 		assert.Len(suite.T(), finishedJobs, len(jobData))
 		for index := range jobData {
 			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
@@ -182,6 +188,7 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	jobData := generateTestData(testJobsCount)
 	finishedJobs := make(map[uint64]bool, testJobsCount)
 
+	mu := sync.Mutex{}
 	done := make(chan struct{})
 
 	processor := func(_ irrecoverable.SignalerContext, job module.Job, complete func()) {
@@ -196,6 +203,8 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 		index, err := JobIDToIndex(jobID)
 		assert.NoError(suite.T(), err)
 
+		mu.Lock()
+		defer mu.Unlock()
 		finishedJobs[index] = true
 
 		suite.T().Logf("job %d finished", index)
@@ -213,6 +222,8 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	})
 
 	// verify all jobs were run
+	mu.Lock()
+	defer mu.Unlock()
 	assert.Len(suite.T(), finishedJobs, int(stopIndex))
 	for index := range finishedJobs {
 		assert.LessOrEqual(suite.T(), index, stopIndex)
@@ -275,12 +286,9 @@ func (suite *ComponentConsumerSuite) runTest(
 	sendJobs func(),
 ) {
 	ctx, cancel := context.WithCancel(testCtx)
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	// use global context so we listen for errors until the test is finished
-	go irrecoverableNotExpected(suite.T(), testCtx, errChan)
-
-	consumer.Start(signalCtx)
+	consumer.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
@@ -288,13 +296,4 @@ func (suite *ComponentConsumerSuite) runTest(
 	// shutdown
 	cancel()
 	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
-	}
 }

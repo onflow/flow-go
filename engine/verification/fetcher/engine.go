@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -52,6 +53,8 @@ type Engine struct {
 	verifier              network.Engine            // used to push verifiable chunk down the verification pipeline.
 	requester             ChunkDataPackRequester    // used to request chunk data packs from network.
 	chunkConsumerNotifier module.ProcessingNotifier // used to notify chunk consumer that it is done processing a chunk.
+
+	stopAtHeight uint64
 }
 
 func New(
@@ -66,6 +69,7 @@ func New(
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
 	requester ChunkDataPackRequester,
+	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
 		unit:          engine.NewUnit(),
@@ -80,6 +84,7 @@ func New(
 		results:       results,
 		receipts:      receipts,
 		requester:     requester,
+		stopAtHeight:  stopAtHeight,
 	}
 
 	e.requester.WithChunkDataPackHandler(e)
@@ -166,9 +171,9 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 
 	span, _, isSampled := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
 	if isSampled {
-		span.SetTag("collection_index", chunk.CollectionIndex)
+		span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	}
-	defer span.Finish()
+	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
 
@@ -185,6 +190,13 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+		return false, blockHeight, nil
+	}
+
+	// skip chunk if it verifies a block at or above stop height
+	if e.stopAtHeight > 0 && blockHeight >= e.stopAtHeight {
+		e.log.Warn().Msgf("Skipping chunk %s - height  %d at or above stop height requested (%d)", chunkID, blockHeight, e.stopAtHeight)
 		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
 		return false, blockHeight, nil
 	}
@@ -253,7 +265,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Logger()
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
-	defer span.Finish()
+	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
 	if IsChunkDataPackValidationError(err) {

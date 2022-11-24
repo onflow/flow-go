@@ -151,6 +151,8 @@ func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
 
 // InterfaceFromMessageCode returns an interface with the correct underlying go type
 // of the message code represents.
+// Expected error returns during normal operations:
+//   - ErrUnknownMsgCode if message code does not match any of the configured message codes above.
 func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 	switch code {
 	// consensus
@@ -230,6 +232,6 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &message.TestMessage{}, "TestMessage", nil
 
 	default:
-		return nil, "", fmt.Errorf("invalid message code (%d)", code)
+		return nil, "", NewUnknownMsgCodeErr(code)
 	}
 }

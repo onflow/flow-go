@@ -65,16 +65,9 @@ func (p Params) EpochFallbackTriggered() (bool, error) {
 
 func (p Params) Root() (*flow.Header, error) {
 
-	// retrieve the root height
-	var height uint64
-	err := p.state.db.View(operation.RetrieveRootHeight(&height))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root height: %w", err)
-	}
-
-	// look up root header
+	// look up root block ID
 	var rootID flow.Identifier
-	err = p.state.db.View(operation.LookupBlockHeight(height, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
@@ -90,16 +83,9 @@ func (p Params) Root() (*flow.Header, error) {
 
 func (p Params) Seal() (*flow.Seal, error) {
 
-	// retrieve the root height
-	var height uint64
-	err := p.state.db.View(operation.RetrieveRootHeight(&height))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root height: %w", err)
-	}
-
 	// look up root header
 	var rootID flow.Identifier
-	err = p.state.db.View(operation.LookupBlockHeight(height, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}

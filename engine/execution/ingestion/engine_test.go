@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	mathRand "math/rand"
 	"strings"
 	"sync"
@@ -10,15 +11,15 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	engineCommon "github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -33,6 +34,7 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -72,6 +74,7 @@ type testingContext struct {
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
+	stopControl         *StopControl
 
 	mu *sync.Mutex
 }
@@ -146,7 +149,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
@@ -154,6 +157,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
+
+	stopControl := NewStopControl(zerolog.Nop(), false, 0)
 
 	engine, err = New(
 		log,
@@ -177,7 +182,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		10,
 		false,
 		checkAuthorizedAtBlock,
-		false,
+		nil,
+		nil,
+		stopControl,
 	)
 	require.NoError(t, err)
 
@@ -197,6 +204,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		identity:            myIdentity,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
 		identities:          identityList,
+		stopControl:         stopControl,
 
 		mu: &sync.Mutex{},
 	})
@@ -572,7 +580,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 
 		blockASnapshot.On("Head").Return(&blockA, nil)
 		blockCSnapshot.On("Head").Return(blockC.Block.Header, nil)
-		blockCSnapshot.On("ValidDescendants").Return(nil, nil)
+		blockCSnapshot.On("Descendants").Return(nil, nil)
 
 		ctx.state.On("AtHeight", blockC.Height()).Return(blockCSnapshot)
 
@@ -927,6 +935,212 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.True(t, ok)
 		_, ok = commits[blocks["D"].ID()]
 		require.True(t, ok)
+
+		// make sure no stopping has been engaged, as it was not set
+		stopState := ctx.stopControl.GetState()
+		require.Equal(t, stopState, StopControlOff)
+	})
+}
+
+func TestStopAtHeight(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockSealed := unittest.BlockHeaderFixture()
+
+		blocks := make(map[string]*entity.ExecutableBlock)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
+		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
+
+		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
+		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
+		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
+
+		// stop at block C
+		_, _, err := ctx.stopControl.SetStopHeight(blockSealed.Height+3, false)
+		require.NoError(t, err)
+
+		// log the blocks, so that we can link the block ID in the log with the blocks in tests
+		logBlocks(blocks)
+
+		// none of the blocks has any collection, so state is essentially the same
+		blocks["B"].StartState = blocks["A"].StartState
+		blocks["C"].StartState = blocks["A"].StartState
+		blocks["D"].StartState = blocks["A"].StartState
+
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blocks["A"].Block.Header.ParentID] = *blocks["A"].StartState
+
+		ctx.mockStateCommitsWithMap(commits)
+
+		// make sure the seal height won't trigger state syncing, so that all blocks
+		// will be executed.
+		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
+		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blocks["B"].Block.Header, unittest.IdentityListFixture(1))
+
+		wg := sync.WaitGroup{}
+		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		}
+
+		ctx.blocks.EXPECT().ByID(blocks["A"].ID()).Return(blocks["A"].Block, nil)
+		ctx.blocks.EXPECT().ByID(blocks["B"].ID()).Return(blocks["B"].Block, nil)
+		ctx.blocks.EXPECT().ByID(blocks["C"].ID()).Times(0)
+		ctx.blocks.EXPECT().ByID(blocks["D"].ID()).Times(0)
+
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), true, *blocks["B"].StartState, nil)
+
+		assert.False(t, ctx.stopControl.IsPaused())
+
+		wg.Add(1)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
+		wg.Add(1)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+
+		ctx.engine.BlockProcessable(blocks["C"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["D"].Block.Header)
+
+		// wait until all 4 blocks have been executed
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		// we don't pause until a block has been finalized
+		assert.False(t, ctx.stopControl.IsPaused())
+
+		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
+		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+
+		assert.False(t, ctx.stopControl.IsPaused())
+		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
+		assert.True(t, ctx.stopControl.IsPaused())
+
+		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
+
+		var ok bool
+		for c := range commits {
+			fmt.Printf("%s => ok\n", c.String())
+		}
+		_, ok = commits[blocks["A"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["B"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["C"].ID()]
+		require.False(t, ok)
+		_, ok = commits[blocks["D"].ID()]
+		require.False(t, ok)
+
+		// make sure C and D were not executed
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["C"].ID()
+		}), mock.Anything)
+
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["D"].ID()
+		}), mock.Anything)
+	})
+}
+
+// TestStopAtHeightRaceFinalization test a possible race condition which happens
+// when block at stop height N is finalized while N-1 is being executed.
+// If execution finishes exactly between finalization checking execution state and
+// setting block ID to crash, it's possible to miss and never actually stop the EN
+func TestStopAtHeightRaceFinalization(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockSealed := unittest.BlockHeaderFixture()
+
+		blocks := make(map[string]*entity.ExecutableBlock)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
+		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
+
+		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
+		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
+
+		// stop at block B, so B-1 (A) will be last executed
+		_, _, err := ctx.stopControl.SetStopHeight(blocks["B"].Height(), false)
+		require.NoError(t, err)
+
+		// log the blocks, so that we can link the block ID in the log with the blocks in tests
+		logBlocks(blocks)
+
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].Block.Header.ParentID).Return(
+			*blocks["A"].StartState, nil,
+		)
+
+		// make sure the seal height won't trigger state syncing, so that all blocks
+		// will be executed.
+		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
+		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
+
+		executionWg := sync.WaitGroup{}
+		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+			executionWg.Done()
+		}
+
+		ctx.blocks.EXPECT().ByID(blocks["A"].ID()).Return(blocks["A"].Block, nil)
+
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Return(nil, storageerr.ErrNotFound).Once()
+
+		// second call should come from finalization handler, which should wait for execution to finish before returning.
+		// This way we simulate possible race condition when block execution finishes exactly in the middle of finalization handler
+		// setting stopping blockID
+		finalizationWg := sync.WaitGroup{}
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Run(func(args mock.Arguments) {
+			executionWg.Wait()
+			finalizationWg.Done()
+		}).Return(nil, storageerr.ErrNotFound).Once()
+
+		// second call from finalization handler, third overall
+		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).
+			Return(flow.StateCommitment{}, nil).Maybe()
+
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+
+		assert.False(t, ctx.stopControl.IsPaused())
+
+		executionWg.Add(1)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+
+		assert.False(t, ctx.stopControl.IsPaused())
+
+		finalizationWg.Add(1)
+		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+
+		finalizationWg.Wait()
+		executionWg.Wait()
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
+
+		assert.True(t, ctx.stopControl.IsPaused())
+
+		var ok bool
+
+		// make sure B and C were not executed
+		_, ok = commits[blocks["A"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["B"].ID()]
+		require.False(t, ok)
+		_, ok = commits[blocks["C"].ID()]
+		require.False(t, ok)
+
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["B"].ID()
+		}), mock.Anything)
+
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+			return eb.ID() == blocks["C"].ID()
+		}), mock.Anything)
 	})
 }
 
@@ -958,6 +1172,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	e := Engine{
 		execState: execState,
 		tracer:    trace.NewNoopTracer(),
+		metrics:   metrics.NewNoopCollector(),
 		me:        me,
 	}
 
@@ -1214,7 +1429,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	request := module.NewMockRequester(ctrl)
 	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
-	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -1264,7 +1479,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		10,
 		false,
 		checkAuthorizedAtBlock,
-		false,
+		nil,
+		nil,
+		NewStopControl(zerolog.Nop(), false, 0),
 	)
 
 	require.NoError(t, err)
@@ -1509,4 +1726,36 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestRetryableUploader(t *testing.T) {
+	testRetryableUploader := new(FakeRetryableUploader)
+
+	engine := &Engine{
+		uploaders: []uploader.Uploader{testRetryableUploader},
+	}
+
+	err := engine.retryUpload()
+	assert.Nil(t, err)
+
+	require.True(t, testRetryableUploader.RetryUploadCalled())
+}
+
+// FakeRetryableUploader is one RetryableUploader for testing purposes.
+type FakeRetryableUploader struct {
+	uploader.RetryableUploaderWrapper
+	retryUploadCalled bool
+}
+
+func (f *FakeRetryableUploader) Upload(_ *execution.ComputationResult) error {
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUpload() error {
+	f.retryUploadCalled = true
+	return nil
+}
+
+func (f *FakeRetryableUploader) RetryUploadCalled() bool {
+	return f.retryUploadCalled
 }

@@ -37,11 +37,11 @@ func init() {
 // and merge them, depending on whether there are leaves or not.
 //
 // CONVENTION:
-//  * If the tree contains _any_ elements, the tree is defined by its root vertex.
-//    This case follows completely the convention for nodes: "In any existing tree,
-//    all nodes are non-nil."
-//  * Without any stored elements, there exists no root vertex in this data model,
-//    and we set `root` to nil.
+//   - If the tree contains _any_ elements, the tree is defined by its root vertex.
+//     This case follows completely the convention for nodes: "In any existing tree,
+//     all nodes are non-nil."
+//   - Without any stored elements, there exists no root vertex in this data model,
+//     and we set `root` to nil.
 type Tree struct {
 	keyLength int
 	root      node
@@ -66,12 +66,12 @@ func NewTree(keyLength int) (*Tree, error) {
 // are internally stored and copied where necessary, thereby allowing
 // external code to re-use the slices.
 // Returns:
-//  * (false, nil): key-value pair is stored; key did _not_ yet exist prior to update
-//  * (true, nil):  key-value pair is stored; key existed prior to update and the old
-//                  value was overwritten
-//  * (false, error): with possible error returns
-//    - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
-//    No other errors are returned.
+//   - (false, nil): key-value pair is stored; key did _not_ yet exist prior to update
+//   - (true, nil):  key-value pair is stored; key existed prior to update and the old
+//     value was overwritten
+//   - (false, error): with possible error returns
+//   - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
+//     No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	if len(key) != t.keyLength {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
@@ -83,7 +83,7 @@ func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 // unsafePut stores the given value in the trie under the given key. If the
 // key already exists, it will replace the value and return true.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
@@ -228,7 +228,7 @@ func (t *Tree) Get(key []byte) ([]byte, bool) {
 // unsafeGet retrieves the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeGet(key []byte) ([]byte, bool) {
 	cur := &t.root // start at the root
 	index := 0     // and we start at a zero index in the path
@@ -282,9 +282,9 @@ GetLoop:
 // - (proof, true) if key is found
 // - (nil, false) if key is not found
 // Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
-//  - if full node, append the sibling node hash value to sibling hash list
-//  - if short node, appends the node.shortCount to the short count list
-//  - if leaf, would capture the leaf value
+//   - if full node, append the sibling node hash value to sibling hash list
+//   - if short node, appends the node.shortCount to the short count list
+//   - if leaf, would capture the leaf value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// check the len of key first
@@ -391,7 +391,7 @@ func (t *Tree) Del(key []byte) bool {
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeDel(key []byte) bool {
 	cur := &t.root // start at the root
 	index := 0     // the index points to the bit we are processing in the path

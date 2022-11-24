@@ -37,10 +37,9 @@ func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func
 // epoch emergency fallback has been triggered, and the block where it was triggered.
 //
 // EECC can be triggered in two ways:
-// 1. Finalizing the first block past the epoch commitment deadline, when the
-//    next epoch has not yet been committed (see protocol.Params for more detail)
-// 2. Incorporating a block where an invalid service event would have been applied
-//    to the protocol state (see function handleEpochServiceEvents for more detail)
+//  1. Finalizing the first block past the epoch commitment deadline, when the
+//     next epoch has not yet been committed (see protocol.Params for more detail)
+//  2. Finalizing a fork in which an invalid service event was incorporated.
 //
 // Calling this function multiple times is a no-op and returns no expected errors.
 func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn *badger.Txn) error {

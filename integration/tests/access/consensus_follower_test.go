@@ -50,11 +50,7 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 }
 
 func (suite *ConsensusFollowerSuite) SetupTest() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "unstaked.go").
-		Str("testcase", suite.T().Name()).
-		Logger()
-	suite.log = logger
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
 	suite.log.Info().Msg("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
@@ -77,13 +73,11 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 		var err error
 		receiveBlocks := func() {
 			for i := 0; i < blockCount; i++ {
-				select {
-				case blockID := <-suite.followerMgr1.blockIDChan:
-					receivedBlocks[blockID] = struct{}{}
-					_, err = suite.followerMgr1.getBlock(blockID)
-					if err != nil {
-						return
-					}
+				blockID := <-suite.followerMgr1.blockIDChan
+				receivedBlocks[blockID] = struct{}{}
+				_, err = suite.followerMgr1.getBlock(blockID)
+				if err != nil {
+					return
 				}
 			}
 		}
@@ -138,7 +132,6 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),

@@ -14,10 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const IdentifierLen = 32
@@ -77,8 +75,11 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 // IsSampled is a utility method to sample entities based on their ids
 // the range is from [0, 64].
 // 0 is 100% (all data will be collected)
-// 32 is ~50%
-// 64 is ~0% (no data will be collected)
+// 1 is ~50%
+// 2 is ~25%
+// 3 is ~12.5%
+// ...
+// >64 is 0% (no data will be collected)
 func (id Identifier) IsSampled(sensitivity uint) bool {
 	if sensitivity > 64 {
 		return false
@@ -114,13 +115,16 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
-	//bs1 := binstat.EnterTime(binstat.BinMakeID + ".??lock.Fingerprint")
+	// collect fingerprint of the entity
 	data := fingerprint.Fingerprint(entity)
-	//binstat.LeaveVal(bs1, int64(len(data)))
-	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
+	// make ID from fingerprint
+	return MakeIDFromFingerPrint(data)
+}
+
+// MakeIDFromFingerPrint is similar to MakeID but skipping fingerprinting step.
+func MakeIDFromFingerPrint(fingerPrint []byte) Identifier {
 	var id Identifier
-	hash.ComputeSHA3_256((*[32]byte)(&id), data)
-	//binstat.Leave(bs2)
+	hash.ComputeSHA3_256((*[hash.HashLenSHA3_256]byte)(&id), fingerPrint)
 	return id
 }
 
@@ -202,7 +206,6 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 
 func CidToId(c cid.Cid) (Identifier, error) {
 	decoded, err := mh.Decode(c.Hash())
-
 	if err != nil {
 		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
 	}
@@ -210,7 +213,6 @@ func CidToId(c cid.Cid) (Identifier, error) {
 	if decoded.Code != mh.SHA2_256 {
 		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
 	}
-
 	if decoded.Length != IdentifierLen {
 		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
 	}

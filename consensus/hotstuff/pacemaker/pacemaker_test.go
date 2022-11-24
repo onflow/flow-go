@@ -1,6 +1,7 @@
 package pacemaker
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -18,16 +19,15 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 400.0 // Milliseconds
-	minRepTimeout          float64 = 100.0 // Milliseconds
-	maxRepTimeout          float64 = 600.0 // Milliseconds
-	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	multiplicativeDecrease float64 = 0.85  // multiplicative factor
+	minRepTimeout             float64 = 100.0 // Milliseconds
+	maxRepTimeout             float64 = 600.0 // Milliseconds
+	multiplicativeIncrease    float64 = 1.5   // multiplicative factor
+	happyPathMaxRoundFailures uint64  = 6     // number of failed rounds before first timeout increase
 )
 
 func expectedTimerInfo(view uint64) interface{} {
 	return mock.MatchedBy(
-		func(timerInfo *model.TimerInfo) bool {
+		func(timerInfo model.TimerInfo) bool {
 			return timerInfo.View == view
 		})
 }
@@ -43,6 +43,7 @@ type ActivePaceMakerTestSuite struct {
 	notifier     *mocks.Consumer
 	persist      *mocks.Persister
 	paceMaker    *ActivePaceMaker
+	stop         context.CancelFunc
 }
 
 func (s *ActivePaceMakerTestSuite) SetupTest() {
@@ -50,12 +51,12 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.persist = mocks.NewPersister(s.T())
 
 	tc, err := timeout.NewConfig(
-		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
 		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
-		multiplicativeDecrease,
-		0)
+		happyPathMaxRoundFailures,
+		0,
+		time.Duration(maxRepTimeout*1e6))
 	require.NoError(s.T(), err)
 
 	s.livenessData = &hotstuff.LivenessData{
@@ -71,7 +72,13 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.livenessData.CurrentView)).Return().Once()
 
-	s.paceMaker.Start()
+	var ctx context.Context
+	ctx, s.stop = context.WithCancel(context.Background())
+	s.paceMaker.Start(ctx)
+}
+
+func (s *ActivePaceMakerTestSuite) TearDownTest() {
+	s.stop()
 }
 
 func QC(view uint64) *flow.QuorumCertificate {
@@ -93,6 +100,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4)).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", qc, uint64(4)).Return().Once()
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, qc.View+1).Once()
 	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), qc.View+1, s.paceMaker.CurView())
@@ -105,6 +113,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1)).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", qc, qc.View+1).Return().Once()
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, qc.View+1).Once()
 	nve, err = s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
 	require.True(s.T(), nve.View == qc.View+1)
@@ -127,6 +136,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
 	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), tc.View+1, s.paceMaker.CurView())
@@ -145,6 +155,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
 	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err = s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.True(s.T(), nve.View == tc.View+1)
@@ -202,12 +213,14 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Times(2)
 	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NotNil(s.T(), nve)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), s.paceMaker.LastViewTC())
 
 	qc := QC(tc.View + 1)
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, qc.View+1).Once()
 	nve, err = s.paceMaker.ProcessQC(qc)
 	require.NotNil(s.T(), nve)
 	require.NoError(s.T(), err)
@@ -232,6 +245,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
 	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
 	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
 		helper.WithTCNewestQC(s.livenessData.NewestQC))
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), nve)
@@ -258,6 +272,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
 	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
 	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
 		helper.WithTCNewestQC(s.livenessData.NewestQC))
+	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), nve)

@@ -1,8 +1,8 @@
 package pacemaker
 
 import (
+	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -23,20 +23,24 @@ import (
 // A local timeout for a view `v` causes a node to:
 // * never produce a vote for any proposal with view ≤ `v`, after the timeout
 // * produce and broadcast a timeout object, which can form a part of the TC for the timed out view
+//
+// Not concurrency safe.
 type ActivePaceMaker struct {
+	ctx            context.Context
 	timeoutControl *timeout.Controller
 	notifier       hotstuff.Consumer
 	persist        hotstuff.Persister
 	livenessData   *hotstuff.LivenessData
-	started        sync.Once
+	started        bool
 }
 
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 
 // New creates a new ActivePaceMaker instance
-//  * startView is the view for the pacemaker to start with.
-//  * timeoutController controls the timeout trigger.
-//  * notifier provides callbacks for pacemaker events.
+//   - startView is the view for the pacemaker to start with.
+//   - timeoutController controls the timeout trigger.
+//   - notifier provides callbacks for pacemaker events.
+//
 // Expected error conditions:
 // * model.ConfigurationError if initial LivenessData is invalid
 func New(timeoutController *timeout.Controller,
@@ -56,6 +60,7 @@ func New(timeoutController *timeout.Controller,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
 		persist:        persist,
+		started:        false,
 	}
 	return &pm, nil
 }
@@ -121,7 +126,8 @@ func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
 // fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
-	if qc.View < p.CurView() {
+	oldView := p.CurView()
+	if qc.View < oldView {
 		err := p.updateNewestQC(qc)
 		if err != nil {
 			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
@@ -139,8 +145,9 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 	}
 
 	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	p.notifier.OnViewChange(oldView, newView)
 
-	timerInfo := p.timeoutControl.StartTimeout(newView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -160,7 +167,8 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, nil
 	}
 
-	if tc.View < p.CurView() {
+	oldView := p.CurView()
+	if tc.View < oldView {
 		err := p.updateNewestQC(tc.NewestQC)
 		if err != nil {
 			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
@@ -178,8 +186,9 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	}
 
 	p.notifier.OnTcTriggeredViewChange(tc, newView)
+	p.notifier.OnViewChange(oldView, newView)
 
-	timerInfo := p.timeoutControl.StartTimeout(newView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -202,11 +211,17 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
 
 // Start starts the pacemaker by starting the initial timer for the current view.
 // Start should only be called once - subsequent calls are a no-op.
-func (p *ActivePaceMaker) Start() {
-	p.started.Do(func() {
-		timerInfo := p.timeoutControl.StartTimeout(p.CurView())
-		p.notifier.OnStartingTimeout(timerInfo)
-	})
+// CAUTION: ActivePaceMaker is not concurrency safe. The Start method must
+// be executed by the same goroutine that also calls the other business logic
+// methods, or concurrency safety has to be implemented externally.
+func (p *ActivePaceMaker) Start(ctx context.Context) {
+	if p.started {
+		return
+	}
+	p.started = true
+	p.ctx = ctx
+	timerInfo := p.timeoutControl.StartTimeout(ctx, p.CurView())
+	p.notifier.OnStartingTimeout(timerInfo)
 }
 
 // BlockRateDelay returns the delay for broadcasting its own proposals.

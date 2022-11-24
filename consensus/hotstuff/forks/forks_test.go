@@ -421,7 +421,6 @@ func TestNotification(t *testing.T) {
 	notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
-	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	genesisBQ := makeGenesis()
 
@@ -460,11 +459,10 @@ func TestNewestView(t *testing.T) {
 
 func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
 	notifier := mocks.NewConsumer(t)
-	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
+	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Maybe()
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil).Maybe()
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil).Maybe()
-	finalizationCallback.On("MakeValid", mock.Anything).Return(nil).Maybe()
 
 	genesisBQ := makeGenesis()
 

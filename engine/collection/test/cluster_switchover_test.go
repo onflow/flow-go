@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -16,8 +17,9 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
@@ -99,9 +101,14 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
+	defer cancel()
+
 	// create a mock node for each collector identity
 	for _, collector := range nodeInfos {
-		node := testutil.CollectionNode(tc.T(), tc.hub, collector, tc.root)
+		node := testutil.CollectionNode(tc.T(), ctx, tc.hub, collector, tc.root)
 		tc.nodes = append(tc.nodes, node)
 	}
 
@@ -113,7 +120,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.root,
 	)
 	tc.sn = new(mocknetwork.Engine)
-	_, err = consensus.Net.Register(network.ReceiveGuarantees, tc.sn)
+	_, err = consensus.Net.Register(channels.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state
@@ -208,8 +215,10 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	// start all node components
 	nodes := make([]module.ReadyDoneAware, 0, len(tc.nodes))
 	for _, node := range tc.nodes {
+		node.Start(tc.T())
 		nodes = append(nodes, node)
 	}
+
 	unittest.RequireCloseBefore(tc.T(), util.AllReady(nodes...), time.Second, "could not start nodes")
 
 	// start continuous delivery for all nodes

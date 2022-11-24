@@ -5,9 +5,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,13 +20,20 @@ const activeSpan spanKey = "activeSpan"
 // LogTracer is the implementation of the Tracer interface which passes
 // all the traces back to the passed logger and print them
 // this is mostly useful for debugging and testing
+// TODO(rbtz): make private
 type LogTracer struct {
-	log zerolog.Logger
+	log      zerolog.Logger
+	provider trace.TracerProvider
 }
 
-// LogTracer creates a new tracer.
+// NewLogTracer creates a new zerolog-based tracer.
+// TODO: Consider switching to go.opentelemetry.io/otel/exporters/stdout/stdouttrace
 func NewLogTracer(log zerolog.Logger) *LogTracer {
-	return &LogTracer{log: log}
+	t := &LogTracer{
+		log: log,
+	}
+	t.provider = &logTracerProvider{tracer: t}
+	return t
 }
 
 func (t *LogTracer) Ready() <-chan struct{} {
@@ -40,13 +48,20 @@ func (t *LogTracer) Done() <-chan struct{} {
 	return done
 }
 
+// Start implements trace.Tracer interface.
+func (t *LogTracer) Start(ctx context.Context, spanName string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
+	sp := newLogSpan(t, spanName)
+	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
+	return ctx, sp
+}
+
 func (t *LogTracer) StartBlockSpan(
 	ctx context.Context,
 	blockID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context, bool) {
+	ctx, sp := t.Start(ctx, string(spanName), opts...)
 	return sp, ctx, true
 }
 
@@ -54,9 +69,9 @@ func (t *LogTracer) StartCollectionSpan(
 	ctx context.Context,
 	collectionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context, bool) {
+	ctx, sp := t.Start(ctx, string(spanName), opts...)
 	return sp, ctx, true
 }
 
@@ -66,43 +81,43 @@ func (t *LogTracer) StartTransactionSpan(
 	ctx context.Context,
 	transactionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context, bool) {
+	ctx, sp := t.Start(ctx, string(spanName), opts...)
 	return sp, ctx, true
 }
 
 func (t *LogTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
-	opts ...opentracing.StartSpanOption,
-) (opentracing.Span, context.Context) {
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context) {
 	parentSpanID := ctx.Value(activeSpan).(uint64)
-	sp := NewLogSpanWithParent(t, operationName, parentSpanID)
+	sp := newLogSpanWithParent(t, operationName, parentSpanID)
 	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
-	return sp, opentracing.ContextWithSpan(ctx, sp)
+	return sp, trace.ContextWithSpan(ctx, sp)
 }
 
 func (t *LogTracer) StartSpanFromParent(
-	span opentracing.Span,
+	span trace.Span,
 	operationName SpanName,
-	opts ...opentracing.StartSpanOption,
-) opentracing.Span {
-	parentSpan := span.(*LogSpan)
-	return NewLogSpanWithParent(t, operationName, parentSpan.spanID)
+	opts ...trace.SpanStartOption,
+) trace.Span {
+	parentSpan := span.(*logSpan)
+	return newLogSpanWithParent(t, operationName, parentSpan.spanID)
 }
 
 func (t *LogTracer) RecordSpanFromParent(
-	span opentracing.Span,
+	span trace.Span,
 	operationName SpanName,
 	duration time.Duration,
-	logs []opentracing.LogRecord,
-	opts ...opentracing.StartSpanOption,
+	attrs []attribute.KeyValue,
+	opts ...trace.SpanStartOption,
 ) {
-	parentSpan := span.(*LogSpan)
-	sp := NewLogSpanWithParent(t, operationName, parentSpan.spanID)
+	parentSpan := span.(*logSpan)
+	sp := newLogSpanWithParent(t, operationName, parentSpan.spanID)
 	sp.start = time.Now().Add(-duration)
-	sp.Finish()
+	span.End()
 }
 
 // WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
@@ -110,76 +125,78 @@ func (t *LogTracer) RecordSpanFromParent(
 func (t *LogTracer) WithSpanFromContext(ctx context.Context,
 	operationName SpanName,
 	f func(),
-	opts ...opentracing.StartSpanOption) {
+	opts ...trace.SpanStartOption,
+) {
 	span, _ := t.StartSpanFromContext(ctx, operationName, opts...)
-	defer span.Finish()
+	defer span.End()
 
 	f()
 }
 
-type LogSpan struct {
-	tracer        *LogTracer
+var _ trace.Span = &logSpan{}
+
+type logSpan struct {
+	tracer *LogTracer
+
 	spanID        uint64
 	parentID      uint64
-	operationName SpanName
+	operationName string
 	start         time.Time
 	end           time.Time
-	tags          map[string]interface{}
+	attrs         map[attribute.Key]attribute.Value
 }
 
-func NewLogSpan(tracer *LogTracer, operationName SpanName) *LogSpan {
-	return &LogSpan{
+func newLogSpan(tracer *LogTracer, operationName string) *logSpan {
+	return &logSpan{
 		tracer:        tracer,
 		spanID:        rand.Uint64(),
 		operationName: operationName,
 		start:         time.Now(),
-		tags:          make(map[string]interface{}),
+		attrs:         make(map[attribute.Key]attribute.Value),
 	}
 }
 
-func NewLogSpanWithParent(tracer *LogTracer, operationName SpanName, parentSpanID uint64) *LogSpan {
-	sp := NewLogSpan(tracer, operationName)
+func newLogSpanWithParent(tracer *LogTracer, operationName SpanName, parentSpanID uint64) *logSpan {
+	sp := newLogSpan(tracer, string(operationName))
 	sp.parentID = parentSpanID
 	return sp
 }
 
-func (s *LogSpan) ProduceLog() {
+func (s *logSpan) produceLog() {
 	s.tracer.log.Info().
 		Uint64("spanID", s.spanID).
 		Uint64("parent", s.parentID).
 		Time("start", s.start).
 		Time("end", s.end).
-		Msgf("Span %s (duration %d ms)", s.operationName, s.end.Sub(s.start).Milliseconds())
+		TimeDiff("duration", s.end, s.start).
+		Str("operationName", string(s.operationName)).
+		Interface("attrs", s.attrs).
+		Msg("span")
 }
 
-func (s *LogSpan) Finish() {
+func (s *logSpan) End(...trace.SpanEndOption) {
 	s.end = time.Now()
-	s.ProduceLog()
+	s.produceLog()
 }
-func (s *LogSpan) FinishWithOptions(opts opentracing.FinishOptions) {
-	// TODO support finish options
-	s.Finish()
-}
-func (s *LogSpan) Context() opentracing.SpanContext {
-	return &NoopSpanContext{}
-}
-func (s *LogSpan) SetOperationName(operationName string) opentracing.Span {
-	s.operationName = SpanName(operationName)
-	return s
-}
-func (s *LogSpan) SetTag(key string, value interface{}) opentracing.Span {
-	s.tags[key] = value
-	return s
-}
-func (s *LogSpan) LogFields(fields ...log.Field) {
-	for _, f := range fields {
-		s.tags[f.Key()] = f.Value()
+
+func (s *logSpan) SpanContext() trace.SpanContext { return trace.SpanContext{} }
+func (s *logSpan) IsRecording() bool              { return s.end == time.Time{} }
+func (s *logSpan) SetStatus(codes.Code, string)   {}
+func (s *logSpan) SetError(bool)                  {}
+func (s *logSpan) SetAttributes(attrs ...attribute.KeyValue) {
+	for _, f := range attrs {
+		s.attrs[f.Key] = f.Value
 	}
 }
-func (s *LogSpan) LogKV(alternatingKeyValues ...interface{})                   {}
-func (s *LogSpan) SetBaggageItem(restrictedKey, value string) opentracing.Span { return s }
-func (s *LogSpan) BaggageItem(restrictedKey string) string                     { return "" }
-func (s *LogSpan) Tracer() opentracing.Tracer                                  { return nil }
-func (s *LogSpan) LogEvent(event string)                                       {}
-func (s *LogSpan) LogEventWithPayload(event string, payload interface{})       {}
-func (s *LogSpan) Log(data opentracing.LogData)                                {}
+func (s *logSpan) RecordError(error, ...trace.EventOption) {}
+func (s *logSpan) AddEvent(string, ...trace.EventOption)   {}
+func (s *logSpan) SetName(string)                          {}
+func (s *logSpan) TracerProvider() trace.TracerProvider    { return s.tracer.provider }
+
+type logTracerProvider struct {
+	tracer *LogTracer
+}
+
+func (ltp *logTracerProvider) Tracer(instrumentationName string, _ ...trace.TracerOption) trace.Tracer {
+	return ltp.tracer
+}

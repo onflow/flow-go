@@ -1,107 +1,67 @@
 package errors
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AccountNotFoundError is returned when account doesn't exist for the given address
-type AccountNotFoundError struct {
-	address flow.Address
-}
-
-// NewAccountNotFoundError constructs a new AccountNotFoundError
-func NewAccountNotFoundError(address flow.Address) error {
-	return &AccountNotFoundError{
-		address: address,
-	}
-}
-
-func (e AccountNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s account not found for address %s",
-		e.Code().String(),
-		e.address.String(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountNotFoundError) Code() ErrorCode {
-	return ErrCodeAccountNotFoundError
+func NewAccountNotFoundError(address flow.Address) CodedError {
+	return NewCodedError(
+		ErrCodeAccountNotFoundError,
+		"account not found for address %s",
+		address.String())
 }
 
 // IsAccountNotFoundError returns true if error has this type
 func IsAccountNotFoundError(err error) bool {
-	var t *AccountNotFoundError
-	return errors.As(err, &t)
+	return HasErrorCode(err, ErrCodeAccountNotFoundError)
 }
 
-// AccountAlreadyExistsError is returned when account creation fails because
-// another account already exist at that address
+// NewAccountAlreadyExistsError constructs a new CodedError. It is returned
+// when account creation fails because another account already exist at that
+// address.
+//
 // TODO maybe this should be failure since user has no control over this
-type AccountAlreadyExistsError struct {
-	address flow.Address
+func NewAccountAlreadyExistsError(address flow.Address) CodedError {
+	return NewCodedError(
+		ErrCodeAccountAlreadyExistsError,
+		"account with address %s already exists",
+		address)
 }
 
-// NewAccountAlreadyExistsError constructs a new AccountAlreadyExistsError
-func NewAccountAlreadyExistsError(address flow.Address) error {
-	return &AccountAlreadyExistsError{address: address}
-}
-
-func (e AccountAlreadyExistsError) Error() string {
-	return fmt.Sprintf(
-		"%s account with address %s already exists",
-		e.Code().String(),
-		e.address,
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountAlreadyExistsError) Code() ErrorCode {
-	return ErrCodeAccountAlreadyExistsError
-}
-
-// AccountPublicKeyNotFoundError is returned when a public key not found for the given address and key index
-type AccountPublicKeyNotFoundError struct {
-	address  flow.Address
-	keyIndex uint64
-}
-
-// NewAccountPublicKeyNotFoundError constructs a new AccountPublicKeyNotFoundError
-func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) *AccountPublicKeyNotFoundError {
-	return &AccountPublicKeyNotFoundError{address: address, keyIndex: keyIndex}
+// NewAccountPublicKeyNotFoundError constructs a new CodedError. It is returned
+// when a public key not found for the given address and key index.
+func NewAccountPublicKeyNotFoundError(
+	address flow.Address,
+	keyIndex uint64,
+) CodedError {
+	return NewCodedError(
+		ErrCodeAccountPublicKeyNotFoundError,
+		"account public key not found for address %s and key index %d",
+		address,
+		keyIndex)
 }
 
 // IsAccountAccountPublicKeyNotFoundError returns true if error has this type
 func IsAccountAccountPublicKeyNotFoundError(err error) bool {
-	var t *AccountPublicKeyNotFoundError
-	return errors.As(err, &t)
-}
-
-func (e AccountPublicKeyNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s account public key not found for address %s and key index %d",
-		e.Code().String(),
-		e.address,
-		e.keyIndex,
-	)
-}
-
-// Code returns the error code for this error type
-func (e AccountPublicKeyNotFoundError) Code() ErrorCode {
-	return ErrCodeAccountPublicKeyNotFoundError
+	return HasErrorCode(err, ErrCodeAccountPublicKeyNotFoundError)
 }
 
 // FrozenAccountError is returned when a frozen account signs a transaction
 type FrozenAccountError struct {
 	address flow.Address
+
+	CodedError
 }
 
 // NewFrozenAccountError constructs a new FrozenAccountError
-func NewFrozenAccountError(address flow.Address) error {
-	return &FrozenAccountError{address: address}
+func NewFrozenAccountError(address flow.Address) CodedError {
+	return FrozenAccountError{
+		address: address,
+		CodedError: NewCodedError(
+			ErrCodeFrozenAccountError,
+			"account %s is frozen",
+			address),
+	}
 }
 
 // Address returns the address of frozen account
@@ -109,40 +69,17 @@ func (e FrozenAccountError) Address() flow.Address {
 	return e.address
 }
 
-func (e FrozenAccountError) Error() string {
-	return fmt.Sprintf("%s account %s is frozen", e.Code().String(), e.address)
-}
-
-// Code returns the error code for this error type
-func (e FrozenAccountError) Code() ErrorCode {
-	return ErrCodeFrozenAccountError
-}
-
-// StorageNotInitialized captures a fatal error when trying to update storage used on a non-initialized account
-type StorageNotInitialized struct {
-	Address string
-}
-
-// NewStorageNotInitialized formats and returns a new StorageNotInitialized
-func NewStorageNotInitialized(address string) *StorageNotInitialized {
-	return &StorageNotInitialized{
-		Address: address,
-	}
-}
-
-func (e *StorageNotInitialized) Error() string {
-	return fmt.Sprintf("%s account %s storage used is not initialized or not initialized correctly",
-		e.Code().String(),
-		e.Address)
-}
-
-// Code returns the failure code
-func (e *StorageNotInitialized) Code() ErrorCode {
-	return ErrCodeAccountStorageNotInitializedError
-}
-
-// IsStorageNotInitializedFailure  checks if the error is a StorageNotInitializedFailure
-func IsStorageNotInitializedFailure(err error) bool {
-	var t *StorageNotInitialized
-	return errors.As(err, &t)
+// NewAccountPublicKeyLimitError constructs a new CodedError.  It is returned
+// when an account tries to add public keys over the limit.
+func NewAccountPublicKeyLimitError(
+	address flow.Address,
+	counts uint64,
+	limit uint64,
+) CodedError {
+	return NewCodedError(
+		ErrCodeAccountPublicKeyLimitError,
+		"account's (%s) public key count (%d) exceeded the limit (%d)",
+		address,
+		counts,
+		limit)
 }

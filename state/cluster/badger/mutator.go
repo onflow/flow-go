@@ -36,13 +36,18 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 	return mutableState, nil
 }
 
+// Extend validates that the given cluster block passes compliance rules, then inserts
+// it to the cluster state.
 // TODO (Ramtin) pass context here
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
 	blockID := block.ID()
 
 	span, ctx, _ := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 
@@ -83,6 +88,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
+		// extending block must have correct parent view
+		if header.ParentView != parent.View {
+			return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+				header.ParentView, parent.View)
+		}
+
 		// the extending block must increase height by 1 from parent
 		if header.Height != parent.Height+1 {
 			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
@@ -93,7 +104,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
-		setupSpan.Finish()
+		setupSpan.End()
 		checkAnsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
 
 		// start with the extending block's parent
@@ -116,9 +127,14 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			parentID = ancestor.ParentID
 		}
 
-		checkAnsSpan.Finish()
+		checkAnsSpan.End()
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-		defer checkTxsSpan.Finish()
+		defer checkTxsSpan.End()
+
+		// no validation of transactions is necessary for empty collections
+		if payload.Collection.Len() == 0 {
+			return nil
+		}
 
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
@@ -214,7 +230,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	}
 
 	insertDbSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	defer insertDbSpan.Finish()
+	defer insertDbSpan.End()
 
 	// insert the new block
 	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))

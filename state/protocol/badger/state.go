@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
@@ -30,6 +31,8 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+	rootHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -147,6 +150,12 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
+
 	return state, nil
 }
 
@@ -181,10 +190,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
-			}
-			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
-			if err != nil {
-				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
@@ -505,6 +510,11 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	return state, nil
 }
@@ -518,7 +528,8 @@ func (state *State) Sealed() protocol.Snapshot {
 	var sealed uint64
 	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
-		return invalid.NewSnapshot(fmt.Errorf("could not retrieve sealed height: %w", err))
+		// sealed height must always be set, all errors here are critical
+		return invalid.NewSnapshotf("could not retrieve sealed height: %w", err)
 	}
 	return state.AtHeight(sealed)
 }
@@ -528,6 +539,7 @@ func (state *State) Final() protocol.Snapshot {
 	var finalized uint64
 	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
+		// finalized height must always be set, so all errors here are critical
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
 	}
 	return state.AtHeight(finalized)
@@ -537,13 +549,18 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
-	if err != nil {
-		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
+	if errors.Is(err, storage.ErrNotFound) {
+		return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
 	}
-	return NewSnapshot(state, blockID)
+	if err != nil {
+		// critical storage error
+		return invalid.NewSnapshotf("could not look up block by height: %w", err)
+	}
+	return state.AtBlockID(blockID)
 }
 
 func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	// TODO should return invalid.NewSnapshot(ErrUnknownSnapshotReference) if block doesn't exist
 	return NewSnapshot(state, blockID)
 }
 
@@ -581,7 +598,7 @@ func newState(
 	}
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state
 func IsBootstrapped(db *badger.DB) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -646,6 +663,17 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	return nil
 }
 
+// populateCache is used after opening or bootstrapping the state to populate the cache.
+func (state *State) populateCache() error {
+	var rootHeight uint64
+	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not read root block to populate cache: %w", err)
+	}
+	state.rootHeight = rootHeight
+	return nil
+}
+
 // updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
 // based on the current epoch phase of the input snapshot. It should be called
 // at startup and during transitions between EpochSetup and EpochCommitted phases.
@@ -685,6 +713,11 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	return nil
 }
 
+// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
+// Returns:
+// * (true, nil) if epoch fallback is triggered
+// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
+// * (false, err) if an unexpected error occurs
 func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
 	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))

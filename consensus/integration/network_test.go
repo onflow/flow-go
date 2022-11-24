@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
@@ -45,7 +46,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 		ctx:      context.Background(),
 		hub:      h,
 		originID: originID,
-		conduits: make(map[network.Channel]*Conduit),
+		conduits: make(map[channels.Channel]*Conduit),
 		node:     node,
 	}
 	h.networks[originID] = net
@@ -64,13 +65,13 @@ type Network struct {
 	hub      *Hub
 	node     *Node
 	originID flow.Identifier
-	conduits map[network.Channel]*Conduit
+	conduits map[channels.Channel]*Conduit
 	mocknetwork.Network
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
+func (n *Network) Register(channel channels.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	ctx, cancel := context.WithCancel(n.ctx)
 	con := &Conduit{
 		ctx:     ctx,
@@ -93,7 +94,7 @@ func (n *Network) Register(channel network.Channel, engine network.MessageProces
 }
 
 // unregister unregisters the engine associated with the given channel and closes the conduit queue.
-func (n *Network) unregister(channel network.Channel) error {
+func (n *Network) unregister(channel channels.Channel) error {
 	con := n.conduits[channel]
 	close(con.queue)
 	delete(n.conduits, channel)
@@ -103,7 +104,7 @@ func (n *Network) unregister(channel network.Channel) error {
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
 // This implementation uses unicast under the hood.
-func (n *Network) submit(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(event interface{}, channel channels.Channel, targetIDs ...flow.Identifier) error {
 	var sendErrors *multierror.Error
 	for _, targetID := range targetIDs {
 		if err := n.unicast(event, channel, targetID); err != nil {
@@ -115,7 +116,7 @@ func (n *Network) submit(event interface{}, channel network.Channel, targetIDs .
 
 // unicast is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
-func (n *Network) unicast(event interface{}, channel network.Channel, targetID flow.Identifier) error {
+func (n *Network) unicast(event interface{}, channel channels.Channel, targetID flow.Identifier) error {
 	net, found := n.hub.networks[targetID]
 	if !found {
 		return fmt.Errorf("could not find target network on hub: %x", targetID)
@@ -153,14 +154,14 @@ func (n *Network) unicast(event interface{}, channel network.Channel, targetID f
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
+func (n *Network) publish(event interface{}, channel channels.Channel, targetIDs ...flow.Identifier) error {
 	return n.submit(event, channel, targetIDs...)
 }
 
 // multicast is called when an Engine attached to the channel is sending an event to a number of randomly chosen
 // Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(event interface{}, channel network.Channel, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) multicast(event interface{}, channel channels.Channel, num uint, targetIDs ...flow.Identifier) error {
 	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(event, channel, targetIDs...)
 }
@@ -169,7 +170,7 @@ type Conduit struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	net     *Network
-	channel network.Channel
+	channel channels.Channel
 	queue   chan message
 }
 

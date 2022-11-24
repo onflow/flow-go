@@ -2,7 +2,7 @@ package eventloop
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -40,11 +40,11 @@ type EventLoopTestSuite struct {
 
 func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = mocks.NewEventHandler(s.T())
-	s.eh.On("Start").Return(nil).Maybe()
-	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
+	s.eh.On("Start", mock.Anything).Return(nil).Maybe()
+	s.eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1)).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
@@ -75,13 +75,12 @@ func (s *EventLoopTestSuite) TestReadyDone() {
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
 func (s *EventLoopTestSuite) Test_SubmitProposal() {
-	proposal := unittest.BlockHeaderFixture()
-	expectedProposal := model.ProposalFromFlow(proposal, proposal.View-1)
+	proposal := helper.MakeProposal()
 	processed := atomic.NewBool(false)
-	s.eh.On("OnReceiveProposal", expectedProposal).Run(func(args mock.Arguments) {
+	s.eh.On("OnReceiveProposal", proposal).Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
-	s.eventLoop.SubmitProposal(proposal, proposal.View-1)
+	s.eventLoop.SubmitProposal(proposal)
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
@@ -192,18 +191,19 @@ func (s *EventLoopTestSuite) Test_OnPartialTcCreated() {
 func TestEventLoop_Timeout(t *testing.T) {
 	eh := &mocks.EventHandler{}
 	processed := atomic.NewBool(false)
-	eh.On("Start").Return(nil).Once()
-	eh.On("TimeoutChannel").Return(time.NewTimer(100 * time.Millisecond).C)
+	eh.On("Start", mock.Anything).Return(nil).Once()
 	eh.On("OnReceiveQc", mock.Anything).Return(nil).Maybe()
 	eh.On("OnReceiveProposal", mock.Anything).Return(nil).Maybe()
 	eh.On("OnLocalTimeout").Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
+
+	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
@@ -228,13 +228,12 @@ func TestEventLoop_Timeout(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for !processed.Load() {
-			proposal := unittest.BlockHeaderFixture()
-			eventLoop.SubmitProposal(proposal, proposal.View-1)
+			eventLoop.SubmitProposal(helper.MakeProposal())
 		}
 	}()
 
 	require.Eventually(t, processed.Load, time.Millisecond*200, time.Millisecond*10)
-	wg.Wait()
+	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Millisecond*200)
 
 	cancel()
 	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
@@ -244,13 +243,13 @@ func TestEventLoop_Timeout(t *testing.T) {
 // when startTime argument is used
 func TestReadyDoneWithStartTime(t *testing.T) {
 	eh := &mocks.EventHandler{}
-	eh.On("Start").Return(nil)
-	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
+	eh.On("Start", mock.Anything).Return(nil)
+	eh.On("TimeoutChannel").Return(make(<-chan time.Time, 1))
 	eh.On("OnLocalTimeout").Return(nil)
 
 	metrics := metrics.NewNoopCollector()
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 
 	startTimeDuration := 2 * time.Second
 	startTime := time.Now().Add(startTimeDuration)
@@ -271,7 +270,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	parentBlock := unittest.BlockHeaderFixture()
 	block := unittest.BlockHeaderWithParentFixture(parentBlock)
-	eventLoop.SubmitProposal(block, parentBlock.View)
+	eventLoop.SubmitProposal(model.ProposalFromFlow(block))
 
 	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()

@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -30,22 +31,24 @@ type LivenessData struct {
 //
 // • The channel for the CURRENTLY ACTIVE timeout is returned by PaceMaker.TimeoutChannel()
 //
-// • Each time the EventHandler processes an event, the EventHandler might call into PaceMaker
-//   potentially resulting in a state transition and the PaceMaker starting a new timeout
+//   - Each time the EventHandler processes an event, the EventHandler might call into PaceMaker
+//     potentially resulting in a state transition and the PaceMaker starting a new timeout
 //
-// • Hence, after processing any event, EventHandler should retrieve the current TimeoutChannel
-//   from the PaceMaker.
+//   - Hence, after processing any event, EventHandler should retrieve the current TimeoutChannel
+//     from the PaceMaker.
 //
 // For Example:
 //
-// for {
+//	for {
 //		timeoutChannel := el.eventHandler.TimeoutChannel()
 //		select {
 //		   case <-timeoutChannel:
 //		    	el.eventHandler.OnLocalTimeout()
 //		   case <other events>
 //		}
-// }
+//	}
+//
+// Not concurrency safe.
 type PaceMaker interface {
 
 	// CurView returns the current view.
@@ -74,8 +77,12 @@ type PaceMaker interface {
 	TimeoutChannel() <-chan time.Time
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
-	Start()
+	// CAUTION: EventHandler is not concurrency safe. The Start method must
+	// be executed by the same goroutine that also calls the other business logic
+	// methods, or concurrency safety has to be implemented externally.
+	Start(ctx context.Context)
 
-	// BlockRateDelay
+	// BlockRateDelay returns the minimal wait time for broadcasting a proposal, measured from
+	// the point in time when the primary (locally) enters the respective view.
 	BlockRateDelay() time.Duration
 }

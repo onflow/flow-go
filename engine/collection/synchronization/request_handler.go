@@ -12,9 +12,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 )
@@ -87,7 +89,7 @@ func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (r *RequestHandlerEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := r.Process(channel, originID, event)
 	if err != nil {
 		r.log.Fatal().Err(err).Msg("internal error processing event")
@@ -101,7 +103,7 @@ func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := r.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -115,8 +117,8 @@ func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Id
 
 // process processes events for the synchronization request handler engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandlerEngine) process(originID flow.Identifier, event interface{}) error {
 	return r.requestMessageHandler.Process(originID, event)
 }
@@ -200,6 +202,8 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
+	// get the latest final state to know if we can fulfill the request
 	head, err := r.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
@@ -208,6 +212,26 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
 		return nil
+	}
+
+	// enforce client-side max request size
+	var maxSize uint
+	// TODO: clean up this logic
+	if core, ok := r.core.(*chainsync.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = chainsync.DefaultConfig().MaxSize
+	}
+	maxHeight := req.FromHeight + uint64(maxSize)
+	if maxHeight < req.ToHeight {
+		r.log.Warn().
+			Uint64("from", req.FromHeight).
+			Uint64("to", req.ToHeight).
+			Uint64("size", (req.ToHeight-req.FromHeight)+1).
+			Uint("max_size", maxSize).
+			Msg("range request is too large")
+
+		req.ToHeight = maxHeight
 	}
 
 	// get all of the blocks, one by one
@@ -247,15 +271,36 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
+	}
+
+	// TODO: clean up this logic
+	var maxSize uint
+	if core, ok := r.core.(*chainsync.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = chainsync.DefaultConfig().MaxSize
+	}
+
+	if len(req.BlockIDs) > int(maxSize) {
+		r.log.Warn().
+			Int("size", len(req.BlockIDs)).
+			Uint("max_size", maxSize).
+			Msg("batch request is too large")
 	}
 
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
 		blockIDs[blockID] = struct{}{}
+
+		// enforce client-side max request size
+		if len(blockIDs) == int(maxSize) {
+			break
+		}
 	}
 
 	// try to get all the blocks by ID

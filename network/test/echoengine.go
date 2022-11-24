@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	mockcomponent "github.com/onflow/flow-go/module/component/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/testutils"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of
@@ -20,24 +22,24 @@ import (
 type EchoEngine struct {
 	sync.RWMutex
 	t        *testing.T
-	con      network.Conduit        // used to directly communicate with the network
-	originID flow.Identifier        // used to keep track of the id of the sender of the messages
-	event    chan interface{}       // used to keep track of the events that the node receives
-	channel  chan network.Channel   // used to keep track of the channels that events are received on
-	received chan struct{}          // used as an indicator on reception of messages for testing
-	echomsg  string                 // used as a fix string to be included in the reply echos
-	seen     map[string]int         // used to track the seen events
-	echo     bool                   // used to enable or disable echoing back the recvd message
-	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
+	con      network.Conduit                  // used to directly communicate with the network
+	originID flow.Identifier                  // used to keep track of the id of the sender of the messages
+	event    chan interface{}                 // used to keep track of the events that the node receives
+	channel  chan channels.Channel            // used to keep track of the channels that events are received on
+	received chan struct{}                    // used as an indicator on reception of messages for testing
+	echomsg  string                           // used as a fix string to be included in the reply echos
+	seen     map[string]int                   // used to track the seen events
+	echo     bool                             // used to enable or disable echoing back the recvd message
+	send     testutils.ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 	mockcomponent.Component
 }
 
-func NewEchoEngine(t *testing.T, net network.Network, cap int, channel network.Channel, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net network.Network, cap int, channel channels.Channel, echo bool, send testutils.ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
-		channel:  make(chan network.Channel, cap),
+		channel:  make(chan channels.Channel, cap),
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
 		echo:     echo,
@@ -59,7 +61,7 @@ func (te *EchoEngine) SubmitLocal(event interface{}) {
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *EchoEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (te *EchoEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	go func() {
 		err := te.Process(channel, originID, event)
 		if err != nil {
@@ -78,7 +80,7 @@ func (te *EchoEngine) ProcessLocal(event interface{}) error {
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
-func (te *EchoEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (te *EchoEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	te.Lock()
 	defer te.Unlock()
 	te.originID = originID

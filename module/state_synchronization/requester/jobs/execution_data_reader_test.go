@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -26,14 +26,14 @@ type ExecutionDataReaderSuite struct {
 	suite.Suite
 
 	reader       *ExecutionDataReader
-	eds          *syncmock.ExecutionDataService
+	downloader   *exedatamock.Downloader
 	headers      *storagemock.Headers
 	results      *storagemock.ExecutionResults
 	seals        *storagemock.Seals
 	fetchTimeout time.Duration
 
 	executionDataID flow.Identifier
-	executionData   *state_synchronization.ExecutionData
+	executionData   *execution_data.BlockExecutionData
 	block           *flow.Block
 	blocksByHeight  map[uint64]*flow.Block
 
@@ -86,9 +86,9 @@ func (suite *ExecutionDataReaderSuite) reset() {
 		}),
 	)
 
-	suite.eds = new(syncmock.ExecutionDataService)
+	suite.downloader = new(exedatamock.Downloader)
 	suite.reader = NewExecutionDataReader(
-		suite.eds,
+		suite.downloader,
 		suite.headers,
 		suite.results,
 		suite.seals,
@@ -100,9 +100,9 @@ func (suite *ExecutionDataReaderSuite) reset() {
 }
 
 func (suite *ExecutionDataReaderSuite) TestAtIndex() {
-	setExecutionDataGet := func(executionData *state_synchronization.ExecutionData, err error) {
-		suite.eds.On("Get", mock.Anything, suite.executionDataID).Return(
-			func(ctx context.Context, id flow.Identifier) *state_synchronization.ExecutionData {
+	setExecutionDataGet := func(executionData *execution_data.BlockExecutionData, err error) {
+		suite.downloader.On("Download", mock.Anything, suite.executionDataID).Return(
+			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
 				return executionData
 			},
 			func(ctx context.Context, id flow.Identifier) error {
@@ -196,19 +196,9 @@ func (suite *ExecutionDataReaderSuite) runTest(fn func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	suite.reader.AddContext(signalCtx)
+	suite.reader.AddContext(signalerCtx)
 
 	fn()
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
-	}
 }

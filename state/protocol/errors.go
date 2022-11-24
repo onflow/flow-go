@@ -28,6 +28,14 @@ var (
 
 	// ErrClusterNotFound is a sentinel error returns for queries for a cluster
 	ErrClusterNotFound = fmt.Errorf("could not find cluster")
+
+	// ErrMultipleSealsForSameHeight indicates that an (unordered) slice of seals
+	// contains two or more seals for the same block height (possibilities include
+	// duplicated seals or seals for different blocks at the same height).
+	ErrMultipleSealsForSameHeight = fmt.Errorf("multiple seals for same block height")
+
+	// ErrDiscontinuousSeals indicates that an (unordered) slice of seals skips at least one block height.
+	ErrDiscontinuousSeals = fmt.Errorf("seals have discontinuity, i.e. they skip some block heights")
 )
 
 type IdentityNotFoundError struct {

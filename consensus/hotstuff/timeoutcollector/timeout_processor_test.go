@@ -431,7 +431,6 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 // enough objects. After we verify if TC was correctly constructed and if it doesn't violate protocol rules.
 // After obtaining valid TC we will repeat this test case to make sure that TimeoutObject(and TC eventually) with LastViewTC is
 // correctly built
-//
 func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)

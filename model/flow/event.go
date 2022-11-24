@@ -79,6 +79,16 @@ func wrapEventID(e Event) eventIDWrapper {
 	}
 }
 
+// byteSize returns the number of bytes needed to store the wrapped version of the event.
+// returned int is an approximate measure, ignoring the number of bytes needed as headers.
+func (e Event) byteSize() int {
+	return IdentifierLen + // txID
+		4 + // Index
+		len(e.Type) + // Type
+		4 + // TransactionIndex
+		len(e.Payload) // Payload
+}
+
 func wrapEvent(e Event) eventWrapper {
 	return eventWrapper{
 		TxID:             e.TransactionID[:],
@@ -99,6 +109,15 @@ type BlockEvents struct {
 
 type EventsList []Event
 
+// byteSize returns an approximate number of bytes needed to store the wrapped version of the event.
+func (el EventsList) ByteSize() int {
+	size := 0
+	for _, event := range el {
+		size += event.byteSize()
+	}
+	return size
+}
+
 // EventsMerkleRootHash calculates the root hash of events inserted into a
 // merkle trie with the hash of event as the key and encoded event as value
 func EventsMerkleRootHash(el EventsList) (Identifier, error) {
@@ -111,7 +130,8 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 		// event fingerprint is the rlp encoding of the wrapperevent
 		// eventID is the standard sha3 hash of the event fingerprint
 		fingerPrint := event.Fingerprint()
-		eventID := MakeID(fingerPrint)
+		// computing enityID from the fingerprint
+		eventID := MakeIDFromFingerPrint(fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
 			return ZeroID, err

@@ -12,18 +12,18 @@ import (
 )
 
 // IndexNewBlock will add parent-child index for the new block.
-// - Each block has a parent, we use this parent-child relationship to build a reverse index
-// - for looking up children blocks for a given block. This is useful for forks recovery
-//   where we want to find all the pending children blocks for the lastest finalized block.
-// - when adding parent-child index for a new block, we will add two indexes:
-//   1) since it's a new block, the new block should have no child, so adding an empty
-//      index for the new block. Note: It's impossible there is a block whose parent is the
-//      new block.
-//   2) since the parent block has this new block as a child, adding an index for that.
-//      there are two special cases for 2):
-//      - if the parent block is zero, then we don't need to add this index.
-//      - if the parent block doesn't exist, then we will insert the child index instead of
-// 				updating
+//   - Each block has a parent, we use this parent-child relationship to build a reverse index
+//   - for looking up children blocks for a given block. This is useful for forks recovery
+//     where we want to find all the pending children blocks for the lastest finalized block.
+//
+// When adding parent-child index for a new block, we will add two indexes:
+//  1. since it's a new block, the new block should have no child, so adding an empty
+//     index for the new block. Note: It's impossible there is a block whose parent is the
+//     new block.
+//  2. since the parent block has this new block as a child, adding an index for that.
+//     there are two special cases for (2):
+//     - if the parent block is zero, then we don't need to add this index.
+//     - if the parent block doesn't exist, then we will insert the child index instead of updating
 func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// Step 1: index the child for the new block.
@@ -44,10 +44,10 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 		// children or not, we will either update the index or insert the index:
 		// when parent block doesn't exist, we will insert the block children.
 		// when parent block exists already, we will update the block children,
-		var childrenIDs []flow.Identifier
+		var childrenIDs flow.IdentifierList
 		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(tx)
 
-		var saveIndex func(blockID flow.Identifier, childrenIDs []flow.Identifier) func(*badger.Txn) error
+		var saveIndex func(blockID flow.Identifier, childrenIDs flow.IdentifierList) func(*badger.Txn) error
 		if errors.Is(err, storage.ErrNotFound) {
 			saveIndex = operation.InsertBlockChildren
 		} else if err != nil {
@@ -77,6 +77,6 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 }
 
 // LookupBlockChildren looks up the IDs of all child blocks of the given parent block.
-func LookupBlockChildren(blockID flow.Identifier, childrenIDs *[]flow.Identifier) func(tx *badger.Txn) error {
+func LookupBlockChildren(blockID flow.Identifier, childrenIDs *flow.IdentifierList) func(tx *badger.Txn) error {
 	return operation.RetrieveBlockChildren(blockID, childrenIDs)
 }

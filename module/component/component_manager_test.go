@@ -655,29 +655,3 @@ func TestComponentManagerShutdown_100(t *testing.T) {
 		TestComponentManagerShutdown(t)
 	}
 }
-
-// TestComponentManager_NoWorkers demonstrates the behaviour of ComponentManager
-// when it is built with no workers. After being started, it will immediately
-// shut down.
-func TestComponentManager_NoWorkers(t *testing.T) {
-	mgr := component.NewComponentManagerBuilder().Build()
-	ctx, _ := irrecoverable.WithSignaler(context.Background())
-	mgr.Start(ctx)
-	unittest.AssertClosesBefore(t, mgr.Done(), 10*time.Millisecond)
-}
-
-// TestComponentManager_NoopWorker demonstrates the behaviour of ComponentManager
-// when it is built with a NoopWorker. It will not shut down until the context
-// is cancelled.
-func TestComponentManager_NoopWorker(t *testing.T) {
-	mgr := component.NewComponentManagerBuilder().
-		AddWorker(component.NoopWorker).
-		Build()
-	parent, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parent)
-	mgr.Start(ctx)
-
-	unittest.AssertNotClosesBefore(t, mgr.Done(), 10*time.Millisecond)
-	cancel()
-	unittest.AssertClosesBefore(t, mgr.Done(), 10*time.Millisecond)
-}

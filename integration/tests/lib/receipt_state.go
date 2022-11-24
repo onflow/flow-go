@@ -49,6 +49,9 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 	}, receiptTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
 			receiptTimeout))
+
+	rs.RLock()
+	defer rs.RUnlock()
 	for _, r := range rs.receipts[blockID] {
 		return r
 	}
@@ -69,4 +72,19 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
 			receiptTimeout))
 	return r
+}
+
+// WaitForNoReceiptFrom waits no execution receipt for the given blockID and the given executorID exists
+func (rs *ReceiptState) WaitForNoReceiptFrom(t *testing.T, timeout time.Duration, blockID, executorID flow.Identifier) {
+	require.Eventually(t, func() bool {
+		rs.RLock() // avoiding concurrent map access
+		defer rs.RUnlock()
+
+		var ok bool
+		_, ok = rs.receipts[blockID][executorID]
+		return !ok
+	}, timeout, 100*time.Millisecond,
+		fmt.Sprintf("received unwanted execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
+			timeout))
+
 }

@@ -43,12 +43,10 @@ const DefaultSnapshotHistoryLimit = 50
 const DefaultLoggedScriptsCacheSize = 1_000_000
 
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
-const DefaultConnectionPoolSize = 10
+const DefaultConnectionPoolSize = 250
 
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
-
-var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
 
 // Backend implements the Access API.
 //
@@ -70,13 +68,13 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 	backendExecutionResults
+	backendNetwork
 
-	state                protocol.State
-	chainID              flow.ChainID
-	collections          storage.Collections
-	executionReceipts    storage.ExecutionReceipts
-	connFactory          ConnectionFactory
-	snapshotHistoryLimit int
+	state             protocol.State
+	chainID           flow.ChainID
+	collections       storage.Collections
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
 }
 
 func New(
@@ -164,11 +162,15 @@ func New(
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
 		},
-		collections:          collections,
-		executionReceipts:    executionReceipts,
-		connFactory:          connFactory,
-		chainID:              chainID,
-		snapshotHistoryLimit: snapshotHistoryLimit,
+		backendNetwork: backendNetwork{
+			state:                state,
+			chainID:              chainID,
+			snapshotHistoryLimit: snapshotHistoryLimit,
+		},
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
 	}
 
 	retry.SetBackend(b)
@@ -260,80 +262,6 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	}
 
 	return convert.SnapshotToBytes(validSnapshot)
-}
-
-// getValidSnapshot will return a valid snapshot that has a sealing segment which
-// 1. does not contain any blocks that span an epoch transition
-// 2. does not contain any blocks that span an epoch phase transition
-// If a snapshot does contain an invalid sealing segment query the state
-// by height of each block in the segment and return a snapshot at the point
-// where the transition happens.
-func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
-	segment, err := snapshot.SealingSegment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sealing segment: %w", err)
-	}
-
-	counterAtHighest, phaseAtHighest, err := b.getCounterAndPhase(segment.Highest().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
-	}
-
-	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Lowest().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
-	}
-
-	// Check if the counters and phase are different this indicates that the sealing segment
-	// of the snapshot requested spans either an epoch transition or phase transition.
-	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
-		// Visit each node in strict order of decreasing height starting at head
-		// to find the block that straddles the transition boundary.
-		for i := len(segment.Blocks) - 1; i >= 0; i-- {
-			blocksVisited++
-
-			// NOTE: Check if we have reached our history limit, in edge cases
-			// where the sealing segment is abnormally long we want to short circuit
-			// the recursive calls and return an error. The API caller can retry.
-			if blocksVisited > b.snapshotHistoryLimit {
-				return nil, fmt.Errorf("%w: (%d)", SnapshotHistoryLimitErr, b.snapshotHistoryLimit)
-			}
-
-			counterAtBlock, phaseAtBlock, err := b.getCounterAndPhase(segment.Blocks[i].Header.Height)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get epoch counter and phase for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
-			}
-
-			// Check if this block straddles the transition boundary, if it does return the snapshot
-			// at that block height.
-			if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtBlock, phaseAtHighest, phaseAtBlock) {
-				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited)
-			}
-		}
-	}
-
-	return snapshot, nil
-}
-
-// getCounterAndPhase will return the epoch counter and phase at the specified height in state
-func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, error) {
-	snapshot := b.state.AtHeight(height)
-
-	counter, err := snapshot.Epochs().Current().Counter()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get counter for block (height=%d): %w", height, err)
-	}
-
-	phase, err := snapshot.Phase()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get phase for block (height=%d): %w", height, err)
-	}
-
-	return counter, phase, nil
-}
-
-func (b *Backend) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
-	return counter1 != counter2 || phase1 != phase2
 }
 
 func convertStorageError(err error) error {

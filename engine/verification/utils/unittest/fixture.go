@@ -5,7 +5,12 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -25,10 +30,15 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 
-	fvmMock "github.com/onflow/flow-go/fvm/mock"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -221,7 +231,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
-		defer led.Done()
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
@@ -235,14 +252,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 		require.NoError(t, err)
 
-		rt := fvm.NewInterpreterRuntime()
+		vm := fvm.NewVirtualMachine()
 
-		vm := fvm.NewVirtualMachine(rt)
-
-		blocks := new(fvmMock.Blocks)
+		blocks := new(envMock.Blocks)
 
 		execCtx := fvm.NewContext(
-			log,
+			fvm.WithLogger(log),
 			fvm.WithChain(chain),
 			fvm.WithBlocks(blocks),
 		)
@@ -250,10 +265,24 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		programs := programs.NewEmptyPrograms()
+		programs := programs.NewEmptyBlockPrograms()
+
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer)
+		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer, prov)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)

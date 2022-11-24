@@ -5,15 +5,17 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // HotstuffModules is a helper structure to encapsulate dependencies to create
 // a hotStuff participant.
 type HotstuffModules struct {
-	Notifier                    hotstuff.Consumer               // observer for hotstuff events
 	Committee                   hotstuff.DynamicCommittee       // consensus committee
 	Signer                      hotstuff.Signer                 // signer of proposal & votes
 	Persist                     hotstuff.Persister              // last state of consensus participant
+	Notifier                    *pubsub.Distributor             // observer for hotstuff events
 	FinalizationDistributor     *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
 	QCCreatedDistributor        *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
 	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor
@@ -24,13 +26,28 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime           time.Time     // the time when consensus participant enters first view
-	TimeoutInitial        time.Duration // the initial timeout for the pacemaker
-	TimeoutMinimum        time.Duration // the minimum timeout for the pacemaker
-	TimeoutMaximum        time.Duration // the maximum timeout for the pacemaker
-	TimeoutIncreaseFactor float64       // the factor at which the timeout grows when timeouts occur
-	TimeoutDecreaseFactor float64       // the factor at which the timeout grows when timeouts occur
-	BlockRateDelay        time.Duration // a delay to broadcast block proposal in order to control the block production rate
+	StartupTime                         time.Time                   // the time when consensus participant enters first view
+	TimeoutMinimum                      time.Duration               // the minimum timeout for the pacemaker
+	TimeoutMaximum                      time.Duration               // the maximum timeout for the pacemaker
+	TimeoutAdjustmentFactor             float64                     // the factor at which the timeout duration is adjusted
+	HappyPathMaxRoundFailures           uint64                      // number of failed rounds before first timeout increase
+	BlockRateDelay                      time.Duration               // a delay to broadcast block proposal in order to control the block production rate
+	MaxTimeoutObjectRebroadcastInterval time.Duration               // maximum interval for timeout object rebroadcast
+	Registrar                           updatable_configs.Registrar // optional: for registering HotStuff configs as dynamically configurable
+}
+
+func DefaultParticipantConfig() ParticipantConfig {
+	defTimeout := timeout.DefaultConfig
+	cfg := ParticipantConfig{
+		TimeoutMinimum:                      time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutMaximum:                      time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
+		TimeoutAdjustmentFactor:             defTimeout.TimeoutAdjustmentFactor,
+		HappyPathMaxRoundFailures:           defTimeout.HappyPathMaxRoundFailures,
+		BlockRateDelay:                      defTimeout.GetBlockRateDelay(),
+		MaxTimeoutObjectRebroadcastInterval: time.Duration(defTimeout.MaxTimeoutObjectRebroadcastInterval) * time.Millisecond,
+		Registrar:                           nil,
+	}
+	return cfg
 }
 
 type Option func(*ParticipantConfig)
@@ -41,32 +58,32 @@ func WithStartupTime(time time.Time) Option {
 	}
 }
 
-func WithInitialTimeout(timeout time.Duration) Option {
-	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutInitial = timeout
-	}
-}
-
 func WithMinTimeout(timeout time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.TimeoutMinimum = timeout
 	}
 }
 
-func WithTimeoutIncreaseFactor(factor float64) Option {
+func WithTimeoutAdjustmentFactor(factor float64) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutIncreaseFactor = factor
+		cfg.TimeoutAdjustmentFactor = factor
 	}
 }
 
-func WithTimeoutDecreaseFactor(factor float64) Option {
+func WithHappyPathMaxRoundFailures(happyPathMaxRoundFailures uint64) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutDecreaseFactor = factor
+		cfg.HappyPathMaxRoundFailures = happyPathMaxRoundFailures
 	}
 }
 
 func WithBlockRateDelay(delay time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.BlockRateDelay = delay
+	}
+}
+
+func WithConfigRegistrar(reg updatable_configs.Registrar) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.Registrar = reg
 	}
 }
