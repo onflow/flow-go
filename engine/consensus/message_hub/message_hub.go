@@ -481,6 +481,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 // forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs vote and forwards it to own `voteAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, originID flow.Identifier) {
+	h.engineMetrics.MessageReceived(metrics.EngineConsensusMessageHub, metrics.MessageBlockVote)
 	v := &model.Vote{
 		View:     vote.View,
 		BlockID:  vote.BlockID,
@@ -499,6 +500,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.BlockVote, origin
 // forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
+	h.engineMetrics.MessageReceived(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 	h.log.Info().
 		Hex("origin_id", t.SignerID[:]).
 		Uint64("view", t.View).

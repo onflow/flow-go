@@ -123,6 +123,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		if ok {
 			inBlock := msg.(flow.Slashable[messages.BlockProposal])
 			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
+			e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}

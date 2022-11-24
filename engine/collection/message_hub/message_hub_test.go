@@ -258,8 +258,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		header.ProposerID = s.myID
 	})
 
-	// should fail with changed (missing) parent
-	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
+	// should fail since we can't query payload
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
