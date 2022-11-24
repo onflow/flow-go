@@ -477,6 +477,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
+	e.trackExecutionReceiptMetrics(r)
 
 	return nil
 }
