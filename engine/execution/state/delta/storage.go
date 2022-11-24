@@ -268,7 +268,6 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 		s.db.Write(s.wo, s.wb)
 		s.wb.Clear()
 	}
-	time.Sleep(time.Millisecond * 300)
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, blockHeight)
 	s.wb.Put(BadgerStoreHeightKey, buf)

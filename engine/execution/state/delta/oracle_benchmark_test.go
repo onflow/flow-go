@@ -75,20 +75,24 @@ func benchmarkStorage(steps int, b *testing.B) {
 		storage, err := delta.NewRocksStore(db)
 		require.NoError(b, err)
 
-		owners := testutils.RandomValues(bootstrapSize, keyPartMinByteSize, keyPartMaxByteSize)
-		keys := testutils.RandomValues(bootstrapSize, keyPartMinByteSize, keyPartMaxByteSize)
-		values := testutils.RandomValues(bootstrapSize, 1, valueMaxByteSize)
+		batchSize := 1000
+		steps := bootstrapSize / batchSize
+		for i := 0; i < steps; i++ {
+			owners := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
+			keys := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
+			values := testutils.RandomValues(batchSize, 1, valueMaxByteSize)
+			registers := make([]flow.RegisterEntry, batchSize)
+			for i := 0; i < batchSize; i++ {
+				registers[i] = flow.RegisterEntry{Key: flow.RegisterID{
+					Owner: string(owners[i]),
+					Key:   string(keys[i]),
+				},
+					Value: values[i]}
+			}
 
-		registers := make([]flow.RegisterEntry, bootstrapSize)
-		for i := 0; i < bootstrapSize; i++ {
-			registers[i] = flow.RegisterEntry{Key: flow.RegisterID{
-				Owner: string(owners[i]),
-				Key:   string(keys[i]),
-			},
-				Value: values[i]}
+			err = storage.Bootstrap(0, registers)
+			require.NoError(b, err)
 		}
-		err = storage.Bootstrap(0, registers)
-		require.NoError(b, err)
 
 		oracle, err := delta.NewOracle(storage)
 		require.NoError(b, err)
