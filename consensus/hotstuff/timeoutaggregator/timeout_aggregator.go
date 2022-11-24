@@ -48,9 +48,9 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // NewTimeoutAggregator creates an instance of timeout aggregator.
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
-	notifier hotstuff.Consumer,
 	hotstuffMetrics module.HotstuffMetrics,
 	mempoolMetrics module.MempoolMetrics,
+	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {

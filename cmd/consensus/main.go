@@ -582,9 +582,10 @@ func main() {
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				node.Logger,
+				mainMetrics,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
-				node.Metrics.Mempool,
 				voteProcessorFactory,
 				finalizationDistributor)
 			if err != nil {
@@ -595,11 +596,12 @@ func main() {
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
-				lowestViewForVoteProcessing,
-				notifier,
+				mainMetrics,
 				node.Metrics.Mempool,
+				notifier,
 				timeoutProcessorFactory,
 				timeoutCollectorDistributor,
+				lowestViewForVoteProcessing,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)

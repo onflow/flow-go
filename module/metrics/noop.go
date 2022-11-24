@@ -11,6 +11,7 @@ import (
 
 type NoopCollector struct{}
 
+var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 
 func NewNoopCollector() *NoopCollector {
@@ -62,7 +63,6 @@ func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                          
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                                          {}
 func (nc *NoopCollector) FinalizedHeight(height uint64)                                          {}
 func (nc *NoopCollector) SealedHeight(height uint64)                                             {}
-func (nc *NoopCollector) BlockProposed(*flow.Block)                                              {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
@@ -85,8 +85,9 @@ func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)           
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string)              {}
 func (nc *NoopCollector) SetCurView(view uint64)                                                 {}
 func (nc *NoopCollector) SetQCView(view uint64)                                                  {}
-func (nc *NoopCollector) CountSkipped()                                                          {}
-func (nc *NoopCollector) CountTimeout()                                                          {}
+func (nc *NoopCollector) SetTCView(uint64)                                                       {}
+func (nc *NoopCollector) VoteProcessingDuration(time.Duration)                                   {}
+func (nc *NoopCollector) TimeoutObjectProcessingDuration(time.Duration)                          {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                                      {}
 func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
