@@ -153,6 +153,8 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.MessageDropped(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	}
 }
 
@@ -162,6 +164,8 @@ func (e *Engine) OnSyncedBlock(syncedBlock flow.Slashable[messages.BlockProposal
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.MessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	}
 }
 
