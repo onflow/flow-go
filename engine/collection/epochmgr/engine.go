@@ -302,7 +302,7 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 	if err != nil {
 		if errors.Is(err, ErrNotAuthorizedForEpoch) {
 			// if we are not authorized in this epoch, skip starting up cluster consensus
-			log.Info().Msg("epoch transition: we are not authorized for new epoch, exiting...")
+			log.Warn().Msg("epoch transition: we are not authorized for new epoch, exiting...")
 			return nil
 		}
 		return fmt.Errorf("could not create epoch components: %w", err)
@@ -314,7 +314,7 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 		return fmt.Errorf("unexpected failure starting epoch components: %w", err)
 	}
 
-	log.Info().Msg("epoch transition: new epoch components started successfully")
+	log.Warn().Msg("epoch transition: new epoch components started successfully")
 
 	return nil
 }
