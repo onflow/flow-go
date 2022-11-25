@@ -293,7 +293,7 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 
 	err := writer.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("error opening the path for sst writer: %w", err)
 	}
 
 	for i := uint64(0); i < numberOfKeys; i++ {
@@ -316,19 +316,19 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 		rand.Read(value)
 		err = writer.Add(key, value)
 		if err != nil {
-			return err
+			return fmt.Errorf("error writing data: %w", err)
 		}
 	}
 	err = writer.Finish()
 	if err != nil {
-		return err
+		return fmt.Errorf("error finishing writer: %w", err)
 	}
 
 	// get all files in a path
 	var files []string
 	filepath.WalkDir(path, func(s string, d fs.DirEntry, e error) error {
 		if e != nil {
-			return e
+			return fmt.Errorf("error walking temp directory: %w", err)
 		}
 		if filepath.Ext(d.Name()) == ".sst" {
 			files = append(files, s)
