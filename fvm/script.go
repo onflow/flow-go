@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -26,15 +27,6 @@ type ScriptProcedure struct {
 	GasUsed        uint64
 	MemoryEstimate uint64
 	Err            errors.CodedError
-}
-
-type ScriptProcessor interface {
-	Process(
-		Context,
-		*ScriptProcedure,
-		*state.TransactionState,
-		*programs.TransactionPrograms,
-	) error
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -81,27 +73,20 @@ func NewScriptWithContextAndArgs(
 	}
 }
 
+func (proc *ScriptProcedure) NewExecutor(
+	ctx Context,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) ProcedureExecutor {
+	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
+}
+
 func (proc *ScriptProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txError, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			if errors.IsALedgerFailure(failure) {
-				return fmt.Errorf("cannot execute the script, this error usually happens if the reference block for this script is not set to a recent block: %w", failure)
-			}
-			return failure
-		}
-		if txError != nil {
-			proc.Err = txError
-			return nil
-		}
-	}
-
-	return nil
+	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -140,38 +125,81 @@ func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
 	return programs.EndOfBlockExecutionTime
 }
 
-type ScriptInvoker struct{}
+type scriptExecutor struct {
+	proc *ScriptProcedure
 
-func NewScriptInvoker() ScriptInvoker {
-	return ScriptInvoker{}
+	txnState       *state.TransactionState
+	derivedTxnData *programs.DerivedTransactionData
+
+	env environment.Environment
 }
 
-func (i ScriptInvoker) Process(
+func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
-) error {
-	env := NewScriptEnv(proc.RequestContext, ctx, txnState, programs)
+	derivedTxnData *programs.DerivedTransactionData,
+) *scriptExecutor {
+	return &scriptExecutor{
+		proc:           proc,
+		txnState:       txnState,
+		derivedTxnData: derivedTxnData,
+		env: environment.NewScriptEnvironment(
+			proc.RequestContext,
+			ctx.EnvironmentParams,
+			txnState,
+			derivedTxnData),
+	}
+}
 
-	rt := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(rt)
+func (executor *scriptExecutor) Cleanup() {
+	// Do nothing.
+}
+
+func (executor *scriptExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *scriptExecutor) Execute() error {
+	err := executor.execute()
+	txError, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		if errors.IsALedgerFailure(failure) {
+			return fmt.Errorf(
+				"cannot execute the script, this error usually happens if "+
+					"the reference block for this script is not set to a "+
+					"recent block: %w",
+				failure)
+		}
+		return failure
+	}
+	if txError != nil {
+		executor.proc.Err = txError
+	}
+
+	return nil
+}
+
+func (executor *scriptExecutor) execute() error {
+	rt := executor.env.BorrowCadenceRuntime()
+	defer executor.env.ReturnCadenceRuntime(rt)
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    proc.Script,
-			Arguments: proc.Arguments,
+			Source:    executor.proc.Script,
+			Arguments: executor.proc.Arguments,
 		},
-		common.ScriptLocation(proc.ID))
+		common.ScriptLocation(executor.proc.ID))
 
 	if err != nil {
 		return err
 	}
 
-	proc.Value = value
-	proc.Logs = env.Logs()
-	proc.Events = env.Events()
-	proc.GasUsed = env.ComputationUsed()
-	proc.MemoryEstimate = env.MemoryEstimate()
+	executor.proc.Value = value
+	executor.proc.Logs = executor.env.Logs()
+	executor.proc.Events = executor.env.Events()
+	executor.proc.GasUsed = executor.env.ComputationUsed()
+	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
 	return nil
 }

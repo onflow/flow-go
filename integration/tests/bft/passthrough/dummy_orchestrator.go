@@ -26,7 +26,8 @@ type dummyOrchestrator struct {
 	sync.Mutex
 	logger              zerolog.Logger
 	orchestratorNetwork insecure.OrchestratorNetwork
-	eventTracker        map[string]flow.IdentifierList
+	egressEventTracker  map[string]flow.IdentifierList
+	ingressEventTracker map[string]flow.IdentifierList
 }
 
 var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
@@ -34,11 +35,15 @@ var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
 func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	return &dummyOrchestrator{
 		logger: logger.With().Str("component", "dummy-orchestrator").Logger(),
-		eventTracker: map[string]flow.IdentifierList{
+		egressEventTracker: map[string]flow.IdentifierList{
 			typeExecutionReceipt:  {},
 			typeChunkDataRequest:  {},
 			typeChunkDataResponse: {},
 			typeResultApproval:    {},
+		},
+		ingressEventTracker: map[string]flow.IdentifierList{
+			typeChunkDataRequest:  {},
+			typeChunkDataResponse: {},
 		},
 	}
 }
@@ -62,19 +67,18 @@ func (d *dummyOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error
 
 	switch e := event.FlowProtocolEvent.(type) {
 	case *flow.ExecutionReceipt:
-		d.eventTracker[typeExecutionReceipt] = append(d.eventTracker[typeExecutionReceipt], e.ID())
+		d.egressEventTracker[typeExecutionReceipt] = append(d.egressEventTracker[typeExecutionReceipt], e.ID())
 	case *messages.ChunkDataRequest:
-		d.eventTracker[typeChunkDataRequest] = append(d.eventTracker[typeChunkDataRequest], e.ChunkID)
+		d.egressEventTracker[typeChunkDataRequest] = append(d.egressEventTracker[typeChunkDataRequest], e.ChunkID)
 	case *messages.ChunkDataResponse:
-		d.eventTracker[typeChunkDataResponse] = append(d.eventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
+		d.egressEventTracker[typeChunkDataResponse] = append(d.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
 	case *flow.ResultApproval:
-		d.eventTracker[typeResultApproval] = append(d.eventTracker[typeResultApproval], e.ID())
+		d.egressEventTracker[typeResultApproval] = append(d.egressEventTracker[typeResultApproval], e.ID())
 	}
 
 	err := d.orchestratorNetwork.SendEgress(event)
 	if err != nil {
-		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
-		lg.Fatal().Err(err).Msg("could not pass through egress event")
+		lg.Error().Err(err).Msg("could not pass through egress event")
 		return err
 	}
 	lg.Info().Msg("egress event passed through successfully")
@@ -89,11 +93,18 @@ func (d *dummyOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) err
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
 
+	switch e := event.FlowProtocolEvent.(type) {
+	case *messages.ChunkDataRequest:
+		d.ingressEventTracker[typeChunkDataRequest] = append(d.ingressEventTracker[typeChunkDataRequest], e.ChunkID)
+	case *messages.ChunkDataResponse:
+		d.ingressEventTracker[typeChunkDataResponse] = append(d.ingressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
+	}
+
 	err := d.orchestratorNetwork.SendIngress(event)
 
 	if err != nil {
 		// since this is used for testing, if we encounter any RPC send error, crash the orchestrator.
-		lg.Fatal().Err(err).Msg("could not pass through ingress event")
+		lg.Error().Err(err).Msg("could not pass through ingress event")
 		return err
 	}
 	lg.Info().Msg("ingress event passed through successfully")
@@ -104,10 +115,21 @@ func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNe
 	d.orchestratorNetwork = orchestratorNetwork
 }
 
-// mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
-// if any entity is gone missing from sight of the orchestrator.
-func (d *dummyOrchestrator) mustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
-	events, ok := d.eventTracker[eventType]
+// mustSeenEgressFlowProtocolEvent checks the dummy orchestrator has passed through the egress flow protocol events with given ids.
+// It fails if any entity is gone missing from sight of the orchestrator.
+func (d *dummyOrchestrator) mustSeenEgressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+	events, ok := d.egressEventTracker[eventType]
+	require.Truef(t, ok, "unknown type: %s", eventType)
+
+	for _, id := range ids {
+		require.Contains(t, events, id)
+	}
+}
+
+// mustSeenIngressFlowProtocolEvent checks the dummy orchestrator has passed through the ingress flow protocol events with given ids.
+// It fails if any entity is gone missing from sight of the orchestrator.
+func (d *dummyOrchestrator) mustSeenIngressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+	events, ok := d.ingressEventTracker[eventType]
 	require.Truef(t, ok, "unknown type: %s", eventType)
 
 	for _, id := range ids {

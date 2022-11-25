@@ -413,10 +413,10 @@ func TestViewMergeView(t *testing.T) {
 		r2 := flow.NewRegisterID(registerID2, "")
 		r3 := flow.NewRegisterID(registerID3, "")
 
-		assert.Equal(t, map[string]flow.RegisterID{
-			r1.String(): r1,
-			r2.String(): r2,
-			r3.String(): r3,
+		assert.Equal(t, map[flow.RegisterID]struct{}{
+			r1: struct{}{},
+			r2: struct{}{},
+			r3: struct{}{},
 		}, reads)
 	})
 
@@ -570,9 +570,9 @@ func TestView_Reads(t *testing.T) {
 		r1 := flow.NewRegisterID(registerID1, "")
 		r2 := flow.NewRegisterID(registerID2, "")
 
-		assert.Equal(t, map[string]flow.RegisterID{
-			r1.String(): r1,
-			r2.String(): r2,
+		assert.Equal(t, map[flow.RegisterID]struct{}{
+			r1: struct{}{},
+			r2: struct{}{},
 		}, touches)
 	})
 }

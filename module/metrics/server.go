@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	_ "net/http/pprof"
 	"strconv"
 	"time"
 
@@ -20,16 +19,13 @@ type Server struct {
 
 // NewServer creates a new server that will start on the specified port,
 // and responds to only the `/metrics` endpoint
-func NewServer(log zerolog.Logger, port uint, enableProfilerEndpoint bool) *Server {
+func NewServer(log zerolog.Logger, port uint) *Server {
 	addr := ":" + strconv.Itoa(int(port))
 
 	mux := http.NewServeMux()
 	endpoint := "/metrics"
 	mux.Handle(endpoint, promhttp.Handler())
 	log.Info().Str("address", addr).Str("endpoint", endpoint).Msg("metrics server started")
-	if enableProfilerEndpoint {
-		mux.Handle("/debug/pprof/", http.DefaultServeMux)
-	}
 
 	m := &Server{
 		server: &http.Server{Addr: addr, Handler: mux},

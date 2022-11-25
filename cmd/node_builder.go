@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -21,12 +20,14 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/profiler"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -157,12 +158,7 @@ type BaseConfig struct {
 	level                       string
 	metricsPort                 uint
 	BootstrapDir                string
-	profilerEnabled             bool
-	uploaderEnabled             bool
-	profilerDir                 string
-	profilerInterval            time.Duration
-	profilerDuration            time.Duration
-	profilerMemProfileRate      int
+	profilerConfig              profiler.ProfilerConfig
 	tracerEnabled               bool
 	tracerSensitivity           uint
 	MetricsEnabled              bool
@@ -172,7 +168,7 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
-	LibP2PNode                  *p2pnode.Node
+	LibP2PNode                  p2p.LibP2PNode
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
@@ -187,9 +183,20 @@ type NetworkConfig struct {
 	PeerScoringEnabled              bool // enables peer scoring on pubsub
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	PeerUpdateInterval              time.Duration
-	UnicastMessageTimeout           time.Duration
-	DNSCacheTTL                     time.Duration
+	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
+	UnicastRateLimitDryRun bool
+	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
+	// after being rate limited.
+	UnicastRateLimitLockoutDuration time.Duration
+	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
+	UnicastMessageRateLimit int
+	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
+	UnicastBandwidthRateLimit int
+	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	UnicastBandwidthBurstLimit int
+	PeerUpdateInterval         time.Duration
+	UnicastMessageTimeout      time.Duration
+	DNSCacheTTL                time.Duration
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -202,6 +209,7 @@ type NodeConfig struct {
 	NodeID            flow.Identifier
 	Me                module.Local
 	Tracer            module.Tracer
+	ConfigManager     *updatable_configs.Manager
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
@@ -257,8 +265,14 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
-			NetworkConnectionPruning: connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:       scoring.DefaultPeerScoringEnabled,
+			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
+			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
+			UnicastMessageRateLimit:         0,
+			UnicastBandwidthRateLimit:       0,
+			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
+			UnicastRateLimitLockoutDuration: 10,
+			UnicastRateLimitDryRun:          true,
+			DNSCacheTTL:                     dns.DefaultTimeToLive,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
@@ -272,18 +286,21 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsDBEnabled: true,
 		level:            "info",
 
-		metricsPort:            8080,
-		profilerEnabled:        false,
-		uploaderEnabled:        false,
-		profilerDir:            "profiler",
-		profilerInterval:       15 * time.Minute,
-		profilerDuration:       10 * time.Second,
-		profilerMemProfileRate: runtime.MemProfileRate,
-		tracerEnabled:          false,
-		tracerSensitivity:      4,
-		MetricsEnabled:         true,
-		receiptsCacheSize:      bstorage.DefaultCacheSize,
-		guaranteesCacheSize:    bstorage.DefaultCacheSize,
+		metricsPort:         8080,
+		tracerEnabled:       false,
+		tracerSensitivity:   4,
+		MetricsEnabled:      true,
+		receiptsCacheSize:   bstorage.DefaultCacheSize,
+		guaranteesCacheSize: bstorage.DefaultCacheSize,
+
+		profilerConfig: profiler.ProfilerConfig{
+			Enabled:         false,
+			UploaderEnabled: false,
+
+			Dir:      "profiler",
+			Interval: 15 * time.Minute,
+			Duration: 10 * time.Second,
+		},
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),

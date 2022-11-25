@@ -33,7 +33,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
+		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *programs.DerivedBlockData) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -52,7 +52,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
 				err = vm.Run(ctx, tx, view)
@@ -251,7 +251,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) error {
+	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *programs.DerivedBlockData) error {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -261,7 +261,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view)
 
@@ -290,7 +290,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view)
 		if err != nil {

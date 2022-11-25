@@ -37,7 +37,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		blockID := flow.MakeID([]byte{0x42})
 
-		expected := flow.GetIDs(seals)
+		expected := []flow.Identifier(flow.GetIDs(seals))
 
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, seal := range seals {

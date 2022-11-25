@@ -5,6 +5,7 @@ package middleware
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -26,16 +27,18 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -64,6 +67,11 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
+
+	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
+	// the middleware receives a message via unicast but does not have a corresponding subscription for
+	// the channel in that message.
+	ErrUnicastMsgWithoutSub = errors.New("middleware does not have subscription for the channel ID indicated in the unicast message received")
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -78,18 +86,20 @@ type Middleware struct {
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
 	wg                         *sync.WaitGroup
-	libP2PNode                 *p2pnode.Node
+	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
+	peerManagerFilters         []p2p.PeerFilter
 	unicastMessageTimeout      time.Duration
 	idTranslator               p2p.IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
 	slashingViolationsConsumer slashing.ViolationsConsumer
+	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 	component.Component
 }
@@ -108,6 +118,21 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 	}
 }
 
+// WithPeerManagerFilters sets a list of p2p.PeerFilter funcs that are used to
+// filter out peers provided by the peer manager PeersProvider.
+func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.peerManagerFilters = peerManagerFilters
+	}
+}
+
+// WithUnicastRateLimiters sets the unicast rate limiters.
+func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.unicastRateLimiters = rateLimiters
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -119,7 +144,7 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNode *p2pnode.Node,
+	libP2PNode p2p.LibP2PNode,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
 	bitswapMet module.BitswapMetrics,
@@ -149,6 +174,7 @@ func NewMiddleware(
 		idTranslator:               idTranslator,
 		codec:                      codec,
 		slashingViolationsConsumer: slashingViolationsConsumer,
+		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {
@@ -173,6 +199,11 @@ func NewMiddleware(
 			mw.wg.Wait()
 
 			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+
+			// clean up rate limiter resources
+			mw.unicastRateLimiters.Stop()
+			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+
 		}).Build()
 
 	mw.Component = cm
@@ -286,13 +317,37 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.libP2PNode.WithPeersProvider(m.topologyPeers)
 
+	// starting rate limiters kicks off cleanup loop
+	m.unicastRateLimiters.Start()
+
 	return nil
 }
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers.
+// which this node should be directly connected to as peers. The peer ID list
+// returned will be filtered through any configured m.peerManagerFilters.
 func (m *Middleware) topologyPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Topology().NodeIDs())
+	peerIDs := make([]peer.ID, 0)
+	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
+		peerAllowed := true
+		for _, filter := range m.peerManagerFilters {
+			if err := filter(id); err != nil {
+				m.log.Debug().
+					Err(err).
+					Str("peer_id", id.String()).
+					Msg("filtering topology peer")
+
+				peerAllowed = false
+				break
+			}
+		}
+
+		if peerAllowed {
+			peerIDs = append(peerIDs, id)
+		}
+	}
+
+	return peerIDs
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
@@ -303,7 +358,7 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 // a more efficient candidate.
 //
 // The following benign errors can be returned:
-// - he peer ID for the target node ID cannot be found.
+// - the peer ID for the target node ID cannot be found.
 // - the msg size was too large.
 // - failed to send message to peer.
 //
@@ -339,7 +394,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
 	// create new stream
-	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
+	// streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
@@ -419,6 +474,14 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 	}()
 
+	// check if peer is currently rate limited before continuing to process stream.
+	if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) || m.unicastRateLimiters.BandWidthRateLimiter.IsRateLimited(remotePeer) {
+		log.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("dropping unicast stream from rate limited peer")
+		return
+	}
+
 	// TODO: We need to allow per-topic timeouts and message size limits.
 	// This allows us to configure higher limits for topics on which we expect
 	// to receive large messages (e.g. Chunk Data Packs), and use the normal
@@ -437,7 +500,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// create the reader
 	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
-
 	for {
 		if ctx.Err() != nil {
 			return
@@ -445,18 +507,53 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// Note: message fields must not be trusted until explicitly validated
 		var msg message.Message
-
 		// read the next message (blocking call)
 		err = r.ReadMsg(&msg)
-
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 
-			m.log.Err(err).
-				Str("peer_id", remotePeer.String()).
-				Msg("failed to read message")
+			m.log.Err(err).Msg("failed to read message")
+			return
+		}
+
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+
+		// ignore messages if node does not have subscription to topic
+		if !m.libP2PNode.HasSubscription(topic) {
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+
+			// msg type is not guaranteed to be correct since it is set by the client
+			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			if err != nil {
+				violation.Err = err
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
+
+			violation.MsgType = what
+			violation.Err = ErrUnicastMsgWithoutSub
+			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
+			return
+		}
+
+		// check if unicast messages have reached rate limit before processing next message
+		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
+			return
+		}
+
+		// check if we can get a role for logging and metrics label if this is not a public channel
+		role := ""
+		if !channels.IsPublicChannel(channels.Channel(msg.ChannelID)) {
+			if identity, ok := m.ov.Identity(remotePeer); ok {
+				role = identity.Role.String()
+			}
+		}
+
+		// check unicast bandwidth rate limiter for peer
+		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
 			return
 		}
 
@@ -493,7 +590,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, m.slashingViolationsConsumer, validators...)
+	topicValidator := flowpubsub.TopicValidator(m.log, m.codec, m.slashingViolationsConsumer, peerFilter, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, topicValidator)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
@@ -533,17 +631,16 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
 func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
-
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
-	if codec.IsErrMsgUnmarshal(err) {
+	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
@@ -580,7 +677,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, true)
+		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, message.ProtocolUnicast)
 		if err != nil {
 			m.log.
 				Error().

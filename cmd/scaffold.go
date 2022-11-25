@@ -16,9 +16,11 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/admin"
@@ -43,9 +45,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -55,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -73,6 +78,7 @@ import (
 const (
 	NetworkComponent        = "network"
 	ConduitFactoryComponent = "conduit-factory"
+	LibP2PNodeComponent     = "libp2p-node"
 )
 
 type Metrics struct {
@@ -136,20 +142,19 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
-	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.Enabled, "profiler-enabled", defaultConfig.profilerConfig.Enabled, "whether to enable the auto-profiler")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.UploaderEnabled, "profile-uploader-enabled", defaultConfig.profilerConfig.UploaderEnabled,
 		"whether to enable automatic profile upload to Google Cloud Profiler. "+
 			"For autoupload to work forllowing should be true: "+
 			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
 			"2) node is running in GCE. "+
 			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerConfig.Dir, "profiler-dir", defaultConfig.profilerConfig.Dir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Interval, "profiler-interval", defaultConfig.profilerConfig.Interval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Duration, "profiler-duration", defaultConfig.profilerConfig.Duration,
 		"the duration to run the auto-profile for")
-	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
-		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
+
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
@@ -187,6 +192,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	// unicast stream handler rate limits
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", defaultConfig.NetworkConfig.UnicastMessageRateLimit, "maximum number of unicast messages that a peer can send per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", defaultConfig.NetworkConfig.UnicastBandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.NetworkConfig.UnicastBandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", defaultConfig.NetworkConfig.UnicastRateLimitLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
+	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", defaultConfig.NetworkConfig.UnicastRateLimitDryRun, "disable peer disconnects and connections gating when rate limiting peers")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -261,7 +273,65 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("libp2p node", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+	connGaterPeerDialFilters := make([]p2p.PeerFilter, 0)
+	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
+	peerManagerFilters := make([]p2p.PeerFilter, 0)
+
+	// log and collect metrics for unicast messages that are rate limited
+	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
+		fnb.Logger.Warn().
+			Str("peer_id", peerID.String()).
+			Str("role", role).
+			Str("message_type", msgType).
+			Str("topic", topic.String()).
+			Str("reason", reason.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("unicast peer rate limited")
+		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
+	}
+
+	// setup default noop unicast rate limiters
+	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
+
+	// override noop unicast message rate limiter
+	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
+		unicastMessageRateLimiter := ratelimit.NewMessageRateLimiter(
+			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
+			fnb.BaseConfig.UnicastMessageRateLimit,
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+		)
+		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
+
+		// avoid connection gating and pruning during dry run
+		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
+			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
+			// don't allow rate limited peers to establishing incoming connections
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
+			// don't create outbound connections to rate limited peers
+			peerManagerFilters = append(peerManagerFilters, f)
+		}
+	}
+
+	// override noop unicast bandwidth rate limiter
+	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
+		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
+			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
+			fnb.BaseConfig.UnicastBandwidthBurstLimit,
+			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+		)
+		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
+
+		// avoid connection gating and pruning during dry run
+		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
+			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
+			peerManagerFilters = append(peerManagerFilters, f)
+		}
+	}
+
+	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
@@ -277,6 +347,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Resolver,
 			fnb.PeerScoringEnabled,
 			fnb.BaseConfig.NodeRole,
+			connGaterPeerDialFilters,
+			connGaterInterceptSecureFilters,
 			// run peer manager with the specified interval and let it also prune connections
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
@@ -294,8 +366,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
-
-		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
 
 	fnb.Module("middleware dependency", func(node *NodeConfig) error {
@@ -310,17 +381,27 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}, fnb.PeerManagerDependencies)
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
 	}
 
+	// by default if no rate limiter configuration was provided in the CLI args the default
+	// noop rate limiter will be used.
+	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
+
 	mwOpts = append(mwOpts,
 		middleware.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
+	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
+	if len(peerManagerFilters) > 0 {
+		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
+	}
+
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
+
 	fnb.Middleware = middleware.NewMiddleware(
 		fnb.Logger,
 		fnb.LibP2PNode,
@@ -382,7 +463,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
 		return server, nil
 	})
 }
@@ -393,6 +474,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
+		// create the updatable config manager
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// set up all admin commands
@@ -596,7 +678,7 @@ func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts 
 
 func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 	switch {
-	case fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE():
+	case fnb.BaseConfig.profilerConfig.UploaderEnabled && gcemd.OnGCE():
 		return fnb.createGCEProfileUploader(gcemd.NewClient(nil))
 	default:
 		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
@@ -605,24 +687,45 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
-	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
-	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-
 	uploader, err := fnb.createProfileUploader()
 	if err != nil {
 		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
 		uploader = &profiler.NoopUploader{}
 	}
 
-	profiler, err := profiler.New(
-		fnb.Logger,
-		uploader,
-		fnb.BaseConfig.profilerDir,
-		fnb.BaseConfig.profilerInterval,
-		fnb.BaseConfig.profilerDuration,
-		fnb.BaseConfig.profilerEnabled,
-	)
+	profiler, err := profiler.New(fnb.Logger, uploader, fnb.BaseConfig.profilerConfig)
 	fnb.MustNot(err).Msg("could not initialize profiler")
+
+	// register the enabled state of the profiler for dynamic configuring
+	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
+	fnb.MustNot(err).Msg("could not register profiler-enabled config")
+	err = fnb.ConfigManager.RegisterDurationConfig(
+		"profiler-trigger",
+		func() time.Duration { return fnb.BaseConfig.profilerConfig.Duration },
+		func(d time.Duration) error { return profiler.TriggerRun(d) })
+	fnb.MustNot(err).Msg("could not register profiler-trigger config")
+
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-mem-profile-rate",
+			func() uint { return uint(runtime.MemProfileRate) },
+			func(r uint) error { runtime.MemProfileRate = int(r); return nil }),
+	).Msg("could not register profiler setting")
+	// There is no way to get the current block progile rate so we keep track of it ourselves.
+	currentRate := new(uint)
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-block-profile-rate",
+			func() uint { return *currentRate },
+			func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil }),
+	).Msg("could not register profiler setting")
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-mutex-profile-fraction",
+			func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
+			func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil }),
+	).Msg("could not register profiler setting")
+
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
@@ -776,9 +879,17 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		node.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
+		node.IdentityProvider = blocklistWrapper
+
+		// register the blocklist for dynamic configuration via admin command
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
+			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+		if err != nil {
+			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
@@ -946,9 +1057,13 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithTransactionFeesEnabled(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+		vmOpts = append(vmOpts,
+			fvm.WithTransactionFeesEnabled(true),
+		)
+	}
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -1372,6 +1487,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			BaseConfig:              *config,
 			Logger:                  zerolog.New(os.Stderr),
 			PeerManagerDependencies: &DependencyList{},
+			ConfigManager:           updatable_configs.NewManager(),
 		},
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
@@ -1414,8 +1530,14 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
-	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
-		return &common.SetProfilerEnabledCommand{}
+	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetGologLevelCommand{}
+	}).AdminCommand("get-config", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetConfigCommand(config.ConfigManager)
+	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewSetConfigCommand(config.ConfigManager)
+	}).AdminCommand("list-configs", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewListConfigCommand(config.ConfigManager)
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
@@ -1567,4 +1689,14 @@ func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) 
 		return nil, fmt.Errorf("could not read secrets db encryption key (path=%s): %w", path, err)
 	}
 	return data, nil
+}
+
+func rateLimiterPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
+	return func(p peer.ID) error {
+		if rateLimiter.IsRateLimited(p) {
+			return fmt.Errorf("peer is rate limited")
+		}
+
+		return nil
+	}
 }
