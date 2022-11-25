@@ -51,6 +51,11 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result3.ID(), eventType, height3))
 		require.NoError(t, err)
 
+		// insert result 2 again to make sure we tolerate duplicates
+		// it is possible for two or more events of the same type to be from the same height
+		err = db.Update(IndexExecutionResultByServiceEventTypeAndHeight(result2.ID(), eventType, height2))
+		require.NoError(t, err)
+
 		t.Run("retrieve exact height match", func(t *testing.T) {
 			//t.Parallel()
 			var actualResult flow.Identifier
@@ -96,8 +101,6 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 			err := db.View(LookupLastExecutionResultForServiceEventType(height1-1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
-
-		t.Parallel()
 
 	})
 }

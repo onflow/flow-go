@@ -26,8 +26,9 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
-// IndexExecutionResultByServiceEventTypeAndHeight indexes result ID by a service event type and a sealed block height
-// this index allows us to answer questions such as what is the latest EpochSetup service event up to
+// IndexExecutionResultByServiceEventTypeAndHeight indexes result ID by a service event type and a height it went into effect
+// See handleServiceEvents documentation for in-depth explanation of what height and why it's being used.
+// This index allows us to answer questions such as what is the latest EpochSetup service event up to
 // block height 1000.
 //
 // why indexing result ID rather than service events? because the service event is included in a result,
@@ -44,7 +45,7 @@ func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, e
 			return err
 		}
 	}
-	return insert(makePrefix(codeServiceEventIndex, typeByte, blockHeight), resultID)
+	return upsert(makePrefix(codeServiceEventIndex, typeByte, blockHeight), resultID)
 }
 
 // ReindexExecutionResult updates mapping of an execution result ID keyed by block ID

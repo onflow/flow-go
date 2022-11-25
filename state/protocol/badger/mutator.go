@@ -557,17 +557,38 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 
+	// track service events to index results by event type and height
+	var serviceEvents []struct {
+		height   uint64
+		resultID flow.Identifier
+		event    flow.ServiceEvent
+	}
+
 	for _, seal := range parent.Payload.Seals {
-		// skip updating epoch-related metrics if EECC is triggered
-		if epochFallbackTriggered {
-			break
-		}
 
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 		for _, event := range result.ServiceEvents {
+			// it is possible, however very unlikely, that there are multiple service events of the same type in a single result.
+			// This will add multiple identical entries here, but the storage layer will only keep one index entry per combination of
+			// height and event type, essentially disregarding duplicates. Since the situation is very unlikely and other layer will handle
+			// this situation gracefully we leave it like this instead of writing deduplication logic here.
+			serviceEvents = append(serviceEvents, struct {
+				height   uint64
+				resultID flow.Identifier
+				event    flow.ServiceEvent
+			}{
+				height:   parent.Header.Height,
+				resultID: result.ID(),
+				event:    event})
+
+			// skip updating epoch-related metrics if EECC is triggered
+			if epochFallbackTriggered {
+				continue
+			}
+
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 				// update current epoch phase
@@ -628,41 +649,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// if EECC is triggered, update metric
 	if epochFallbackTriggered {
 		m.metrics.EpochEmergencyFallbackTriggered()
-	}
-
-	// track service events to index results by event type and height
-	var serviceEvents []struct {
-		height   uint64
-		resultID flow.Identifier
-		event    flow.ServiceEvent
-	}
-
-	// FOUR AND A HALF: Index sealed service events by height
-	for _, seal := range block.Payload.Seals {
-
-		result, err := m.results.ByID(seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x) for service events indexing: %w", seal.ResultID, seal.ID(), err)
-		}
-		blockHeader, err := m.headers.ByBlockID(result.BlockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header (id=%x) for result (id=%x) for service events indexing: %w", result.BlockID, result.ID(), err)
-		}
-
-		for _, serviceEvent := range result.ServiceEvents {
-			// it is possible, however very unlikely, that there are multiple service events of the same type in a single result.
-			// This will add multiple identical entries here, but the storage layer will only keep one index entry per combination of
-			// height and event type, essentially disregarding duplicates. Since the situation is very unlikely and other layer will handle
-			// this situation gracefully we leave it like this instead of writing deduplication logic here.
-			serviceEvents = append(serviceEvents, struct {
-				height   uint64
-				resultID flow.Identifier
-				event    flow.ServiceEvent
-			}{
-				height:   blockHeader.Height,
-				resultID: result.ID(),
-				event:    serviceEvent})
-		}
 	}
 
 	// FIFTH: Persist updates in database

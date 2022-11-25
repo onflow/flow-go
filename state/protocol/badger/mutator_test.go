@@ -243,14 +243,14 @@ func TestSealedIndex(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
-		executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
-		require.NoError(t, err)
-		//  once B5 is finalized, so is seal for b1, hence index should now find it
-		require.Equal(t, b1Receipt.ExecutionResult, *executionResult)
-
 		// when B7 is finalized, can find seals for B2, B3
 		err = state.Finalize(context.Background(), b6.ID())
 		require.NoError(t, err)
+
+		executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
+		require.NoError(t, err)
+		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
+		require.Equal(t, b1Receipt.ExecutionResult, *executionResult)
 
 		err = state.Finalize(context.Background(), b7.ID())
 		require.NoError(t, err)
