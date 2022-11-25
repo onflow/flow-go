@@ -12,31 +12,31 @@ import (
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived
 // data for a particular block.
 type DerivedBlockData struct {
-	programs *BlockDerivedData[common.AddressLocation, *interpreter.Program]
+	programs *DerivedDataTable[common.AddressLocation, *interpreter.Program]
 
-	meterParamOverrides *BlockDerivedData[struct{}, MeterParamOverrides]
+	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
 }
 
 // DerivedTransactionData is the derived data scratch space for a single
 // transaction.
 type DerivedTransactionData struct {
-	programs *TransactionDerivedData[
+	programs *TableTransaction[
 		common.AddressLocation,
 		*interpreter.Program,
 	]
 
 	// There's only a single entry in this table.  For simplicity, we'll use
 	// struct{} as the entry's key.
-	meterParamOverrides *TransactionDerivedData[struct{}, MeterParamOverrides]
+	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
 }
 
 func NewEmptyDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		programs: NewEmptyBlockDerivedData[
+		programs: NewEmptyTable[
 			common.AddressLocation,
 			*interpreter.Program,
 		](),
-		meterParamOverrides: NewEmptyBlockDerivedData[
+		meterParamOverrides: NewEmptyTable[
 			struct{},
 			MeterParamOverrides,
 		](),
@@ -47,11 +47,11 @@ func NewEmptyDerivedBlockData() *DerivedBlockData {
 // beginning of the block.
 func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
 	return &DerivedBlockData{
-		programs: NewEmptyBlockDerivedDataWithOffset[
+		programs: NewEmptyTableWithOffset[
 			common.AddressLocation,
 			*interpreter.Program,
 		](offset),
-		meterParamOverrides: NewEmptyBlockDerivedDataWithOffset[
+		meterParamOverrides: NewEmptyTableWithOffset[
 			struct{},
 			MeterParamOverrides,
 		](offset),
@@ -60,8 +60,8 @@ func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockD
 
 func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		programs:            block.programs.NewChildBlockDerivedData(),
-		meterParamOverrides: block.meterParamOverrides.NewChildBlockDerivedData(),
+		programs:            block.programs.NewChildTable(),
+		meterParamOverrides: block.meterParamOverrides.NewChildTable(),
 	}
 }
 
@@ -72,14 +72,14 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txnPrograms, err := block.programs.NewSnapshotReadTransactionDerivedData(
+	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
-	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTransactionDerivedData(
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {
@@ -99,14 +99,14 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txnPrograms, err := block.programs.NewTransactionDerivedData(
+	txnPrograms, err := block.programs.NewTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
-	txnMeterParamOverrides, err := block.meterParamOverrides.NewTransactionDerivedData(
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {

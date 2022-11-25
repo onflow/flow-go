@@ -65,46 +65,46 @@ func TestModifiedSetsProgramInvalidator(t *testing.T) {
 }
 
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedDerivedDataInvalidators[string, *string]
+	var chain chainedTableInvalidators[string, *string]
 	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[string, *string]{}
+	chain = chainedTableInvalidators[string, *string]{}
 	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[string, *string]{
+	chain = chainedTableInvalidators[string, *string]{
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          1,
+			TableInvalidator: testInvalidator{},
+			executionTime:    1,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          2,
+			TableInvalidator: testInvalidator{},
+			executionTime:    2,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{},
+			executionTime:    3,
 		},
 	}
 	require.False(t, chain.ShouldInvalidateEntries())
 
-	chain = chainedDerivedDataInvalidators[string, *string]{
+	chain = chainedTableInvalidators[string, *string]{
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "1"},
-			executionTime:          1,
+			TableInvalidator: testInvalidator{invalidateName: "1"},
+			executionTime:    1,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "3a"},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{invalidateName: "3a"},
+			executionTime:    3,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "3b"},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{invalidateName: "3b"},
+			executionTime:    3,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "7"},
-			executionTime:          7,
+			TableInvalidator: testInvalidator{invalidateName: "7"},
+			executionTime:    7,
 		},
 	}
 	require.True(t, chain.ShouldInvalidateEntries())
