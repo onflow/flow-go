@@ -156,7 +156,7 @@ func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address
 }
 
 // GetBlockByHeight provides a mock function with given fields: ctx, height
-func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, error) {
+func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, height)
 
 	var r0 *flow.Block
@@ -168,18 +168,25 @@ func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) flow.BlockStatus); ok {
 		r1 = rf(ctx, height)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, uint64) error); ok {
+		r2 = rf(ctx, height)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetBlockByID provides a mock function with given fields: ctx, id
-func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, error) {
+func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, id)
 
 	var r0 *flow.Block
@@ -191,18 +198,25 @@ func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Bloc
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) flow.BlockStatus); ok {
 		r1 = rf(ctx, id)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier) error); ok {
+		r2 = rf(ctx, id)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetBlockHeaderByHeight provides a mock function with given fields: ctx, height
-func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error) {
+func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, height)
 
 	var r0 *flow.Header
@@ -214,18 +228,25 @@ func (_m *API) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) flow.BlockStatus); ok {
 		r1 = rf(ctx, height)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, uint64) error); ok {
+		r2 = rf(ctx, height)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetBlockHeaderByID provides a mock function with given fields: ctx, id
-func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error) {
+func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, id)
 
 	var r0 *flow.Header
@@ -237,14 +258,21 @@ func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flo
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) flow.BlockStatus); ok {
 		r1 = rf(ctx, id)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier) error); ok {
+		r2 = rf(ctx, id)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetCollectionByID provides a mock function with given fields: ctx, id
@@ -363,7 +391,7 @@ func (_m *API) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Id
 }
 
 // GetLatestBlock provides a mock function with given fields: ctx, isSealed
-func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, error) {
+func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, isSealed)
 
 	var r0 *flow.Block
@@ -375,18 +403,25 @@ func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, 
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, bool) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, bool) flow.BlockStatus); ok {
 		r1 = rf(ctx, isSealed)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, bool) error); ok {
+		r2 = rf(ctx, isSealed)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetLatestBlockHeader provides a mock function with given fields: ctx, isSealed
-func (_m *API) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error) {
+func (_m *API) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, isSealed)
 
 	var r0 *flow.Header
@@ -398,14 +433,21 @@ func (_m *API) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.H
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, bool) error); ok {
+	var r1 flow.BlockStatus
+	if rf, ok := ret.Get(1).(func(context.Context, bool) flow.BlockStatus); ok {
 		r1 = rf(ctx, isSealed)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(flow.BlockStatus)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, bool) error); ok {
+		r2 = rf(ctx, isSealed)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetLatestProtocolStateSnapshot provides a mock function with given fields: ctx
