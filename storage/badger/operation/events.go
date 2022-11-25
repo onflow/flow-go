@@ -17,17 +17,17 @@ const (
 )
 
 // serviceEventTypeToPrefix returns byte prefix for given service event type
-func serviceEventTypeToPrefix(eventType string) byte {
+func serviceEventTypeToPrefix(eventType string) (byte, error) {
 	switch eventType {
 	case flow.ServiceEventSetup:
-		return ServiceEventPrefixSetup
+		return ServiceEventPrefixSetup, nil
 	case flow.ServiceEventCommit:
-		return ServiceEventPrefixCommit
+		return ServiceEventPrefixCommit, nil
 
-	// service events are special and the list is strictly controlled, hardcoded
-	// that's why we panic for an unknown type
+	// service events are special and the list is strictly controlled
+	// any unknown type must error out
 	default:
-		panic(fmt.Sprintf("unexpected service event type: %s", eventType))
+		return 0, fmt.Errorf("unexpected service event type: %s", eventType)
 	}
 }
 

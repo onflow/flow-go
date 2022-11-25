@@ -38,7 +38,13 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 // filter by service event type first, and then find the result for highest height,
 // see LookupLastExecutionResultForServiceEventType
 func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, eventType string, blockHeight uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType), blockHeight), resultID)
+	typeByte, err := serviceEventTypeToPrefix(eventType)
+	if err != nil {
+		return func(txn *badger.Txn) error {
+			return err
+		}
+	}
+	return insert(makePrefix(codeServiceEventIndex, typeByte, blockHeight), resultID)
 }
 
 // ReindexExecutionResult updates mapping of an execution result ID keyed by block ID
@@ -62,5 +68,11 @@ func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error
 }
 
 func LookupLastExecutionResultForServiceEventType(height uint64, eventType string, resultID *flow.Identifier) func(*badger.Txn) error {
-	return findOneHighestButNoHigher(makePrefix(codeServiceEventIndex, serviceEventTypeToPrefix(eventType)), height, resultID)
+	typeByte, err := serviceEventTypeToPrefix(eventType)
+	if err != nil {
+		return func(txn *badger.Txn) error {
+			return err
+		}
+	}
+	return findOneHighestButNoHigher(makePrefix(codeServiceEventIndex, typeByte), height, resultID)
 }
