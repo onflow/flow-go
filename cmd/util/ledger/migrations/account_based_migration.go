@@ -3,8 +3,11 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // PayloadToAccount takes a payload and return:
@@ -61,13 +64,20 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload) ([
 		Accounts:           make(map[string][]ledger.Payload),
 	}
 
+	log.Info().Msgf("start grouping for a total of %v payloads", len(allPayloads))
+
 	var err error
-	for _, payload := range allPayloads {
+	logGrouping := util.LogProgress("grouping payload", len(allPayloads), &log.Logger)
+	for i, payload := range allPayloads {
 		groups, err = PayloadGrouping(groups, payload)
 		if err != nil {
 			return nil, err
 		}
+		logGrouping(i)
 	}
+
+	log.Info().Msgf("finish grouping for payloads, %v groups in total, %v NonAccountPayloads",
+		len(groups.Accounts), len(groups.NonAccountPayloads))
 
 	// migrate the payloads under accounts
 	migrated, err := MigrateGroupSequentially(migrator, groups.Accounts)
@@ -75,6 +85,8 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload) ([
 	if err != nil {
 		return nil, fmt.Errorf("could not migrate group: %w", err)
 	}
+
+	log.Info().Msgf("finished migrating all account based payloads, total migrated payloads: %v", len(migrated))
 
 	// add the non accounts which don't need to be migrated
 	withNonAccount := append(migrated, groups.NonAccountPayloads...)
@@ -86,6 +98,10 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload) ([
 // using the migrator
 func MigrateGroupSequentially(migrator AccountMigrator, payloadsByAccount map[string][]ledger.Payload) (
 	[]ledger.Payload, error) {
+
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+
+	i := 0
 	migrated := make([]ledger.Payload, 0)
 	for address, payloads := range payloadsByAccount {
 		accountMigrated, err := migrator(address, payloads)
@@ -94,6 +110,8 @@ func MigrateGroupSequentially(migrator AccountMigrator, payloadsByAccount map[st
 		}
 
 		migrated = append(migrated, accountMigrated...)
+		logAccount(i)
+		i++
 	}
 
 	return migrated, nil
