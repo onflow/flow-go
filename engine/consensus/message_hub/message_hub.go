@@ -413,6 +413,8 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 	}
 	if ok := h.ownOutboundVotes.Push(packed); ok {
 		h.ownOutboundMessageNotifier.Notify()
+	} else {
+		h.engineMetrics.MessageDropped(metrics.EngineConsensusMessageHub, metrics.MessageBlockVote)
 	}
 }
 
@@ -422,6 +424,8 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
 	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
 		h.ownOutboundMessageNotifier.Notify()
+	} else {
+		h.engineMetrics.MessageDropped(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 	}
 }
 
@@ -446,6 +450,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 
 		if ok := h.ownOutboundProposals.Push(proposal); ok {
 			h.ownOutboundMessageNotifier.Notify()
+		} else {
+			h.engineMetrics.MessageDropped(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 		}
 	}()
 }
