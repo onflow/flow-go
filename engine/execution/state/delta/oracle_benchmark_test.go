@@ -99,7 +99,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 		tempdir, err := os.MkdirTemp("", "flow-testing-temp-")
 		require.NoError(b, err)
 
-		storage.FastBootstrapWithRandomValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
+		err = storage.FastBootstrapWithRandomValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
+		require.NoError(b, err)
 
 		oracle, err := delta.NewOracle(storage)
 		require.NoError(b, err)
