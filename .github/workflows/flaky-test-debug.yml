@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - integration-bft
+          - integration-epochs
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
