@@ -336,7 +336,6 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 		return nil
 	})
 
-	fmt.Println(files)
 	sort.Strings(files)
 	// ingest new files into the db
 	return s.db.IngestExternalFile(files, grocksdb.NewDefaultIngestExternalFileOptions())

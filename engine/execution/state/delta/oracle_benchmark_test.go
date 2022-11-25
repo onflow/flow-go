@@ -33,7 +33,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(1000, b) } // 1_000_000
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 10_000 // 500_000_000
+		bootstrapSize      = 1_000_000 // 500_000_000
 		numInsPerStep      = 1000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
@@ -96,7 +96,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		// 	require.NoError(b, err)
 		// }
 
-		tempdir, err := os.MkdirTemp("", "flow-testing-temp-")
+		tempdir, err := os.MkdirTemp("", "flow-temp-data")
 		require.NoError(b, err)
 
 		err = storage.FastBootstrapWithRandomValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
