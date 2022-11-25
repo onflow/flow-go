@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -131,7 +132,11 @@ func TestState_MaxKeySize(t *testing.T) {
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(12))
+	st := state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(12)))
 
 	// read - interaction 2
 	_, err := st.Get("1", "2", true)
@@ -148,7 +153,11 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
-	st = state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(6))
+	st = state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(6)))
 	stChild := st.NewChild()
 
 	// update - 0
@@ -178,11 +187,15 @@ func TestState_MaxInteraction(t *testing.T) {
 }
 
 func TestState_IsFVMStateKey(t *testing.T) {
-	require.True(t, state.IsFVMStateKey("", "uuid"))
+	require.True(t, state.IsFVMStateKey("", state.UUIDKey))
+	require.True(t, state.IsFVMStateKey("", state.AddressStateKey))
+	require.False(t, state.IsFVMStateKey("", "other"))
+	require.False(t, state.IsFVMStateKey("Address", state.UUIDKey))
+	require.False(t, state.IsFVMStateKey("Address", state.AddressStateKey))
 	require.True(t, state.IsFVMStateKey("Address", "public_key_12"))
-	require.True(t, state.IsFVMStateKey("Address", state.KeyContractNames))
+	require.True(t, state.IsFVMStateKey("Address", state.ContractNamesKey))
 	require.True(t, state.IsFVMStateKey("Address", "code.MYCODE"))
-	require.True(t, state.IsFVMStateKey("Address", state.KeyAccountStatus))
+	require.True(t, state.IsFVMStateKey("Address", state.AccountStatusKey))
 	require.False(t, state.IsFVMStateKey("Address", "anything else"))
 }
 

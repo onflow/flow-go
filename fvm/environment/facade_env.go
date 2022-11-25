@@ -52,7 +52,7 @@ type facadeEnvironment struct {
 func newFacadeEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 	meter Meter,
 ) *facadeEnvironment {
 	tracer := NewTracer(params.TracerParams)
@@ -129,7 +129,7 @@ func newFacadeEnvironment(
 			meter,
 			txnState,
 			accounts,
-			programs),
+			derivedTxnData),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -140,16 +140,16 @@ func newFacadeEnvironment(
 	return env
 }
 
-func newScriptFacadeEnvironment(
+func NewScriptEnvironment(
 	ctx context.Context,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		params,
 		txnState,
-		programs,
+		derivedTxnData,
 		NewCancellableMeter(ctx, txnState))
 
 	env.addParseRestrictedChecks()
@@ -157,15 +157,15 @@ func newScriptFacadeEnvironment(
 	return env
 }
 
-func newTransactionFacadeEnvironment(
+func NewTransactionEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		params,
 		txnState,
-		programs,
+		derivedTxnData,
 		NewMeter(txnState),
 	)
 

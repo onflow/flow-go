@@ -9,39 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm after emulator is updated ...
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// is merged and integrated.
 const (
-	// [2_000, 3_000) reserved for the FVM
-	_ common.ComputationKind = iota + 2_000
-	ComputationKindHash
-	ComputationKindVerifySignature
-	ComputationKindAddAccountKey
-	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
-	ComputationKindCreateAccount
-	ComputationKindEmitEvent
-	ComputationKindGenerateUUID
-	ComputationKindGetAccountAvailableBalance
-	ComputationKindGetAccountBalance
-	ComputationKindGetAccountContractCode
-	ComputationKindGetAccountContractNames
-	ComputationKindGetAccountKey
-	ComputationKindGetBlockAtHeight
-	ComputationKindGetCode
-	ComputationKindGetCurrentBlockHeight
-	ComputationKindGetProgram
-	ComputationKindGetStorageCapacity
-	ComputationKindGetStorageUsed
-	ComputationKindGetValue
-	ComputationKindRemoveAccountContractCode
-	ComputationKindResolveLocation
-	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	ComputationKindSetProgram
-	ComputationKindSetValue
-	ComputationKindUpdateAccountContractCode
-	ComputationKindValidatePublicKey
-	ComputationKindValueExists
+	ComputationKindCreateAccount = 2006
+	ComputationKindGetValue      = 2020
+	ComputationKindSetValue      = 2026
 )
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
@@ -409,16 +382,6 @@ func NewMeter(params MeterParameters) *Meter {
 	}
 
 	return m
-}
-
-// NewChild construct a new Meter instance with the same limits as parent
-func (m *Meter) NewChild() *Meter {
-	return &Meter{
-		MeterParameters:        m.MeterParameters,
-		computationIntensities: make(MeteredComputationIntensities),
-		memoryIntensities:      make(MeteredMemoryIntensities),
-		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
-	}
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits

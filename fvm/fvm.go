@@ -3,10 +3,10 @@ package fvm
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -22,12 +22,29 @@ const (
 	ScriptProcedureType      = ProcedureType("script")
 )
 
+type ProcedureExecutor interface {
+	Preprocess() error
+	Execute() error
+	Cleanup()
+}
+
+func run(executor ProcedureExecutor) error {
+	defer executor.Cleanup()
+
+	err := executor.Preprocess()
+	if err != nil {
+		return err
+	}
+
+	return executor.Execute()
+}
+
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	Run(
 		ctx Context,
 		txnState *state.TransactionState,
-		programs *programs.TransactionPrograms,
+		derivedTxnData *programs.DerivedTransactionData,
 	) error
 
 	ComputationLimit(ctx Context) uint64
@@ -68,21 +85,21 @@ func (vm *VirtualMachine) Run(
 	proc Procedure,
 	v state.View,
 ) error {
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockProgramsWithTransactionOffset(
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = programs.NewEmptyDerivedBlockDataWithTransactionOffset(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var txnPrograms *programs.TransactionPrograms
+	var derivedTxnData *programs.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	case TransactionProcedureType, BootstrapProcedureType:
-		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	default:
@@ -90,53 +107,35 @@ func (vm *VirtualMachine) Run(
 	}
 
 	if err != nil {
-		return fmt.Errorf("error creating transaction programs: %w", err)
+		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
-	meterParams := meter.DefaultParameters().
-		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-		WithMemoryLimit(proc.MemoryLimit(ctx))
-
-	meterParams, err = getEnvironmentMeterParameters(
-		ctx,
-		v,
-		txnPrograms,
-		meterParams,
-	)
+	// TODO(patrick): move this into transaction executor (and maybe also script
+	// executor)
+	meterParams, err := getMeterParameters(ctx, proc, v, derivedTxnData)
 	if err != nil {
-		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+		return fmt.Errorf("error gettng meter parameters: %w", err)
 	}
-
-	interactionLimit := ctx.MaxStateInteractionSize
-	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
-		interactionLimit = math.MaxUint64
-	}
-
-	eventSizeLimit := ctx.EventCollectionByteSizeLimit
-	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
 	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMeterParameters(meterParams).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(interactionLimit),
-	)
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
-	err = proc.Run(ctx, txnState, txnPrograms)
+	err = proc.Run(ctx, txnState, derivedTxnData)
 	if err != nil {
 		return err
 	}
 
-	// Note: it is safe to skip committing the parsed programs for non-normal
+	// Note: it is safe to skip committing derived data for non-normal
 	// transactions (i.e., bootstrap and script) since these do not invalidate
-	// programs.
+	// derived data entries.
 	if proc.Type() == TransactionProcedureType {
-		// NOTE: It is not safe to ignore txnPrograms' commit error for
-		// transactions that trigger programs invalidation.
-		return txnPrograms.Commit()
+		// NOTE: It is not safe to ignore derivedTxnData' commit error for
+		// transactions that trigger derived data invalidation.
+		return derivedTxnData.Commit()
 	}
 
 	return nil
@@ -156,24 +155,29 @@ func (vm *VirtualMachine) GetAccount(
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
-	)
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockPrograms()
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = programs.NewEmptyDerivedBlockData()
 	}
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
+	derviedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
 		programs.EndOfBlockExecutionTime,
 		programs.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error creating transaction programs for GetAccount: %w",
+			"error creating derived transaction data for GetAccount: %w",
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {

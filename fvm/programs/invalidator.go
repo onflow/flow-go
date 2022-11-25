@@ -4,23 +4,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type ProgramEntry struct {
-	Location common.AddressLocation
-	Program  *interpreter.Program
-	State    *state.State
-}
-
-type Invalidator interface {
-	// This returns true if the this invalidates at least one program
-	ShouldInvalidatePrograms() bool
-
-	// This returns true if the program entry should be invalidated.
-	ShouldInvalidateEntry(ProgramEntry) bool
-}
 
 type ContractUpdateKey struct {
 	Address flow.Address
@@ -32,66 +19,74 @@ type ContractUpdate struct {
 	Code []byte
 }
 
-var _ Invalidator = ModifiedSetsInvalidator{}
+type MeterParamOverrides struct {
+	ComputationWeights meter.ExecutionEffortWeights // nil indicates no override
+	MemoryWeights      meter.ExecutionMemoryWeights // nil indicates no override
+	MemoryLimit        *uint64                      // nil indicates no override
+}
+
+type ProgramInvalidator DerivedDataInvalidator[
+	common.AddressLocation,
+	*interpreter.Program,
+]
+
+type MeterParamOverridesInvalidator DerivedDataInvalidator[
+	struct{},
+	MeterParamOverrides,
+]
+
+type TransactionInvalidator interface {
+	ProgramInvalidator() ProgramInvalidator
+	MeterParamOverridesInvalidator() MeterParamOverridesInvalidator
+}
 
 type ModifiedSetsInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
 	FrozenAccounts     []common.Address
 }
 
-func (sets ModifiedSetsInvalidator) ShouldInvalidatePrograms() bool {
+func (sets ModifiedSetsInvalidator) ProgramInvalidator() ProgramInvalidator {
+	return ModifiedSetsProgramInvalidator{sets}
+}
+
+func (sets ModifiedSetsInvalidator) MeterParamOverridesInvalidator() MeterParamOverridesInvalidator {
+	return ModifiedSetsMeterParamOverridesInvalidator{sets}
+}
+
+type ModifiedSetsProgramInvalidator struct {
+	ModifiedSetsInvalidator
+}
+
+var _ ProgramInvalidator = ModifiedSetsProgramInvalidator{}
+
+func (sets ModifiedSetsProgramInvalidator) ShouldInvalidateEntries() bool {
+	// TODO(patrick): invalidate on meter param updates
 	return len(sets.ContractUpdateKeys) > 0 || len(sets.FrozenAccounts) > 0
 }
 
-func (sets ModifiedSetsInvalidator) ShouldInvalidateEntry(
-	entry ProgramEntry,
+func (sets ModifiedSetsProgramInvalidator) ShouldInvalidateEntry(
+	location common.AddressLocation,
+	program *interpreter.Program,
+	state *state.State,
 ) bool {
 	// TODO(rbtz): switch to fine grain invalidation.
-	return sets.ShouldInvalidatePrograms()
+	return sets.ShouldInvalidateEntries()
 }
 
-type invalidatorAtTime struct {
-	Invalidator
-
-	executionTime LogicalTime
+type ModifiedSetsMeterParamOverridesInvalidator struct {
+	ModifiedSetsInvalidator
 }
 
-// NOTE: chainedInvalidator assumes that the entries are order by non-decreasing
-// execution time.
-type chainedInvalidators []invalidatorAtTime
-
-func (chained chainedInvalidators) ApplicableInvalidators(
-	snapshotTime LogicalTime,
-) chainedInvalidators {
-	// NOTE: switch to bisection search (or reverse iteration) if the list
-	// is long.
-	for idx, entry := range chained {
-		if snapshotTime <= entry.executionTime {
-			return chained[idx:]
-		}
-	}
-
-	return nil
+func (sets ModifiedSetsMeterParamOverridesInvalidator) ShouldInvalidateEntries() bool {
+	// TODO(patrick): invalidate on meter param updates instead of contract
+	// updates
+	return len(sets.ContractUpdateKeys) > 0 || len(sets.FrozenAccounts) > 0
 }
 
-func (chained chainedInvalidators) ShouldInvalidatePrograms() bool {
-	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidatePrograms() {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (chained chainedInvalidators) ShouldInvalidateEntry(
-	entry ProgramEntry,
+func (sets ModifiedSetsMeterParamOverridesInvalidator) ShouldInvalidateEntry(
+	_ struct{},
+	_ MeterParamOverrides,
+	_ *state.State,
 ) bool {
-	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidateEntry(entry) {
-			return true
-		}
-	}
-
-	return false
+	return sets.ShouldInvalidateEntries()
 }
