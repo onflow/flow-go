@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -811,6 +812,11 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
 
+type streamEvent struct {
+	message string
+	stream  libp2pnet.Stream
+}
+
 // TestUnicastStreamLimit tests that the middleware does not accept more than the maximum number of
 // unicast streams and streams created beyond the limit are reset
 func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
@@ -826,10 +832,16 @@ func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
 	// configured mw.unicastMaxStreamsPerPeer (using default)
 	maxStreams := middleware.DefaultMaxUnicastStreamsPerPeer
 
-	receiveCount := 0
-	m.ov[receiver].On("Receive", senderNodeID, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
-		receiveCount++
-	})
+	mu := sync.Mutex{}
+	receivedMsgs := map[string]bool{}
+	m.ov[receiver].On("Receive", senderNodeID, mockery.AnythingOfType("*message.Message"), mockery.AnythingOfType("*message.TestMessage")).
+		Return(nil).
+		Run(func(args mockery.Arguments) {
+			event := args[2].(*libp2pmessage.TestMessage)
+			mu.Lock()
+			receivedMsgs[event.Text] = true
+			mu.Unlock()
+		})
 
 	var protocol protocol.ID
 
@@ -838,16 +850,20 @@ func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
 	// this test only works if streamCount > mw.unicastMaxStreamsPerPeer
 	require.Greater(m.T(), streamCount, maxStreams)
 
-	streams := make([]libp2pnet.Stream, 0, streamCount)
+	streams := make(chan streamEvent, streamCount)
 	for i := 0; i < streamCount; i++ {
 		s, err := m.nodes[sender].CreateStream(m.mwCtx, receiverPeerID)
 		require.NoError(m.T(), err)
 
-		protocol = s.Protocol()
-		streams = append(streams, s)
+		e := streamEvent{
+			message: fmt.Sprintf("message %d", i),
+			stream:  s,
+		}
+
+		streams <- e
 
 		// write message to stream (don't use SendDirect because it will close the stream)
-		msg, _, _ := messageutils.CreateMessage(m.T(), senderNodeID, receiverNodeID, testChannel, "hello")
+		msg, _, _ := messageutils.CreateMessage(m.T(), senderNodeID, receiverNodeID, testChannel, e.message)
 		bufw := bufio.NewWriter(s)
 		writer := ggio.NewDelimitedWriter(bufw)
 
@@ -857,7 +873,7 @@ func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
 		err = bufw.Flush()
 		require.NoError(m.T(), err)
 	}
-	assert.Len(m.T(), streams, streamCount)
+	close(streams)
 
 	// give the receiver time to process the messages
 	time.Sleep(50 * time.Millisecond)
@@ -869,20 +885,137 @@ func (m *MiddlewareTestSuite) TestUnicastStreamLimit() {
 	// close all streams. Streams that were reset will return an error
 	// stream processing may happen out of order, so just count up all the resets
 	resets := 0
-	for _, s := range streams {
-		err := s.Close()
+	closedStreams := 0
+	for e := range streams {
+		err := e.stream.Close()
 		if err != nil {
-			require.True(m.T(), strings.Contains(err.Error(), "stream reset"))
+			assert.True(m.T(), strings.Contains(err.Error(), "stream reset"))
+			assert.False(m.T(), receivedMsgs[e.message], "message '%s' should not have been received", e.message)
 			resets++
+		} else {
+			assert.True(m.T(), receivedMsgs[e.message], "message '%s' should have been received", e.message)
 		}
+		closedStreams++
 	}
+	assert.Equal(m.T(), streamCount, closedStreams)
 
 	// middleware should only accept up to mw.unicastMaxStreamsPerPeer messages. it's possible there
-	// are additional resets due to flakiness in the network setup.
-	assert.LessOrEqual(m.T(), receiveCount, maxStreams)
+	// are additional resets due to flakiness in the network setup, but make sure at least 90% of the
+	// expected streams were accepted
+	assert.LessOrEqual(m.T(), len(receivedMsgs), maxStreams)
+	assert.GreaterOrEqual(m.T(), len(receivedMsgs), maxStreams*9/10)
 
 	// the rest should result in resets
 	assert.GreaterOrEqual(m.T(), resets, streamCount-maxStreams)
+}
+
+// TestUnicastStreamLimit_Concurrent tests that the middleware does not accept more than the maximum number of
+// unicast streams and streams created beyond the limit are reset. It does this by creating all of the streams
+// concurrently to additionally validate that the stream limit is enforced correctly.
+func (m *MiddlewareTestSuite) TestUnicastStreamLimit_Concurrent() {
+	sender := 0
+	receiver := m.size - 1
+
+	senderNodeID := m.ids[sender].NodeID
+	receiverNodeID := m.ids[receiver].NodeID
+
+	senderPeerID := m.nodes[sender].Host().ID()
+	receiverPeerID := m.nodes[receiver].Host().ID()
+
+	// configured mw.unicastMaxStreamsPerPeer (using default)
+	maxStreams := middleware.DefaultMaxUnicastStreamsPerPeer
+
+	mu := sync.Mutex{}
+	receivedMsgs := map[string]bool{}
+	m.ov[receiver].On("Receive", senderNodeID, mockery.AnythingOfType("*message.Message"), mockery.AnythingOfType("*message.TestMessage")).
+		Return(nil).
+		Run(func(args mockery.Arguments) {
+			event := args[2].(*libp2pmessage.TestMessage)
+			mu.Lock()
+			receivedMsgs[event.Text] = true
+			mu.Unlock()
+		})
+
+	// create enough streams to exceed the limit, but not too many more to reduce false positives
+	streamCount := maxStreams + 5
+
+	// this test only works if streamCount > mw.unicastMaxStreamsPerPeer
+	require.Greater(m.T(), streamCount, maxStreams)
+
+	// create all streams concurrently
+	wg := sync.WaitGroup{}
+
+	streams := make(chan streamEvent, streamCount)
+	for i := 0; i < streamCount; i++ {
+		wg.Add(1)
+		i := i
+		go func() {
+			defer wg.Done()
+			s, err := m.nodes[sender].CreateStream(m.mwCtx, receiverPeerID)
+			require.NoError(m.T(), err)
+
+			e := streamEvent{
+				message: fmt.Sprintf("message %d", i),
+				stream:  s,
+			}
+
+			streams <- e
+
+			// write message to stream (don't use SendDirect because it will close the stream)
+			msg, _, _ := messageutils.CreateMessage(m.T(), senderNodeID, receiverNodeID, testChannel, e.message)
+			bufw := bufio.NewWriter(s)
+			writer := ggio.NewDelimitedWriter(bufw)
+
+			err = writer.WriteMsg(msg)
+			require.NoError(m.T(), err)
+
+			err = bufw.Flush()
+			require.NoError(m.T(), err)
+		}()
+	}
+	wg.Wait()
+	close(streams)
+
+	// give the receiver time to process the messages
+	time.Sleep(50 * time.Millisecond)
+
+	// make sure there are no more than the max number of streams still open (the rest were reset)
+	count := p2putils.CountStreams(m.nodes[receiver].Host(), senderPeerID, unicast.FlowProtocolID(testutils.SporkID), libp2pnet.DirInbound)
+	assert.LessOrEqual(m.T(), count, maxStreams)
+
+	// close all streams concurrently. Streams that were reset will return an error
+	// stream processing may happen out of order, so just count up all the resets
+	resets := atomic.NewInt32(0)
+	closedStreams := 0
+	for e := range streams {
+		wg.Add(1)
+		e := e
+		go func() {
+			defer wg.Done()
+			err := e.stream.Close()
+			if err != nil {
+				assert.True(m.T(), strings.Contains(err.Error(), "stream reset"))
+				assert.False(m.T(), receivedMsgs[e.message], "message '%s' should not have been received", e.message)
+				resets.Inc()
+			} else {
+				assert.True(m.T(), receivedMsgs[e.message], "message '%s' should have been received", e.message)
+			}
+		}()
+		closedStreams++
+	}
+	assert.Equal(m.T(), streamCount, closedStreams)
+	wg.Wait()
+
+	// middleware should only accept up to mw.unicastMaxStreamsPerPeer messages. When opening
+	// streams concurrent, some streams are incorrectly reset due to
+	//it's possible there
+	// are additional resets due to flakiness in the network setup, but make sure at least 60% of the
+	// expected streams were accepted
+	assert.LessOrEqual(m.T(), len(receivedMsgs), maxStreams)
+	assert.GreaterOrEqual(m.T(), len(receivedMsgs), maxStreams*9/10)
+
+	// the rest should result in resets
+	assert.GreaterOrEqual(m.T(), int(resets.Load()), streamCount-maxStreams)
 }
 
 func (m *MiddlewareTestSuite) stopMiddlewares() {

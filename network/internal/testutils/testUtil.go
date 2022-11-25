@@ -49,7 +49,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var sporkID = unittest.IdentifierFixture()
+var SporkID = unittest.IdentifierFixture()
 
 type PeerTag struct {
 	Peer peer.ID
@@ -180,7 +180,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			nodeId,
 			o.networkMetrics,
 			bitswapmet,
-			sporkID,
+			SporkID,
 			middleware.DefaultUnicastTimeout,
 			middleware.DefaultMaxUnicastStreamsPerPeer,
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
@@ -378,7 +378,7 @@ func generateLibP2PNode(
 		metrics.NewNoopCollector(),
 		"0.0.0.0:0",
 		key,
-		sporkID).
+		SporkID).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 
