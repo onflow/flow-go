@@ -4,6 +4,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/fs"
+	"math/rand"
+	"path/filepath"
+	"sort"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/linxGnu/grocksdb"
@@ -170,19 +174,22 @@ func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEnt
 }
 
 type RocksStore struct {
-	db *grocksdb.DB
-	ro *grocksdb.ReadOptions
-	wo *grocksdb.WriteOptions
-	wb *grocksdb.WriteBatch
+	db  *grocksdb.DB
+	opt *grocksdb.Options
+	ro  *grocksdb.ReadOptions
+	wo  *grocksdb.WriteOptions
+	wb  *grocksdb.WriteBatch
 }
 
 var _ Storage = &RocksStore{}
 
-func NewRocksStore(db *grocksdb.DB) (*RocksStore, error) {
-	store := &RocksStore{db: db,
-		ro: grocksdb.NewDefaultReadOptions(),
-		wo: grocksdb.NewDefaultWriteOptions(),
-		wb: grocksdb.NewWriteBatch(),
+func NewRocksStore(db *grocksdb.DB, opt *grocksdb.Options) (*RocksStore, error) {
+	store := &RocksStore{
+		db:  db,
+		opt: opt,
+		ro:  grocksdb.NewDefaultReadOptions(),
+		wo:  grocksdb.NewDefaultWriteOptions(),
+		wb:  grocksdb.NewWriteBatch(),
 	}
 	err := store.initHeight()
 	return store, err
@@ -270,4 +277,66 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 	binary.BigEndian.PutUint64(buf, blockHeight)
 	s.wb.Put(BadgerStoreHeightKey, buf)
 	return s.db.Write(s.wo, s.wb)
+}
+
+func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uint64, keySize, minValueSize, maxValueSize int) error {
+
+	// in the future for exports we need to iterate over keys in sorted order
+	// (which means it would be the hash of the key)
+
+	// Options passed to SstFileWriter will be used to figure out the table type, compression options, etc that will be used to create the SST file.
+	// The Comparator that is passed to the SstFileWriter must be exactly the same as the Comparator used in the DB that this file will be ingested into.
+	// Rows must be inserted in a strictly increasing order.
+	// files would be somthing like /home/usr/file1.sst
+	writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
+	defer writer.Destroy()
+
+	err := writer.Open(path)
+	if err != nil {
+		return err
+	}
+
+	for i := uint64(0); i < numberOfKeys; i++ {
+		// the first 8 bytes of the key would be the big endian encoding of i
+		// the rest would be populated randomly
+		// so keys would always be strictly increasing in order
+		key := make([]byte, 8)
+		binary.BigEndian.PutUint64(key, i)
+		randomBytes := make([]byte, keySize-8)
+		rand.Read(randomBytes)
+		key = append(key, randomBytes...)
+
+		// decide on the value byte size
+		var byteSize = maxValueSize
+		if minValueSize < maxValueSize {
+			byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
+		}
+		// randomly fill in the value
+		value := make([]byte, byteSize)
+		rand.Read(value)
+		err = writer.Add(key, value)
+		if err != nil {
+			return err
+		}
+	}
+	err = writer.Finish()
+	if err != nil {
+		return err
+	}
+
+	// get all files in a path
+	var files []string
+	filepath.WalkDir(path, func(s string, d fs.DirEntry, e error) error {
+		if e != nil {
+			return e
+		}
+		if filepath.Ext(d.Name()) == ".sst" {
+			files = append(files, s)
+		}
+		return nil
+	})
+
+	sort.Strings(files)
+	// ingest new files into the db
+	return s.db.IngestExternalFile(files, grocksdb.NewDefaultIngestExternalFileOptions())
 }

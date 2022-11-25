@@ -2,6 +2,7 @@ package delta_test
 
 import (
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(1000, b) } // 1_000_000
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 500_000_000
+		bootstrapSize      = 10_000 // 500_000_000
 		numInsPerStep      = 1000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
@@ -73,27 +74,32 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		db, err := grocksdb.OpenDb(opts, dir)
 
-		storage, err := delta.NewRocksStore(db)
+		storage, err := delta.NewRocksStore(db, opts)
 		require.NoError(b, err)
 
-		batchSize := 1000
-		steps := bootstrapSize / batchSize
-		for i := 0; i < steps; i++ {
-			owners := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
-			keys := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
-			values := testutils.RandomValues(batchSize, 1, valueMaxByteSize)
-			registers := make([]flow.RegisterEntry, batchSize)
-			for i := 0; i < batchSize; i++ {
-				registers[i] = flow.RegisterEntry{Key: flow.RegisterID{
-					Owner: string(owners[i]),
-					Key:   string(keys[i]),
-				},
-					Value: values[i]}
-			}
+		// batchSize := 1000
+		// steps := bootstrapSize / batchSize
+		// for i := 0; i < steps; i++ {
+		// 	owners := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
+		// 	keys := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
+		// 	values := testutils.RandomValues(batchSize, 1, valueMaxByteSize)
+		// 	registers := make([]flow.RegisterEntry, batchSize)
+		// 	for i := 0; i < batchSize; i++ {
+		// 		registers[i] = flow.RegisterEntry{Key: flow.RegisterID{
+		// 			Owner: string(owners[i]),
+		// 			Key:   string(keys[i]),
+		// 		},
+		// 			Value: values[i]}
+		// 	}
 
-			err = storage.Bootstrap(0, registers)
-			require.NoError(b, err)
-		}
+		// 	err = storage.Bootstrap(0, registers)
+		// 	require.NoError(b, err)
+		// }
+
+		tempdir, err := os.MkdirTemp("", "flow-testing-temp-")
+		require.NoError(b, err)
+
+		storage.FastBootstrapWithRandomValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
 
 		oracle, err := delta.NewOracle(storage)
 		require.NoError(b, err)
