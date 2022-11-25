@@ -134,6 +134,7 @@ func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) err
 		err := t.processQueuedTimeout(timeoutObject)
 		// report duration of processing one timeout object
 		t.hotstuffMetrics.TimeoutObjectProcessingDuration(time.Since(startTime))
+		t.engineMetrics.MessageHandled(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 
 		if err != nil {
 			return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
@@ -175,7 +176,6 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 		return fmt.Errorf("could not process TO for view %d: %w",
 			timeoutObject.View, err)
 	}
-
 	return nil
 }
 

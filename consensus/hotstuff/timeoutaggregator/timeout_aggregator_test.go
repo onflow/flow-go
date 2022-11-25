@@ -50,6 +50,7 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 		unittest.Logger(),
 		metricsCollector,
 		metricsCollector,
+		metricsCollector,
 		s.consumer,
 		s.lowestRetainedView,
 		s.collectors,

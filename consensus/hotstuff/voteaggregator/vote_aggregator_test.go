@@ -48,6 +48,7 @@ func (s *VoteAggregatorTestSuite) SetupTest() {
 		unittest.Logger(),
 		metricsCollector,
 		metricsCollector,
+		metricsCollector,
 		s.consumer,
 		0,
 		s.collectors,

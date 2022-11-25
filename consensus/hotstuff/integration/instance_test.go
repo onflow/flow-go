@@ -436,7 +436,15 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	metricsCollector := metrics.NewNoopCollector()
 
 	// initialize the vote aggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, metricsCollector, metricsCollector, notifier, livenessData.CurrentView, voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(
+		log,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		notifier,
+		livenessData.CurrentView,
+		voteCollectors,
+	)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
@@ -484,6 +492,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// initialize the timeout aggregator
 	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(
 		log,
+		metricsCollector,
 		metricsCollector,
 		metricsCollector,
 		notifier,

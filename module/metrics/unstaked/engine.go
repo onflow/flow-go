@@ -23,3 +23,7 @@ func (ec *EngineCollector) MessageReceived(engine string, message string) {
 func (ec *EngineCollector) MessageHandled(engine string, message string) {
 	ec.metrics.MessageHandled("unstaked_"+engine, message)
 }
+
+func (ec *EngineCollector) MessageDropped(engine string, message string) {
+	ec.metrics.MessageDropped("unstaked_"+engine, message)
+}

@@ -504,6 +504,7 @@ func createNode(
 		log,
 		metricsCollector,
 		metricsCollector,
+		metricsCollector,
 		notifier,
 		livenessData.CurrentView,
 		voteCollectors,
@@ -519,6 +520,7 @@ func createNode(
 
 	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(
 		log,
+		metricsCollector,
 		metricsCollector,
 		metricsCollector,
 		notifier,
