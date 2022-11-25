@@ -45,7 +45,7 @@ int      bls_verifyPerDistinctKey(const byte*,
 void     bls_batchVerify(const int, byte*, const ep2_st*,
             const byte*, const byte*, const int);
 
-int      check_membership_Zr(const bn_t);
+int      check_membership_Zr_star(const bn_t);
 int      check_membership_G1(const ep_t p);
 int      check_membership_G2(const ep2_t);
 

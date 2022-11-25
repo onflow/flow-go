@@ -128,13 +128,14 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
+	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
+
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
 		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
+		require.NoError(m.T(), mw.Subscribe(testChannel))
 	}
-
-	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -228,7 +229,15 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// we expect 5 messages to be processed the rest will be rate limited
 	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
 
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, testutils.WithUnicastRateLimiters(rateLimiters), testutils.WithNetworkMetrics(netmet))
+	mws, providers := testutils.GenerateMiddlewares(
+		m.T(),
+		m.logger,
+		ids,
+		libP2PNodes,
+		unittest.NetworkCodec(),
+		m.slashingViolationsConsumer,
+		testutils.WithUnicastRateLimiters(rateLimiters),
+		testutils.WithNetworkMetrics(netmet))
 
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -246,7 +255,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+
+	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -274,6 +288,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
+	unittest.RequireCloseBefore(m.T(), libP2PNodes[0].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
@@ -333,7 +348,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+
+	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -598,6 +618,10 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	targetIndex := m.size - 1
 	sourceNode := m.ids[sourceIndex].NodeID
 	targetNode := m.ids[targetIndex].NodeID
+	targetMW := m.mws[targetIndex]
+
+	// subscribe to channels.ProvideChunks so that the message is not dropped
+	require.NoError(m.T(), targetMW.Subscribe(channels.ProvideChunks))
 
 	// creates a network payload with a size greater than the default max size using a known large message type
 	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
@@ -715,12 +739,6 @@ func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_Publish() {
 			close(ch)
 		})
 
-	// initially subscribe the nodes to the channel
-	for _, mw := range m.mws {
-		err := mw.Subscribe(testChannel)
-		require.NoError(m.Suite.T(), err)
-	}
-
 	// set up waiting for m.size pubsub tags indicating a mesh has formed
 	for i := 0; i < m.size; i++ {
 		select {
@@ -747,12 +765,6 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	last := m.size - 1
 	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
-
-	// initially subscribe the nodes to the channel
-	for _, mw := range m.mws {
-		err := mw.Subscribe(testChannel)
-		require.NoError(m.Suite.T(), err)
-	}
 
 	// set up waiting for m.size pubsub tags indicating a mesh has formed
 	for i := 0; i < m.size; i++ {

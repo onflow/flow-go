@@ -13,32 +13,78 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	programsCache "github.com/onflow/flow-go/fvm/programs"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
+// TODO(patrick): rm.  call proc.Run directly.
 type TransactionInvoker struct {
 }
 
-func NewTransactionInvoker() TransactionInvoker {
-	return TransactionInvoker{}
+func NewTransactionInvoker() *TransactionInvoker {
+	return &TransactionInvoker{}
+}
+
+func (i TransactionInvoker) NewExecutor(
+	ctx Context,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+	derivedTxnData *programsCache.DerivedTransactionData,
+) *transactionExecutor {
+	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
 }
 
 func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	programs *programsCache.TransactionPrograms,
+	derivedTxnData *programsCache.DerivedTransactionData,
 ) error {
-	executor := newInvocationExecutor(ctx, proc, txnState, programs)
+	// TODO(patrick): switch to run(i.NewExecutor(...))
+	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
 	defer executor.Cleanup()
-	return executor.Process()
+	return executor.Execute()
 }
 
-type invocationExecutor struct {
-	proc     *TransactionProcedure
-	txnState *state.TransactionState
-	programs *programsCache.TransactionPrograms
+type TransactionExecutorParams struct {
+	AuthorizationChecksEnabled bool
+
+	SequenceNumberCheckAndIncrementEnabled bool
+
+	// If AccountKeyWeightThreshold is set to a negative number, signature
+	// verification is skipped during authorization checks.
+	//
+	// Note: This is set only by tests
+	AccountKeyWeightThreshold int
+
+	// Note: This is disabled only by tests
+	TransactionBodyExecutionEnabled bool
+}
+
+func DefaultTransactionExecutorParams() TransactionExecutorParams {
+	return TransactionExecutorParams{
+		AuthorizationChecksEnabled:             true,
+		SequenceNumberCheckAndIncrementEnabled: true,
+		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
+		TransactionBodyExecutionEnabled:        true,
+	}
+}
+
+type transactionExecutor struct {
+	TransactionExecutorParams
+
+	TransactionVerifier
+	TransactionSequenceNumberChecker
+	TransactionStorageLimiter
+
+	tracer module.Tracer
+	logger zerolog.Logger
+
+	proc           *TransactionProcedure
+	txnState       *state.TransactionState
+	derivedTxnData *programsCache.DerivedTransactionData
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -46,42 +92,105 @@ type invocationExecutor struct {
 	errs *errors.ErrorsCollector
 
 	nestedTxnId state.NestedTransactionId
+
+	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
+	txnBodyExecutor runtime.Executor
 }
 
-func newInvocationExecutor(
+func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	programs *programsCache.TransactionPrograms,
-) *invocationExecutor {
+	derivedTxnData *programsCache.DerivedTransactionData,
+) *transactionExecutor {
 	span := proc.StartSpanFromProcTraceSpan(
 		ctx.Tracer,
 		trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	env := NewTransactionEnvironment(
-		ctx,
-		txnState,
-		programs,
-		proc.Transaction,
-		proc.TxIndex,
-		span)
+	ctx.RootSpan = span
+	ctx.TxIndex = proc.TxIndex
+	ctx.TxId = proc.Transaction.ID()
+	ctx.TxBody = proc.Transaction
 
-	return &invocationExecutor{
-		proc:     proc,
-		txnState: txnState,
-		programs: programs,
-		span:     span,
-		env:      env,
-		errs:     errors.NewErrorsCollector(),
+	env := environment.NewTransactionEnvironment(
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
+
+	return &transactionExecutor{
+		TransactionExecutorParams: ctx.TransactionExecutorParams,
+		tracer:                    ctx.Tracer,
+		logger:                    ctx.Logger,
+		proc:                      proc,
+		txnState:                  txnState,
+		derivedTxnData:            derivedTxnData,
+		span:                      span,
+		env:                       env,
+		errs:                      errors.NewErrorsCollector(),
+		cadenceRuntime:            env.BorrowCadenceRuntime(),
 	}
 }
 
-func (executor *invocationExecutor) Cleanup() {
+func (executor *transactionExecutor) Cleanup() {
+	executor.env.ReturnCadenceRuntime(executor.cadenceRuntime)
 	executor.span.End()
 }
 
-func (executor *invocationExecutor) Process() error {
+func (executor *transactionExecutor) Preprocess() error {
+	// TODO(patrick): split ExecuteTransactionBody preprocessing.
+	return nil
+}
+
+func (executor *transactionExecutor) Execute() error {
+	err := executor.execute()
+	txErr, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		// log the full error path
+		executor.logger.Err(err).Msg("fatal error when execution a transaction")
+		return failure
+	}
+
+	if txErr != nil {
+		executor.proc.Err = txErr
+	}
+
+	return nil
+}
+
+func (executor *transactionExecutor) execute() error {
+	if executor.AuthorizationChecksEnabled {
+		err := executor.CheckAuthorization(
+			executor.tracer,
+			executor.proc,
+			executor.txnState,
+			executor.AccountKeyWeightThreshold)
+		if err != nil {
+			return err
+		}
+	}
+
+	if executor.SequenceNumberCheckAndIncrementEnabled {
+		err := executor.CheckAndIncrementSequenceNumber(
+			executor.tracer,
+			executor.proc,
+			executor.txnState)
+		if err != nil {
+			return err
+		}
+	}
+
+	if executor.TransactionBodyExecutionEnabled {
+		err := executor.ExecuteTransactionBody()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	var beginErr error
 	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransaction()
 	if beginErr != nil {
@@ -108,7 +217,7 @@ func (executor *invocationExecutor) Process() error {
 	return executor.errs.ErrorOrNil()
 }
 
-func (executor *invocationExecutor) deductTransactionFees() (err error) {
+func (executor *transactionExecutor) deductTransactionFees() (err error) {
 	if !executor.env.TransactionFeesEnabled() {
 		return nil
 	}
@@ -133,7 +242,7 @@ func (executor *invocationExecutor) deductTransactionFees() (err error) {
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (executor *invocationExecutor) logExecutionIntensities() {
+func (executor *transactionExecutor) logExecutionIntensities() {
 	if !executor.env.Logger().Debug().Enabled() {
 		return
 	}
@@ -155,20 +264,26 @@ func (executor *invocationExecutor) logExecutionIntensities() {
 		Msg("transaction execution data")
 }
 
-func (executor *invocationExecutor) normalExecution() (
+func (executor *transactionExecutor) normalExecution() (
 	modifiedSets programsCache.ModifiedSetsInvalidator,
 	err error,
 ) {
-	rt := executor.env.BorrowCadenceRuntime()
-	defer executor.env.ReturnCadenceRuntime(rt)
-
-	err = rt.ExecuteTransaction(
+	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID))
 
+	err = executor.txnBodyExecutor.Preprocess()
+	if err != nil {
+		err = fmt.Errorf(
+			"transaction invocation failed when executing transaction: %w",
+			err)
+		return
+	}
+
+	err = executor.txnBodyExecutor.Execute()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed when executing transaction: %w",
@@ -205,7 +320,7 @@ func (executor *invocationExecutor) normalExecution() (
 	// so we don't error from computation/memory limits on this part.
 	// We cannot charge the user for this part, since fee deduction already happened.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = NewTransactionStorageLimiter().CheckLimits(
+		err = executor.CheckStorageLimits(
 			executor.env,
 			executor.txnState.UpdatedAddresses())
 	})
@@ -214,7 +329,7 @@ func (executor *invocationExecutor) normalExecution() (
 }
 
 // Clear changes and try to deduct fees again.
-func (executor *invocationExecutor) errorExecution() {
+func (executor *transactionExecutor) errorExecution() {
 	executor.txnState.DisableAllLimitEnforcements()
 	defer executor.txnState.EnableAllLimitEnforcements()
 
@@ -250,7 +365,7 @@ func (executor *invocationExecutor) errorExecution() {
 	}
 }
 
-func (executor *invocationExecutor) commit(
+func (executor *transactionExecutor) commit(
 	modifiedSets programsCache.ModifiedSetsInvalidator,
 ) error {
 	if executor.txnState.NumNestedTransactions() > 1 {
@@ -275,10 +390,10 @@ func (executor *invocationExecutor) commit(
 		executor.proc.ServiceEvents,
 		executor.env.ServiceEvents()...)
 
-	// based on the contract and frozen account updates we decide how to
-	// clean up the programs for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	executor.programs.AddInvalidator(modifiedSets)
+	// Based on various (e.g., contract and frozen account) updates, we decide
+	// how to clean up the derived data.  For failed transactions we also do
+	// the same as a successful transaction without any updates.
+	executor.derivedTxnData.AddInvalidator(modifiedSets)
 
 	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
 	if commitErr != nil {
