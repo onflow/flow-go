@@ -291,7 +291,7 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 	writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
 	defer writer.Destroy()
 
-	err := writer.Open(path + "input.sst")
+	err := writer.Open(path + "/input.sst")
 	if err != nil {
 		return fmt.Errorf("error opening the path for sst writer: %w", err)
 	}
@@ -336,6 +336,7 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 		return nil
 	})
 
+	fmt.Println("files: %s", files)
 	sort.Strings(files)
 	// ingest new files into the db
 	return s.db.IngestExternalFile(files, grocksdb.NewDefaultIngestExternalFileOptions())
