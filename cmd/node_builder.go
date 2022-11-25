@@ -198,7 +198,7 @@ type NetworkConfig struct {
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
 	UnicastBandwidthBurstLimit int
 
-	// UnicastMaxStreamsPerPeer is the maximum number of inbound unicast streams that can be opened with a peer.
+	// UnicastMaxStreamsPerPeer is the maximum number of inbound unicast streams that can be opened from a remote peer to the current peer.
 	UnicastMaxStreamsPerPeer uint
 }
 
