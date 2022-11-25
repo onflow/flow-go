@@ -291,7 +291,7 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 	writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
 	defer writer.Destroy()
 
-	err := writer.Open(path)
+	err := writer.Open(path + "input.sst")
 	if err != nil {
 		return fmt.Errorf("error opening the path for sst writer: %w", err)
 	}
