@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/irrecoverable"

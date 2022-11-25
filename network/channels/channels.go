@@ -28,7 +28,7 @@ func RolesByChannel(channel Channel) (flow.RoleList, bool) {
 	if IsClusterChannel(channel) {
 		return ClusterChannelRoles(channel), true
 	}
-	if PublicChannels().Contains(channel) {
+	if IsPublicChannel(channel) {
 		return flow.Roles(), true
 	}
 	roles, ok := channelRoleMap[channel]
@@ -103,6 +103,11 @@ func PublicChannels() ChannelList {
 		PublicSyncCommittee,
 		PublicReceiveBlocks,
 	}
+}
+
+// IsPublicChannel returns true if channel is in the public channels list
+func IsPublicChannel(channel Channel) bool {
+	return PublicChannels().Contains(channel)
 }
 
 // channels
@@ -251,6 +256,15 @@ func TopicFromChannel(channel Channel, rootBlockID flow.Identifier) Topic {
 		return Topic(channel)
 	}
 	return Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
+}
+
+// TopicsFromChannels returns the unique LibP2P topics form the channels.
+func TopicsFromChannels(channels ChannelList, rootBlockID flow.Identifier) []Topic {
+	topics := make([]Topic, 0, len(channels))
+	for _, channel := range channels {
+		topics = append(topics, TopicFromChannel(channel, rootBlockID))
+	}
+	return topics
 }
 
 func ChannelFromTopic(topic Topic) (Channel, bool) {

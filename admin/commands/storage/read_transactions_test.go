@@ -47,7 +47,7 @@ func TestReadTransactionsMissingStart(t *testing.T) {
 		Data: data,
 	})
 	require.Error(t, err)
-	require.Contains(t, fmt.Sprintf("%v", err), "end-height not set")
+	require.True(t, admin.IsInvalidAdminParameterError(err))
 }
 
 func TestReadTransactionsMissingEnd(t *testing.T) {
@@ -60,5 +60,5 @@ func TestReadTransactionsMissingEnd(t *testing.T) {
 		Data: data,
 	})
 	require.Error(t, err)
-	require.Contains(t, fmt.Sprintf("%v", err), "start-height not set")
+	require.True(t, admin.IsInvalidAdminParameterError(err))
 }

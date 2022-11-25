@@ -111,18 +111,18 @@ func NewFullConsensusState(
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// find the last seal at the parent block
 	last, err := m.lastSealed(candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -139,31 +139,31 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload guarantee(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
+		return fmt.Errorf("payload receipt(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized
 	// state
 	lastSeal, err := m.sealExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -240,8 +240,8 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 			// for instance:
 			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
 			//                  ^- G             ^- H             ^- I
-			// block G is not a valid block, because it does not include C which has been finalized.
-			// block H and I are a valid, because its their includes C.
+			// block G is not a valid block, because it does not have C (which has been finalized) as an ancestor
+			// block H and I are valid, because they do have C as an ancestor
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
 				header.Height, ancestor.Height, finalizedHeight)
@@ -258,7 +258,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer span.Finish()
+	defer span.End()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -347,7 +347,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
-	defer span.Finish()
+	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -358,15 +358,16 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 }
 
 // receiptExtend checks the compliance of the receipt payload.
-//   * Receipts should pertain to blocks on the fork
-//   * Receipts should not appear more than once on a fork
-//   * Receipts should pass the ReceiptValidator check
-//   * No seal has been included for the respective block in this particular fork
+//   - Receipts should pertain to blocks on the fork
+//   - Receipts should not appear more than once on a fork
+//   - Receipts should pass the ReceiptValidator check
+//   - No seal has been included for the respective block in this particular fork
+//
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -424,7 +425,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := candidate.ID()
 
@@ -488,7 +489,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
-	defer span.Finish()
+	defer span.End()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
@@ -692,16 +693,17 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epoch in its respective fork. We do this by comparing the block's view to
 // the Epoch data from its parent. If the block's view is _larger_ than the
 // final View of the parent's epoch, the block starts a new Epoch.
-// case (a): block is in same Epoch as parent.
-//           the parent's EpochStatus.CurrentEpoch also applies for the current block
-// case (b): block starts new Epoch in its respective fork.
-//           the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//   - case (a): block is in same Epoch as parent.
+//     the parent's EpochStatus.CurrentEpoch also applies for the current block
+//   - case (b): block starts new Epoch in its respective fork.
+//     the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//
 // As the parent was a valid extension of the chain, by induction, the parent satisfies all
 // consistency requirements of the protocol.
 //
 // Returns:
-// * errIncompleteEpochConfiguration if the epoch has ended before processing
-//   both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
+//   - errIncompleteEpochConfiguration if the epoch has ended before processing
+//     both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
 func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
@@ -764,8 +766,8 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // operations to insert service events for blocks that include them.
 //
 // Return values:
-//  * ops: pending database operations to persist this processing step
-//  * error: no errors expected during normal operations
+//   - ops: pending database operations to persist this processing step
+//   - error: no errors expected during normal operations
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 	var ops []func(*transaction.Tx) error
 	blockID := block.ID()
@@ -896,7 +898,6 @@ SealLoop:
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-//
 func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {

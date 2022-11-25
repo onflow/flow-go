@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -22,24 +26,27 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	vm := fvm.NewVirtualMachine()
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -103,25 +110,31 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
-
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
-	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		tracer:        trace.NewNoopTracer(),
-		me:            me,
-		programsCache: programsCache,
-		eds:           eds,
-		edCache:       edCache,
+		blockComputer:    blockComputer,
+		tracer:           trace.NewNoopTracer(),
+		me:               me,
+		derivedChainData: derivedChainData,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -161,25 +174,25 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 }
 
 // TestPrograms_TestBlockForks tests the functionality of
-// programsCache under contract deployment and contract updates on
+// derivedChainData under contract deployment and contract updates on
 // different block forks
 //
 // block structure and operations
 // Block1 (empty block)
-//     -> Block11 (deploy contract v1)
-//         -> Block111  (emit event - version should be 1) and (update contract to v3)
-//             -> Block1111   (emit event - version should be 3)
-//	       -> Block112 (emit event - version should be 1) and (update contract to v4)
-//             -> Block1121  (emit event - version should be 4)
-//     -> Block12 (deploy contract v2)
-//         -> Block121 (emit event - version should be 2)
-//             -> Block1211 (emit event - version should be 2)
+//
+//	    -> Block11 (deploy contract v1)
+//	        -> Block111  (emit event - version should be 1) and (update contract to v3)
+//	            -> Block1111   (emit event - version should be 3)
+//		       -> Block112 (emit event - version should be 1) and (update contract to v4)
+//	            -> Block1121  (emit event - version should be 4)
+//	    -> Block12 (deploy contract v2)
+//	        -> Block121 (emit event - version should be 2)
+//	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
-	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Emulator.Chain()
-	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(),
+	vm := fvm.NewVirtualMachine()
+	execCtx := fvm.NewContext(
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))
@@ -187,7 +200,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	account := accounts[0]
@@ -196,25 +209,31 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
-	programsCache, err := NewProgramsCache(10)
+	derivedChainData, err := programs.NewDerivedChainData(10)
 	require.NoError(t, err)
-
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
-	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		tracer:        trace.NewNoopTracer(),
-		me:            me,
-		programsCache: programsCache,
-		eds:           eds,
-		edCache:       edCache,
+		blockComputer:    blockComputer,
+		tracer:           trace.NewNoopTracer(),
+		me:               me,
+		derivedChainData: derivedChainData,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -256,9 +275,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11View = block1View.NewChild()
 		block11, res = createTestBlockAndRun(t, engine, block1, col11, block11View)
 		// cache should include value for this block
-		require.NotNil(t, programsCache.Get(block11.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block11.ID()).HasChanges())
+		require.NotNil(t, derivedChainData.Get(block11.ID()))
 		// 1st event should be contract deployed
 		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
 	})
@@ -277,9 +294,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111View = block11View.NewChild()
 		block111, res = createTestBlockAndRun(t, engine, block11, col111, block111View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block111.ID()))
-		// cache should have changes
-		require.True(t, programsCache.Get(block111.ID()).HasChanges())
+		require.NotNil(t, derivedChainData.Get(block111.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -298,7 +313,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111View = block111View.NewChild()
 		block1111, res = createTestBlockAndRun(t, engine, block111, col1111, block1111View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block1111.ID()))
+		require.NotNil(t, derivedChainData.Get(block1111.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -319,7 +334,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block112View = block11View.NewChild()
 		block112, res = createTestBlockAndRun(t, engine, block11, col112, block112View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block112.ID()))
+		require.NotNil(t, derivedChainData.Get(block112.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -338,7 +353,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1121View = block112View.NewChild()
 		block1121, res = createTestBlockAndRun(t, engine, block112, col1121, block1121View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block1121.ID()))
+		require.NotNil(t, derivedChainData.Get(block1121.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -355,7 +370,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block12View = block1View.NewChild()
 		block12, res = createTestBlockAndRun(t, engine, block1, col12, block12View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block12.ID()))
+		require.NotNil(t, derivedChainData.Get(block12.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -370,7 +385,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block121View = block12View.NewChild()
 		block121, res = createTestBlockAndRun(t, engine, block12, col121, block121View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block121.ID()))
+		require.NotNil(t, derivedChainData.Get(block121.ID()))
 
 		require.Len(t, res.Events, 2)
 
@@ -386,9 +401,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1211View = block121View.NewChild()
 		block1211, res = createTestBlockAndRun(t, engine, block121, col1211, block1211View)
 		// cache should include a program for this block
-		require.NotNil(t, programsCache.Get(block1211.ID()))
+		require.NotNil(t, derivedChainData.Get(block1211.ID()))
 		// had no change so cache should be equal to parent
-		require.Equal(t, programsCache.Get(block121.ID()), programsCache.Get(block1211.ID()))
+		require.Equal(t, derivedChainData.Get(block121.ID()), derivedChainData.Get(block1211.ID()))
 
 		require.Len(t, res.Events, 2)
 

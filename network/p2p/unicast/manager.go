@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	libp2pnet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	swarm "github.com/libp2p/go-libp2p-swarm"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
@@ -33,7 +33,7 @@ type Manager struct {
 
 func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
 	return &Manager{
-		logger:        logger,
+		logger:        logger.With().Str("module", "unicast-manager").Logger(),
 		streamFactory: streamFactory,
 		sporkId:       sporkId,
 	}
@@ -57,6 +57,7 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	}
 
 	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
+	m.logger.Info().Str("protocol_id", string(defaultProtocolID)).Msg("default unicast handler registered")
 }
 
 // Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
@@ -71,6 +72,7 @@ func (m *Manager) Register(unicast ProtocolName) error {
 
 	m.unicasts = append(m.unicasts, u)
 	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler)
+	m.logger.Info().Str("protocol_id", string(u.ProtocolId())).Msg("unicast handler registered")
 
 	return nil
 }

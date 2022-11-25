@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -25,11 +26,7 @@ type ScriptProcedure struct {
 	Events         []flow.Event
 	GasUsed        uint64
 	MemoryEstimate uint64
-	Err            errors.Error
-}
-
-type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
+	Err            errors.CodedError
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -51,7 +48,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *ScriptProcedure {
+func (proc *ScriptProcedure) WithRequestContext(
+	reqContext context.Context,
+) *ScriptProcedure {
 	return &ScriptProcedure{
 		ID:             proc.ID,
 		Script:         proc.Script,
@@ -60,7 +59,11 @@ func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *Scr
 	}
 }
 
-func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args ...[]byte) *ScriptProcedure {
+func NewScriptWithContextAndArgs(
+	code []byte,
+	reqContext context.Context,
+	args ...[]byte,
+) *ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
@@ -70,23 +73,20 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
-	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, sth, programs)
-		txError, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			if errors.IsALedgerFailure(failure) {
-				return fmt.Errorf("cannot execute the script, this error usually happens if the reference block for this script is not set to a recent block: %w", failure)
-			}
-			return failure
-		}
-		if txError != nil {
-			proc.Err = txError
-			return nil
-		}
-	}
+func (proc *ScriptProcedure) NewExecutor(
+	ctx Context,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) ProcedureExecutor {
+	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
+}
 
-	return nil
+func (proc *ScriptProcedure) Run(
+	ctx Context,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) error {
+	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -107,44 +107,99 @@ func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
 	return memoryLimit
 }
 
-type ScriptInvoker struct{}
-
-func NewScriptInvoker() ScriptInvoker {
-	return ScriptInvoker{}
+func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits
 }
 
-func (i ScriptInvoker) Process(
-	vm *VirtualMachine,
+func (ScriptProcedure) Type() ProcedureType {
+	return ScriptProcedureType
+}
+
+func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
+func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
+type scriptExecutor struct {
+	proc *ScriptProcedure
+
+	txnState       *state.TransactionState
+	derivedTxnData *programs.DerivedTransactionData
+
+	env environment.Environment
+}
+
+func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	sth *state.StateHolder,
-	programs *programs.Programs,
-) error {
-	env, err := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) *scriptExecutor {
+	return &scriptExecutor{
+		proc:           proc,
+		txnState:       txnState,
+		derivedTxnData: derivedTxnData,
+		env: environment.NewScriptEnvironment(
+			proc.RequestContext,
+			ctx.EnvironmentParams,
+			txnState,
+			derivedTxnData),
+	}
+}
+
+func (executor *scriptExecutor) Cleanup() {
+	// Do nothing.
+}
+
+func (executor *scriptExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *scriptExecutor) Execute() error {
+	err := executor.execute()
+	txError, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		if errors.IsALedgerFailure(failure) {
+			return fmt.Errorf(
+				"cannot execute the script, this error usually happens if "+
+					"the reference block for this script is not set to a "+
+					"recent block: %w",
+				failure)
+		}
+		return failure
+	}
+	if txError != nil {
+		executor.proc.Err = txError
+	}
+
+	return nil
+}
+
+func (executor *scriptExecutor) execute() error {
+	rt := executor.env.BorrowCadenceRuntime()
+	defer executor.env.ReturnCadenceRuntime(rt)
+
+	value, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    executor.proc.Script,
+			Arguments: executor.proc.Arguments,
+		},
+		common.ScriptLocation(executor.proc.ID))
+
 	if err != nil {
 		return err
 	}
 
-	location := common.ScriptLocation(proc.ID)
-	value, err := vm.Runtime.ExecuteScript(
-		runtime.Script{
-			Source:    proc.Script,
-			Arguments: proc.Arguments,
-		},
-		runtime.Context{
-			Interface: env,
-			Location:  location,
-		},
-	)
-
-	if err != nil {
-		return errors.HandleRuntimeError(err)
-	}
-
-	proc.Value = value
-	proc.Logs = env.Logs()
-	proc.Events = env.Events()
-	proc.GasUsed = env.ComputationUsed()
-	proc.MemoryEstimate = env.MemoryEstimate()
+	executor.proc.Value = value
+	executor.proc.Logs = executor.env.Logs()
+	executor.proc.Events = executor.env.Events()
+	executor.proc.GasUsed = executor.env.ComputationUsed()
+	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/engine"
@@ -169,9 +170,9 @@ func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkD
 	if chunkDataPack.Collection != nil {
 		span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
 		if isSampled {
-			span.SetTag("chunk_id", chunkDataPack.ChunkID)
+			span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
 		}
-		defer span.Finish()
+		defer span.End()
 	}
 	e.handleChunkDataPack(originID, chunkDataPack)
 }

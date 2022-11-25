@@ -8,7 +8,11 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
-  GO_VERSION: 1.18
+  GO_VERSION: 1.19
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   upload-skipped-test-summary:
@@ -19,6 +23,7 @@ jobs:
         test-category:
           - unit
           - unit-crypto
+          - unit-insecure
           - unit-integration
           - integration-bft
           - integration-mvp
@@ -56,14 +61,12 @@ jobs:
     - name: Get commit date
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
-    - name: Test setup
-      run: ./tools/test_monitor/test-setup.sh
     - name: Run tests
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 60
         max_attempts: 5
-        command: ./tools/test_monitor/run-tests.sh > test-output
+        command: ./tools/test_monitor/run-tests.sh
       env:
         JSON_OUTPUT: true
     - name: Process test results

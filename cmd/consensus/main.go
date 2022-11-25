@@ -14,8 +14,6 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/admin/commands"
-	admincommon "github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -46,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
+	"github.com/onflow/flow-go/module/chainsync"
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
@@ -55,7 +54,6 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
@@ -100,30 +98,29 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                          error
-		mutableState                 protocol.MutableState
-		beaconPrivateKey             *encodable.RandomBeaconPrivKey
-		guarantees                   mempool.Guarantees
-		receipts                     mempool.ExecutionTree
-		seals                        mempool.IncorporatedResultSeals
-		pendingReceipts              mempool.PendingReceipts
-		prov                         *provider.Engine
-		receiptRequester             *requester.Engine
-		syncCore                     *synchronization.Core
-		comp                         *compliance.Engine
-		conMetrics                   module.ConsensusMetrics
-		mainMetrics                  module.HotstuffMetrics
-		receiptValidator             module.ReceiptValidator
-		chunkAssigner                *chmodule.ChunkAssigner
-		finalizationDistributor      *pubsub.FinalizationDistributor
-		dkgBrokerTunnel              *dkgmodule.BrokerTunnel
-		blockTimer                   protocol.BlockTimer
-		finalizedHeader              *synceng.FinalizedHeaderCache
-		hotstuffModules              *consensus.HotstuffModules
-		dkgState                     *bstorage.DKGState
-		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
-		adminCmdSetRequiredApprovals commands.AdminCommand
-		getSealingConfigs            module.SealingConfigsGetter
+		err                     error
+		mutableState            protocol.MutableState
+		beaconPrivateKey        *encodable.RandomBeaconPrivKey
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		prov                    *provider.Engine
+		receiptRequester        *requester.Engine
+		syncCore                *chainsync.Core
+		comp                    *compliance.Engine
+		conMetrics              module.ConsensusMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		finalizationDistributor *pubsub.FinalizationDistributor
+		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
+		finalizedHeader         *synceng.FinalizedHeaderCache
+		hotstuffModules         *consensus.HotstuffModules
+		dkgState                *bstorage.DKGState
+		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs       module.SealingConfigsGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -186,14 +183,13 @@ func main() {
 			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return nil
 		}).
-		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
+		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
 			setter, err := updatable_configs.NewSealingConfigs(
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				chunkAlpha,
 				emergencySealing,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -203,15 +199,10 @@ func main() {
 
 			// admin tool is the only instance that have access to the setter interface, therefore, is
 			// the only module can change this config
-			adminCmdSetRequiredApprovals = admincommon.NewSetRequiredApprovalsForSealingCommand(setter)
-
-			return nil
-		}).
-		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return adminCmdSetRequiredApprovals
-		}).
-		AdminCommand("get-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return admincommon.NewGetRequiredApprovalsForSealingCommand(getSealingConfigs)
+			err = node.ConfigManager.RegisterUintConfig("consensus-required-approvals-for-sealing",
+				setter.RequireApprovalsForSealConstructionDynamicValue,
+				setter.SetRequiredApprovalsForSealingConstruction)
+			return err
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -340,9 +331,16 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.NodeConfig) error {
-			// use a custom ejector so we don't eject seals that would break
+			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
+			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(
+				multipleReceiptsFilterMempool,
+				consensusMempools.LogForkAndCrash(node.Logger),
+				node.DB,
+				node.Logger,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
@@ -358,7 +356,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
@@ -625,7 +623,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				seals,
 				receipts,
 				node.Tracer,
 				builder.WithBlockTimer(blockTimer),
@@ -645,6 +643,7 @@ func main() {
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithConfigRegistrar(node.ConfigManager),
 			}
 
 			if !startupTime.IsZero() {

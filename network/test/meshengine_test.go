@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
@@ -18,13 +20,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,11 +39,12 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []network.Network // used to keep track of the networks
-	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
-	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
-	cancel         context.CancelFunc
+	testutils.ConduitWrapper                      // used as a wrapper around conduit methods
+	nets                     []network.Network    // used to keep track of the networks
+	mws                      []network.Middleware // used to keep track of the middlewares
+	ids                      flow.IdentityList    // used to keep track of the identifiers associated with networks
+	obs                      chan string          // used to keep track of Protect events tagged by pubsub messages
+	cancel                   context.CancelFunc
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -63,15 +71,19 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
-		ctx,
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	var nodes []p2p.LibP2PNode
+	suite.ids, nodes, suite.mws, suite.nets, obs = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
-		WithIdentityOpts(unittest.WithAllRoles()),
+		mocknetwork.NewViolationsConsumer(suite.T()),
+		testutils.WithIdentityOpts(unittest.WithAllRoles()),
 	)
+
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -82,7 +94,8 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *MeshEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopNetworks(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.
@@ -110,7 +123,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Unicast() {
 }
 
 // TestTargetedValidators_Multicast tests if only the intended recipients in a 1-k messaging actually receive the
-//message.
+// message.
 // The messages are disseminated through the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestTargetedValidators_Multicast() {
 	suite.targetValidatorScenario(suite.Multicast)
@@ -125,19 +138,19 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, p2p.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, middleware.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Multicast, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, p2p.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Publish, p2pnode.DefaultMaxPubSubMsgSize)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish
@@ -161,19 +174,19 @@ func (suite *MeshEngineTestSuite) TestUnregister_Unicast() {
 // allToAllScenario creates a complete mesh of the engines
 // each engine x then sends a "hello from node x" to other engines
 // it evaluates the correctness of message delivery as well as content of the message
-func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) {
+func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWrapperFunc) {
 	// allows nodes to find each other in case of Mulitcast and Publish
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// creating engines
 	count := len(suite.nets)
-	engs := make([]*MeshEngine, 0)
+	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	// logs[i][j] keeps the message that node i sends to node j
 	logs := make(map[int][]string)
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 		logs[i] = make([]string, 0)
 	}
@@ -196,15 +209,15 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 
 		// others keeps the identifier of all nodes except ith node
 		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID))).NodeIDs()
-		require.NoError(suite.Suite.T(), send(event, engs[i].con, others...))
+		require.NoError(suite.Suite.T(), send(event, engs[i].Con, others...))
 		wg.Add(count - 1)
 	}
 
 	// fires a goroutine for each engine that listens to incoming messages
 	for i := range suite.nets {
-		go func(e *MeshEngine) {
+		go func(e *testutils.MeshEngine) {
 			for x := 0; x < count-1; x++ {
-				<-e.received
+				<-e.Received
 				wg.Done()
 			}
 		}(engs[i])
@@ -215,9 +228,9 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	// evaluates that all messages are received
 	for index, e := range engs {
 		// confirms the number of received messages at each node
-		if len(e.event) != (count - 1) {
+		if len(e.Event) != (count - 1) {
 			assert.Fail(suite.Suite.T(),
-				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
+				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.Event)))
 		}
 
 		for i := 0; i < count-1; i++ {
@@ -225,7 +238,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		}
 
 		// extracts failed messages
-		receivedIndices, err := extractSenderID(count, e.event, "hello from node")
+		receivedIndices, err := extractSenderID(count, e.Event, "hello from node")
 		require.NoError(suite.Suite.T(), err)
 
 		for j := 0; j < count; j++ {
@@ -246,14 +259,14 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 // based on identifiers list.
 // It then verifies that only the intended recipients receive the message.
 // Message dissemination is done using the send wrapper of conduit.
-func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrapperFunc) {
+func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.ConduitSendWrapperFunc) {
 	// creating engines
 	count := len(suite.nets)
-	engs := make([]*MeshEngine, 0)
+	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -279,13 +292,13 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	event := &message.TestMessage{
 		Text: "hello from node 0",
 	}
-	require.NoError(suite.Suite.T(), send(event, engs[len(engs)-1].con, targets...))
+	require.NoError(suite.Suite.T(), send(event, engs[len(engs)-1].Con, targets...))
 
 	// fires a goroutine for all engines to listens for the incoming message
 	for i := 0; i < len(allIds)/2; i++ {
 		wg.Add(1)
-		go func(e *MeshEngine) {
-			<-e.received
+		go func(e *testutils.MeshEngine) {
+			<-e.Received
 			wg.Done()
 		}(engs[i])
 	}
@@ -295,25 +308,25 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	// evaluates that all messages are received
 	for index, e := range engs {
 		if index < len(engs)/2 {
-			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+			assert.Len(suite.Suite.T(), e.Event, 1, fmt.Sprintf("message not received %v", index))
 			assertChannelReceived(suite.T(), e, channels.TestNetworkChannel)
 		} else {
-			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
+			assert.Len(suite.Suite.T(), e.Event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
 	}
 }
 
 // messageSizeScenario provides a scenario to check if a message of maximum permissible size can be sent
-//successfully.
+// successfully.
 // It broadcasts a message from the first node to all the nodes in the identifiers list using send wrapper function.
-func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFunc, size uint) {
+func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSendWrapperFunc, size uint) {
 	// creating engines
 	count := len(suite.nets)
-	engs := make([]*MeshEngine, 0)
+	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -330,18 +343,18 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
 
 	// generates and sends an event of custom size to the network
-	payload := networkPayloadFixture(suite.T(), size)
+	payload := testutils.NetworkPayloadFixture(suite.T(), size)
 	event := &message.TestMessage{
 		Text: string(payload),
 	}
 
-	require.NoError(suite.T(), send(event, engs[0].con, others...))
+	require.NoError(suite.T(), send(event, engs[0].Con, others...))
 
 	// fires a goroutine for all engines (except sender) to listen for the incoming message
 	for _, eng := range engs[1:] {
 		wg.Add(1)
-		go func(e *MeshEngine) {
-			<-e.received
+		go func(e *testutils.MeshEngine) {
+			<-e.Received
 			wg.Done()
 		}(eng)
 	}
@@ -350,23 +363,23 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
-		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
+		assert.Len(suite.Suite.T(), e.Event, 1, "message not received by engine %d", index+1)
 		assertChannelReceived(suite.T(), e, channels.TestNetworkChannel)
 	}
 }
 
 // conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel.
-func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFunc) {
+func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSendWrapperFunc) {
 
-	optionalSleep(send)
+	testutils.OptionalSleep(send)
 
 	// creating engines
 	count := len(suite.nets)
-	engs := make([]*MeshEngine, 0)
+	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -382,7 +395,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 
 	// unregister a random engine from the test topic by calling close on it's conduit
 	unregisterIndex := rand.Intn(count)
-	err := engs[unregisterIndex].con.Close()
+	err := engs[unregisterIndex].Con.Close()
 	assert.NoError(suite.T(), err)
 
 	// waits enough for peer manager to unsubscribe the node from the topic
@@ -396,16 +409,17 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
 
-		// others keeps the identifier of all nodes except ith node
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID))).NodeIDs()
+		// others keeps the identifier of all nodes except ith node and the node that unregistered from the topic.
+		// nodes without valid topic registration for a channel will reject messages on that channel via unicast.
+		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID, suite.ids[unregisterIndex].NodeID))).NodeIDs()
 
 		if i == unregisterIndex {
 			// assert that unsubscribed engine cannot publish on that topic
-			require.Error(suite.Suite.T(), send(event, engs[i].con, others...))
+			require.Error(suite.Suite.T(), send(event, engs[i].Con, others...))
 			continue
 		}
 
-		require.NoError(suite.Suite.T(), send(event, engs[i].con, others...))
+		require.NoError(suite.Suite.T(), send(event, engs[i].Con, others...))
 	}
 
 	// fire a goroutine to listen for incoming messages for each engine except for the one which unregistered
@@ -414,10 +428,10 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 			continue
 		}
 		wg.Add(1)
-		go func(e *MeshEngine) {
+		go func(e *testutils.MeshEngine) {
 			expectedMsgCnt := count - 2 // count less self and unsubscribed engine
 			for x := 0; x < expectedMsgCnt; x++ {
-				<-e.received
+				<-e.Received
 			}
 			wg.Done()
 		}(engs[i])
@@ -428,13 +442,13 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 
 	// assert that the unregistered engine did not receive the message
 	unregisteredEng := engs[unregisterIndex]
-	assert.Emptyf(suite.T(), unregisteredEng.received, "unregistered engine received the topic message")
+	assert.Emptyf(suite.T(), unregisteredEng.Received, "unregistered engine received the topic message")
 }
 
 // assertChannelReceived asserts that the given channel was received on the given engine
-func assertChannelReceived(t *testing.T, e *MeshEngine, channel channels.Channel) {
+func assertChannelReceived(t *testing.T, e *testutils.MeshEngine, channel channels.Channel) {
 	unittest.AssertReturnsBefore(t, func() {
-		assert.Equal(t, channel, <-e.channel)
+		assert.Equal(t, channel, <-e.Channel)
 	}, 100*time.Millisecond)
 }
 

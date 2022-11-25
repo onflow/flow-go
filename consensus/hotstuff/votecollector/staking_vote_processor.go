@@ -143,7 +143,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 
 	// At this point, we have enough signatures to build a QC. Another routine
 	// might just be at this point. To avoid duplicate work, only one routine can pass:
-	if !p.done.CAS(false, true) {
+	if !p.done.CompareAndSwap(false, true) {
 		return nil
 	}
 	qc, err := p.buildQC()

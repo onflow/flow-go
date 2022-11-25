@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // mockStream is a mocked libp2p stream that is implemented as a pipe with a reader and writer.

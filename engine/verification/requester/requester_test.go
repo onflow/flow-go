@@ -50,7 +50,7 @@ type RequesterEngineTestSuite struct {
 func setupTest() *RequesterEngineTestSuite {
 	r := &RequesterEngineTestSuite{
 		log:             unittest.Logger(),
-		tracer:          &trace.NoopTracer{},
+		tracer:          trace.NewNoopTracer(),
 		metrics:         &mock.VerificationMetrics{},
 		handler:         &mockfetcher.ChunkDataPackHandler{},
 		retryInterval:   100 * time.Millisecond,

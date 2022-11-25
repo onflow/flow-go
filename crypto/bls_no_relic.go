@@ -17,6 +17,11 @@ import (
 
 const relic_panic = "function is not supported when building without \"relic\" Go build tag"
 
+const (
+	SignatureLenBLSBLS12381     = 48
+	KeyGenSeedMinLenBLSBLS12381 = 48
+)
+
 // bls.go functions
 func NewExpandMsgXOFKMAC128(tag string) hash.Hasher {
 	panic(relic_panic)
@@ -47,7 +52,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	panic(relic_panic)
 }
 
-func NeutralBLSPublicKey() PublicKey {
+func IdentityBLSPublicKey() PublicKey {
 	panic(relic_panic)
 }
 
@@ -109,12 +114,12 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 // dkg.go functions
 func NewFeldmanVSS(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	panic(relic_panic)
 }
 

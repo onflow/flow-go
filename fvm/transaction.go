@@ -1,84 +1,68 @@
 package fvm
 
 import (
-	"fmt"
-	"runtime/debug"
-	"strings"
-
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 )
 
+// TODO(patrick): pass in initial snapshot time when we start supporting
+// speculative pre-processing / execution.
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:          tx.ID(),
-		Transaction: tx,
-		TxIndex:     txIndex,
+		ID:                     tx.ID(),
+		Transaction:            tx,
+		InitialSnapshotTxIndex: txIndex,
+		TxIndex:                txIndex,
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
-}
-
-type TransactionProcessor interface {
-	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
-	ID              flow.Identifier
-	Transaction     *flow.TransactionBody
-	TxIndex         uint32
-	Logs            []string
-	Events          []flow.Event
-	ServiceEvents   []flow.Event
-	ComputationUsed uint64
-	MemoryEstimate  uint64
-	Err             errors.Error
-	Retried         int
-	TraceSpan       opentracing.Span
+	ID                     flow.Identifier
+	Transaction            *flow.TransactionBody
+	InitialSnapshotTxIndex uint32
+	TxIndex                uint32
+
+	Logs                   []string
+	Events                 []flow.Event
+	ServiceEvents          []flow.Event
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
+	TraceSpan              otelTrace.Span
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
+func (proc *TransactionProcedure) IsSampled() bool {
+	return proc.TraceSpan != nil
+}
 
-	defer func() {
-		if r := recover(); r != nil {
-
-			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerIntractionLimitExceededError.String()) {
-				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
-				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
-				return
-			}
-
-			panic(r)
-		}
-	}()
-
-	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-		st.SetPayerIsServiceAccount()
+func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
+	tracer module.Tracer,
+	spanName trace.SpanName) otelTrace.Span {
+	if tracer != nil && proc.IsSampled() {
+		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
 	}
+	return trace.NoopSpan
+}
 
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, &ctx, proc, st, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
-
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
-		}
-	}
-
-	return nil
+func (proc *TransactionProcedure) Run(
+	ctx Context,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
+) error {
+	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
@@ -99,17 +83,32 @@ func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 }
 
 func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
-	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
+	// TODO for BFT (enforce max memory limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
 	memoryLimit := ctx.MemoryLimit // TODO use the one set by tx
-	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
+	// if the context memory limit is also zero, fallback to the default memory limit
 	if memoryLimit == 0 {
-		memoryLimit = ctx.MemoryLimit
-		// if the context memory limit is also zero, fallback to the default memory limit
-		if memoryLimit == 0 {
-			memoryLimit = DefaultMemoryLimit
-		}
+		memoryLimit = DefaultMemoryLimit
 	}
 	return memoryLimit
+}
+
+func (proc *TransactionProcedure) ShouldDisableMemoryAndInteractionLimits(
+	ctx Context,
+) bool {
+	return ctx.DisableMemoryAndInteractionLimits ||
+		proc.Transaction.Payer == ctx.Chain.ServiceAddress()
+}
+
+func (TransactionProcedure) Type() ProcedureType {
+	return TransactionProcedureType
+}
+
+func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
+}
+
+func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.LogicalTime(proc.TxIndex)
 }

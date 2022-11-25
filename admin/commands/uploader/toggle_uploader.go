@@ -2,7 +2,6 @@ package uploader
 
 import (
 	"context"
-	"errors"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -19,10 +18,12 @@ func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandR
 	return "ok", nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (t *ToggleUploaderCommand) Validator(req *admin.CommandRequest) error {
 	enabled, ok := req.Data.(bool)
 	if !ok {
-		return errors.New("the input must be a boolean")
+		return admin.NewInvalidAdminReqFormatError("expected bool")
 	}
 
 	req.ValidatorData = enabled

@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -44,6 +45,7 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultProfileUploader   = false
 	DefaultTracing           = true
 	DefaultCadenceTracing    = false
 	DefaultExtensiveTracing  = false
@@ -72,6 +74,7 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	profileUploader        bool
 	tracing                bool
 	cadenceTracing         bool
 	extesiveTracing        bool
@@ -91,6 +94,7 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
@@ -183,7 +187,7 @@ func displayPortAssignments() {
 
 func prepareCommonHostFolders() {
 	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
-		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		}
 
@@ -297,7 +301,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 	}
 
 	err := os.MkdirAll(dataDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -307,7 +311,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
 	}
 	err = os.MkdirAll(profilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -317,64 +321,15 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
-	service := Service{
-		Image: fmt.Sprintf("localnet-%s", container.Role),
-		Command: []string{
-			fmt.Sprintf("--nodeid=%s", container.NodeID),
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
-			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
-			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
-		Labels: map[string]string{
-			"com.dapperlabs.role": container.Role.String(),
-			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
-		},
-	}
+	service := defaultService(container.Role.String(), dataDir, profilerDir, i)
+	service.Command = append(service.Command,
+		fmt.Sprintf("--nodeid=%s", container.NodeID),
+	)
 
-	service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
-
-	// only specify build config for first service of each role
 	if i == 0 {
-		service.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  fmt.Sprintf("./cmd/%s", container.Role.String()),
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-
 		// bring up access node before any other nodes
 		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = []string{"access_1"}
-		}
-
-	} else {
-		// remaining services of this role must depend on first service
-		service.DependsOn = []string{
-			fmt.Sprintf("%s_1", container.Role),
+			service.DependsOn = append(service.DependsOn, "access_1")
 		}
 	}
 
@@ -391,10 +346,10 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
-		fmt.Sprintf("--chunk-alpha=1"),
-		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--chunk-alpha=1",
+		"--emergency-sealing-active=false",
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -409,7 +364,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--chunk-alpha=1"),
+		"--chunk-alpha=1",
 	)
 
 	service.Ports = []string{
@@ -430,8 +385,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -447,7 +402,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
 	err := os.MkdirAll(trieDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -464,6 +419,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Volumes = append(
@@ -493,6 +449,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
+		"--execution-data-sync-enabled=true",
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Ports = []string{
@@ -508,55 +466,19 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	// Observers have a unique naming scheme omitting node id being on the public network
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
-	observerService := Service{
-		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
-		Command: []string{
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-			fmt.Sprintf("--bind=0.0.0.0:0"),
-			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
-			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
-			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
-	}
-	observerService.DependsOn = []string{}
-	if i == 0 {
-		observerService.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  "./cmd/observer",
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-	} else {
-		// remaining services of this role must depend on first service
-		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
-	}
+	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
+	observerService.Command = append(observerService.Command,
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
+		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
+		"--bind=0.0.0.0:0",
+		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
+	)
+
 	// observer services rely on the access gateway
 	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
 	observerService.Ports = []string{
@@ -568,6 +490,66 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
 	return observerService
+}
+
+func defaultService(role, dataDir, profilerDir string, i int) Service {
+	num := fmt.Sprintf("%03d", i+1)
+	service := Service{
+		Image: fmt.Sprintf("localnet-%s", role),
+		Command: []string{
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secret",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
+			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
+		},
+		Volumes: []string{
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/profiler:z", profilerDir),
+			fmt.Sprintf("%s:/data:z", dataDir),
+		},
+		Environment: []string{
+			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
+			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
+			fmt.Sprintf("OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=%s,num=%s", role, num),
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
+		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": role,
+			"com.dapperlabs.num":  num,
+		},
+	}
+
+	if i == 0 {
+		// only specify build config for first service of each role
+		service.Build = Build{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET":  fmt.Sprintf("./cmd/%s", role),
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
+			},
+			Target: "production",
+		}
+	} else {
+		// remaining services of this role must depend on first service
+		service.DependsOn = []string{
+			fmt.Sprintf("%s_1", role),
+		}
+	}
+
+	return service
 }
 
 func writeDockerComposeConfig(services Services) error {
@@ -688,7 +670,7 @@ func writeObserverPrivateKey(observerName string) {
 
 	// write to file
 	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", BootstrapDir, observerName)
-	err = ioutil.WriteFile(outputFile, output, 0600)
+	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
 		panic(err)
 	}

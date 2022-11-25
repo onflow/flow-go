@@ -2,10 +2,11 @@ package extract
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
-	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -27,12 +28,15 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
+	version int, // to be removed after next spork
 	migrate bool,
 	report bool,
 ) error {
 
+	log.Info().Msg("init WAL")
+
 	diskWal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
+		log,
 		nil,
 		metrics.NewNoopCollector(),
 		dir,
@@ -43,9 +47,8 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
+
+	log.Info().Msg("init ledger")
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -57,24 +60,33 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
+	const (
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
+	log.Info().Msg("init compactor")
+
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	if err != nil {
+		return fmt.Errorf("cannot create compactor: %w", err)
+	}
+
+	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
 	var migrations []ledger.Migration
 	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
 
 	if migrate {
-		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
-		accountStatusMigration := mgr.NewAccountStatusMigration(log)
-		legacyControllerMigration := mgr.LegacyControllerMigration{Logger: log}
-
-		migrations = []ledger.Migration{
-			accountStatusMigration.Migrate,
-			legacyControllerMigration.Migrate,
-			storageUsedUpdateMigration.Migrate,
-			mgr.PruneMigration,
-		}
+		migrations = []ledger.Migration{}
 
 	}
 	// generating reports at the end, so that the checkpoint file can be used
@@ -113,6 +125,7 @@ func extractExecutionState(
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
+		version,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)

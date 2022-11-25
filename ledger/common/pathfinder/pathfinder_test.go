@@ -9,14 +9,14 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 )
 
 // Test_KeyToPathV0 tests key to path for V0
 func Test_KeyToPathV0(t *testing.T) {
 
-	kp1 := utils.KeyPartFixture(1, "key part 1")
-	kp2 := utils.KeyPartFixture(22, "key part 2")
+	kp1 := testutils.KeyPartFixture(1, "key part 1")
+	kp2 := testutils.KeyPartFixture(22, "key part 2")
 	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 
 	path, err := pathfinder.KeyToPath(k, 0)
@@ -35,8 +35,8 @@ func Test_KeyToPathV0(t *testing.T) {
 
 func Test_KeyToPathV1(t *testing.T) {
 
-	kp1 := utils.KeyPartFixture(1, "key part 1")
-	kp2 := utils.KeyPartFixture(22, "key part 2")
+	kp1 := testutils.KeyPartFixture(1, "key part 1")
+	kp2 := testutils.KeyPartFixture(22, "key part 2")
 	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 
 	path, err := pathfinder.KeyToPath(k, 1)

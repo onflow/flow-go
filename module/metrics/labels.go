@@ -1,18 +1,19 @@
 package metrics
 
 const (
-	LabelChannel     = "topic"
-	LabelChain       = "chain"
-	LabelProposer    = "proposer"
-	EngineLabel      = "engine"
-	LabelResource    = "resource"
-	LabelMessage     = "message"
-	LabelNodeID      = "nodeid"
-	LabelNodeAddress = "nodeaddress"
-	LabelNodeRole    = "noderole"
-	LabelNodeInfo    = "nodeinfo"
-	LabelNodeVersion = "nodeversion"
-	LabelPriority    = "priority"
+	LabelChannel         = "topic"
+	LabelChain           = "chain"
+	LabelProposer        = "proposer"
+	EngineLabel          = "engine"
+	LabelResource        = "resource"
+	LabelMessage         = "message"
+	LabelNodeID          = "nodeid"
+	LabelNodeAddress     = "nodeaddress"
+	LabelNodeRole        = "noderole"
+	LabelNodeInfo        = "nodeinfo"
+	LabelNodeVersion     = "nodeversion"
+	LabelPriority        = "priority"
+	LabelComputationKind = "computationKind"
 )
 
 const (
@@ -87,10 +88,12 @@ const (
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine
 	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
+	ResourceBlockResponseQueue        = "compliance_block_response_queue"   // consensus node, compliance engine
 	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
 	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
 	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
+	ResourceChunkDataPackRequests     = "chunk_data_pack_request"           // execution node
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
@@ -121,3 +124,8 @@ const (
 	MessageEntityRequest        = "entity_request"
 	MessageEntityResponse       = "entity_response"
 )
+
+const ExecutionDataRequestRetryable = "retryable"
+
+const LabelViolationReason = "reason"
+const LabelRateLimitReason = "reason"

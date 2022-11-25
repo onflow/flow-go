@@ -136,11 +136,12 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
-//  1) vote containing staking sig
-//  2) vote containing random beacon sig
+//  1. vote containing staking sig
+//  2. vote containing random beacon sig
+//
 // For each scenario, we test two sub-cases:
-//  * `SignerID` is not a valid consensus participant;
-//  * `SignerID` is valid consensus participant but the signature is cryptographically invalid
+//   - `SignerID` is not a valid consensus participant;
+//   - `SignerID` is valid consensus participant but the signature is cryptographically invalid
 func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	s.Run("vote with staking-sig", func() {
 		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
@@ -463,8 +464,8 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 
 		// lists to track signers that actually contributed their signatures
 		var (
-			aggregatedStakingSigners []flow.Identifier
-			aggregatedBeaconSigners  []flow.Identifier
+			aggregatedStakingSigners flow.IdentifierList
+			aggregatedBeaconSigners  flow.IdentifierList
 		)
 
 		// need separate locks to safely update vectors of voted signers
@@ -491,7 +492,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// mock expected calls to aggregators and reconstructor
 		combinedSigs := unittest.SignaturesFixture(3)
 		stakingAggregator.On("Aggregate").Return(
-			func() []flow.Identifier {
+			func() flow.IdentifierList {
 				stakingAggregatorLock.Lock()
 				defer stakingAggregatorLock.Unlock()
 				return aggregatedStakingSigners
@@ -500,7 +501,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			func() error { return nil }).Maybe() // Aggregate is only called, if some staking sigs were collected
 
 		rbSigAggregator.On("Aggregate").Return(
-			func() []flow.Identifier {
+			func() flow.IdentifierList {
 				beaconAggregatorLock.Lock()
 				defer beaconAggregatorLock.Unlock()
 				return aggregatedBeaconSigners
@@ -510,7 +511,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
-		mergedSignerIDs := ([]flow.Identifier)(nil)
+		mergedSignerIDs := (flow.IdentifierList)(nil)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
 		pcker.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
@@ -578,7 +579,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 
@@ -795,7 +796,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		combinedSigs := unittest.SignaturesFixture(3)
 		stakingAggregator.On("Aggregate").Return(
 			// per API convention, model.InsufficientSignaturesError is returns when no signatures were collected
-			func() []flow.Identifier {
+			func() flow.IdentifierList {
 				if len(stakingSigners) == 0 {
 					return nil
 				}
@@ -813,7 +814,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 				}
 				return nil
 			}).Maybe()
-		rbSigAggregator.On("Aggregate").Return([]flow.Identifier(beaconSigners.NodeIDs()), []byte(combinedSigs[1]), nil).Once()
+		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
@@ -831,7 +832,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
 			// QC should be created only once
-			if !qcCreated.CAS(false, true) {
+			if !qcCreated.CompareAndSwap(false, true) {
 				t.Fatalf("QC created more than once")
 			}
 		}

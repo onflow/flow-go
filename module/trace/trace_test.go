@@ -20,12 +20,12 @@ func BenchmarkStartSpanFromParent(b *testing.B) {
 
 	span, _, sampled := tracer.StartTransactionSpan(context.Background(), flow.Identifier{}, "test")
 	require.True(b, sampled)
-	defer span.Finish()
+	defer span.End()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		s := tracer.StartSpanFromParent(span, SpanName("test"))
-		s.Finish()
+		s.End()
 	}
 	b.StopTimer()
 }
@@ -58,7 +58,7 @@ func BenchmarkStartTransactionSpan(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				span, _, sampled := tracer.StartTransactionSpan(context.Background(), randomIDs[i%t.n], "test")
 				require.True(b, sampled)
-				span.Finish()
+				span.End()
 			}
 			b.StopTimer()
 		})

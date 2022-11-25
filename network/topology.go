@@ -2,23 +2,15 @@ package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
 )
 
-// Topology provides a subset of nodes which a given node should directly connect to for 1-k messaging.
+// Topology provides a subset of nodes which a given node should directly connect in order to form a connected mesh
+// for epidemic message dissemination (e.g., publisher and subscriber model).
 type Topology interface {
-	// GenerateFanout receives IdentityList of entire network, and list of channels the node is subscribing to.
-	// It constructs and returns the fanout IdentityList of node.
+	// Fanout receives IdentityList of entire network and constructs the fanout IdentityList of the node.
 	// A node directly communicates with its fanout IdentityList on epidemic dissemination
 	// of the messages (i.e., publish and multicast).
-	// Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
-	// connected graph of nodes that enables them talking to each other.
 	//
-	// As a convention, GenerateFanout is not required to guarantee any deterministic behavior, i.e.,
-	// invocations of GenerateFanout with the same input may result in different fanout sets.
-	// One may utilize topology Cache to have a more deterministic endpoint on generating fanout.
-	//
-	// GenerateFanout is not concurrency safe. It is responsibility of caller to lock for it.
-	// with the channels argument, it allows the returned topology to be cached, which is necessary for randomized topology.
-	GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error)
+	// Fanout is not concurrency safe. It is responsibility of caller to lock for it (if needed).
+	Fanout(ids flow.IdentityList) flow.IdentityList
 }

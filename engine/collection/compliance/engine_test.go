@@ -198,7 +198,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ChainID = ""
 	block.Header.Height = 0
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// submit to broadcast proposal
 	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
@@ -285,7 +285,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return()
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return(doneChan())
 		_ = cs.engine.Process(channel, originID, proposal)
 		wg.Done()
 	}()

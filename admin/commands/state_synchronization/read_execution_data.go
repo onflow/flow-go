@@ -3,13 +3,12 @@ package state_synchronization
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
@@ -19,13 +18,13 @@ type requestData struct {
 }
 
 type ReadExecutionDataCommand struct {
-	eds state_synchronization.ExecutionDataService
+	executionDataStore execution_data.ExecutionDataStore
 }
 
 func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
 
-	ed, err := r.eds.Get(ctx, data.rootID)
+	ed, err := r.executionDataStore.GetExecutionData(ctx, data.rootID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data: %w", err)
@@ -34,34 +33,34 @@ func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.Comma
 	return commands.ConvertToMap(ed)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return errors.New("wrong input format")
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	id, ok := input["execution_data_id"]
 	if !ok {
-		return errors.New("the \"execution_data_id\" field is required")
+		return admin.NewInvalidAdminReqErrorf("missing required field 'execution_data_id")
 	}
 
-	errInvalidIDValue := fmt.Errorf("invalid value for \"execution_data_id\": %v", id)
 	data := &requestData{}
 
 	idStr, ok := id.(string)
-
 	if !ok {
-		return errInvalidIDValue
+		return admin.NewInvalidAdminReqParameterError("execution_data_id", "must be a string", id)
 	}
 
 	if len(idStr) == 2*flow.IdentifierLen {
 		b, err := hex.DecodeString(idStr)
 		if err != nil {
-			return errInvalidIDValue
+			return admin.NewInvalidAdminReqParameterError("execution_data_id", "must be 64-char hex string", id)
 		}
 		data.rootID = flow.HashToID(b)
 	} else {
-		return errInvalidIDValue
+		return admin.NewInvalidAdminReqParameterError("execution_data_id", "must be 64-char hex string", id)
 	}
 
 	req.ValidatorData = data
@@ -69,8 +68,8 @@ func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewReadExecutionDataCommand(eds state_synchronization.ExecutionDataService) commands.AdminCommand {
+func NewReadExecutionDataCommand(store execution_data.ExecutionDataStore) commands.AdminCommand {
 	return &ReadExecutionDataCommand{
-		eds,
+		store,
 	}
 }

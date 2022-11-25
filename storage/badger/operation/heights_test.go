@@ -83,3 +83,27 @@ func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
 		assert.Equal(t, retrieved, height)
 	})
 }
+
+func TestLastCompleteBlockHeightInsertIfNotExists(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		height1 := uint64(1337)
+
+		err := db.Update(InsertLastCompleteBlockHeightIfNotExists(height1))
+		require.Nil(t, err)
+
+		var retrieved uint64
+		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, height1)
+
+		height2 := uint64(9999)
+		err = db.Update(InsertLastCompleteBlockHeightIfNotExists(height2))
+		require.Nil(t, err)
+
+		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, height1)
+	})
+}

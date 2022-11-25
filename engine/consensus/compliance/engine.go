@@ -27,6 +27,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// defaultRangeResponseQueueCapacity maximum capacity of block range responses queue
+const defaultRangeResponseQueueCapacity = 100
+
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
 
@@ -49,6 +52,7 @@ type Engine struct {
 	prov                       network.Engine
 	core                       *Core
 	pendingBlocks              engine.MessageStore
+	pendingRangeResponses      engine.MessageStore
 	pendingVotes               engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
@@ -64,6 +68,19 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 
+	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for block responses: %w", err)
+	}
+
+	pendingRangeResponses := &engine.FifoMessageStore{
+		FifoQueue: rangeResponseQueue,
+	}
+
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
@@ -72,6 +89,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
+
 	pendingBlocks := &engine.FifoMessageStore{
 		FifoQueue: blocksQueue,
 	}
@@ -90,6 +108,16 @@ func NewEngine(
 	handler := engine.NewMessageHandler(
 		log.With().Str("compliance", "engine").Logger(),
 		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.BlockResponse)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
+				}
+				return ok
+			},
+			Store: pendingRangeResponses,
+		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
@@ -142,6 +170,7 @@ func NewEngine(
 		metrics:                    core.metrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
+		pendingRangeResponses:      pendingRangeResponses,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		state:                      core.state,
@@ -266,9 +295,26 @@ func (e *Engine) processAvailableMessages() error {
 	for {
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
-		msg, ok := e.pendingBlocks.Get()
+		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
-			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			blockResponse := msg.Payload.(*messages.BlockResponse)
+			for _, block := range blockResponse.Blocks {
+				// process each block and indicate it's from a range of blocks
+				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
+					Header:  block.Header,
+					Payload: block.Payload,
+				}, true)
+
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
+			}
+			continue
+		}
+
+		msg, ok = e.pendingBlocks.Get()
+		if ok {
+			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal), true)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -414,7 +460,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Informs sealing.Core about finalization of respective block.
+// (1) Informs sealing.Core about finalization of respective block.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
@@ -438,9 +485,10 @@ func (e *Engine) finalizationProcessingLoop() {
 
 // handleHotStuffError accepts the error channel from the HotStuff component and
 // crashes the node if any error is detected.
+//
 // TODO: this function should be removed in favour of refactoring this engine and
-//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
-//  can be bubbled all the way to the node scaffold
+// the epochmgr engine to use the Component pattern, so that irrecoverable errors
+// can be bubbled all the way to the node scaffold
 func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
 	for {
 		select {

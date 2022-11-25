@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
@@ -231,8 +231,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // process processes events for the synchronization engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:

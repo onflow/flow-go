@@ -107,7 +107,7 @@ func (w *whiteboard) submit(nodeID flow.Identifier, groupKey crypto.PublicKey, p
 
 	w.results[resultHash] = result
 
-	signers, _ := w.resultSubmitters[resultHash]
+	signers := w.resultSubmitters[resultHash]
 	signers = append(signers, nodeID)
 	w.resultSubmitters[resultHash] = signers
 	w.resultBySubmitter[nodeID] = result

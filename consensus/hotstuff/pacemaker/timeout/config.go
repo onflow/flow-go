@@ -1,17 +1,22 @@
 package timeout
 
 import (
+	"fmt"
 	"math"
 	"time"
 
+	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease
 // timeout.Controller
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: MULTIPLICATIVE timeout decrease
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
 	// ReplicaTimeout is the duration of a view before we time out [MILLISECONDS]
 	// ReplicaTimeout is the only variable quantity
@@ -26,7 +31,7 @@ type Config struct {
 	// TimeoutDecrease: MULTIPLICATIVE factor for decreasing timeout on progress
 	TimeoutDecrease float64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
-	BlockRateDelayMS float64
+	BlockRateDelayMS *atomic.Float64
 }
 
 var DefaultConfig = NewDefaultConfig()
@@ -94,8 +99,8 @@ func NewConfig(
 	if timeoutDecrease <= 0 || 1 <= timeoutDecrease {
 		return Config{}, model.NewConfigurationErrorf("timeoutDecrease must be in range (0,1)")
 	}
-	if blockRateDelay < 0 {
-		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	if err := validBlockRateDelay(blockRateDelay); err != nil {
+		return Config{}, err
 	}
 
 	tc := Config{
@@ -104,17 +109,53 @@ func NewConfig(
 		VoteAggregationTimeoutFraction: voteAggregationTimeoutFraction,
 		TimeoutIncrease:                timeoutIncrease,
 		TimeoutDecrease:                timeoutDecrease,
-		BlockRateDelayMS:               float64(blockRateDelay.Milliseconds()),
+		BlockRateDelayMS:               atomic.NewFloat64(float64(blockRateDelay.Milliseconds())),
 	}
 	return tc, nil
 }
 
+// validBlockRateDelay validates a block rate delay config.
+// Returns model.ConfigurationError for invalid config inputs.
+func validBlockRateDelay(blockRateDelay time.Duration) error {
+	if blockRateDelay < 0 {
+		return model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
+	}
+	return nil
+}
+
+// GetBlockRateDelay returns the block rate delay as a Duration. This is used by
+// the dyamic config manager.
+func (c *Config) GetBlockRateDelay() time.Duration {
+	ms := c.BlockRateDelayMS.Load()
+	return time.Millisecond * time.Duration(ms)
+}
+
+// SetBlockRateDelay sets the block rate delay. It is used to modify this config
+// value while HotStuff is running.
+// Returns updatable_configs.ValidationError if the new value is invalid.
+func (c *Config) SetBlockRateDelay(delay time.Duration) error {
+	if err := validBlockRateDelay(delay); err != nil {
+		if model.IsConfigurationError(err) {
+			return updatable_configs.NewValidationErrorf("invalid block rate delay: %w", err)
+		}
+		return fmt.Errorf("unexpected error validating block rate delay: %w", err)
+	}
+	// sanity check: log a warning if we set block rate delay above min timeout
+	// it is valid to want to do this, to significantly slow the block rate, but
+	// only in edge cases
+	if c.MinReplicaTimeout < float64(delay.Milliseconds()) {
+		log.Warn().Msgf("CAUTION: setting block rate delay to %s, above min timeout %dms - this will degrade performance!", delay.String(), int64(c.MinReplicaTimeout))
+	}
+	c.BlockRateDelayMS.Store(float64(delay.Milliseconds()))
+	return nil
+}
+
 // StandardVoteAggregationTimeoutFraction calculates a standard value for the VoteAggregationTimeoutFraction in case a block delay is used.
 // The motivation for the standard value is as follows:
-//  * the next primary receives the block it ideally would extend at some time t
-//  * the best guess the primary has, when other nodes would receive the block is at time t as well
-//  * the primary needs to get its block to the other replicas, before they time out:
-//    the primary uses its own timeout as estimator for the other replicas' timeout
+//   - the next primary receives the block it ideally would extend at some time t
+//   - the best guess the primary has, when other nodes would receive the block is at time t as well
+//   - the primary needs to get its block to the other replicas, before they time out:
+//     the primary uses its own timeout as estimator for the other replicas' timeout
 func StandardVoteAggregationTimeoutFraction(minReplicaTimeout time.Duration, blockRateDelay time.Duration) float64 {
 	standardVoteAggregationTimeoutFraction := 0.5
 	minReplicaTimeoutMS := float64(minReplicaTimeout.Milliseconds())

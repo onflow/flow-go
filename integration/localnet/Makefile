@@ -1,10 +1,10 @@
 COLLECTION = 3
-CONSENSUS = 3
+CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
-ACCESS = 2
+ACCESS = 1
 OBSERVER = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
@@ -14,6 +14,7 @@ CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
 PROFILER=false
+PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
@@ -21,6 +22,16 @@ CADENCE_TRACING=false
 # The Git commit hash
 COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
+
+CURRENT_DIRECTORY=$(shell pwd)
+
+# These vars set the default TPS values for tps-test-ci
+# These can be overwritten at the time make is called on tps-test-ci
+# by setting these as arguments at the time the make target is called
+# e.g. "make tps-test-ci TPS_INIT=5 TPS_MAX=30"
+TPS_INIT=25
+TPS_MAX=500
+TPS_DURATION=30m
 
 .PHONY: init
 init:
@@ -45,6 +56,7 @@ else
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
+		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
 		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
@@ -53,24 +65,25 @@ else
 endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
+# (Except for consensus and execution nodes, which are set to 2)
 .PHONY: init-light
 init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs
 init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
-# Uninstall logging plugin
-.PHONY: uninstall-docker-plugin
-uninstall-docker-plugin:
-	$(shell docker plugin inspect loki >/dev/null 2>&1 && \
-		(docker plugin disable loki; docker plugin rm loki))
-
 .PHONY: start
-start: uninstall-docker-plugin
+start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
+	$(MAKE) start-thin
+
+# Starts a version of localnet without metrics services. This prevents port collision and consumption
+# when these services are not needed.
+.PHONY: start-thin
+start-thin:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
@@ -80,4 +93,25 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
+
+.PHONY: tps-test
+tps-test:
+	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 10 -tps-durations 1m
+
+.PHONY: tps-ci-smoke
+tps-ci-smoke:
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 10 -max-tps 20 -duration 2m -slice-size 10s
+
+.PHONY: tps-test-ci
+tps-test-ci:
+	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
+	$(MAKE) start-thin
+	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps $(TPS_INIT) -max-tps $(TPS_MAX) -duration $(TPS_DURATION)
+	$(MAKE) stop
+
+.PHONY: clean-data
+clean-data:
+	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
+	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
+	rm -rf ./data

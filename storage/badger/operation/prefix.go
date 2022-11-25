@@ -72,6 +72,11 @@ const (
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
 
+	// code for ComputationResult upload status storage
+	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
+	//		 be supported, we will need to define new code.
+	codeComputationResults = 66
+
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
@@ -90,6 +95,9 @@ const (
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
 	codeIndexResultApprovalByChunk   = 204
+
+	// TEMPORARY codes
+	blockedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 
 	// internal failure information that should be preserved across restarts
 	codeExecutionFork                   = 254

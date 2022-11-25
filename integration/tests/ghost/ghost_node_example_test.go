@@ -6,24 +6,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 )
 
 // Tests to check if the Ghost node works as expected
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
 func TestGhostNodeExample_Send(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "ghost_node_send/main_test.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 
 	var (
@@ -48,7 +46,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 		accessNode = testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
-	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode, accessNode})
+	nodes := []testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode, accessNode}
 	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
 	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
@@ -76,10 +74,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "ghost_node_subscribe/main_test.go").
-		Str("testcase", t.Name()).
-		Logger()
+	logger := unittest.LoggerForTest(t, zerolog.InfoLevel)
 	logger.Info().Msgf("================> START TESTING")
 
 	var (
@@ -104,7 +99,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		accessNode = testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
-	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode, accessNode})
+	nodes := []testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode, accessNode}
 	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
 	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)

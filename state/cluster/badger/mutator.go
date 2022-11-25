@@ -42,7 +42,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	blockID := block.ID()
 
 	span, ctx, _ := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 
@@ -93,7 +93,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
-		setupSpan.Finish()
+		setupSpan.End()
 		checkAnsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
 
 		// start with the extending block's parent
@@ -116,16 +116,16 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			parentID = ancestor.ParentID
 		}
 
-		checkAnsSpan.Finish()
+		checkAnsSpan.End()
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-		defer checkTxsSpan.Finish()
+		defer checkTxsSpan.End()
 
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
 		// otherwise we would compromise liveness of the cluster.
 		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
+			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
 		}
 		if err != nil {
 			return fmt.Errorf("could not check reference block: %w", err)
@@ -146,7 +146,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
 			if errors.Is(err, storage.ErrNotFound) {
 				// unknown reference blocks are invalid
-				return state.NewInvalidExtensionErrorf("unknown reference block (id=%x): %v", flowTx.ReferenceBlockID, err)
+				return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
 			}
 			if err != nil {
 				return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
@@ -214,7 +214,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	}
 
 	insertDbSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	defer insertDbSpan.Finish()
+	defer insertDbSpan.End()
 
 	// insert the new block
 	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))

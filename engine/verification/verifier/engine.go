@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -195,7 +195,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	} else {
 		spockSecret, chFault, err = e.chVerif.Verify(vc)
 	}
-	span.Finish()
+	span.End()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
 	if err != nil {
@@ -240,7 +240,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		attestation,
 		spockSecret)
 
-	span.Finish()
+	span.End()
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
@@ -325,11 +325,13 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 
 	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
 	if isSampled {
-		span.LogFields(log.String("result_id", ch.Result.ID().String()))
-		span.LogFields(log.Uint64("chunk_index", ch.Chunk.Index))
-		span.SetTag("origin_id", originID)
+		span.SetAttributes(
+			attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
+			attribute.String("result_id", ch.Result.ID().String()),
+			attribute.String("origin_id", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	// increments number of received verifiable chunks
 	// for sake of metrics

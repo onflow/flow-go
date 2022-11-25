@@ -3,8 +3,8 @@ package assigner
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -33,6 +33,8 @@ type Engine struct {
 	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
+	stopAtHeight          uint64
+	stopAtBlockID         atomic.Value
 }
 
 func New(
@@ -44,8 +46,9 @@ func New(
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
+	stopAtHeight uint64,
 ) *Engine {
-	return &Engine{
+	e := &Engine{
 		unit:             engine.NewUnit(),
 		log:              log.With().Str("engine", "assigner").Logger(),
 		metrics:          metrics,
@@ -55,7 +58,10 @@ func New(
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
+		stopAtHeight:     stopAtHeight,
 	}
+	e.stopAtBlockID.Store(flow.ZeroID)
+	return e
 }
 
 func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
@@ -158,7 +164,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 
 	span, ctx, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
-	defer span.Finish()
+	defer span.End()
 
 	e.processFinalizedBlock(ctx, block)
 }
@@ -166,6 +172,11 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 // processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
 // processes the chunks assigned to this verification node by pushing them to the chunks consumer.
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
+
+	if e.stopAtHeight > 0 && block.Header.Height == e.stopAtHeight {
+		e.stopAtBlockID.Store(block.ID())
+	}
+
 	blockID := block.ID()
 	// we should always notify block consumer before returning.
 	defer e.blockConsumerNotifier.Notify(blockID)
@@ -201,6 +212,13 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
+
+			if e.stopAtHeight > 0 && e.stopAtBlockID.Load() == chunk.BlockID {
+				resultLog.Fatal().
+					Hex("chunk_id", logging.ID(chunk.ID())).
+					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
+			}
+
 			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().
@@ -225,9 +243,8 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
 func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult, incorporatingBlock flow.Identifier) (flow.ChunkList, error) {
-	var span opentracing.Span
-	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
-	defer span.Finish()
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	defer span.End()
 
 	assignment, err := e.assigner.Assign(result, incorporatingBlock)
 	if err != nil {

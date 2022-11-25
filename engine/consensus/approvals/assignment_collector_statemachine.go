@@ -23,13 +23,13 @@ var (
 // AssignmentCollectorStateMachine is fully concurrent.
 //
 // Comment on concurrency safety for state-specific business logic:
-//  * AssignmentCollectorStateMachine processes state updates concurrently with
-//    state-specific business logic. Hence, it can happen that we update a stale
-//    state.
-//  * To guarantee that we hand inputs to the latest state, we employ a
-//    "Compare And Repeat Pattern": we atomically read the state before and after the
-//    operation. If the state changed, we updated a stale state. We repeat until
-//    we confirm that the latest state was updated.
+//   - AssignmentCollectorStateMachine processes state updates concurrently with
+//     state-specific business logic. Hence, it can happen that we update a stale
+//     state.
+//   - To guarantee that we hand inputs to the latest state, we employ a
+//     "Compare And Repeat Pattern": we atomically read the state before and after the
+//     operation. If the state changed, we updated a stale state. We repeat until
+//     we confirm that the latest state was updated.
 type AssignmentCollectorStateMachine struct {
 	AssignmentCollectorBase
 
@@ -67,8 +67,8 @@ func NewAssignmentCollectorStateMachine(collectorBase AssignmentCollectorBase) *
 // ProcessIncorporatedResult starts tracking the approval for IncorporatedResult.
 // Method is idempotent.
 // Error Returns:
-//  * no errors expected during normal operation;
-//    errors might be symptoms of bugs or internal state corruption (fatal)
+//   - no errors expected during normal operation;
+//     errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	for { // Compare And Repeat if state update occurred concurrently
 		collector := asm.atomicLoadCollector()
@@ -87,9 +87,9 @@ func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporat
 // ProcessApproval ingests Result Approvals and triggers sealing of execution result
 // when sufficient approvals have arrived.
 // Error Returns:
-//  * nil in case of success (outdated approvals might be silently discarded)
-//  * engine.InvalidInputError if the result approval is invalid
-//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
+//   - nil in case of success (outdated approvals might be silently discarded)
+//   - engine.InvalidInputError if the result approval is invalid
+//   - any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.ResultApproval) error {
 	for { // Compare And Repeat if state update occurred concurrently
 		collector := asm.atomicLoadCollector()
@@ -132,9 +132,11 @@ func (asm *AssignmentCollectorStateMachine) ProcessingStatus() ProcessingStatus 
 // state transition is only executed if AssignmentCollector's internal state is
 // equal to `expectedValue`. The return indicates whether the state was updated.
 // The implementation only allows the following transitions:
-//         CachingApprovals   -> VerifyingApprovals
-//         CachingApprovals   -> Orphaned
-//         VerifyingApprovals -> Orphaned
+//
+//	CachingApprovals   -> VerifyingApprovals
+//	CachingApprovals   -> Orphaned
+//	VerifyingApprovals -> Orphaned
+//
 // Error returns:
 // * nil if the state transition was successfully executed
 // * ErrDifferentCollectorState if the AssignmentCollector's state is different than expectedCurrentStatus

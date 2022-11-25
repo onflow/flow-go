@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p/core/network"
 	"go.uber.org/multierr"
 
 	flownet "github.com/onflow/flow-go/network"

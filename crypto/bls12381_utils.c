@@ -6,6 +6,7 @@
 
 #include "bls12381_utils.h"
 #include "bls_include.h"
+#include "assert.h"
 
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
@@ -84,7 +85,10 @@ prec_st* init_precomputed_data_BLS12_381() {
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* relic_init_BLS12_381() { 
     // check Relic was compiled with the right conf 
-    if (ALLOC != AUTO) return NULL;
+    assert(ALLOC == AUTO);
+
+    // sanity check of Relic constants the package is relying on
+    assert(RLC_OK == RLC_EQ);
 
     // initialize relic core with a new context
     ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
@@ -231,8 +235,6 @@ static int fp_get_sign(const fp_t y) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_write_bin
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
-// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
@@ -274,8 +276,8 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
-// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
+//
+// It returns RLC_OK if the inputs are valid and the execution completes, and RLC_ERR otherwise.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
@@ -381,8 +383,8 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
-// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
+//
+// It returns RLC_OK if the inputs are valid and the execution completes and RLC_ERR otherwise.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     // check the length

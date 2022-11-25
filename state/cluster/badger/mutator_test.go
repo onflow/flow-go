@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
@@ -244,6 +245,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
@@ -253,6 +255,7 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
@@ -265,6 +268,7 @@ func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
 	// should fail to extend block with invalid payload
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
@@ -283,6 +287,7 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// try to extend with the invalid block
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsOutdatedExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_Success() {
@@ -297,7 +302,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
 
 	// the block should be indexed by its parent
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
@@ -312,7 +317,7 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 	suite.Assert().Nil(err)
 }
 
-// an unknown reference block is invalid
+// an unknown reference block is unverifiable
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	block := suite.Block()
 	tx := suite.Tx()
@@ -322,9 +327,10 @@ func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	block.SetPayload(payload)
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsUnverifiableExtensionError(err))
 }
 
-// a collection with an expired reference block is a VALID extensino of chain state
+// a collection with an expired reference block is a VALID extension of chain state
 func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	// build enough blocks so that using genesis as a reference block causes
 	// the collection to be expired
@@ -378,6 +384,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
@@ -404,6 +411,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
@@ -510,5 +518,6 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		block.SetPayload(payload)
 		err = suite.state.Extend(&block)
 		assert.Error(t, err)
+		suite.Assert().True(state.IsInvalidExtensionError(err))
 	})
 }

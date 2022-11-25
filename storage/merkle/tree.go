@@ -3,6 +3,7 @@
 package merkle
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/blake2b"
@@ -37,14 +38,17 @@ func init() {
 // and merge them, depending on whether there are leaves or not.
 //
 // CONVENTION:
-//  * If the tree contains _any_ elements, the tree is defined by its root vertex.
-//    This case follows completely the convention for nodes: "In any existing tree,
-//    all nodes are non-nil."
-//  * Without any stored elements, there exists no root vertex in this data model,
-//    and we set `root` to nil.
+//   - If the tree contains _any_ elements, the tree is defined by its root vertex.
+//     This case follows completely the convention for nodes: "In any existing tree,
+//     all nodes are non-nil."
+//   - Without any stored elements, there exists no root vertex in this data model,
+//     and we set `root` to nil.
 type Tree struct {
 	keyLength int
 	root      node
+	// setting this flag would prevent more writes to the trie
+	// but makes it more efficient for proof generation
+	readOnlyEnabled bool
 }
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
@@ -61,18 +65,36 @@ func NewTree(keyLength int) (*Tree, error) {
 	}, nil
 }
 
+// MakeItReadOnly makes the tree read only, this operation is not reversible.
+// when tree becomes readonly, while doing operations it starts caching hashValues
+// for faster operations.
+func (t *Tree) MakeItReadOnly() {
+	t.readOnlyEnabled = true
+}
+
+// ComputeMaxDepth returns the maximum depth of the tree by traversing all paths
+//
+// Warning: this could be a very expensive operation for large trees, as nodes
+// don't cache the depth of children and have to compute by traversing.
+func (t *Tree) ComputeMaxDepth() uint {
+	return t.root.MaxDepthOfDescendants()
+}
+
 // Put stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true. All inputs
 // are internally stored and copied where necessary, thereby allowing
 // external code to re-use the slices.
 // Returns:
-//  * (false, nil): key-value pair is stored; key did _not_ yet exist prior to update
-//  * (true, nil):  key-value pair is stored; key existed prior to update and the old
-//                  value was overwritten
-//  * (false, error): with possible error returns
-//    - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
-//    No other errors are returned.
+//   - (false, nil): key-value pair is stored; key did _not_ yet exist prior to update
+//   - (true, nil):  key-value pair is stored; key existed prior to update and the old
+//     value was overwritten
+//   - (false, error): with possible error returns
+//   - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
+//     No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is in readonly mode, no more put operation is accepted")
+	}
 	if len(key) != t.keyLength {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
 	}
@@ -83,7 +105,7 @@ func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 // unsafePut stores the given value in the trie under the given key. If the
 // key already exists, it will replace the value and return true.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
@@ -228,7 +250,7 @@ func (t *Tree) Get(key []byte) ([]byte, bool) {
 // unsafeGet retrieves the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeGet(key []byte) ([]byte, bool) {
 	cur := &t.root // start at the root
 	index := 0     // and we start at a zero index in the path
@@ -282,9 +304,9 @@ GetLoop:
 // - (proof, true) if key is found
 // - (nil, false) if key is not found
 // Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
-//  - if full node, append the sibling node hash value to sibling hash list
-//  - if short node, appends the node.shortCount to the short count list
-//  - if leaf, would capture the leaf value
+//   - if full node, append the sibling node hash value to sibling hash list
+//   - if short node, appends the node.shortCount to the short count list
+//   - if leaf, would capture the leaf value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// check the len of key first
@@ -323,7 +345,7 @@ ProveLoop:
 			}
 
 			index++
-			siblingHashes = append(siblingHashes, sibling.Hash())
+			siblingHashes = append(siblingHashes, sibling.Hash(t.readOnlyEnabled))
 			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
@@ -378,11 +400,14 @@ ProveLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key []byte) bool {
-	if t.keyLength != len(key) {
-		return false
+func (t *Tree) Del(key []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is in readonly mode, no more delete operation is accepted")
 	}
-	return t.unsafeDel(key)
+	if t.keyLength != len(key) {
+		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
+	}
+	return t.unsafeDel(key), nil
 }
 
 // unsafeDel removes the value associated with the given key from the patricia
@@ -391,7 +416,7 @@ func (t *Tree) Del(key []byte) bool {
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 // UNSAFE:
-//  * all keys must have identical lengths, which is not checked here.
+//   - all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeDel(key []byte) bool {
 	cur := &t.root // start at the root
 	index := 0     // the index points to the bit we are processing in the path
@@ -512,7 +537,7 @@ func (t *Tree) Hash() []byte {
 	if t.root == nil {
 		return EmptyTreeRootHash
 	}
-	return t.root.Hash()
+	return t.root.Hash(t.readOnlyEnabled)
 }
 
 // merge will merge a child short node into a parent short node.

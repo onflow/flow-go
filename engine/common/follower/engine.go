@@ -223,11 +223,12 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
 	log := e.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -356,7 +357,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -393,7 +394,9 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		// the block is invalid; log as error as we desire honest participation
 		// ToDo: potential slashing
 		if state.IsInvalidExtensionError(err) {
-			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			log.Warn().
+				Err(err).
+				Msg("received invalid block from other node (potential slashing evidence?)")
 			return nil
 		}
 
@@ -431,7 +434,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 

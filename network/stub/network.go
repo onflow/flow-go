@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +30,7 @@ type Network struct {
 	myId           flow.Identifier                               // used to represent information of the attached node.
 	hub            *Hub                                          // used to attach Network layers of nodes together.
 	engines        map[channels.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
-	seenEventIDs   sync.Map                                      // used to keep track of event IDs seen by attached engines.
+	seenEventIDs   map[string]struct{}                           // used to keep track of event IDs seen by attached engines.
 	qCD            chan struct{}                                 // used to stop continuous delivery mode of the Network.
 	conduitFactory network.ConduitFactory
 }
@@ -49,6 +50,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		myId:           myId,
 		hub:            hub,
 		engines:        make(map[channels.Channel]network.MessageProcessor),
+		seenEventIDs:   make(map[string]struct{}),
 		qCD:            make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
@@ -56,6 +58,20 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	for _, opt := range opts {
 		opt(net)
 	}
+
+	// mocks the Start, Ready, and Done behavior of the network.
+	net.On("Start", mock.Anything).Return()
+	ready := make(chan struct{})
+	close(ready)
+	net.On("Ready", mock.Anything).Return(func() <-chan struct{} {
+		return ready
+	})
+
+	done := make(chan struct{})
+	close(done)
+	net.On("Done", mock.Anything).Return(func() <-chan struct{} {
+		return done
+	})
 
 	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
@@ -145,30 +161,6 @@ func (n *Network) MulticastOnChannel(channel channels.Channel, event interface{}
 	return n.submit(channel, event, targetIDs...)
 }
 
-// haveSeen returns true if the node attached to this Network instance has seen the event ID.
-// Otherwise, it returns false.
-//
-// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
-// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
-// event by any of the attached engines of that node.
-func (n *Network) haveSeen(eventID string) bool {
-	seen, ok := n.seenEventIDs.Load(eventID)
-	if !ok {
-		return false
-	}
-	return seen.(bool)
-}
-
-// seen marks the eventID as seen for the node attached to this instance of Network.
-// This method is mainly utilized for deduplicating message delivery.
-//
-// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
-// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
-// event by any of the attached engines of that node.
-func (n *Network) seen(eventID string) {
-	n.seenEventIDs.Store(eventID, true)
-}
-
 // buffer saves the message into the pending buffer of the Network hub.
 // Buffering process of a message imitates its transmission over an unreliable Network.
 // In specific, it emulates the process of dispatching the message out of the sender.
@@ -228,9 +220,6 @@ func (n *Network) DeliverSome(syncOnProcess bool, shouldDeliver func(*PendingMes
 // If syncOnProcess is set false, sender and receiver are synced over delivery of the message, i.e., the method call
 // returns once the message is delivered at destination (and not necessarily processed).
 func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error {
-	n.Lock()
-	defer n.Unlock()
-
 	key, err := eventKey(m.From, m.Channel, m.Event)
 	if err != nil {
 		return fmt.Errorf("could not generate event key for event: %w", err)
@@ -243,33 +232,41 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 			continue
 		}
 
-		// checks if the given engine already received the event.
-		// this prevents a node receiving the same event twice.
-		if receiverNetwork.haveSeen(key) {
-			continue
-		}
-
-		// marks the peer has seen the event
-		receiverNetwork.seen(key)
-
 		// finds the engine of the targeted Network
-		receiverEngine, ok := receiverNetwork.engines[m.Channel]
-		if !ok {
-			return fmt.Errorf("could find engine ID: %v for node: %v", m.Channel, nodeID)
+		err := receiverNetwork.processWithEngine(syncOnProcess, key, m)
+		if err != nil {
+			return fmt.Errorf("could not process message for nodeID: %v, %w", nodeID, err)
 		}
+	}
+	return nil
+}
 
-		if syncOnProcess {
-			// sender and receiver are synced over processing the message
-			if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
-				return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
-			}
-		} else {
-			// sender and receiver are synced over delivery of message
-			go func() {
-				_ = receiverEngine.Process(m.Channel, m.From, m.Event)
-			}()
+func (n *Network) processWithEngine(syncOnProcess bool, key string, m *PendingMessage) error {
+	n.Lock()
+	defer n.Unlock()
+
+	// checks if the given engine already received the event.
+	// this prevents a node receiving the same event twice.
+	if _, ok := n.seenEventIDs[key]; ok {
+		return nil
+	}
+	n.seenEventIDs[key] = struct{}{}
+
+	receiverEngine, ok := n.engines[m.Channel]
+	if !ok {
+		return fmt.Errorf("could find engine ID: %v", m.Channel)
+	}
+
+	if syncOnProcess {
+		// sender and receiver are synced over processing the message
+		if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
+			return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
 		}
-
+	} else {
+		// sender and receiver are synced over delivery of message
+		go func() {
+			_ = receiverEngine.Process(m.Channel, m.From, m.Event)
+		}()
 	}
 	return nil
 }

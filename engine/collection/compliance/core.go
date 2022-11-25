@@ -135,38 +135,22 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 
 	// there are two possibilities if the proposal is neither already pending
 	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => we cache the proposal and request the missing link
+	// 1) the proposal is unverifiable because the parent is unknown
+	// => we cache the proposal
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if we can connect the proposal to an ancestor in the cache, it means
-	// there is a missing link; we cache it and request the missing link
-	ancestor, found := c.pending.ByID(header.ParentID)
+	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
+	// we don't have to request its parent block or its ancestor again, because as a
+	// pending block, its parent block must have been requested.
+	// if there was problem requesting its parent or ancestors, the sync engine's forward
+	// syncing with range requests for finalized blocks will request for the blocks.
+	_, found := c.pending.ByID(header.ParentID)
 	if found {
 
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
-
-		// go to the first missing ancestor
-		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height - 1
-		for {
-			ancestor, found := c.pending.ByID(ancestorID)
-			if !found {
-				break
-			}
-			ancestorID = ancestor.Header.ParentID
-			ancestorHeight = ancestor.Header.Height - 1
-		}
-
-		log.Debug().
-			Uint64("ancestor_height", ancestorHeight).
-			Hex("ancestor_id", ancestorID[:]).
-			Msg("requesting missing ancestor for proposal")
-
-		c.sync.RequestBlock(ancestorID, ancestorHeight)
 
 		return nil
 	}
@@ -224,7 +208,16 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 	// the block is invalid; log as error as we desire honest participation
 	// ToDo: potential slashing
 	if engine.IsInvalidInputError(err) {
-		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		c.log.Warn().
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("received invalid block from other node (potential slashing evidence?)")
+		return nil
+	}
+	if engine.IsUnverifiableInputError(err) {
+		c.log.Warn().
+			Err(err).
+			Msg("received unverifiable from other node")
 		return nil
 	}
 	if err != nil {
@@ -282,15 +275,20 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 	err := c.state.Extend(block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+		return engine.NewInvalidInputErrorf("invalid extension of cluster state (block_id: %x, height: %d): %w",
 			header.ID(), header.Height, err)
 	}
 	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
 	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+		return engine.NewOutdatedInputErrorf("outdated extension of cluster state (block_id: %x, height: %d): %w",
+			header.ID(), header.Height, err)
+	}
+	if state.IsUnverifiableExtensionError(err) {
+		return engine.NewUnverifiableInputError("unverifiable extension of cluster state (block_id: %x, height: %d): %w",
+			header.ID(), header.Height, err)
 	}
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
+		return fmt.Errorf("unexpected error while updating cluster state (block_id: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent
@@ -301,6 +299,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
+	// TODO: wait for the returned callback channel if we are processing blocks from range response
 	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil

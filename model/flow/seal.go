@@ -28,15 +28,14 @@ import "encoding/json"
 // seals for the same result (using different subsets of assigned verifiers),
 // they cannot be treated as equivalent for the following reason:
 //
-//  * Swapping a seal in a block with a different once changes the binary
-//    representation of the block payload containing the seal.
-//  * Changing the binary block representation would invalidate the block
-//    proposer's signature.
+//   - Swapping a seal in a block with a different once changes the binary
+//     representation of the block payload containing the seal.
+//   - Changing the binary block representation would invalidate the block
+//     proposer's signature.
 //
 // Therefore, to retrieve valid blocks from storage, it is required that
 // the Seal.ID includes all fields with independent degrees of freedom
 // (such as AggregatedApprovalSigs).
-//
 type Seal struct {
 	BlockID                Identifier
 	ResultID               Identifier
