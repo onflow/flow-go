@@ -16,7 +16,7 @@ type ClusterRootQCVoter interface {
 	// smart contract, and verifying submission. It is safe to run Vote multiple
 	// times within a single setup phase.
 	// Error returns:
-	//   - epochs.ErrWontVote if we fail to vote for a benign reason
+	//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 	//   - generic error in case of critical unexpected failure
 	Vote(context.Context, protocol.Epoch) error
 }

@@ -90,7 +90,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	}
 	cluster, clusterIndex, ok := clusters.ByNodeID(voter.me.NodeID())
 	if !ok {
-		return fmt.Errorf("could not find self in clustering")
+		voter.log.Warn().Msgf("could not find self in clustering: %s", clusters.Assignments())
+		return NewClusterQCNoVoteErrorf("could not find self in clustering")
 	}
 
 	log := voter.log.With().
