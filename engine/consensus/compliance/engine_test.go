@@ -116,6 +116,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = finalizedBlock
+	cs.headerDB[finalizedBlock.ID()] = finalizedBlock
 
 	*cs.pending = *modulemock.NewPendingBlockBuffer(cs.T())
 	// wait for both expected calls before ending the test
