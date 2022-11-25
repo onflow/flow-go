@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/linxGnu/grocksdb"
@@ -166,7 +165,6 @@ func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEnt
 		if err != nil {
 			return err
 		}
-		time.Sleep(time.Millisecond * 100)
 	}
 	return nil
 }

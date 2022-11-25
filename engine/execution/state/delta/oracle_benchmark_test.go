@@ -69,6 +69,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		opts := grocksdb.NewDefaultOptions()
 		opts.SetBlockBasedTableFactory(bbto)
 		opts.SetCreateIfMissing(true)
+		opts.SetMaxOpenFiles(8192)
 
 		db, err := grocksdb.OpenDb(opts, dir)
 
