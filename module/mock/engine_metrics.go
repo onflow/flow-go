@@ -9,6 +9,11 @@ type EngineMetrics struct {
 	mock.Mock
 }
 
+// MessageDropped provides a mock function with given fields: engine, messages
+func (_m *EngineMetrics) MessageDropped(engine string, messages string) {
+	_m.Called(engine, messages)
+}
+
 // MessageHandled provides a mock function with given fields: engine, messages
 func (_m *EngineMetrics) MessageHandled(engine string, messages string) {
 	_m.Called(engine, messages)
