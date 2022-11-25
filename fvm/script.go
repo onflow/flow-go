@@ -126,8 +126,8 @@ func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
 }
 
 type scriptExecutor struct {
-	proc *ScriptProcedure
-
+	ctx            Context
+	proc           *ScriptProcedure
 	txnState       *state.TransactionState
 	derivedTxnData *programs.DerivedTransactionData
 
@@ -141,6 +141,7 @@ func newScriptExecutor(
 	derivedTxnData *programs.DerivedTransactionData,
 ) *scriptExecutor {
 	return &scriptExecutor{
+		ctx:            ctx,
 		proc:           proc,
 		txnState:       txnState,
 		derivedTxnData: derivedTxnData,
@@ -182,6 +183,21 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState,
+		executor.derivedTxnData)
+	if err != nil {
+		return fmt.Errorf("error gettng meter parameters: %w", err)
+	}
+
+	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
+	if err != nil {
+		return err
+	}
+
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
@@ -201,5 +217,7 @@ func (executor *scriptExecutor) execute() error {
 	executor.proc.Events = executor.env.Events()
 	executor.proc.GasUsed = executor.env.ComputationUsed()
 	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
-	return nil
+
+	_, err = executor.txnState.Commit(txnId)
+	return err
 }
