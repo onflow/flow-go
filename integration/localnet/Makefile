@@ -28,10 +28,11 @@ CURRENT_DIRECTORY=$(shell pwd)
 # These vars set the default TPS values for tps-test-ci
 # These can be overwritten at the time make is called on tps-test-ci
 # by setting these as arguments at the time the make target is called
-# e.g. "make tps-test-ci TPS_INIT=5 TPS_MAX=30"
-TPS_INIT=25
-TPS_MAX=500
-TPS_DURATION=30m
+# e.g. "make tps-test-ci TPS_INIT=5 TPS_MIN=1 TPS_MAX=30"
+TPS_INIT=1000
+TPS_MIN=100
+TPS_MAX=1000
+DURATION=30m
 
 .PHONY: init
 init:
@@ -101,13 +102,13 @@ tps-test:
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps 10 -max-tps 20 -duration 2m -slice-size 10s
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 2m
 
 .PHONY: tps-test-ci
 tps-test-ci:
-	$(MAKE) -e COLLECTION=5 VERIFICATION=5 NCLUSTERS=5 init
+	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 init
 	$(MAKE) start-thin
-	go run --tags relic ../benchmark/cmd/ci -log-level info -initial-tps $(TPS_INIT) -max-tps $(TPS_MAX) -duration $(TPS_DURATION)
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
 	$(MAKE) stop
 
 .PHONY: clean-data
