@@ -10,8 +10,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
+// GossipSubAdapter is a wrapper around the libp2p GossipSub implementation
+// that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
 	gossipSub *pubsub.PubSub
 	logger    zerolog.Logger
@@ -36,6 +39,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 }
 
 func (g *GossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
+	// wrap the topic validator function into a libp2p topic validator function.
 	var v pubsub.ValidatorEx = func(ctx context.Context, from peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		switch result := topicValidator(ctx, from, message); result {
 		case p2p.ValidationAccept:
@@ -49,7 +53,9 @@ func (g *GossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p
 			g.logger.Fatal().Msgf("invalid validation result: %v", result)
 		}
 		// should never happen, indicates a bug in the topic validator, but we need to return something
-		g.logger.Warn().Msg("invalid validation result, returning reject")
+		g.logger.Warn().
+			Bool(logging.KeySuspicious, true).
+			Msg("invalid validation result, returning reject")
 		return pubsub.ValidationReject
 	}
 
@@ -63,7 +69,7 @@ func (g *GossipSubAdapter) UnregisterTopicValidator(topic string) error {
 func (g *GossipSubAdapter) Join(topic string) (p2p.Topic, error) {
 	t, err := g.gossipSub.Join(topic)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not join topic %s: %w", topic, err)
 	}
 	return NewGossipSubTopic(t), nil
 }

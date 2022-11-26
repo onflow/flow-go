@@ -10,10 +10,20 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
+	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
+// CorruptGossipSubAdapter is a wrapper around the forked pubsub topic from
+// github.com/yhassanzadeh13/go-libp2p-pubsub that implements the p2p.PubSubAdapter.
+// This is needed because in order to use the forked pubsub module, we need to
+// use the entire dependency tree of the forked module which is resolved to
+// github.com/yhassanzadeh13/go-libp2p-pubsub. This means that we cannot use
+// the original libp2p pubsub module in the same package.
+// Note: we use the forked pubsub module for sake of BFT testing and attack vector
+// implementation, it is designed to be completely isolated in the "insecure" package, and
+// totally separated from the rest of the codebase.
 type CorruptGossipSubAdapter struct {
 	gossipSub *corrupt.PubSub
 	router    *internal.CorruptGossipSubRouter
@@ -23,7 +33,8 @@ type CorruptGossipSubAdapter struct {
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
 
 func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
-	var v corrupt.ValidatorEx = func(ctx context.Context, from peer.ID, message *corrupt.Message) corrupt.ValidationResult {
+	// instantiates a corrupt.ValidatorEx that wraps the topicValidatorFunc
+	var corruptValidator corrupt.ValidatorEx = func(ctx context.Context, from peer.ID, message *corrupt.Message) corrupt.ValidationResult {
 		pubsubMsg := &pubsub.Message{
 			Message:       message.Message, // converting corrupt.Message to pubsub.Message
 			ID:            message.ID,
@@ -35,6 +46,7 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 
 		// overriding the corrupt.ValidationResult with the result from pubsub.TopicValidatorFunc
 		message.ValidatorData = pubsubMsg.ValidatorData
+
 		switch result {
 		case p2p.ValidationAccept:
 			return corrupt.ValidationAccept
@@ -47,10 +59,12 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 			c.logger.Fatal().Msgf("invalid validation result: %v", result)
 		}
 		// should never happen, indicates a bug in the topic validator, but we need to return something
-		c.logger.Warn().Msg("invalid validation result, returning reject")
+		c.logger.Warn().
+			Bool(logging.KeySuspicious, true).
+			Msg("invalid validation result, returning reject")
 		return corrupt.ValidationReject
 	}
-	return c.gossipSub.RegisterTopicValidator(topic, v, corrupt.WithValidatorInline(true))
+	return c.gossipSub.RegisterTopicValidator(topic, corruptValidator, corrupt.WithValidatorInline(true))
 }
 
 func (c *CorruptGossipSubAdapter) UnregisterTopicValidator(topic string) error {
@@ -77,25 +91,30 @@ func (c *CorruptGossipSubAdapter) GetRouter() *internal.CorruptGossipSubRouter {
 	return c.router
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *internal.CorruptGossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
-		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
+		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
+	// initializes a default gossipsub router and wraps it with the corrupt router.
 	router, err := corrupt.DefaultGossipSubRouter(h)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub router: %w", err)
+		return nil, nil, fmt.Errorf("failed to create gossipsub router: %w", err)
 	}
-	// corruptRouter := internal.NewCorruptGossipSubRouter(router)
-	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
+	corruptRouter := internal.NewCorruptGossipSubRouter(router)
+
+	// injects the corrupt router into the gossipsub constructor
+	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, corruptRouter, gossipSubConfig.Build()...)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
-	return &CorruptGossipSubAdapter{
+	adapter := &CorruptGossipSubAdapter{
 		gossipSub: gossipSub,
 		router:    corruptRouter,
 		logger:    logger,
-	}, nil
+	}
+
+	return adapter, corruptRouter, nil
 }

@@ -29,13 +29,13 @@ func (_m *SubscriptionFilter) CanSubscribe(_a0 string) bool {
 	return r0
 }
 
-// FilterIncomingSubscriptions provides a mock function with given fields: from, opts
-func (_m *SubscriptionFilter) FilterIncomingSubscriptions(from peer.ID, opts []*pubsub_pb.RPC_SubOpts) ([]*pubsub_pb.RPC_SubOpts, error) {
-	ret := _m.Called(from, opts)
+// FilterIncomingSubscriptions provides a mock function with given fields: _a0, _a1
+func (_m *SubscriptionFilter) FilterIncomingSubscriptions(_a0 peer.ID, _a1 []*pubsub_pb.RPC_SubOpts) ([]*pubsub_pb.RPC_SubOpts, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 []*pubsub_pb.RPC_SubOpts
 	if rf, ok := ret.Get(0).(func(peer.ID, []*pubsub_pb.RPC_SubOpts) []*pubsub_pb.RPC_SubOpts); ok {
-		r0 = rf(from, opts)
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*pubsub_pb.RPC_SubOpts)
@@ -44,7 +44,7 @@ func (_m *SubscriptionFilter) FilterIncomingSubscriptions(from peer.ID, opts []*
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(peer.ID, []*pubsub_pb.RPC_SubOpts) error); ok {
-		r1 = rf(from, opts)
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

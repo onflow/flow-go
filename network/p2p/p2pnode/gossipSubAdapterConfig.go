@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+// GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
+// implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
 	options []pubsub.Option
 }
@@ -29,7 +31,7 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 	g.options = append(g.options, pubsub.WithSubscriptionFilter(filter))
 }
 
-func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOption) {
+func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
 	g.options = append(g.options, option.BuildFlowPubSubScoreOption())
 }
 
@@ -50,5 +52,3 @@ func defaultPubsubOptions(base *p2p.BasePubSubAdapterConfig) []pubsub.Option {
 		pubsub.WithMaxMessageSize(base.MaxMessageSize),
 	}
 }
-
-var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)

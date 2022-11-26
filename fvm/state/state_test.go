@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -131,7 +132,11 @@ func TestState_MaxKeySize(t *testing.T) {
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(12))
+	st := state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(12)))
 
 	// read - interaction 2
 	_, err := st.Get("1", "2", true)
@@ -148,7 +153,11 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
-	st = state.NewState(view, state.DefaultParameters().WithMaxInteractionSizeAllowed(6))
+	st = state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(6)))
 	stChild := st.NewChild()
 
 	// update - 0

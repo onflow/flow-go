@@ -79,7 +79,12 @@ func NodeFixture(
 	connManager := connection.NewConnManager(logger, noopMetrics)
 	resourceManager := testutils.NewResourceManager(t)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, parameters.Address, parameters.Key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		metrics.NewNoopCollector(),
+		parameters.Address,
+		parameters.Key,
+		sporkID).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
@@ -107,6 +112,10 @@ func NodeFixture(
 	if parameters.UpdateInterval != 0 {
 		require.NotNil(t, parameters.PeerProvider)
 		builder.SetPeerManagerOptions(parameters.ConnectionPruning, parameters.UpdateInterval)
+	}
+
+	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
+		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
 	n, err := builder.Build()
@@ -143,6 +152,8 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
+	GossipSubFactory   p2pbuilder.GossipSubFactoryFuc
+	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
@@ -44,7 +45,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
+		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
@@ -105,6 +106,9 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)
 		}
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
+
+		// override the original flow network with the corruptible network.
+		cnb.Network = corruptibleNetwork
 		return corruptibleNetwork, nil
 	})
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -69,11 +68,6 @@ func DefaultLibP2PNodeFactory(
 	}
 }
 
-// DefaultMessageIDFunction returns a default message ID function based on the message's data
-func DefaultMessageIDFunction(msg *pb.Message) string {
-	return utils.MessageID(msg.Data)
-}
-
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
@@ -93,6 +87,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
+	metrics                     module.NetworkMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -111,6 +106,7 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
@@ -123,6 +119,7 @@ func NewNodeBuilder(
 		createNode:          DefaultCreateNodeFunc,
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		metrics:             metrics,
 	}
 }
 
@@ -350,7 +347,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
 
-	// create a t which disables port reuse and web socket.
+	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
@@ -400,7 +397,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
 	)
 
-	builder := NewNodeBuilder(log, address, flowKey, sporkId).
+	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

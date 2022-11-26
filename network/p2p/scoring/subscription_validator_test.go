@@ -11,7 +11,6 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -263,9 +262,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx5s, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{
-		p2pfixtures.MustBePubSubSubscription(t, ver1SubBlocks),
-		p2pfixtures.MustBePubSubSubscription(t, ver2SubBlocks)})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []p2p.Subscription{ver1SubBlocks, ver2SubBlocks})
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
@@ -277,11 +274,9 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{
-		p2pfixtures.MustBePubSubSubscription(t, ver1SubChunks),
-		p2pfixtures.MustBePubSubSubscription(t, ver2SubChunks)})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{ver1SubChunks, ver2SubChunks})
 
 	ctx5s, cancel5s = context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{p2pfixtures.MustBePubSubSubscription(t, conSubChunks)})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []p2p.Subscription{conSubChunks})
 }
