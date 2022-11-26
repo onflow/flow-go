@@ -156,6 +156,13 @@ type NodeFixtureParameters struct {
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 }
 
+func WithGossipSub(factory p2pbuilder.GossipSubFactoryFuc, config p2pbuilder.GossipSubAdapterConfigFunc) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.GossipSubFactory = factory
+		p.GossipSubConfig = config
+	}
+}
+
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true

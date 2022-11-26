@@ -1,63 +1,59 @@
-package corruptlibp2p
+package corruptlibp2p_test
 
 import (
 	"context"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/insecure/corruptlibp2p/internal"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/insecure/corruptlibp2p"
+	internalinsecure "github.com/onflow/flow-go/insecure/internal"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestGetGossipSubParams(t *testing.T) {
-	gossipSubParams := getGossipSubParams()
-
-	require.Equal(t, gossipSubParams, gossipSubParams)
-}
-
 func TestSpam(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+
+	spammerGossipSubOpt, spammerRouter := WithCorruptGossipSub()
+	spammerNode, _ := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		spammerGossipSubOpt,
+	)
+	// require.NotNil(t, spammerRouter)
+
+	victimGossipSubOpt, _ := WithCorruptGossipSub()
+	victimNode, victimId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		victimGossipSubOpt,
+	)
+	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
+	require.NoError(t, err)
+
+	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	sporkId := unittest.IdentifierFixture()
 	defer cancel()
-
-	count := 5
-	nodes := make([]p2p.LibP2PNode, 0, 5)
-	ids := flow.IdentityList{}
-	inbounds := make([]chan string, 0, 5)
-	peerIds := make([]peer.ID, 5)
-
-	for i := 0; i < count; i++ {
-		handler, inbound := p2ptest.StreamHandlerFixture(t)
-		node, id := p2ptest.NodeFixture(
-			t,
-			sporkId,
-			t.Name(),
-			p2ptest.WithRole(flow.RoleConsensus),
-			p2ptest.WithDefaultStreamHandler(handler),
-		)
-		peerId, err := unittest.PeerIDFromFlowID(&id)
-		require.NoError(t, err)
-
-		nodes = append(nodes, node)
-		ids = append(ids, &id)
-		inbounds = append(inbounds, inbound)
-		peerIds = append(peerIds, peerId)
-	}
-
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{spammerNode, victimNode}, 100*time.Second)
+	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
 	// create new spammer
-	gsr := internal.NewGossipSubRouterFixture()
-	spammer := NewSpammerGossipSub(gsr.Router)
+	require.NotNil(t, spammerRouter)
+	spammer := corruptlibp2p.NewGossipSubSpammer(spammerRouter)
 
 	// start spamming the first peer
-	spammer.SpamIHave(peerIds[0], 10, 1)
+	spammer.SpamIHave(victimPeerId, 10, 1)
+}
+
+func WithCorruptGossipSub() (p2ptest.NodeFixtureParameterOption, *internalinsecure.CorruptGossipSubRouter) {
+	factory, router := corruptlibp2p.CorruptibleGossipSubFactory()
+	config := corruptlibp2p.CorruptibleGossipSubConfigFactory()
+	return p2ptest.WithGossipSub(factory, config), router
 }
