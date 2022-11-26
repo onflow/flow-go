@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
-	internalinsecure "github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -18,21 +17,19 @@ import (
 func TestSpam(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	spammerGossipSubOpt, spammerRouter := WithCorruptGossipSub()
+	var spammerAdapter p2p.PubSubAdapter
 	spammerNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		spammerGossipSubOpt,
+		p2ptest.WithGossipSub(corruptlibp2p.CorruptibleGossipSubFactory(func(adapter p2p.PubSubAdapter) { spammerAdapter = adapter }), corruptlibp2p.CorruptibleGossipSubConfigFactory()),
 	)
-	// require.NotNil(t, spammerRouter)
 
-	victimGossipSubOpt, _ := WithCorruptGossipSub()
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		victimGossipSubOpt,
+		p2ptest.WithGossipSub(corruptlibp2p.CorruptibleGossipSubFactory(func(adapter p2p.PubSubAdapter) {}), corruptlibp2p.CorruptibleGossipSubConfigFactory()),
 	)
 	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)
@@ -45,15 +42,12 @@ func TestSpam(t *testing.T) {
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
 	// create new spammer
-	require.NotNil(t, spammerRouter)
-	spammer := corruptlibp2p.NewGossipSubSpammer(spammerRouter)
+	require.NotNil(t, spammerAdapter)
+	corruptAdapter, ok := spammerAdapter.(*corruptlibp2p.CorruptGossipSubAdapter)
+	require.True(t, ok)
+
+	spammer := corruptlibp2p.NewGossipSubSpammer(corruptAdapter.GetRouter())
 
 	// start spamming the first peer
 	spammer.SpamIHave(victimPeerId, 10, 1)
-}
-
-func WithCorruptGossipSub() (p2ptest.NodeFixtureParameterOption, *internalinsecure.CorruptGossipSubRouter) {
-	factory, router := corruptlibp2p.CorruptibleGossipSubFactory()
-	config := corruptlibp2p.CorruptibleGossipSubConfigFactory()
-	return p2ptest.WithGossipSub(factory, config), router
 }
