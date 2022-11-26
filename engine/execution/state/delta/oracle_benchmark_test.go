@@ -22,7 +22,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(2000, b) } // 1_000_000
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(10000, b) } // 1_000_000
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -33,7 +33,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(2000, b) } // 1_000_000
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 500_000_000 // 500_000_000
+		bootstrapSize      = 1_000_000_000 // 500_000_000
 		numInsPerStep      = 1000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
