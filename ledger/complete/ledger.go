@@ -378,12 +378,14 @@ func (l *Ledger) ExportCheckpointAt(
 		payloads = t.AllPayloads()
 		payloadSize := len(payloads)
 
+		var paths []ledger.Path
+		var err error
 		// migrate payloads
 		for i, migrate := range migrations {
 			l.logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
 
 			start := time.Now()
-			payloads, err = migrate(payloads)
+			payloads, paths, err = migrate(payloads, targetPathFinderVersion)
 			elapsed := time.Since(start)
 
 			if err != nil {
@@ -406,13 +408,13 @@ func (l *Ledger) ExportCheckpointAt(
 
 		l.logger.Info().Msgf("creating paths for %v payloads", len(payloads))
 
-		// get paths
-		paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
-		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
-		}
-
-		l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+		// // get paths
+		// paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
+		// if err != nil {
+		// 	return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+		// }
+		//
+		// l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
 
 		emptyTrie := trie.NewEmptyMTrie()
 
