@@ -32,7 +32,7 @@ type Suite struct {
 	victimENID              flow.Identifier      // corrupt victim EN id
 	victimVNID              flow.Identifier      // corrupt victim VN id
 	ghostID                 flow.Identifier      // represents id of ghost node
-	Orchestrator            *testOrchestrator
+	Orchestrator            *TopicValidatorAttackOrchestrator
 	orchestratorNetwork     *orchestrator.Network
 }
 
