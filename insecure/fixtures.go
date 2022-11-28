@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/hash"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +41,8 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
-	eventID := flow.HashToID(hash.DefaultHasher.ComputeHash(payload))
+	eventID, err := p2p.EventId(channel, payload)
+	require.NoError(t, err)
 
 	// creates egress message that goes over gRPC.
 	egressMsg := &EgressMessage{
@@ -63,7 +64,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 		CorruptOriginId:     originId,
 		Channel:             channel,
 		FlowProtocolEvent:   content,
-		FlowProtocolEventID: eventID,
+		FlowProtocolEventID: eventID.Hex(),
 		Protocol:            protocol,
 		TargetNum:           targetNum,
 		TargetIds:           targetIds,

@@ -9,11 +9,11 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/hash"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -158,12 +158,18 @@ func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
-	egressEventID := flow.HashToID(hash.DefaultHasher.ComputeHash(message.Payload))
+	channel := channels.Channel(message.ChannelID)
+
+	egressEventID, err := p2p.EventId(channel, message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not create egress event ID: %w", err)
+	}
+
 	err = on.orchestrator.HandleEgressEvent(&insecure.EgressEvent{
 		CorruptOriginId:     sender,
-		Channel:             channels.Channel(message.ChannelID),
+		Channel:             channel,
 		FlowProtocolEvent:   event,
-		FlowProtocolEventID: egressEventID,
+		FlowProtocolEventID: egressEventID.Hex(),
 		Protocol:            message.Protocol,
 		TargetNum:           message.TargetNum,
 		TargetIds:           targetIds,
@@ -197,13 +203,17 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
-	ingressEventID := flow.HashToID(hash.DefaultHasher.ComputeHash(message.Payload))
+	channel := channels.Channel(message.ChannelID)
+	ingressEventID, err := p2p.EventId(channel, message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not create ingress event ID: %w", err)
+	}
 	err = on.orchestrator.HandleIngressEvent(&insecure.IngressEvent{
 		OriginID:            senderId,
 		CorruptTargetID:     targetId,
-		Channel:             channels.Channel(message.ChannelID),
+		Channel:             channel,
 		FlowProtocolEvent:   event,
-		FlowProtocolEventID: ingressEventID,
+		FlowProtocolEventID: ingressEventID.Hex(),
 	})
 	if err != nil {
 		return fmt.Errorf("could not handle ingress event by orchestrator: %w", err)

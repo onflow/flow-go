@@ -28,6 +28,6 @@ func (s *TopicValidatorTestSuite) TestTopicValidatorE2E() {
 	s.Orchestrator.sendUnauthorizedMsgs(s.T())
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
 	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventsWg.Wait, 5*time.Second, "could not send authorized messages on time")
-	require.Equal(s.T(), 0, s.Orchestrator.unauthorizedEventsReceived.Len())
-	require.Equal(s.T(), numOfAuthorizedEvents, s.Orchestrator.authorizedEventsReceived.Len())
+	require.Equal(s.T(), 0, len(s.Orchestrator.unauthorizedEventsReceived))
+	require.Equal(s.T(), numOfAuthorizedEvents, len(s.Orchestrator.authorizedEventsReceived))
 }
