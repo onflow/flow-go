@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -23,20 +22,20 @@ const CorruptNetworkPort = 4300
 // CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
-	TopicValidatorEnabled bool
+	TopicValidatorDisabled bool
 }
 
 func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
 	return &CorruptedNodeBuilder{
-		FlowNodeBuilder:       cmd.FlowNode(role),
-		TopicValidatorEnabled: false,
+		FlowNodeBuilder:        cmd.FlowNode(role),
+		TopicValidatorDisabled: true,
 	}
 }
 
 // LoadCorruptFlags load additional flags for corrupt nodes.
 func (cnb *CorruptedNodeBuilder) LoadCorruptFlags() {
 	cnb.FlowNodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.BoolVar(&cnb.TopicValidatorEnabled, "topic-validator-enabled", false, "enable the libp2p topic validator for corrupt nodes")
+		flags.BoolVar(&cnb.TopicValidatorDisabled, "topic-validator-disabled", true, "enable the libp2p topic validator for corrupt nodes")
 	})
 }
 
@@ -64,45 +63,25 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		var libP2PNodeFactory p2pbuilder.LibP2PFactoryFunc
-
 		// create default libp2p factory if corrupt node should enable the topic validator
-		if cnb.TopicValidatorEnabled {
-			libP2PNodeFactory = p2pbuilder.DefaultLibP2PNodeFactory(
-				cnb.Logger,
-				myAddr,
-				cnb.NetworkKey,
-				cnb.SporkID,
-				cnb.IdentityProvider,
-				cnb.Metrics.Network,
-				cnb.Resolver,
-				cnb.PeerScoringEnabled,
-				cnb.BaseConfig.NodeRole,
-				[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
-				[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
-				// run peer manager with the specified interval and let it also prune connections
-				cnb.NetworkConnectionPruning,
-				cnb.PeerUpdateInterval,
-			)
-		} else {
-			libP2PNodeFactory = corruptnet.NewCorruptLibP2PNodeFactory(
-				cnb.Logger,
-				cnb.RootChainID,
-				myAddr,
-				cnb.NetworkKey,
-				cnb.SporkID,
-				cnb.IdentityProvider,
-				cnb.Metrics.Network,
-				cnb.Resolver,
-				cnb.PeerScoringEnabled,
-				cnb.BaseConfig.NodeRole,
-				[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
-				[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
-				// run peer manager with the specified interval and let it also prune connections
-				cnb.NetworkConnectionPruning,
-				cnb.PeerUpdateInterval,
-			)
-		}
+		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
+			cnb.Logger,
+			cnb.RootChainID,
+			myAddr,
+			cnb.NetworkKey,
+			cnb.SporkID,
+			cnb.IdentityProvider,
+			cnb.Metrics.Network,
+			cnb.Resolver,
+			cnb.PeerScoringEnabled,
+			cnb.BaseConfig.NodeRole,
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
+			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
+			// run peer manager with the specified interval and let it also prune connections
+			cnb.NetworkConnectionPruning,
+			cnb.PeerUpdateInterval,
+			cnb.TopicValidatorDisabled,
+		)
 
 		libp2pNode, err := libP2PNodeFactory()
 		if err != nil {
@@ -112,7 +91,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
 			Str("address", myAddr).
-			Bool("topic_validator_enabled", cnb.TopicValidatorEnabled).
+			Bool("topic_validator_disabled", cnb.TopicValidatorDisabled).
 			Msg("corrupted libp2p node initialized")
 
 		return libp2pNode, nil

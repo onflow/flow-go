@@ -82,7 +82,7 @@ func (s *Suite) SetupSuite() {
 	s.victimVNID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.victimVNID),
-		testnet.WithAdditionalFlag("--topic-validator-enabled=true"),
+		testnet.WithAdditionalFlag("--topic-validator-disabled=false"),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
@@ -101,7 +101,7 @@ func (s *Suite) SetupSuite() {
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.victimENID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag("--topic-validator-enabled=true"),
+		testnet.WithAdditionalFlag("--topic-validator-disabled=false"),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
