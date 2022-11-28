@@ -1,6 +1,7 @@
 package delta_test
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -161,7 +162,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 			keysToRead = append(keysToRead, keys[:10]...)
 
 			// read values and compare values
-
 			for _, key := range keys {
 				start = time.Now()
 				v, err := view.Get(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value))
@@ -175,6 +175,13 @@ func benchmarkStorage(steps int, b *testing.B) {
 				totalReadTimeNS += elapsedns
 			}
 		}
+
+		// read special key
+		key := "random key"
+		start := time.Now()
+		_, _, err = storage.UnsafeRead(key)
+		fmt.Println(">>>>>", time.Since(start))
+		require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalRegOperation), "update_time_per_reg_(ns)")

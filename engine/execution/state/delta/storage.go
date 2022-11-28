@@ -195,6 +195,22 @@ func NewRocksStore(db *grocksdb.DB, opt *grocksdb.Options) (*RocksStore, error) 
 	return store, err
 }
 
+func (s *RocksStore) UnsafeRead(key string) (val flow.RegisterValue, found bool, err error) {
+	value, err := s.db.Get(s.ro, []byte(key))
+	if err != nil {
+		return
+	}
+	defer value.Free()
+
+	v := value.Data()
+	if len(v) == 0 {
+		found = false
+		return
+	}
+	val = flow.RegisterValue(v)
+	return
+}
+
 func (s *RocksStore) GetRegister(key flow.RegisterID) (val flow.RegisterValue, found bool, err error) {
 	k := []byte(key.String())
 	value, err := s.db.Get(s.ro, k)
@@ -294,6 +310,14 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 	err := writer.Open(path + "/input.sst")
 	if err != nil {
 		return fmt.Errorf("error opening the path for sst writer: %w", err)
+	}
+
+	// special key to be fetched later to evaulate latency
+	key := []byte("random key")
+	value := []byte("some random value")
+	err = writer.Add(key, value)
+	if err != nil {
+		return fmt.Errorf("error writing data: %w", err)
 	}
 
 	for i := uint64(0); i < numberOfKeys; i++ {
