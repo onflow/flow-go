@@ -1,6 +1,7 @@
 package topicvalidator
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -28,6 +29,11 @@ func (s *TopicValidatorTestSuite) TestTopicValidatorE2E() {
 	s.Orchestrator.sendUnauthorizedMsgs(s.T())
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
 	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
-	require.Equal(s.T(), 0, len(s.Orchestrator.unauthorizedEventsReceived))
-	require.Equal(s.T(), numOfAuthorizedEvents, len(s.Orchestrator.authorizedEventsReceived))
+	
+	// The victim nodes are configured with the topic validator enabled, therefore they should not have
+	// received any of the unauthorized messages.
+	require.Equal(s.T(), 0, len(s.Orchestrator.unauthorizedEventsReceived), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", len(s.Orchestrator.unauthorizedEventsReceived)))
+
+	// Victim nodes should receive all the authorized events sent.
+	require.Equal(s.T(), numOfAuthorizedEvents, len(s.Orchestrator.authorizedEventsReceived), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, len(s.Orchestrator.unauthorizedEventsReceived)))
 }
