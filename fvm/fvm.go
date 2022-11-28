@@ -110,17 +110,10 @@ func (vm *VirtualMachine) Run(
 		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
-	// TODO(patrick): move this into transaction executor (and maybe also script
-	// executor)
-	meterParams, err := getMeterParameters(ctx, proc, v, derivedTxnData)
-	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
-	}
-
 	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
-			WithMeterParameters(meterParams).
+			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 

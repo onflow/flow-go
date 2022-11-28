@@ -180,7 +180,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
-		Return(latestBlock, nil)
+		Return(latestBlock, flow.BlockStatusSealed, nil)
 
 	return events
 }
