@@ -53,7 +53,7 @@ var _ insecure.AttackOrchestrator = &TopicValidatorAttackOrchestrator{}
 func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN, victimEN, victimVN flow.Identifier) *TopicValidatorAttackOrchestrator {
 	orchestrator := &TopicValidatorAttackOrchestrator{
 		t:                          t,
-		logger:                     logger.With().Str("component", "bft_test_orchestrator").Logger(),
+		logger:                     logger.With().Str("component", "bft-test-orchestrator").Logger(),
 		codec:                      unittest.NetworkCodec(),
 		unauthorizedEventsReceived: make([]string, 0),
 		authorizedEventsReceived:   make([]string, 0),
