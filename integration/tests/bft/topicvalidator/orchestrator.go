@@ -41,7 +41,7 @@ type TopicValidatorAttackOrchestrator struct {
 	authorizedEventsReceived   []string
 	unauthorizedEvents         map[string]*insecure.EgressEvent
 	authorizedEvents           map[string]*insecure.EgressEvent
-	authorizedEventsWg         sync.WaitGroup
+	authorizedEventReceivedWg  sync.WaitGroup
 	attackerAN                 flow.Identifier
 	attackerEN                 flow.Identifier
 	victimEN                   flow.Identifier
@@ -59,7 +59,7 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN
 		authorizedEventsReceived:   make([]string, 0),
 		unauthorizedEvents:         make(map[string]*insecure.EgressEvent),
 		authorizedEvents:           make(map[string]*insecure.EgressEvent),
-		authorizedEventsWg:         sync.WaitGroup{},
+		authorizedEventReceivedWg:  sync.WaitGroup{},
 		attackerAN:                 attackerAN,
 		attackerEN:                 attackerEN,
 		victimEN:                   victimEN,
@@ -113,7 +113,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 	// track all authorized events sent during test
 	if _, ok := o.authorizedEvents[event.FlowProtocolEventID]; ok {
 		o.authorizedEventsReceived = append(o.authorizedEventsReceived, event.FlowProtocolEventID)
-		o.authorizedEventsWg.Done()
+		o.authorizedEventReceivedWg.Done()
 	}
 
 	err := o.orchestratorNetwork.SendIngress(event)
@@ -181,7 +181,7 @@ func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
 			FlowProtocolEventID: eventID,
 		}
 		o.authorizedEvents[eventID] = event
-		o.authorizedEventsWg.Add(1)
+		o.authorizedEventReceivedWg.Add(1)
 	}
 }
 
