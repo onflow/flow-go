@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,32 +49,39 @@ func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult
 	}
 }
 
-func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
-	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], inp...)
+func (cr *ComputationResult) AddTransactionResult(
+	chunkIndex int,
+	txn *fvm.TransactionProcedure,
+) {
+	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], txn.Events...)
+	cr.ServiceEvents = append(cr.ServiceEvents, txn.ServiceEvents...)
+
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: txn.ComputationUsed,
+		MemoryUsed:      txn.MemoryEstimate,
+	}
+	if txn.Err != nil {
+		txnResult.ErrorMessage = txn.Err.Error()
+	}
+
+	cr.TransactionResults = append(cr.TransactionResults, txnResult)
+
+	if txn.IsSampled() {
+		for computationKind, intensity := range txn.ComputationIntensities {
+			cr.ComputationIntensities[computationKind] += intensity
+		}
+	}
 }
 
-func (cr *ComputationResult) AddServiceEvents(inp []flow.Event) {
-	cr.ServiceEvents = append(cr.ServiceEvents, inp...)
-}
-
-// Update this
-func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
-	cr.TransactionResults = append(cr.TransactionResults, *inp)
-}
-
+// TODO(patrick): compute this in a loop in computer after cleaning up system
+// collection execution.
 func (cr *ComputationResult) UpdateTransactionResultIndex(txCounts int) {
 	lastIndex := 0
 	if len(cr.TransactionResultIndex) > 0 {
 		lastIndex = cr.TransactionResultIndex[len(cr.TransactionResultIndex)-1]
 	}
 	cr.TransactionResultIndex = append(cr.TransactionResultIndex, lastIndex+txCounts)
-}
-
-func (cr *ComputationResult) MergeComputationEffortVector(
-	computationIntensities meter.MeteredComputationIntensities) {
-	for computationKind, intensity := range computationIntensities {
-		cr.ComputationIntensities[computationKind] += intensity
-	}
 }
 
 func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
