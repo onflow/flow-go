@@ -84,7 +84,6 @@ func (o *testOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error 
 
 	err := o.orchestratorNetwork.SendEgress(event)
 	if err != nil {
-		// since this is used for testing, if we encounter any RPC send error, crash the testOrchestrator.
 		lg.Error().Err(err).Msg("could not pass through egress event")
 		return err
 	}
