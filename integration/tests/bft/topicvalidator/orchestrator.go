@@ -79,8 +79,8 @@ func (o *testOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error 
 		Str("channel", event.Channel.String()).
 		Str("protocol", event.Protocol.String()).
 		Uint32("target_num", event.TargetNum).
-		Str("target_ids", fmt.Sprintf("%v", event.TargetIds)).
-		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+		Strs("target_ids", logging.IDs(event.TargetIds)).
+		Str("flow_protocol_event", logging.Type(event.FlowProtocolEvent)).Logger()
 
 	err := o.orchestratorNetwork.SendEgress(event)
 	if err != nil {
