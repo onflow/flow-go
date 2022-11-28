@@ -393,6 +393,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
+		suite.snapshot.On("Head").Return(block1.Header, nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
