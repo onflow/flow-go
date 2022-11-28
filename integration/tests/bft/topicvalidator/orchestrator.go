@@ -102,7 +102,7 @@ func (o *testOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
 
-	// Track any events unauthorized events that are received by corrupted nodes.
+	// Track any unauthorized events that are received by corrupted nodes.
 	// These events are unauthorized combinations of messages & channels and should be
 	// dropped at the topic validator level.
 	if _, ok := o.unauthorizedEvents[event.FlowProtocolEventID]; ok {
@@ -119,7 +119,6 @@ func (o *testOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 	err := o.orchestratorNetwork.SendIngress(event)
 
 	if err != nil {
-		// since this is used for testing, if we encounter any RPC send error, crash the testOrchestrator.
 		lg.Error().Err(err).Msg("could not pass through ingress event")
 		return err
 	}
