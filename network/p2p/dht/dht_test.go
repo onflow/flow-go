@@ -6,7 +6,6 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log/v2"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -161,11 +160,10 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
-		ps, err := n.Subscribe(topic, topicValidator)
+		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)
-		s := p2pfixtures.MustBePubSubSubscription(t, ps)
 
-		go func(s *pubsub.Subscription, nodeID peer.ID) {
+		go func(s p2p.Subscription, nodeID peer.ID) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)

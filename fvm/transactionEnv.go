@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(patrick): remove once https://github.com/onflow/flow-emulator/pull/242
+// is integrated into flow-go's integration test.
 func NewTransactionEnvironment(
 	ctx Context,
 	txnState *state.TransactionState,

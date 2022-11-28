@@ -543,7 +543,7 @@ func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channe
 
 	err = n.attackerInboundStream.Send(msg)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not send message to attack orchestrator to observe")
+		lg.Error().Err(err).Msg("could not send message to attack orchestrator to observe")
 	}
 
 	lg.Info().Msg("ingress event successfully sent to attack orchestrator")

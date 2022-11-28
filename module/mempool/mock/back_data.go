@@ -124,22 +124,6 @@ func (_m *BackData) Has(entityID flow.Identifier) bool {
 	return r0
 }
 
-// Hash provides a mock function with given fields:
-func (_m *BackData) Hash() flow.Identifier {
-	ret := _m.Called()
-
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Identifiers provides a mock function with given fields:
 func (_m *BackData) Identifiers() flow.IdentifierList {
 	ret := _m.Called()

@@ -78,7 +78,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub p2p.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)
@@ -99,10 +99,10 @@ func TestFilterSubscribe(t *testing.T) {
 	}
 
 	// publish a message from node 1 and check that only node2 receives
-	testPublish(&wg, node1, p2pfixtures.MustBePubSubSubscription(t, sub2))
+	testPublish(&wg, node1, sub2)
 
 	// publish a message from node 2 and check that only node1 receives
-	testPublish(&wg, node2, p2pfixtures.MustBePubSubSubscription(t, sub1))
+	testPublish(&wg, node2, sub1)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timeout performing publish test")
 }

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -192,11 +191,11 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	require.NoError(t, err)
 
 	// access node group
-	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
+	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
 		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
-		accessNodeSubs[i] = p2pfixtures.MustBePubSubSubscription(t, sub)
 		require.NoError(t, err)
+		accessNodeSubs[i] = sub
 	}
 
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
@@ -214,7 +213,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// If honest peer scoring is enabled, then con1Node and con2Node are certainly in the same mesh, and hence the message is delivered.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, p2pfixtures.MustBePubSubSubscription(t, con2Sub))
+	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
 // maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and

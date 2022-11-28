@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+// GossipSubTopic is a wrapper around libp2p pubsub topics that implements the
+// PubSubTopic interface for the Flow network.
 type GossipSubTopic struct {
 	t *pubsub.Topic
 }

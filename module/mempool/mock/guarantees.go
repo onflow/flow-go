@@ -80,22 +80,6 @@ func (_m *Guarantees) Has(collID flow.Identifier) bool {
 	return r0
 }
 
-// Hash provides a mock function with given fields:
-func (_m *Guarantees) Hash() flow.Identifier {
-	ret := _m.Called()
-
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Remove provides a mock function with given fields: collID
 func (_m *Guarantees) Remove(collID flow.Identifier) bool {
 	ret := _m.Called(collID)
