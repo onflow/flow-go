@@ -27,7 +27,9 @@ const (
 	// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
 	DefaultRequestProviderWorkers = uint(5)
 
-	DefaultEntityRequestCacheSize = 1000
+	// DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
+	// This equates to ~5GB of memory usage with a full queue (10M*500)
+	DefaultEntityRequestCacheSize = 500
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
@@ -88,13 +90,7 @@ func New(
 			// Provider engine only expects EntityRequest.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				request, ok := message.Payload.(*messages.EntityRequest)
-				if ok {
-					log.Info().
-						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
-						Hex("origin_id", logging.ID(message.OriginID)).
-						Msg("entity request received")
-				}
+				_, ok := message.Payload.(*messages.EntityRequest)
 				return ok
 			},
 			// Map is called on messages that are Match(ed) successfully, i.e.,

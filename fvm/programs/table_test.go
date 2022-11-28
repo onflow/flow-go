@@ -10,12 +10,12 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func newEmptyTestBlock() *BlockDerivedData[string, *string] {
-	return NewEmptyBlockDerivedData[string, *string]()
+func newEmptyTestBlock() *DerivedDataTable[string, *string] {
+	return NewEmptyTable[string, *string]()
 }
 
-func TestBlockDerivedDataWithTransactionOffset(t *testing.T) {
-	block := NewEmptyBlockDerivedDataWithOffset[string, *string](18)
+func TestDerivedDataTableWithTransactionOffset(t *testing.T) {
+	block := NewEmptyTableWithOffset[string, *string](18)
 
 	require.Equal(
 		t,
@@ -26,50 +26,50 @@ func TestBlockDerivedDataWithTransactionOffset(t *testing.T) {
 func TestTxnDerivedDataNormalTransactionInvalidExecutionTimeBound(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	_, err := block.NewTransactionDerivedData(-1, -1)
+	_, err := block.NewTableTransaction(-1, -1)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewTransactionDerivedData(0, 0)
+	_, err = block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewTransactionDerivedData(0, EndOfBlockExecutionTime)
+	_, err = block.NewTableTransaction(0, EndOfBlockExecutionTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewTransactionDerivedData(0, EndOfBlockExecutionTime-1)
+	_, err = block.NewTableTransaction(0, EndOfBlockExecutionTime-1)
 	require.NoError(t, err)
 }
 
 func TestTxnDerivedDataNormalTransactionInvalidSnapshotTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	_, err := block.NewTransactionDerivedData(10, 0)
+	_, err := block.NewTableTransaction(10, 0)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewTransactionDerivedData(10, 10)
+	_, err = block.NewTableTransaction(10, 10)
 	require.NoError(t, err)
 
-	_, err = block.NewTransactionDerivedData(999, 998)
+	_, err = block.NewTableTransaction(999, 998)
 	require.ErrorContains(t, err, "snapshot > execution")
 
-	_, err = block.NewTransactionDerivedData(999, 999)
+	_, err = block.NewTableTransaction(999, 999)
 	require.NoError(t, err)
 }
 
 func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	_, err := block.NewSnapshotReadTransactionDerivedData(
+	_, err := block.NewSnapshotReadTableTransaction(
 		ParentBlockTime,
 		ParentBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadTransactionDerivedData(ParentBlockTime, 0)
+	_, err = block.NewSnapshotReadTableTransaction(ParentBlockTime, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewSnapshotReadTransactionDerivedData(0, ChildBlockTime)
+	_, err = block.NewSnapshotReadTableTransaction(0, ChildBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadTransactionDerivedData(
+	_, err = block.NewSnapshotReadTableTransaction(
 		0,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
@@ -78,10 +78,10 @@ func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testi
 func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewTransactionDerivedData(0, 0)
+	testTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 1)
+	testSetupTxn, err := block.NewTableTransaction(0, 1)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -98,13 +98,13 @@ func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
 func TestTxnDerivedDataValidateRejectNonIncreasingExecutionTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionDerivedData(0, 0)
+	testTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -116,7 +116,7 @@ func TestTxnDerivedDataValidateRejectCommitGapForNormalTxn(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -124,7 +124,7 @@ func TestTxnDerivedDataValidateRejectCommitGapForNormalTxn(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewTransactionDerivedData(10, 10)
+	testTxn, err := block.NewTableTransaction(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -136,7 +136,7 @@ func TestTxnDerivedDataValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -144,7 +144,7 @@ func TestTxnDerivedDataValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadTransactionDerivedData(10, 10)
+	testTxn, err := block.NewSnapshotReadTableTransaction(10, 10)
 	require.NoError(t, err)
 
 	validateErr := testTxn.Validate()
@@ -155,13 +155,13 @@ func TestTxnDerivedDataValidateRejectCommitGapForSnapshotRead(t *testing.T) {
 func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn1, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn1, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewTransactionDerivedData(0, 1)
+	testSetupTxn2, err := block.NewTableTransaction(0, 1)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionDerivedData(0, 2)
+	testTxn, err := block.NewTableTransaction(0, 2)
 	require.NoError(t, err)
 
 	key := "abc"
@@ -200,7 +200,7 @@ func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
 func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -210,7 +210,7 @@ func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewTransactionDerivedData(0, 1)
+	testTxn, err := block.NewTableTransaction(0, 1)
 	require.NoError(t, err)
 
 	value := "value"
@@ -224,7 +224,7 @@ func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
 func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -233,7 +233,7 @@ func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T)
 
 	require.Equal(t, 1, len(block.InvalidatorsForTestingOnly()))
 
-	testTxn, err := block.NewTransactionDerivedData(1, 1)
+	testTxn, err := block.NewTableTransaction(1, 1)
 	require.NoError(t, err)
 
 	value := "value"
@@ -247,7 +247,7 @@ func TestTxnDerivedDataCommitEndOfBlockSnapshotRead(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -255,7 +255,7 @@ func TestTxnDerivedDataCommitEndOfBlockSnapshotRead(t *testing.T) {
 
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxn, err := block.NewSnapshotReadTransactionDerivedData(
+	testTxn, err := block.NewSnapshotReadTableTransaction(
 		EndOfBlockExecutionTime,
 		EndOfBlockExecutionTime)
 	require.NoError(t, err)
@@ -270,7 +270,7 @@ func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(71)
-	testSetupTxn, err := block.NewTransactionDerivedData(0, commitTime)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
@@ -278,7 +278,7 @@ func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 
 	repeatedTime := commitTime + 1
 	for i := 0; i < 10; i++ {
-		txn, err := block.NewSnapshotReadTransactionDerivedData(0, repeatedTime)
+		txn, err := block.NewSnapshotReadTableTransaction(0, repeatedTime)
 		require.NoError(t, err)
 
 		err = txn.Commit()
@@ -294,7 +294,7 @@ func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 func TestTxnDerivedDataCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewTransactionDerivedData(0, 0)
+	testTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	key := "234"
@@ -343,7 +343,7 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) 
 	block := newEmptyTestBlock()
 
 	testTxnTime := LogicalTime(47)
-	testTxn, err := block.NewTransactionDerivedData(0, testTxnTime)
+	testTxn, err := block.NewTableTransaction(0, testTxnTime)
 	require.NoError(t, err)
 
 	key := "999"
@@ -380,10 +380,10 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) 
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[string, *string]{
+		chainedTableInvalidators[string, *string]{
 			{
-				DerivedDataInvalidator: invalidator,
-				executionTime:          testTxnTime,
+				TableInvalidator: invalidator,
+				executionTime:    testTxnTime,
 			},
 		},
 		block.InvalidatorsForTestingOnly())
@@ -394,10 +394,10 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) 
 func TestTxnDerivedDataCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 11)
+	testSetupTxn, err := block.NewTableTransaction(0, 11)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionDerivedData(10, 12)
+	testTxn, err := block.NewTableTransaction(10, 12)
 	require.NoError(t, err)
 
 	key := "17"
@@ -442,10 +442,10 @@ func TestTxnDerivedDataCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.
 func TestTxnDerivedDataCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionDerivedData(0, 1)
+	testTxn, err := block.NewTableTransaction(0, 1)
 	require.NoError(t, err)
 
 	key1 := "key1"
@@ -514,14 +514,14 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn1Time := LogicalTime(2)
-	testSetupTxn1, err := block.NewTransactionDerivedData(0, testSetupTxn1Time)
+	testSetupTxn1, err := block.NewTableTransaction(0, testSetupTxn1Time)
 	require.NoError(t, err)
 
-	testSetupTxn2, err := block.NewTransactionDerivedData(0, 4)
+	testSetupTxn2, err := block.NewTableTransaction(0, 4)
 	require.NoError(t, err)
 
 	testTxnTime := LogicalTime(6)
-	testTxn, err := block.NewTransactionDerivedData(0, testTxnTime)
+	testTxn, err := block.NewTableTransaction(0, testTxnTime)
 	require.NoError(t, err)
 
 	testSetupTxn1Invalidator := testInvalidator{
@@ -579,14 +579,14 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[string, *string]{
+		chainedTableInvalidators[string, *string]{
 			{
-				DerivedDataInvalidator: testSetupTxn1Invalidator,
-				executionTime:          testSetupTxn1Time,
+				TableInvalidator: testSetupTxn1Invalidator,
+				executionTime:    testSetupTxn1Time,
 			},
 			{
-				DerivedDataInvalidator: testTxnInvalidator,
-				executionTime:          testTxnTime,
+				TableInvalidator: testTxnInvalidator,
+				executionTime:    testTxnTime,
 			},
 		},
 		block.InvalidatorsForTestingOnly())
@@ -597,13 +597,13 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 func TestTxnDerivedDataCommitValidateError(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 10)
+	testSetupTxn, err := block.NewTableTransaction(0, 10)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewTransactionDerivedData(10, 10)
+	testTxn, err := block.NewTableTransaction(10, 10)
 	require.NoError(t, err)
 
 	commitErr := testTxn.Commit()
@@ -615,13 +615,13 @@ func TestTxnDerivedDataCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) 
 	block := newEmptyTestBlock()
 
 	expectedTime := LogicalTime(10)
-	testSetupTxn, err := block.NewTransactionDerivedData(0, expectedTime)
+	testSetupTxn, err := block.NewTableTransaction(0, expectedTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	testTxn, err := block.NewSnapshotReadTransactionDerivedData(0, 11)
+	testTxn, err := block.NewSnapshotReadTableTransaction(0, 11)
 	require.NoError(t, err)
 
 	err = testTxn.Commit()
@@ -636,7 +636,7 @@ func TestTxnDerivedDataCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) 
 func TestTxnDerivedDataCommitBadSnapshotReadInvalidator(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewSnapshotReadTransactionDerivedData(0, 42)
+	testTxn, err := block.NewSnapshotReadTableTransaction(0, 42)
 	require.NoError(t, err)
 
 	testTxn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -651,7 +651,7 @@ func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
 
 	// Setup the database with two read entries
 
-	testSetupTxn, err := block.NewTransactionDerivedData(0, 0)
+	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	readKey1 := "read-key-1"
@@ -674,7 +674,7 @@ func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
 	// two new ones,
 
 	testTxnTime := LogicalTime(15)
-	testTxn, err := block.NewTransactionDerivedData(1, testTxnTime)
+	testTxn, err := block.NewTableTransaction(1, testTxnTime)
 	require.NoError(t, err)
 
 	actualValue, actualState, ok := testTxn.Get(readKey1)
@@ -724,14 +724,14 @@ func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		chainedDerivedDataInvalidators[string, *string]{
+		chainedTableInvalidators[string, *string]{
 			{
-				DerivedDataInvalidator: invalidator1,
-				executionTime:          testTxnTime,
+				TableInvalidator: invalidator1,
+				executionTime:    testTxnTime,
 			},
 			{
-				DerivedDataInvalidator: invalidator2,
-				executionTime:          testTxnTime,
+				TableInvalidator: invalidator2,
+				executionTime:    testTxnTime,
 			},
 		},
 		block.InvalidatorsForTestingOnly())
@@ -752,7 +752,7 @@ func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
 	require.Same(t, writeState2, entry.State)
 }
 
-func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
+func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 	parentBlock := newEmptyTestBlock()
 
 	require.Equal(
@@ -762,7 +762,7 @@ func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
 	require.Equal(t, 0, len(parentBlock.InvalidatorsForTestingOnly()))
 	require.Equal(t, 0, len(parentBlock.EntriesForTestingOnly()))
 
-	txn, err := parentBlock.NewTransactionDerivedData(0, 0)
+	txn, err := parentBlock.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
 	txn.AddInvalidator(testInvalidator{invalidateAll: true})
@@ -770,7 +770,7 @@ func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	txn, err = parentBlock.NewTransactionDerivedData(1, 1)
+	txn, err = parentBlock.NewTableTransaction(1, 1)
 	require.NoError(t, err)
 
 	key := "foo bar"
@@ -803,7 +803,7 @@ func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
 
 	// Verify child is correctly initialized
 
-	childBlock := parentBlock.NewChildBlockDerivedData()
+	childBlock := parentBlock.NewChildTable()
 
 	require.Equal(
 		t,
@@ -824,49 +824,47 @@ func TestBlockDerivedDataNewChildDerivedBlockData(t *testing.T) {
 	require.NotSame(t, parentEntry, childEntry)
 }
 
-func TestTxnDerivedDataGetOrCompute(t *testing.T) {
-	blockDerivedData := NewEmptyBlockDerivedData[string, int]()
+type testValueComputer struct {
+	value  int
+	called bool
+}
 
-	derivedKey := "derivedKey"
-	derivedValue := 12345
-	addr := "addr"
+func (computer *testValueComputer) Compute(
+	txnState *state.TransactionState,
+	key string,
+) (
+	int,
+	error,
+) {
+	computer.called = true
+	_, err := txnState.Get("addr", key, true)
+	if err != nil {
+		return 0, err
+	}
+
+	return computer.value, nil
+}
+
+func TestTxnDerivedDataGetOrCompute(t *testing.T) {
+	blockDerivedData := NewEmptyTable[string, int]()
+
 	key := "key"
+	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
 		view := utils.NewSimpleView()
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
-		calledValFunc := false
-		valFunc := func(
-			txnState *state.TransactionState,
-			_ string,
-		) (
-			int,
-			error,
-		) {
-			calledValFunc = true
-			_, err := txnState.Get(addr, key, true)
-			if err != nil {
-				return 0, err
-			}
-
-			return derivedValue, nil
-		}
-
-		txnDerivedData, err := blockDerivedData.NewTransactionDerivedData(0, 0)
+		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
 		assert.Nil(t, err)
 
-		val, err := txnDerivedData.GetOrCompute(
-			txnState,
-			derivedKey,
-			valFunc)
+		computer := &testValueComputer{value: value}
+		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
 		assert.Nil(t, err)
-		assert.Equal(t, derivedValue, val)
-		assert.True(t, calledValFunc)
+		assert.Equal(t, value, val)
+		assert.True(t, computer.called)
 
-		assert.True(
-			t,
-			view.Ledger.RegisterTouches[utils.FullKey(addr, key)])
+		assert.True(t, view.Ledger.RegisterTouches[utils.FullKey("addr", key)])
 
 		// Commit to setup the next test.
 		err = txnDerivedData.Commit()
@@ -877,36 +875,15 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 		view := utils.NewSimpleView()
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
-		calledValFunc := false
-		valFunc := func(
-			txnState *state.TransactionState,
-			_ string,
-		) (
-			int,
-			error,
-		) {
-			calledValFunc = true
-			_, err := txnState.Get(addr, key, true)
-			if err != nil {
-				return 0, err
-			}
-
-			return derivedValue, nil
-		}
-
-		txnDerivedData, err := blockDerivedData.NewTransactionDerivedData(1, 1)
+		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
 		assert.Nil(t, err)
 
-		val, err := txnDerivedData.GetOrCompute(
-			txnState,
-			derivedKey,
-			valFunc)
+		computer := &testValueComputer{value: value}
+		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
 		assert.Nil(t, err)
-		assert.Equal(t, derivedValue, val)
-		assert.False(t, calledValFunc)
+		assert.Equal(t, value, val)
+		assert.False(t, computer.called)
 
-		assert.True(
-			t,
-			view.Ledger.RegisterTouches[utils.FullKey(addr, key)])
+		assert.True(t, view.Ledger.RegisterTouches[utils.FullKey("addr", key)])
 	})
 }

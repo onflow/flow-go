@@ -15,7 +15,6 @@ import (
 	programsCache "github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -79,9 +78,7 @@ type transactionExecutor struct {
 	TransactionSequenceNumberChecker
 	TransactionStorageLimiter
 
-	tracer module.Tracer
-	logger zerolog.Logger
-
+	ctx            Context
 	proc           *TransactionProcedure
 	txnState       *state.TransactionState
 	derivedTxnData *programsCache.DerivedTransactionData
@@ -108,18 +105,19 @@ func newTransactionExecutor(
 		trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	env := NewTransactionEnvironment(
-		ctx,
+	ctx.RootSpan = span
+	ctx.TxIndex = proc.TxIndex
+	ctx.TxId = proc.Transaction.ID()
+	ctx.TxBody = proc.Transaction
+
+	env := environment.NewTransactionEnvironment(
+		ctx.EnvironmentParams,
 		txnState,
-		derivedTxnData,
-		proc.Transaction,
-		proc.TxIndex,
-		span)
+		derivedTxnData)
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
-		tracer:                    ctx.Tracer,
-		logger:                    ctx.Logger,
+		ctx:                       ctx,
 		proc:                      proc,
 		txnState:                  txnState,
 		derivedTxnData:            derivedTxnData,
@@ -145,7 +143,8 @@ func (executor *transactionExecutor) Execute() error {
 	txErr, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
 		// log the full error path
-		executor.logger.Err(err).Msg("fatal error when execution a transaction")
+		executor.ctx.Logger.Err(err).
+			Msg("fatal error when executing a transaction")
 		return failure
 	}
 
@@ -159,7 +158,7 @@ func (executor *transactionExecutor) Execute() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.tracer,
+			executor.ctx.Tracer,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -170,7 +169,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.tracer,
+			executor.ctx.Tracer,
 			executor.proc,
 			executor.txnState)
 		if err != nil {
@@ -189,8 +188,18 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState,
+		executor.derivedTxnData)
+	if err != nil {
+		return fmt.Errorf("error gettng meter parameters: %w", err)
+	}
+
 	var beginErr error
-	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransaction()
+	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
 	if beginErr != nil {
 		return beginErr
 	}

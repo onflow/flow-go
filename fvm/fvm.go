@@ -3,11 +3,12 @@ package fvm
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -109,26 +110,12 @@ func (vm *VirtualMachine) Run(
 		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
-	// TODO(patrick): move this into transaction executor (and maybe also script
-	// executor)
-	meterParams, err := getMeterParameters(ctx, proc, v, derivedTxnData)
-	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
-	}
-
-	interactionLimit := ctx.MaxStateInteractionSize
-	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		interactionLimit = math.MaxUint64
-	}
-
 	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
-			WithMeterParameters(meterParams).
+			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(interactionLimit),
-	)
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
 	err = proc.Run(ctx, txnState, derivedTxnData)
 	if err != nil {
@@ -161,8 +148,9 @@ func (vm *VirtualMachine) GetAccount(
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
-	)
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
@@ -178,7 +166,11 @@ func (vm *VirtualMachine) GetAccount(
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, derviedTxnData)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
