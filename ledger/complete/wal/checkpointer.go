@@ -86,16 +86,14 @@ type Checkpointer struct {
 	wal            *DiskWAL
 	keyByteSize    int
 	forestCapacity int
-	outputVersion  uint16 // the output checkpoint version, only support VersionV5 or VersionV6
 }
 
-func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int, outputVersion uint16) *Checkpointer {
+func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
 		keyByteSize:    keyByteSize,
 		forestCapacity: forestCapacity,
-		outputVersion:  outputVersion,
 	}
 }
 
@@ -248,7 +246,8 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
 	fileName := NumberToFilename(to)
-	err = StoreCheckpointByVersion(c.outputVersion, tries, c.wal.dir, fileName, &c.wal.log)
+
+	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, &c.wal.log)
 
 	if err != nil {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
@@ -276,10 +275,6 @@ func (c *Checkpointer) Dir() string {
 	return c.dir
 }
 
-func (c *Checkpointer) OutputVersion() uint16 {
-	return c.outputVersion
-}
-
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
 func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 
@@ -301,18 +296,6 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 		targetName: fullname,
 		Writer:     writer,
 	}, nil
-}
-
-func StoreCheckpointByVersion(outputVersion uint16, tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
-	switch outputVersion {
-	case VersionV5:
-		return StoreCheckpointV5(dir, fileName, logger, tries...)
-	case VersionV6:
-		// during normal operation,  single thread is used in order to minimize the memory footprint,
-		return StoreCheckpointV6SingleThread(tries, dir, fileName, logger)
-	default:
-		return fmt.Errorf("only support output checkpoint version VersionV5 and VersionV6, but got :%v", outputVersion)
-	}
 }
 
 // StoreCheckpointV5 writes the given tries to checkpoint file, and also appends

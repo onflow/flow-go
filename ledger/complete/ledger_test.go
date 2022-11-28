@@ -706,7 +706,7 @@ func TestLedgerFunctionality(t *testing.T) {
 }
 
 func Test_ExportCheckpointAt(t *testing.T) {
-	for _, version := range []int{5, 6} {
+	for _, version := range []int{6} {
 		t.Run(fmt.Sprintf("noop migration version %v", version), func(t *testing.T) {
 			// the exported state has two key/value pairs
 			// (/1/1/22/2, "A") and (/1/3/22/4, "B")
@@ -737,7 +737,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 					state, _, err = led.Set(u)
 					require.NoError(t, err)
 
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
+					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 					require.NoError(t, err)
 					assert.Equal(t, newState, state)
 
@@ -795,7 +795,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 					state, _, err = led.Set(u)
 					require.NoError(t, err)
 
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
+					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 					require.NoError(t, err)
 
 					diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -851,7 +851,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 					state, _, err = led.Set(u)
 					require.NoError(t, err)
 
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
+					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 					require.NoError(t, err)
 
 					diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
