@@ -39,7 +39,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -673,9 +672,6 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
-
-	// Assume SetFulfilledHeight succeeds unless otherwise indicadted in a test requriement
-	trackerStorage.On("SetFulfilledHeight", mock.Anything).Return(nil)
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
