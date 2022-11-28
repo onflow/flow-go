@@ -19,11 +19,11 @@ func main() {
 	}
 
 	if err := builder.Initialize(); err != nil {
-		builder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		builder.Logger.Fatal().Err(err).Send()
 	}
 
 	if err := corruptedBuilder.Initialize(); err != nil {
-		builder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		builder.Logger.Fatal().Err(err).Send()
 	}
 
 	node, err := builder.Build()

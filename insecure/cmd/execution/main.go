@@ -14,14 +14,14 @@ func main() {
 	corruptedBuilder.LoadCorruptFlags()
 
 	if err := corruptedBuilder.Initialize(); err != nil {
-		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedExecutionBuilder.Logger.Fatal().Err(err).Send()
 	}
 
 	corruptedExecutionBuilder.LoadComponentsAndModules()
 
 	node, err := corruptedExecutionBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedExecutionBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
