@@ -347,7 +347,7 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 	// 	return fmt.Errorf("error finishing writer: %w", err)
 	// }
 
-	path = "/tmp/flow-testing-temp-1978265851/"
+	path = "/tmp/flow-temp-data3172611116/"
 	var err error
 	// get all files in a path
 	var files []string
