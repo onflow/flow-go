@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"math/rand"
 	"path/filepath"
 	"sort"
 
@@ -297,57 +296,58 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 
 func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uint64, keySize, minValueSize, maxValueSize int) error {
 
-	// in the future for exports we need to iterate over keys in sorted order
-	// (which means it would be the hash of the key)
+	// // in the future for exports we need to iterate over keys in sorted order
+	// // (which means it would be the hash of the key)
 
-	// Options passed to SstFileWriter will be used to figure out the table type, compression options, etc that will be used to create the SST file.
-	// The Comparator that is passed to the SstFileWriter must be exactly the same as the Comparator used in the DB that this file will be ingested into.
-	// Rows must be inserted in a strictly increasing order.
-	// files would be somthing like /home/usr/file1.sst
-	writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
-	defer writer.Destroy()
+	// // Options passed to SstFileWriter will be used to figure out the table type, compression options, etc that will be used to create the SST file.
+	// // The Comparator that is passed to the SstFileWriter must be exactly the same as the Comparator used in the DB that this file will be ingested into.
+	// // Rows must be inserted in a strictly increasing order.
+	// // files would be somthing like /home/usr/file1.sst
+	// writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
+	// defer writer.Destroy()
 
-	err := writer.Open(path + "/input.sst")
-	if err != nil {
-		return fmt.Errorf("error opening the path for sst writer: %w", err)
-	}
+	// err := writer.Open(path + "/input.sst")
+	// if err != nil {
+	// 	return fmt.Errorf("error opening the path for sst writer: %w", err)
+	// }
 
-	// special key to be fetched later to evaulate latency
-	key := []byte("random key")
-	value := []byte("some random value")
-	err = writer.Add(key, value)
-	if err != nil {
-		return fmt.Errorf("error writing data: %w", err)
-	}
+	// // special key to be fetched later to evaulate latency
+	// key := []byte("random key")
+	// value := []byte("some random value")
+	// err = writer.Add(key, value)
+	// if err != nil {
+	// 	return fmt.Errorf("error writing data: %w", err)
+	// }
 
-	for i := uint64(0); i < numberOfKeys; i++ {
-		// the first 8 bytes of the key would be the big endian encoding of i
-		// the rest would be populated randomly
-		// so keys would always be strictly increasing in order
-		key := make([]byte, 8)
-		binary.BigEndian.PutUint64(key, i)
-		randomBytes := make([]byte, keySize-8)
-		rand.Read(randomBytes)
-		key = append(key, randomBytes...)
+	// for i := uint64(0); i < numberOfKeys; i++ {
+	// 	// the first 8 bytes of the key would be the big endian encoding of i
+	// 	// the rest would be populated randomly
+	// 	// so keys would always be strictly increasing in order
+	// 	key := make([]byte, 8)
+	// 	binary.BigEndian.PutUint64(key, i)
+	// 	randomBytes := make([]byte, keySize-8)
+	// 	rand.Read(randomBytes)
+	// 	key = append(key, randomBytes...)
 
-		// decide on the value byte size
-		var byteSize = maxValueSize
-		if minValueSize < maxValueSize {
-			byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
-		}
-		// randomly fill in the value
-		value := make([]byte, byteSize)
-		rand.Read(value)
-		err = writer.Add(key, value)
-		if err != nil {
-			return fmt.Errorf("error writing data: %w", err)
-		}
-	}
-	err = writer.Finish()
-	if err != nil {
-		return fmt.Errorf("error finishing writer: %w", err)
-	}
+	// 	// decide on the value byte size
+	// 	var byteSize = maxValueSize
+	// 	if minValueSize < maxValueSize {
+	// 		byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
+	// 	}
+	// 	// randomly fill in the value
+	// 	value := make([]byte, byteSize)
+	// 	rand.Read(value)
+	// 	err = writer.Add(key, value)
+	// 	if err != nil {
+	// 		return fmt.Errorf("error writing data: %w", err)
+	// 	}
+	// }
+	// err = writer.Finish()
+	// if err != nil {
+	// 	return fmt.Errorf("error finishing writer: %w", err)
+	// }
 
+	var err error
 	// get all files in a path
 	var files []string
 	filepath.WalkDir(path, func(s string, d fs.DirEntry, e error) error {
