@@ -565,7 +565,7 @@ func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templat
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithID(info.NodeID),
 	}
 
@@ -703,6 +703,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// assert at least 20 blocks have been finalized since the node replacement
+	// TODO - this is checking finalization not sealing (?)
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 }
 

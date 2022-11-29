@@ -214,8 +214,8 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
 		// requesting resources for blocks below the expiry.
 		// TODO need a solution for this - testing to see if it fixes test first
-		//firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
 		if err != nil {
 			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 		}
@@ -710,6 +710,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		return
 	}
 
+	// TODO remove - debug logging
 	{
 		header, err := e.state.Params().Root()
 		if err != nil {
@@ -736,6 +737,10 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	finalizedHeight := finalBlk.Height
 	e.log.Warn().Msgf("finalized height: %d, last full height: %d", finalBlk.Height, lastFullHeight)
 
+	if finalizedHeight <= lastFullHeight {
+		return
+	}
+
 	// track number of incomplete blocks
 	incompleteBlksCnt := 0
 
@@ -746,10 +751,10 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	var allMissingColls []*flow.CollectionGuarantee
 
 	// start from the next block till we either hit the finalized block or cross the max collection missing threshold
-	for i := lastFullHeight + 1; i <= finalizedHeight && incompleteBlksCnt < defaultMissingCollsForBlkThreshold; i++ {
+	for height := lastFullHeight + 1; height <= finalizedHeight && incompleteBlksCnt < defaultMissingCollsForBlkThreshold; height++ {
 
-		// find missing collections for block at height i
-		missingColls, err := e.missingCollectionsAtHeight(i)
+		// find missing collections for block at height
+		missingColls, err := e.missingCollectionsAtHeight(height)
 		if err != nil {
 			logError(err)
 			return
@@ -769,7 +774,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 
 		// if there are no missing collections so far, advance the latestFullHeight pointer
 		if incompleteBlksCnt == 0 {
-			latestFullHeight = i
+			latestFullHeight = height
 		}
 	}
 
@@ -836,6 +841,9 @@ func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
 
 // requestCollectionsInFinalizedBlock registers collection requests with the requester engine
 func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee) {
+	if len(missingColls) == 0 {
+		return
+	}
 	e.log.Warn().Msgf("requesting %d missing collections in finalized blocks", len(missingColls))
 	for _, cg := range missingColls {
 		// TODO: move this query out of for loop?
