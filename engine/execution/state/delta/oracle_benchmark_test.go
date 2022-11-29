@@ -23,7 +23,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(10_000, b) } // 10_000
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(20_000, b) } // 10_000
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -166,6 +166,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 			// append the first 10 keys for future reads
 			keysToRead = append(keysToRead, keys[:10]...)
 
+			time.Sleep(250 * time.Millisecond)
 		}
 
 		fmt.Println(blockProductionIndex, oracle.BlocksInFlight())
