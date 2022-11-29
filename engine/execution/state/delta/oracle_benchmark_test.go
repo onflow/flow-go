@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linxGnu/grocksdb"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/montanaflynn/stats"
 	"github.com/stretchr/testify/require"
 
@@ -47,42 +47,44 @@ func benchmarkStorage(steps int, b *testing.B) {
 	unittest.RunWithTempDir(b, func(dir string) {
 		b.Logf("badger dir: %s", dir)
 
-		////// BadgerDB
-		// opts := badger.
-		// 	DefaultOptions(dir).
-		// 	WithKeepL0InMemory(true).
+		//// BadgerDB
+		opts := badger.
+			DefaultOptions(dir).
+			WithKeepL0InMemory(true).
 
-		// 	// the ValueLogFileSize option specifies how big the value of a
-		// 	// key-value pair is allowed to be saved into badger.
-		// 	// exceeding this limit, will fail with an error like this:
-		// 	// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// 	// Maximum value size is 10G, needed by execution node
-		// 	// TODO: finding a better max value for each node type
-		// 	WithValueLogFileSize(128 << 23).
-		// 	WithValueLogMaxEntries(100000) // Default is 1000000
+			// the ValueLogFileSize option specifies how big the value of a
+			// key-value pair is allowed to be saved into badger.
+			// exceeding this limit, will fail with an error like this:
+			// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+			// Maximum value size is 10G, needed by execution node
+			// TODO: finding a better max value for each node type
+			WithValueLogFileSize(128 << 23).
+			WithValueLogMaxEntries(100000) // Default is 1000000
 
-		// db, err := badger.Open(opts)
-		// require.NoError(b, err)
+		db, err := badger.Open(opts)
+		require.NoError(b, err)
 
-		// storage, err := delta.NewBadgerStore(db)
-		// require.NoError(b, err)
+		storage, err := delta.NewBadgerStore(db)
+		require.NoError(b, err)
+
+		storage.BootstrapWithRandomKeyValues(bootstrapSize, 32, 32, valueMaxByteSize)
 
 		////// RocksDB
-		bbto := grocksdb.NewDefaultBlockBasedTableOptions()
-		bbto.SetBlockCache(grocksdb.NewLRUCache(16 << 30))                          // TODO increase the cache size to higher than 3GB
-		bbto.SetFilterPolicy(grocksdb.NewBloomFilter(10))                           // TODO maybe increase number of bits for bloomfilter
-		bbto.SetDataBlockIndexType(grocksdb.KDataBlockIndexTypeBinarySearchAndHash) // test
+		// bbto := grocksdb.NewDefaultBlockBasedTableOptions()
+		// bbto.SetBlockCache(grocksdb.NewLRUCache(16 << 30)) // TODO increase the cache size to higher than 3GB
+		// // bbto.SetFilterPolicy(grocksdb.NewBloomFilter(10))                           // TODO maybe increase number of bits for bloomfilter
+		// bbto.SetDataBlockIndexType(grocksdb.KDataBlockIndexTypeBinarySearchAndHash) // test
 
-		opts := grocksdb.NewDefaultOptions()
-		opts.SetBlockBasedTableFactory(bbto)
-		opts.SetCreateIfMissing(true)
-		opts.SetMaxOpenFiles(8192)
-		// opts.SetCompression(grocksdb.NoCompression) // TODO: set no compression
+		// opts := grocksdb.NewDefaultOptions()
+		// opts.SetBlockBasedTableFactory(bbto)
+		// opts.SetCreateIfMissing(true)
+		// opts.SetMaxOpenFiles(8192)
+		// // opts.SetCompression(grocksdb.NoCompression) // TODO: set no compression
 
-		db, err := grocksdb.OpenDb(opts, dir)
+		// db, err := grocksdb.OpenDb(opts, dir)
 
-		storage, err := delta.NewRocksStore(db, opts)
-		require.NoError(b, err)
+		// storage, err := delta.NewRocksStore(db, opts)
+		// require.NoError(b, err)
 
 		// //// bootstrap with sst files
 		// // tempdir, err := os.MkdirTemp("", "flow-temp-data")
@@ -91,31 +93,12 @@ func benchmarkStorage(steps int, b *testing.B) {
 		// // err = storage.GenerateSSTFileWithRandomKeyValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
 		// // require.NoError(b, err)
 
-		tempdir := "/tmp/flow-temp-data3172611116/"
-
-		err = storage.BootstrapWithSSTFiles(tempdir)
-		require.NoError(b, err)
+		// tempdir := "/tmp/flow-temp-data3172611116/"
+		// err = storage.BootstrapWithSSTFiles(tempdir)
+		// require.NoError(b, err)
 
 		// // ////// Basic DB
 		// storage := delta.NewBasicStorage()
-
-		// batchSize := 1000
-		// steps := bootstrapSize / batchSize
-		// for i := 0; i < steps; i++ {
-		// 	owners := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
-		// 	keys := testutils.RandomValues(batchSize, keyPartMinByteSize, keyPartMaxByteSize)
-		// 	values := testutils.RandomValues(batchSize, 1, valueMaxByteSize)
-		// 	registers := make([]flow.RegisterEntry, batchSize)
-		// 	for i := 0; i < batchSize; i++ {
-		// 		registers[i] = flow.RegisterEntry{Key: flow.RegisterID{
-		// 			Owner: string(owners[i]),
-		// 			Key:   string(keys[i]),
-		// 		},
-		// 			Value: values[i]}
-		// 	}
-		// 	err = storage.Bootstrap(0, registers)
-		// 	require.NoError(b, err)
-		// }
 
 		oracle, err := delta.NewOracle(storage)
 		require.NoError(b, err)
@@ -195,12 +178,12 @@ func benchmarkStorage(steps int, b *testing.B) {
 			totalReadCount++
 		}
 
-		////// read special key
-		key := "random key"
-		start := time.Now()
-		_, _, err = storage.UnsafeRead(key)
-		fmt.Println(">>>>>", time.Since(start))
-		require.NoError(b, err)
+		// ////// read special key
+		// key := "random key"
+		// start := time.Now()
+		// _, _, err = storage.UnsafeRead(key)
+		// fmt.Println(">>>>>", time.Since(start))
+		// require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")

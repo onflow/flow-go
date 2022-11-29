@@ -173,6 +173,50 @@ func (s *BadgerStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEnt
 	return nil
 }
 
+func (s *BadgerStore) BootstrapWithRandomKeyValues(numberOfKeys, keySize, minValueSize, maxValueSize int) error {
+	batchSize := 1000
+	index := uint64(0)
+	for i := 0; i < numberOfKeys; i += batchSize {
+		err := s.db.Update(
+			func(tx *badger.Txn) error {
+				var err error
+				for j := 0; j < batchSize; j++ {
+					// the first 8 bytes of the key would be the big endian encoding of i
+					// the rest would be populated randomly
+					// so keys would always be strictly increasing in order
+					key := make([]byte, 8)
+					binary.BigEndian.PutUint64(key, index)
+					randomBytes := make([]byte, keySize-8)
+					rand.Read(randomBytes)
+					key = append(key, randomBytes...)
+
+					// decide on the value byte size
+					var byteSize = maxValueSize
+					if minValueSize < maxValueSize {
+						byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
+					}
+					// randomly fill in the value
+					value := make([]byte, byteSize)
+					rand.Read(value)
+
+					err = tx.Set(key, value)
+					if err != nil {
+						return fmt.Errorf("could not set data: %w", err)
+					}
+					index++
+				}
+
+				return nil
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 type RocksStore struct {
 	db  *grocksdb.DB
 	opt *grocksdb.Options
@@ -312,6 +356,7 @@ func (s *RocksStore) GenerateSSTFileWithRandomKeyValues(sstFilePath string, numb
 		return fmt.Errorf("error opening the path for sst writer: %w", err)
 	}
 
+	// TODO: fix this THIS is problematic as its the first value
 	// special key to be fetched later to evaulate latency
 	key := []byte("random key")
 	value := make([]byte, 1000)
