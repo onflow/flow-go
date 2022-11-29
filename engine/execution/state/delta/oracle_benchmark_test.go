@@ -76,6 +76,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		opts.SetBlockBasedTableFactory(bbto)
 		opts.SetCreateIfMissing(true)
 		opts.SetMaxOpenFiles(8192)
+		// opts.SetCompression(grocksdb.NoCompression) // TODO: set no compression
 
 		db, err := grocksdb.OpenDb(opts, dir)
 
@@ -167,7 +168,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 			// append the first 10 keys for future reads
 			keysToRead = append(keysToRead, keys[:10]...)
 
-			time.Sleep(250 * time.Millisecond)
+			// time.Sleep(250 * time.Millisecond)
 		}
 
 		fmt.Println(blockProductionIndex, oracle.BlocksInFlight())
