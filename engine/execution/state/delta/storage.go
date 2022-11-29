@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand"
 	"path/filepath"
 	"sort"
 
@@ -36,6 +37,22 @@ func NewBadgerStore(db *badger.DB) (*BadgerStore, error) {
 	store := &BadgerStore{db: db}
 	err := store.initHeight()
 	return store, err
+}
+
+func (s *BadgerStore) initHeight() error {
+	err := s.db.Update(
+		func(tx *badger.Txn) error {
+			var err error
+			buf := make([]byte, 8)
+			binary.BigEndian.PutUint64(buf, 0)
+			err = tx.Set(BadgerStoreHeightKey, buf)
+			if err != nil {
+				return fmt.Errorf("could not init height: %w", err)
+			}
+			return nil
+		},
+	)
+	return err
 }
 
 func (s *BadgerStore) GetRegister(key flow.RegisterID) (val flow.RegisterValue, found bool, err error) {
@@ -77,22 +94,6 @@ func (s *BadgerStore) BlockHeight() (height uint64, err error) {
 		},
 	)
 	return
-}
-
-func (s *BadgerStore) initHeight() error {
-	err := s.db.Update(
-		func(tx *badger.Txn) error {
-			var err error
-			buf := make([]byte, 8)
-			binary.BigEndian.PutUint64(buf, 0)
-			err = tx.Set(BadgerStoreHeightKey, buf)
-			if err != nil {
-				return fmt.Errorf("could not init height: %w", err)
-			}
-			return nil
-		},
-	)
-	return err
 }
 
 func (s *BadgerStore) CommitBlockDelta(blockHeight uint64, delta Delta) error {
@@ -294,66 +295,67 @@ func (s *RocksStore) Bootstrap(blockHeight uint64, registers []flow.RegisterEntr
 	return s.db.Write(s.wo, s.wb)
 }
 
-func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uint64, keySize, minValueSize, maxValueSize int) error {
+func (s *RocksStore) GenerateSSTFileWithRandomKeyValues(sstFilePath string, numberOfKeys uint64, keySize, minValueSize, maxValueSize int) error {
+	// in the future for exports we need to iterate over keys in sorted order
+	// (which means it would be the hash of the key)
 
-	// // in the future for exports we need to iterate over keys in sorted order
-	// // (which means it would be the hash of the key)
+	// Options passed to SstFileWriter will be used to figure out the table type, compression options, etc that will be used to create the SST file.
+	// The Comparator that is passed to the SstFileWriter must be exactly the same as the Comparator used in the DB that this file will be ingested into.
+	// Rows must be inserted in a strictly increasing order.
+	// files would be somthing like /home/usr/file1.sst
 
-	// // Options passed to SstFileWriter will be used to figure out the table type, compression options, etc that will be used to create the SST file.
-	// // The Comparator that is passed to the SstFileWriter must be exactly the same as the Comparator used in the DB that this file will be ingested into.
-	// // Rows must be inserted in a strictly increasing order.
-	// // files would be somthing like /home/usr/file1.sst
-	// writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
-	// defer writer.Destroy()
+	writer := grocksdb.NewSSTFileWriter(grocksdb.NewDefaultEnvOptions(), s.opt)
+	defer writer.Destroy()
 
-	// err := writer.Open(path + "/input.sst")
-	// if err != nil {
-	// 	return fmt.Errorf("error opening the path for sst writer: %w", err)
-	// }
+	err := writer.Open(sstFilePath + "/input.sst")
+	if err != nil {
+		return fmt.Errorf("error opening the path for sst writer: %w", err)
+	}
 
-	// // special key to be fetched later to evaulate latency
-	// key := []byte("random key")
-	// value := []byte("some random value")
-	// err = writer.Add(key, value)
-	// if err != nil {
-	// 	return fmt.Errorf("error writing data: %w", err)
-	// }
+	// special key to be fetched later to evaulate latency
+	key := []byte("random key")
+	value := []byte("some random value")
+	err = writer.Add(key, value)
+	if err != nil {
+		return fmt.Errorf("error writing data: %w", err)
+	}
 
-	// for i := uint64(0); i < numberOfKeys; i++ {
-	// 	// the first 8 bytes of the key would be the big endian encoding of i
-	// 	// the rest would be populated randomly
-	// 	// so keys would always be strictly increasing in order
-	// 	key := make([]byte, 8)
-	// 	binary.BigEndian.PutUint64(key, i)
-	// 	randomBytes := make([]byte, keySize-8)
-	// 	rand.Read(randomBytes)
-	// 	key = append(key, randomBytes...)
+	for i := uint64(0); i < numberOfKeys; i++ {
+		// the first 8 bytes of the key would be the big endian encoding of i
+		// the rest would be populated randomly
+		// so keys would always be strictly increasing in order
+		key := make([]byte, 8)
+		binary.BigEndian.PutUint64(key, i)
+		randomBytes := make([]byte, keySize-8)
+		rand.Read(randomBytes)
+		key = append(key, randomBytes...)
 
-	// 	// decide on the value byte size
-	// 	var byteSize = maxValueSize
-	// 	if minValueSize < maxValueSize {
-	// 		byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
-	// 	}
-	// 	// randomly fill in the value
-	// 	value := make([]byte, byteSize)
-	// 	rand.Read(value)
-	// 	err = writer.Add(key, value)
-	// 	if err != nil {
-	// 		return fmt.Errorf("error writing data: %w", err)
-	// 	}
-	// }
-	// err = writer.Finish()
-	// if err != nil {
-	// 	return fmt.Errorf("error finishing writer: %w", err)
-	// }
+		// decide on the value byte size
+		var byteSize = maxValueSize
+		if minValueSize < maxValueSize {
+			byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
+		}
+		// randomly fill in the value
+		value := make([]byte, byteSize)
+		rand.Read(value)
+		err = writer.Add(key, value)
+		if err != nil {
+			return fmt.Errorf("error writing data: %w", err)
+		}
+	}
+	err = writer.Finish()
+	if err != nil {
+		return fmt.Errorf("error finishing writer: %w", err)
+	}
+	return nil
+}
 
-	path = "/tmp/flow-temp-data3172611116/"
-	var err error
+func (s *RocksStore) BootstrapWithSSTFiles(path string) error {
 	// get all files in a path
 	var files []string
 	filepath.WalkDir(path, func(s string, d fs.DirEntry, e error) error {
 		if e != nil {
-			return fmt.Errorf("error walking temp directory: %w", err)
+			return fmt.Errorf("error walking temp directory: %w", e)
 		}
 		if filepath.Ext(d.Name()) == ".sst" {
 			files = append(files, s)
@@ -364,4 +366,20 @@ func (s *RocksStore) FastBootstrapWithRandomValues(path string, numberOfKeys uin
 	sort.Strings(files)
 	// ingest new files into the db
 	return s.db.IngestExternalFile(files, grocksdb.NewDefaultIngestExternalFileOptions())
+}
+
+type NoopStorage struct {
+}
+
+func (NoopStorage) GetRegister(key flow.RegisterID) (value flow.RegisterValue, exists bool, err error) {
+	return nil, false, nil
+}
+func (NoopStorage) CommitBlockDelta(blockHeight uint64, delta Delta) error {
+	return nil
+}
+func (NoopStorage) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
+	return nil
+}
+func (NoopStorage) BlockHeight() (uint64, error) {
+	return 0, nil
 }

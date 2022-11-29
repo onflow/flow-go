@@ -3,7 +3,6 @@ package delta_test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -23,7 +22,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(10000, b) } // 1_000_000
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(1000, b) } // 10000
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -46,6 +45,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 	unittest.RunWithTempDir(b, func(dir string) {
 		b.Logf("badger dir: %s", dir)
+
+		////// BadgerDB
 		// opts := badger.
 		// 	DefaultOptions(dir).
 		// 	WithKeepL0InMemory(true).
@@ -65,6 +66,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		// storage, err := delta.NewBadgerStore(db)
 		// require.NoError(b, err)
 
+		////// RocksDB
 		bbto := grocksdb.NewDefaultBlockBasedTableOptions()
 		bbto.SetBlockCache(grocksdb.NewLRUCache(3 << 30))
 
@@ -77,6 +79,21 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		storage, err := delta.NewRocksStore(db, opts)
 		require.NoError(b, err)
+
+		// //// bootstrap with sst files
+		// // tempdir, err := os.MkdirTemp("", "flow-temp-data")
+		// // require.NoError(b, err)
+
+		// // err = storage.GenerateSSTFileWithRandomKeyValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
+		// // require.NoError(b, err)
+
+		tempdir := "/tmp/flow-temp-data3172611116/"
+
+		err = storage.BootstrapWithSSTFiles(tempdir)
+		require.NoError(b, err)
+
+		// ////// Dummy DB
+		// storage := &delta.NoopStorage{}
 
 		// batchSize := 1000
 		// steps := bootstrapSize / batchSize
@@ -97,18 +114,14 @@ func benchmarkStorage(steps int, b *testing.B) {
 		// 	require.NoError(b, err)
 		// }
 
-		tempdir, err := os.MkdirTemp("", "flow-temp-data")
-		require.NoError(b, err)
-
-		err = storage.FastBootstrapWithRandomValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
-		require.NoError(b, err)
-
 		oracle, err := delta.NewOracle(storage)
 		require.NoError(b, err)
 
 		totalUpdateTimeNS := 0
 		totalReadTimeNS := 0
-		totalRegOperation := 0
+		totalUpdateCount := 0
+		totalReadCount := 0
+
 		maxReadTimeNS := 0
 
 		headers := []*flow.Header{
@@ -121,21 +134,17 @@ func benchmarkStorage(steps int, b *testing.B) {
 		keysToRead := make([]ledger.Key, 0)
 
 		for i := 0; i < steps; i++ {
-			if i%1000 == 0 {
-				b.Logf("progress: %d percent", i/steps*100)
-			}
 			// send seal info
-			if blockSealedIndex >= blockProductionIndex+sealLatency {
+			if blockProductionIndex >= blockSealedIndex+sealLatency {
 				h := headers[blockSealedIndex]
 				oracle.BlockIsSealed(h.ID(), h)
 				require.NoError(b, err)
-				require.Equal(b, oracle.BlocksInFlight(), sealLatency)
+				// require.Equal(b, sealLatency+1, oracle.BlocksInFlight())
 
 				blockSealedIndex++
 			}
 
 			// construct new block
-
 			parentHeader := headers[blockProductionIndex]
 			newHeader := unittest.BlockHeaderWithParentFixture(parentHeader)
 			headers = append(headers, newHeader)
@@ -147,47 +156,52 @@ func benchmarkStorage(steps int, b *testing.B) {
 			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
-			totalRegOperation += len(keys)
-			start := time.Now()
-
 			for i, key := range keys {
+				start := time.Now()
 				err := view.Set(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value), values[i])
+				elapsed := time.Since(start)
 				require.NoError(b, err)
+				totalUpdateTimeNS += int(elapsed.Nanoseconds())
+				totalUpdateCount++
 			}
-
-			elapsed := time.Since(start)
-			totalUpdateTimeNS += int(elapsed.Nanoseconds())
 
 			// append the first 10 keys for future reads
 			keysToRead = append(keysToRead, keys[:10]...)
 
-			// read values and compare values
-			for _, key := range keys {
-				start = time.Now()
-				v, err := view.Get(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value))
-				require.NoError(b, err)
-				require.True(b, len(v) > 0)
-				elapsed = time.Since(start)
-				elapsedns := int(elapsed.Nanoseconds())
-				if elapsedns > maxReadTimeNS {
-					maxReadTimeNS = elapsedns
-				}
-				totalReadTimeNS += elapsedns
-			}
 		}
 
-		// read special key
-		key := "random key"
-		start := time.Now()
-		_, _, err = storage.UnsafeRead(key)
-		fmt.Println(">>>>>", time.Since(start))
+		fmt.Println(blockProductionIndex, oracle.BlocksInFlight())
+		lastHeader := headers[blockProductionIndex]
+		newHeader := unittest.BlockHeaderWithParentFixture(lastHeader)
+		view, err := oracle.NewBlockView(newHeader.ID(), newHeader)
 		require.NoError(b, err)
 
+		// read values and compare values
+		for _, key := range keysToRead {
+			start := time.Now()
+			v, err := view.Get(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value))
+			elapsed := time.Since(start)
+			require.NoError(b, err)
+			require.True(b, len(v) > 0)
+			elapsedns := int(elapsed.Nanoseconds())
+			if elapsedns > maxReadTimeNS {
+				maxReadTimeNS = elapsedns
+			}
+			totalReadTimeNS += elapsedns
+			totalReadCount++
+		}
+		////// read special key
+		// key := "random key"
+		// start := time.Now()
+		// _, _, err = storage.UnsafeRead(key)
+		// fmt.Println(">>>>>", time.Since(start))
+		// require.NoError(b, err)
+
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
-		b.ReportMetric(float64(totalUpdateTimeNS/totalRegOperation), "update_time_per_reg_(ns)")
+		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")
 
 		b.ReportMetric(float64(totalReadTimeNS/steps), "read_time_(ns)")
-		b.ReportMetric(float64(totalReadTimeNS/totalRegOperation), "read_time_per_reg_(ns)")
+		b.ReportMetric(float64(totalReadTimeNS/totalReadCount), "read_time_per_reg_(ns)")
 		b.ReportMetric(float64(maxReadTimeNS), "max_read_time(ns)")
 
 	})
