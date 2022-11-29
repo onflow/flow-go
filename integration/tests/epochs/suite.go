@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -70,7 +71,7 @@ func (s *Suite) SetupTest() {
 
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -794,7 +795,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.assertEpochCounter(s.ctx, 1)
 
 	err = containerToReplace.Pause()
-	require.NoError(s.T(), err)
+	assert.NoError(s.T(), err) // AN test is failing here, pausing the og AN
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network
 	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)

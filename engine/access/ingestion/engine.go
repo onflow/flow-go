@@ -710,23 +710,6 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		return
 	}
 
-	// TODO remove - debug logging
-	{
-		header, err := e.state.Params().Root()
-		if err != nil {
-			logError(err)
-			return
-		}
-		lastFullHeight = header.Height
-
-		segment, err := e.state.AtBlockID(header.ID()).SealingSegment()
-		if err != nil {
-			logError(err)
-			return
-		}
-		e.log.Warn().Msgf("root height: %d, root segment [%d, %d]", header.Height, segment.Lowest().Header.Height, segment.Highest().Header.Height)
-	}
-
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
 
 	finalBlk, err := e.state.Final().Head()
