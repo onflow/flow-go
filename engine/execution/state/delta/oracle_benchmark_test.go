@@ -69,7 +69,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		////// RocksDB
 		bbto := grocksdb.NewDefaultBlockBasedTableOptions()
-		bbto.SetBlockCache(grocksdb.NewLRUCache(3 << 30))
+		bbto.SetBlockCache(grocksdb.NewLRUCache(3 << 30)) // TODO increase the cache size to higher than 3GB
+		bbto.SetFilterPolicy(grocksdb.NewBloomFilter(10)) // TODO maybe increase number of bits for bloomfilter
 
 		opts := grocksdb.NewDefaultOptions()
 		opts.SetBlockBasedTableFactory(bbto)
