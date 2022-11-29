@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -56,7 +57,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 

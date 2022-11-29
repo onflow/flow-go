@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -48,13 +49,13 @@ func New(
 func (b *backend) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block, error) {
 	header, err := b.getLatestHeader(isSealed)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
 	block, err := b.blocks.ByID(header.ID())
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -64,7 +65,7 @@ func (b *backend) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block,
 func (b *backend) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -74,7 +75,7 @@ func (b *backend) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Blo
 func (b *backend) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -84,7 +85,7 @@ func (b *backend) GetBlockByHeight(_ context.Context, height uint64) (*flow.Bloc
 func (b *backend) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, error) {
 	header, err := b.getLatestHeader(isSealed)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -94,7 +95,7 @@ func (b *backend) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.
 func (b *backend) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -104,7 +105,7 @@ func (b *backend) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*fl
 func (b *backend) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 

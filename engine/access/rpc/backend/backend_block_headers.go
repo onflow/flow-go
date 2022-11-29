@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -26,7 +27,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 	}
 
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -36,7 +37,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -46,7 +47,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Iden
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = storage.ConvertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 

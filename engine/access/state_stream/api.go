@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -39,17 +40,17 @@ func New(
 func (s *StateStreamBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 	header, err := s.headers.ByBlockID(blockID)
 	if err != nil {
-		return nil, storage.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	seal, err := s.seals.FinalizedSealForBlock(header.ID())
 	if err != nil {
-		return nil, storage.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	result, err := s.results.ByID(seal.ResultID)
 	if err != nil {
-		return nil, storage.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	blockExecData, err := s.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
