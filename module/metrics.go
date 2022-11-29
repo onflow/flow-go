@@ -80,12 +80,12 @@ type NetworkMetrics interface {
 
 type EngineMetrics interface {
 	// MessageSent reports that the engine transmitted the message over the network.
-	// Unicasts, broadcasts, and multicasts are all reported once. 
+	// Unicasts, broadcasts, and multicasts are all reported once.
 	MessageSent(engine string, message string)
 	// MessageReceived reports that the engine received the message over the network.
 	MessageReceived(engine string, message string)
-	// MessageHandled reports that the engine has finished processing the message. 
-	// Both invalid and valid messages should be reported. 
+	// MessageHandled reports that the engine has finished processing the message.
+	// Both invalid and valid messages should be reported.
 	// A message must be reported as either handled or dropped, not both.
 	MessageHandled(engine string, messages string)
 	// MessageDropped reports that the engine has dropped the message without processing it.
