@@ -476,7 +476,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if peer is currently rate limited before continuing to process stream.
 	if m.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) || m.unicastRateLimiters.BandWidthRateLimiter.IsRateLimited(remotePeer) {
-		log.Debug().
+		lg.Debug().
 			Bool(logging.KeySuspicious, true).
 			Msg("dropping unicast stream from rate limited peer")
 		return
