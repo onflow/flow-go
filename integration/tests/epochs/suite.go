@@ -32,9 +32,8 @@ const waitTimeout = 2 * time.Minute
 // nodeUpdateValidation func that will be used to validate the health of the network
 // after an identity table change during an epoch transition. This is used in
 // tandem with runTestEpochJoinAndLeave.
-//
-// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
-type nodeUpdateValidation func(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
+// NOTE: The snapshot must reference a block within the second epoch.
+type nodeUpdateValidation func(ctx context.Context, env templates.Environment, snapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
 
 // Suite encapsulates common functionality for epoch integration tests.
 type Suite struct {
@@ -642,17 +641,20 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
 }
 
-// assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
-// is greater than numOfBlocks.
-func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64) {
-	bootstrapHead, err := snapshot.Head()
+// awaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
+// sealed block height has exceeded the snapshot height by numOfBlocks
+// the snapshot height and latest finalized height is greater than numOfBlocks.
+func (s *Suite) awaitSealedBlockHeightExceedsSnapshot(ctx context.Context, snapshot *inmem.Snapshot, threshold uint64, waitFor, tick time.Duration) {
+	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
+	snapshotHeight := header.Height
 
-	header, err := s.client.GetLatestSealedBlockHeader(ctx)
-	require.NoError(s.T(), err)
-
-	// head should now be at-least numOfBlocks blocks higher from when we started
-	require.True(s.T(), header.Height-bootstrapHead.Height >= numOfBlocks, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+	require.Eventually(s.T(), func() bool {
+		latestSealed, err := s.client.GetLatestSealedBlockHeader(ctx)
+		require.NoError(s.T(), err)
+		s.TimedLogf("waiting for sealed block height: %d+%d < %d", snapshotHeight, threshold, latestSealed.Height)
+		return snapshotHeight+threshold < latestSealed.Height
+	}, waitFor, tick)
 }
 
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
@@ -679,7 +681,7 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 // 2. Check that the chain moved atleast 20 blocks from when the node was bootstrapped by comparing
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
-func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
+func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, info *StakedNodeOperationInfo) {
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
@@ -690,7 +692,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
 	s.client = client
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
+	s.awaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -698,15 +700,15 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 }
 
-// assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
+// assertNetworkHealthyAfterVNChange after a verification node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// assert at least 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// assert at least 10 blocks have been sealed since the node replacement
+	s.awaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
-// assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
+// assertNetworkHealthyAfterLNChange after a collection node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
 // is after the first epoch.
@@ -720,7 +722,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
 // the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
 // that will indicate overall network health
-// 1. Submit transaction to network
+// 1. Submit transaction to network and verify it is executed and sealed.
 func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we can assure that our SN node is participating in finalization and sealing because
 	// there are only 2 SN nodes in the network now we will submit a transaction to the
@@ -743,6 +745,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	var containerToReplace *testnet.Container
 
 	// replace access_2, avoid replacing access_1 the container used for client connections
+	// TODO - access_2 is ghost node - is this why we're failing here?
 	if role == flow.RoleAccess {
 		containerToReplace = s.net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
@@ -767,23 +770,23 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
-	// get latest snapshot and start new container
-	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
+	// get the latest snapshot and start new container with it
+	rootSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 	require.NoError(s.T(), err)
-	testContainer.WriteRootSnapshot(snapshot)
+	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.ctx)
 
-	header, err := snapshot.Head()
+	header, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
 
-	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
+	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
-	// wait for 5 views after the start of the next epoch before we pause our container to replace
-	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
-	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+5)
+	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
+	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+1)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+1)
+	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
@@ -795,13 +798,17 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
-	// wait for 5 views after pausing our container to replace before we assert healthy network
+	// retrieve a snapshot after observing that we have entered the second epoch
+	secondEpochSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
+	require.NoError(s.T(), err)
+
+	// wait some time after pausing our container to replace before we assert healthy network
 	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
 	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
 	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
-	checkNetworkHealth(s.ctx, env, snapshot, info)
+	checkNetworkHealth(s.ctx, env, secondEpochSnapshot, info)
 }
 
 // DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
