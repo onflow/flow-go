@@ -87,7 +87,8 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 		len(groups.Accounts), len(groups.NonAccountPayloads))
 
 	// migrate the payloads under accounts
-	migrated, paths, err := MigrateGroupSequentially(migrator, groups.Accounts, pathFinderVersion)
+	// migrated, paths, err := MigrateGroupSequentially(migrator, groups.Accounts, pathFinderVersion)
+	migrated, paths, err := MigrateGroupConcurrently(migrator, groups.Accounts, pathFinderVersion)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not migrate group: %w", err)
@@ -133,10 +134,11 @@ func MigrateGroupSequentially(
 		}
 
 		migrated = append(migrated, accountMigrated...)
-		migratedPaths, err = pathfinder.PathsFromPayloads(accountMigrated, pathFinderVersion)
+		paths, err := pathfinder.PathsFromPayloads(accountMigrated, pathFinderVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("can not find paths for migrated payload: %w", err)
 		}
+		migratedPaths = append(migratedPaths, paths...)
 		logAccount(i)
 		i++
 	}
@@ -144,11 +146,78 @@ func MigrateGroupSequentially(
 	return migrated, migratedPaths, nil
 }
 
+type jobMigrateAccountGroup struct {
+	Account  string
+	Payloads []ledger.Payload
+}
+
+type resultMigrating struct {
+	Migrated []ledger.Payload
+	Err      error
+}
+
 // MigrateGroupConcurrently migrate the payloads in the given payloadsByAccount map which
 // using the migrator
 // It's similar to MigrateGroupSequentially, except it will migrate different groups concurrently
-func MigrateGroupConcurrently(migrator AccountMigrator, payloadsByAccount map[string][]ledger.Payload) (
-	[]ledger.Payload, error) {
-	// logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
-	panic("TO IMPLEMENT")
+func MigrateGroupConcurrently(
+	migrator AccountMigrator,
+	payloadsByAccount map[string][]DecodedPayload,
+	pathFinderVersion uint8,
+) (
+	[]ledger.Payload, []ledger.Path, error) {
+	nWorker := 10
+
+	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
+	go func() {
+		for account, decoded := range payloadsByAccount {
+
+			payloads := make([]ledger.Payload, len(decoded))
+			for i, d := range decoded {
+				payloads[i] = d.Payload
+			}
+
+			jobs <- jobMigrateAccountGroup{
+				Account:  account,
+				Payloads: payloads,
+			}
+		}
+		close(jobs)
+	}()
+
+	resultCh := make(chan *resultMigrating)
+	for i := 0; i < int(nWorker); i++ {
+		go func() {
+			for job := range jobs {
+				accountMigrated, err := migrator(job.Account, job.Payloads)
+				resultCh <- &resultMigrating{
+					Migrated: accountMigrated,
+					Err:      err,
+				}
+			}
+		}()
+	}
+
+	// read job results
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+
+	i := 0
+	migrated := make([]ledger.Payload, 0)
+	migratedPaths := make([]ledger.Path, 0)
+	for result := range resultCh {
+		if result.Err != nil {
+			return nil, nil, fmt.Errorf("fail to migrate payload: %w", result.Err)
+		}
+
+		accountMigrated := result.Migrated
+		migrated = append(migrated, accountMigrated...)
+		var err error
+		paths, err := pathfinder.PathsFromPayloads(accountMigrated, pathFinderVersion)
+		if err != nil {
+			return nil, nil, fmt.Errorf("can not find paths for migrated payload: %w", err)
+		}
+		migratedPaths = append(migratedPaths, paths...)
+		logAccount(i)
+		i++
+	}
+	return migrated, migratedPaths, nil
 }
