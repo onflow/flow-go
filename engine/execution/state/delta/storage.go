@@ -314,7 +314,8 @@ func (s *RocksStore) GenerateSSTFileWithRandomKeyValues(sstFilePath string, numb
 
 	// special key to be fetched later to evaulate latency
 	key := []byte("random key")
-	value := []byte("some random value")
+	value := make([]byte, 1000)
+	rand.Read(value)
 	err = writer.Add(key, value)
 	if err != nil {
 		return fmt.Errorf("error writing data: %w", err)

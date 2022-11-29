@@ -192,11 +192,11 @@ func benchmarkStorage(steps int, b *testing.B) {
 		}
 
 		////// read special key
-		// key := "random key"
-		// start := time.Now()
-		// _, _, err = storage.UnsafeRead(key)
-		// fmt.Println(">>>>>", time.Since(start))
-		// require.NoError(b, err)
+		key := "random key"
+		start := time.Now()
+		_, _, err = storage.UnsafeRead(key)
+		fmt.Println(">>>>>", time.Since(start))
+		require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")
