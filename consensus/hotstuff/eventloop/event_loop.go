@@ -21,16 +21,17 @@ import (
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
-	log                 zerolog.Logger
-	eventHandler        hotstuff.EventHandler
-	metrics             module.HotstuffMetrics
-	proposals           chan *model.Proposal
-	partialTcCreated    chan *hotstuff.PartialTcCreated
-	newestSubmittedTc   *tracker.NewestTCTracker
-	newestSubmittedQc   *tracker.NewestQCTracker
-	tcSubmittedNotifier engine.Notifier
-	qcSubmittedNotifier engine.Notifier
-	startTime           time.Time
+	log                      zerolog.Logger
+	eventHandler             hotstuff.EventHandler
+	metrics                  module.HotstuffMetrics
+	proposals                chan *model.Proposal
+	newestSubmittedTc        *tracker.NewestTCTracker
+	newestSubmittedQc        *tracker.NewestQCTracker
+	newestSubmittedPartialTc *tracker.NewestPartialTcTracker
+	tcSubmittedNotifier      engine.Notifier
+	qcSubmittedNotifier      engine.Notifier
+	partialTcCreatedNotifier engine.Notifier
+	startTime                time.Time
 }
 
 var _ hotstuff.EventLoop = (*EventLoop)(nil)
@@ -45,22 +46,19 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 	// large number of blocks in short period of time(when catching up for instance).
 	// TODO(active-pacemaker) add metrics for length of inbound channels
 	proposals := make(chan *model.Proposal, 1000)
-	// we will use a buffered channel to avoid blocking of caller
-	// we will create at most one partial TC per view and only in recovery path
-	// since we don't expect a large number of messages we are using a buffered channel.
-	partialTcCreated := make(chan *hotstuff.PartialTcCreated, 10)
 
 	el := &EventLoop{
-		log:                 log,
-		eventHandler:        eventHandler,
-		metrics:             metrics,
-		proposals:           proposals,
-		tcSubmittedNotifier: engine.NewNotifier(),
-		qcSubmittedNotifier: engine.NewNotifier(),
-		newestSubmittedTc:   tracker.NewNewestTCTracker(),
-		newestSubmittedQc:   tracker.NewNewestQCTracker(),
-		partialTcCreated:    partialTcCreated,
-		startTime:           startTime,
+		log:                      log,
+		eventHandler:             eventHandler,
+		metrics:                  metrics,
+		proposals:                proposals,
+		tcSubmittedNotifier:      engine.NewNotifier(),
+		qcSubmittedNotifier:      engine.NewNotifier(),
+		partialTcCreatedNotifier: engine.NewNotifier(),
+		newestSubmittedTc:        tracker.NewNewestTCTracker(),
+		newestSubmittedQc:        tracker.NewNewestQCTracker(),
+		newestSubmittedPartialTc: tracker.NewNewestPartialTcTracker(),
+		startTime:                startTime,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -101,6 +99,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	shutdownSignaled := ctx.Done()
 	timeoutCertificates := el.tcSubmittedNotifier.Channel()
 	quorumCertificates := el.qcSubmittedNotifier.Channel()
+	partialTCs := el.partialTcCreatedNotifier.Channel()
 
 	for {
 		// Giving timeout events the priority to be processed first
@@ -137,10 +136,10 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			// Very important to start the for loop from the beginning, to continue the with the new timeout channel!
 			continue
 
-		case ev := <-el.partialTcCreated:
+		case <-partialTCs:
 
 			processStart := time.Now()
-			err := el.eventHandler.OnPartialTcCreated(ev)
+			err := el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
 
 			// measure how long it takes for a partial TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
@@ -242,13 +241,13 @@ func (el *EventLoop) loop(ctx context.Context) error {
 				return fmt.Errorf("could not process TC: %w", err)
 			}
 
-		case ev := <-el.partialTcCreated:
+		case <-partialTCs:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-			err := el.eventHandler.OnPartialTcCreated(ev)
+			err := el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
 
 			// measure how long it takes for a partial TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
@@ -299,22 +298,14 @@ func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 // OnPartialTcCreated created a hotstuff.PartialTcCreated payload and pushes it into partialTcCreated buffered channel for
 // further processing by EventHandler. Since we use buffered channel this function can block if buffer is full.
 func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
-	received := time.Now()
 	event := &hotstuff.PartialTcCreated{
 		View:       view,
 		NewestQC:   newestQC,
 		LastViewTC: lastViewTC,
 	}
-
-	select {
-	case el.partialTcCreated <- event:
-	case <-el.ComponentManager.ShutdownSignal():
-		return
+	if el.newestSubmittedPartialTc.Track(event) {
+		el.partialTcCreatedNotifier.Notify()
 	}
-
-	// the wait duration is measured as how long it takes from an event being
-	// received to event handler commencing the processing of the event
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnPartialTc)
 }
 
 // OnNewQcDiscovered pushes already validated QCs that were submitted from TimeoutAggregator to the event handler

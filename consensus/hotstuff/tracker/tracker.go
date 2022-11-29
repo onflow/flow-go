@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -124,4 +125,43 @@ func (t *NewestBlockTracker) Track(block *model.Block) bool {
 // Concurrently safe.
 func (t *NewestBlockTracker) NewestBlock() *model.Block {
 	return (*model.Block)(t.newestBlock.Load())
+}
+
+// NewestPartialTcTracker is a helper structure which keeps track of the newest partial TC(by view)
+// in concurrency safe way.
+type NewestPartialTcTracker struct {
+	newestPartialTc *atomic.UnsafePointer
+}
+
+func NewNewestPartialTcTracker() *NewestPartialTcTracker {
+	tracker := &NewestPartialTcTracker{
+		newestPartialTc: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
+	return tracker
+}
+
+// Track updates local state of newestPartialTc if the provided instance is newer (by view)
+// Concurrently safe.
+func (t *NewestPartialTcTracker) Track(partialTc *hotstuff.PartialTcCreated) bool {
+	// to record the newest value that we have ever seen we need to use loop
+	// with CAS atomic operation to make sure that we always write the latest value
+	// in case of shared access to updated value.
+	for {
+		// take a snapshot
+		newestPartialTc := t.NewestPartialTc()
+		// verify that our update makes sense
+		if newestPartialTc != nil && newestPartialTc.View >= partialTc.View {
+			return false
+		}
+		// attempt to install new value, repeat in case of shared update.
+		if t.newestPartialTc.CompareAndSwap(unsafe.Pointer(newestPartialTc), unsafe.Pointer(partialTc)) {
+			return true
+		}
+	}
+}
+
+// NewestPartialTc returns the newest partial TC (by view) tracked.
+// Concurrently safe.
+func (t *NewestPartialTcTracker) NewestPartialTc() *hotstuff.PartialTcCreated {
+	return (*hotstuff.PartialTcCreated)(t.newestPartialTc.Load())
 }
