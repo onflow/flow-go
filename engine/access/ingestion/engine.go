@@ -105,18 +105,14 @@ func New(
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
-	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultQueueCapacity),
-	)
+	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
 	}
 
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
 
-	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultQueueCapacity),
-	)
+	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
 	}
