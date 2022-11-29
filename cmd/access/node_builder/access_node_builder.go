@@ -522,6 +522,31 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
+		}).
+		Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.rpcConf.StateStreamListenAddr == "" {
+				return nil, nil
+			}
+			conf := state_stream.Config{
+				ListenAddr:        builder.rpcConf.StateStreamListenAddr,
+				MaxBlockMsgSize:   builder.rpcConf.MaxBlockMsgSize,
+				RpcMetricsEnabled: builder.rpcMetricsEnabled,
+			}
+
+			blobStore := blobs.NewBlobstore(ds)
+			builder.StateStreamEng = state_stream.NewEng(
+				conf,
+				blobStore,
+				execution_data.DefaultSerializer,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Results,
+				node.Logger,
+				node.RootChainID,
+				builder.apiRatelimits,
+				builder.apiBurstlimits,
+			)
+			return builder.StateStreamEng, nil
 		})
 
 	return builder
@@ -934,41 +959,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
-		if builder.rpcConf.StateStreamListenAddr != "" {
-			builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				conf := state_stream.Config{
-					ListenAddr:        builder.rpcConf.StateStreamListenAddr,
-					MaxBlockMsgSize:   builder.rpcConf.MaxBlockMsgSize,
-					RpcMetricsEnabled: builder.rpcMetricsEnabled,
-				}
-
-				datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-				err := os.MkdirAll(datastoreDir, 0700)
-				if err != nil {
-					return nil, fmt.Errorf("could not create or find exec data blobstore directory: %w", err)
-				}
-
-				ds, err := badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
-				if err != nil {
-					return nil, fmt.Errorf("could not create datastore object: %w", err)
-				}
-
-				bs := blobs.NewBlobstore(ds)
-				builder.StateStreamEng = state_stream.NewEng(
-					conf,
-					bs,
-					execution_data.DefaultSerializer,
-					node.Storage.Headers,
-					node.Storage.Seals,
-					node.Storage.Results,
-					node.Logger,
-					node.RootChainID,
-					builder.apiRatelimits,
-					builder.apiBurstlimits,
-				)
-				return builder.StateStreamEng, nil
-			})
-		}
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
