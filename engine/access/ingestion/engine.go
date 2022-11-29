@@ -194,10 +194,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 	if err != nil {
 		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
 	}
-
-	// if spork root snapshot
 	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
-
 	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
 	if err != nil {
 		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
@@ -216,8 +213,9 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 	} else {
 		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
 		// requesting resources for blocks below the expiry.
-		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
+		// TODO need a solution for this - testing to see if it fixes test first
+		//firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
 		if err != nil {
 			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 		}
@@ -704,19 +702,28 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		e.log.Error().Err(err).Msg("failed to update the last full block height")
 	}
 
+	// index is initialized in Start, therefore no expected errors here
 	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			logError(err)
-			return
-		}
-		// use the root height as the last full height
+		// TODO error handling
+		logError(err)
+		return
+	}
+
+	{
 		header, err := e.state.Params().Root()
 		if err != nil {
 			logError(err)
 			return
 		}
 		lastFullHeight = header.Height
+
+		segment, err := e.state.AtBlockID(header.ID()).SealingSegment()
+		if err != nil {
+			logError(err)
+			return
+		}
+		e.log.Warn().Msgf("root height: %d, root segment [%d, %d]", header.Height, segment.Lowest().Header.Height, segment.Highest().Header.Height)
 	}
 
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
@@ -727,6 +734,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		return
 	}
 	finalizedHeight := finalBlk.Height
+	e.log.Warn().Msgf("finalized height: %d, last full height: %d", finalBlk.Height, lastFullHeight)
 
 	// track number of incomplete blocks
 	incompleteBlksCnt := 0
@@ -775,12 +783,16 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	}
 
 	// additionally, if more than threshold blocks have missing collection OR collections are missing since defaultMissingCollsForAgeThreshold, re-request those collections
+	// >  (finalizedHeight-lastFullHeight) overflows, because finalized < full
 	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold || (finalizedHeight-lastFullHeight) > uint64(defaultMissingCollsForAgeThreshold) {
 		// warn log since this should generally not happen
 		e.log.Warn().
 			Int("missing_collection_blk_count", incompleteBlksCnt).
-			Int("threshold", defaultMissingCollsForBlkThreshold).
+			Int("missing_threshold", defaultMissingCollsForBlkThreshold).
+			Int("age_threshold", defaultMissingCollsForAgeThreshold).
 			Uint64("last_full_blk_height", latestFullHeight).
+			Uint64("finalized_height", finalizedHeight).
+			Uint64("finalized_sub_last_full_height", finalizedHeight-lastFullHeight).
 			Msg("re-requesting missing collections")
 		e.requestCollectionsInFinalizedBlock(allMissingColls)
 	}
@@ -824,6 +836,7 @@ func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
 
 // requestCollectionsInFinalizedBlock registers collection requests with the requester engine
 func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee) {
+	e.log.Warn().Msgf("requesting %d missing collections in finalized blocks", len(missingColls))
 	for _, cg := range missingColls {
 		// TODO: move this query out of for loop?
 		guarantors, err := protocol.FindGuarantors(e.state, cg)
