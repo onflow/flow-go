@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/linxGnu/grocksdb"
+	"github.com/montanaflynn/stats"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -22,7 +23,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(10_000, b) } // 10000
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(10_000, b) } // 10_000
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -92,8 +93,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 		err = storage.BootstrapWithSSTFiles(tempdir)
 		require.NoError(b, err)
 
-		// ////// Dummy DB
-		// storage := &delta.NoopStorage{}
+		// // ////// Basic DB
+		// storage := delta.NewBasicStorage()
 
 		// batchSize := 1000
 		// steps := bootstrapSize / batchSize
@@ -109,7 +110,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 		// 		},
 		// 			Value: values[i]}
 		// 	}
-
 		// 	err = storage.Bootstrap(0, registers)
 		// 	require.NoError(b, err)
 		// }
@@ -121,8 +121,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalReadTimeNS := 0
 		totalUpdateCount := 0
 		totalReadCount := 0
-
-		maxReadTimeNS := 0
 
 		headers := []*flow.Header{
 			unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0)), // genesis
@@ -176,33 +174,47 @@ func benchmarkStorage(steps int, b *testing.B) {
 		view, err := oracle.NewBlockView(newHeader.ID(), newHeader)
 		require.NoError(b, err)
 
+		readTimes := make([]float64, len(keysToRead))
 		// read values and compare values
-		for _, key := range keysToRead {
+		for i, key := range keysToRead {
 			start := time.Now()
 			v, err := view.Get(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value))
 			elapsed := time.Since(start)
 			require.NoError(b, err)
 			require.True(b, len(v) > 0)
 			elapsedns := int(elapsed.Nanoseconds())
-			if elapsedns > maxReadTimeNS {
-				maxReadTimeNS = elapsedns
-			}
+			readTimes[i] = float64(elapsed.Nanoseconds())
+			// if elapsedns > maxReadTimeNS {
+			// 	maxReadTimeNS = elapsedns
+			// }
 			totalReadTimeNS += elapsedns
 			totalReadCount++
 		}
+
 		////// read special key
-		key := "random key"
-		start := time.Now()
-		_, _, err = storage.UnsafeRead(key)
-		fmt.Println(">>>>>", time.Since(start))
-		require.NoError(b, err)
+		// key := "random key"
+		// start := time.Now()
+		// _, _, err = storage.UnsafeRead(key)
+		// fmt.Println(">>>>>", time.Since(start))
+		// require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")
 
 		b.ReportMetric(float64(totalReadTimeNS/steps), "read_time_(ns)")
 		b.ReportMetric(float64(totalReadTimeNS/totalReadCount), "read_time_per_reg_(ns)")
-		b.ReportMetric(float64(maxReadTimeNS), "max_read_time(ns)")
 
+		max, err := stats.Max(readTimes)
+		require.NoError(b, err)
+
+		median, err := stats.Median(readTimes)
+		require.NoError(b, err)
+
+		percentile95, err := stats.Percentile(readTimes, 95)
+		require.NoError(b, err)
+
+		b.ReportMetric(median, "median_read_time_(ns)")
+		b.ReportMetric(percentile95, "95percentile_read_time(ns)")
+		b.ReportMetric(max, "max_read_time_(ns)")
 	})
 }

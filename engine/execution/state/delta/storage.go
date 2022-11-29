@@ -368,18 +368,36 @@ func (s *RocksStore) BootstrapWithSSTFiles(path string) error {
 	return s.db.IngestExternalFile(files, grocksdb.NewDefaultIngestExternalFileOptions())
 }
 
-type NoopStorage struct {
+type BasicStorage struct {
+	blockHeight uint64
+	registers   map[flow.RegisterID]flow.RegisterValue
 }
 
-func (NoopStorage) GetRegister(key flow.RegisterID) (value flow.RegisterValue, exists bool, err error) {
-	return nil, false, nil
+func NewBasicStorage() *BasicStorage {
+	return &BasicStorage{registers: make(map[flow.RegisterID]flow.RegisterValue)}
 }
-func (NoopStorage) CommitBlockDelta(blockHeight uint64, delta Delta) error {
+
+func (s *BasicStorage) GetRegister(key flow.RegisterID) (value flow.RegisterValue, exists bool, err error) {
+	val, found := s.registers[key]
+	return val, found, nil
+}
+
+func (s *BasicStorage) CommitBlockDelta(blockHeight uint64, delta Delta) error {
+	s.blockHeight = blockHeight
+	for k, v := range delta.Data {
+		s.registers[k] = v
+	}
 	return nil
 }
-func (NoopStorage) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
+
+func (s *BasicStorage) Bootstrap(blockHeight uint64, registers []flow.RegisterEntry) error {
+	s.blockHeight = blockHeight
+	for _, reg := range registers {
+		s.registers[reg.Key] = reg.Value
+	}
 	return nil
 }
-func (NoopStorage) BlockHeight() (uint64, error) {
-	return 0, nil
+
+func (s *BasicStorage) BlockHeight() (uint64, error) {
+	return s.blockHeight, nil
 }
