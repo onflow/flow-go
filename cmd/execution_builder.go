@@ -424,6 +424,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
+	if exeNode.blobService == nil {
+		return nil, errors.New("blob service is not initialized")
+	}
+
 	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 	if node.MetricsEnabled {
 		providerMetrics = metrics.NewExecutionDataProviderCollector()
