@@ -22,7 +22,7 @@ import (
 //	go test -bench=.  -benchmem
 //
 // will track the heap allocations for the Benchmarks
-func BenchmarkStorage(b *testing.B) { benchmarkStorage(1000, b) } // 10000
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(10_000, b) } // 10000
 
 // register to read from previous batches
 // insertion (bestcase vs worst case)
@@ -191,11 +191,11 @@ func benchmarkStorage(steps int, b *testing.B) {
 			totalReadCount++
 		}
 		////// read special key
-		// key := "random key"
-		// start := time.Now()
-		// _, _, err = storage.UnsafeRead(key)
-		// fmt.Println(">>>>>", time.Since(start))
-		// require.NoError(b, err)
+		key := "random key"
+		start := time.Now()
+		_, _, err = storage.UnsafeRead(key)
+		fmt.Println(">>>>>", time.Since(start))
+		require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")
