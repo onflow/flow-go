@@ -247,6 +247,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
 	addresses []common.Address,
+	payer common.Address,
+	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
 	for i, address := range addresses {
@@ -257,17 +259,21 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		ContractFunctionSpec{
 			AddressFromChain: ServiceAddress,
 			LocationName:     systemcontracts.ContractStorageFees,
-			FunctionName:     systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
+			FunctionName:     systemcontracts.ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck,
 			ArgumentTypes: []sema.Type{
 				sema.NewConstantSizedType(
 					nil,
 					&sema.AddressType{},
 					int64(len(arrayValues)),
 				),
+				&sema.AddressType{},
+				sema.UFix64Type,
 			},
 		},
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
+			cadence.BytesToAddress(payer.Bytes()),
+			cadence.UFix64(maxTxFees),
 		},
 	)
 }

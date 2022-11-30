@@ -48,6 +48,11 @@ func NewTransactionFeeDeductionFailedError(
 		payer)
 }
 
+// IsTransactionFeeDeductionFailedError returns true if error has this code.
+func IsTransactionFeeDeductionFailedError(err error) bool {
+	return HasErrorCode(err, ErrCodeTransactionFeeDeductionFailedError)
+}
+
 // NewInsufficientPayerBalanceError constructs a new CodedError which
 // indicates that the payer has insufficient balance to attempt transaction execution.
 func NewInsufficientPayerBalanceError(
@@ -60,6 +65,11 @@ func NewInsufficientPayerBalanceError(
 		payer,
 		requiredBalance,
 	)
+}
+
+// IsInsufficientPayerBalanceError returns true if error has this code.
+func IsInsufficientPayerBalanceError(err error) bool {
+	return HasErrorCode(err, ErrCodeInsufficientPayerBalance)
 }
 
 // NewPayerBalanceCheckError constructs a new CodedError which
