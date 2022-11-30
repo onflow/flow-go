@@ -700,33 +700,33 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 }
 
-// assertNetworkHealthyAfterVNChange after a verification node is removed or added to the network
-// this func can be used to perform sanity.
-// 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+// assertNetworkHealthyAfterVNChange performs a basic network health check after replacing a verification node.
+//  1. Ensure sealing continues into the second epoch (post-replacement) by observing
+//     at least 10 blocks of sealing progress within the epoch
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// assert at least 10 blocks have been sealed since the node replacement
 	s.awaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
-// assertNetworkHealthyAfterLNChange after a collection node is removed or added to the network
-// this func can be used to perform sanity.
-// 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
-// is after the first epoch.
+// assertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
+//  1. Submit transaction to network that will target the newly staked LN by making
+//     sure the reference block ID is after the first epoch.
 func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
-	// To validate the LN joined the network successfully and is processing transactions we submit a
-	// create account transaction and assert there are no errors.
+	// At this point we have reached the second epoch and our new LN is the only LN in the network.
+	// To validate the LN joined the network successfully and is processing transactions we create
+	// an account, which submits a transaction and verifies it is sealed.
 	s.submitSmokeTestTransaction(ctx)
 }
 
-// assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
-// the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
-// that will indicate overall network health
-// 1. Submit transaction to network and verify it is executed and sealed.
+// assertNetworkHealthyAfterSNChange performs a basic network health check after replacing a consensus node.
+// The runTestEpochJoinAndLeave function running prior to this health check already asserts that we successfully:
+//  1. enter the second epoch (DKG succeeds; epoch fallback is not triggered)
+//  2. seal at least the first block within the second epoch (consensus progresses into second epoch).
+//
+// The test is configured so that one offline committee member is enough to prevent progress,
+// therefore the newly joined consensus node must be participating in consensus.
+//
+// In addition, here, we submit a transaction and verify that it is sealed.
 func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// At this point we can assure that our SN node is participating in finalization and sealing because
-	// there are only 2 SN nodes in the network now we will submit a transaction to the
-	// network to ensure the network is overall healthy.
 	s.submitSmokeTestTransaction(ctx)
 }
 
