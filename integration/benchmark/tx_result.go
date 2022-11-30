@@ -12,7 +12,7 @@ import (
 )
 
 // WaitForTransactionResult waits for the transaction to get into the terminal state and returns the result.
-func WaitForTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) (*flowsdk.TransactionResult, error) {
+func WaitForTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier, requireSealed bool) (*flowsdk.TransactionResult, error) {
 	var b retry.Backoff
 	b = retry.NewConstant(500 * time.Millisecond)
 	b = retry.WithMaxDuration(60*time.Second, b)
@@ -28,7 +28,12 @@ func WaitForTransactionResult(ctx context.Context, client access.Client, txID fl
 		}
 
 		switch result.Status {
-		case flowsdk.TransactionStatusExecuted, flowsdk.TransactionStatusSealed:
+		case flowsdk.TransactionStatusExecuted:
+			if requireSealed {
+				return retry.RetryableError(fmt.Errorf("waiting for transaction sealed: %s", txID))
+			}
+			return nil
+		case flowsdk.TransactionStatusSealed:
 			return nil
 		case flowsdk.TransactionStatusPending, flowsdk.TransactionStatusFinalized:
 			return retry.RetryableError(fmt.Errorf("waiting for transaction execution: %s", txID))
