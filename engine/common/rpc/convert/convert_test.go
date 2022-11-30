@@ -71,7 +71,9 @@ func TestConvertEvents(t *testing.T) {
 	})
 }
 
+// TestConvertBlockExecutionData checks if conversions between BlockExecutionData and it's fields are consistent.
 func TestConvertBlockExecutionData(t *testing.T) {
+	// Initialize the BlockExecutionData object
 	numChunks := 5
 	ced := make([]*execution_data.ChunkExecutionData, numChunks)
 	bed := &execution_data.BlockExecutionData{
@@ -79,19 +81,32 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		ChunkExecutionDatas: ced,
 	}
 
+	// Fill the chunk execution datas with trie updates, collections, and events
 	minSerializedSize := uint64(10 * execution_data.DefaultMaxBlobSize)
 	for i := 0; i < numChunks; i++ {
+		// Initialize collection
+		tx1 := unittest.TransactionBodyFixture()
+		tx2 := unittest.TransactionBodyFixture()
+		col := &flow.Collection{Transactions: []*flow.TransactionBody{&tx1, &tx2}}
+
+		// Initialize events
+		header := unittest.BlockHeaderFixture()
+		events := unittest.BlockEventsFixture(header, 5).Events
+
 		chunk := &execution_data.ChunkExecutionData{
+			Collection: col,
+			Events:     events,
 			TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
 		}
 		size := 1
+
+		// Fill the TrieUpdate with data
 	inner:
 		for {
 			buf := &bytes.Buffer{}
 			require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, chunk))
 
 			if buf.Len() >= int(minSerializedSize) {
-				t.Logf("Chunk execution data size: %d", buf.Len())
 				break inner
 			}
 
@@ -107,17 +122,21 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		bed.ChunkExecutionDatas[i] = chunk
 	}
 
-	chunkMsg, err := convert.ChunkExecutionDataToMessage(bed.ChunkExecutionDatas[0])
-	assert.Nil(t, err)
+	t.Run("chunk execution data conversions", func(t *testing.T) {
+		chunkMsg, err := convert.ChunkExecutionDataToMessage(bed.ChunkExecutionDatas[0])
+		assert.Nil(t, err)
 
-	chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
-	assert.Nil(t, err)
-	assert.Equal(t, bed.ChunkExecutionDatas[0], &chunkReConverted)
+		chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
+		assert.Nil(t, err)
+		assert.Equal(t, bed.ChunkExecutionDatas[0], &chunkReConverted)
+	})
 
-	blockMsg, err := convert.BlockExecutionDataToMessage(bed)
-	assert.Nil(t, err)
+	t.Run("block execution data conversions", func(t *testing.T) {
+		blockMsg, err := convert.BlockExecutionDataToMessage(bed)
+		assert.Nil(t, err)
 
-	bedReConverted, err := convert.MessageToBlockExecutionData(blockMsg, flow.Testnet.Chain())
-	assert.Nil(t, err)
-	assert.Equal(t, bed, &bedReConverted)
+		bedReConverted, err := convert.MessageToBlockExecutionData(blockMsg, flow.Testnet.Chain())
+		assert.Nil(t, err)
+		assert.Equal(t, bed, &bedReConverted)
+	})
 }

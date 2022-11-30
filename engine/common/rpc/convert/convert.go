@@ -930,7 +930,7 @@ func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain
 	for i, message := range messages {
 		transaction, err := MessageToTransaction(message, chain)
 		if err != nil {
-			return &flow.Collection{}, err
+			return nil, err
 		}
 		transactions[i] = &transaction
 	}
@@ -945,14 +945,14 @@ func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain
 func messageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 	rootHash, err := ledger.ToRootHash(m.GetRootHash())
 	if err != nil {
-		return &ledger.TrieUpdate{}, err
+		return nil, err
 	}
 
 	paths := make([]ledger.Path, len(m.GetPaths()))
 	for i, path := range m.GetPaths() {
 		convertedPath, err := ledger.ToPath(path)
 		if err != nil {
-			return &ledger.TrieUpdate{}, err
+			return nil, err
 		}
 		paths[i] = convertedPath
 	}
