@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestChainPrograms(t *testing.T) {
+func TestDerivedChainData(t *testing.T) {
 	testBlockId := func(i byte) flow.Identifier {
 		id := flow.ZeroID
 		id[0] = i
@@ -24,76 +24,76 @@ func TestChainPrograms(t *testing.T) {
 		}
 	}
 
-	programs, err := NewChainPrograms(2)
+	programs, err := NewDerivedChainData(2)
 	require.NoError(t, err)
 
 	//
-	// Creating a BlockPrograms from scratch
+	// Creating a DerivedBlockData from scratch
 	//
 
 	blockId1 := testBlockId(1)
 
-	block1 := programs.GetOrCreateBlockPrograms(blockId1, flow.ZeroID)
+	block1 := programs.GetOrCreateDerivedBlockData(blockId1, flow.ZeroID)
 	require.NotNil(t, block1)
 
 	loc1 := testLocation("0a")
 	prog1 := &interpreter.Program{}
 
-	txn, err := block1.NewTransactionPrograms(0, 0)
+	txn, err := block1.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	txn.Set(loc1, prog1, nil)
+	txn.SetProgram(loc1, prog1, nil)
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	entry := block1.GetForTestingOnly(loc1)
+	entry := block1.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	//
-	// Creating a BlockPrograms from parent
+	// Creating a DerivedBlockData from parent
 	//
 
 	blockId2 := testBlockId(2)
 
-	block2 := programs.GetOrCreateBlockPrograms(blockId2, blockId1)
+	block2 := programs.GetOrCreateDerivedBlockData(blockId2, blockId1)
 	require.NotNil(t, block2)
 	require.NotSame(t, block1, block2)
 
 	loc2 := testLocation("0b")
 	prog2 := &interpreter.Program{}
 
-	txn, err = block2.NewTransactionPrograms(0, 0)
+	txn, err = block2.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	txn.Set(loc2, prog2, nil)
+	txn.SetProgram(loc2, prog2, nil)
 	err = txn.Commit()
 	require.NoError(t, err)
 
-	entry = block2.GetForTestingOnly(loc1)
+	entry = block2.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
-	entry = block2.GetForTestingOnly(loc2)
+	entry = block2.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	//
-	// Reuse exising BlockPrograms in cache
+	// Reuse exising DerivedBlockData in cache
 	//
 
-	foundBlock := programs.GetOrCreateBlockPrograms(blockId1, flow.ZeroID)
+	foundBlock := programs.GetOrCreateDerivedBlockData(blockId1, flow.ZeroID)
 	require.Same(t, block1, foundBlock)
 
 	foundBlock = programs.Get(blockId1)
 	require.Same(t, block1, foundBlock)
 
-	entry = block1.GetForTestingOnly(loc1)
+	entry = block1.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
 	// writes to block2 did't poplute block1.
-	entry = block1.GetForTestingOnly(loc2)
+	entry = block1.programs.GetForTestingOnly(loc2)
 	require.Nil(t, entry)
 
 	//
@@ -103,27 +103,27 @@ func TestChainPrograms(t *testing.T) {
 	blockId3 := testBlockId(3)
 
 	// block3 forces block1 to evict
-	block3 := programs.GetOrCreateBlockPrograms(blockId3, blockId2)
+	block3 := programs.GetOrCreateDerivedBlockData(blockId3, blockId2)
 	require.NotNil(t, block3)
 	require.NotSame(t, block1, block3)
 	require.NotSame(t, block2, block3)
 
-	entry = block3.GetForTestingOnly(loc1)
+	entry = block3.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
-	entry = block3.GetForTestingOnly(loc2)
+	entry = block3.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	// block1 forces block2 to evict
-	foundBlock = programs.GetOrCreateBlockPrograms(blockId1, flow.ZeroID)
+	foundBlock = programs.GetOrCreateDerivedBlockData(blockId1, flow.ZeroID)
 	require.NotSame(t, block1, foundBlock)
 
-	entry = foundBlock.GetForTestingOnly(loc1)
+	entry = foundBlock.programs.GetForTestingOnly(loc1)
 	require.Nil(t, entry)
 
-	entry = foundBlock.GetForTestingOnly(loc2)
+	entry = foundBlock.programs.GetForTestingOnly(loc2)
 	require.Nil(t, entry)
 
 	block1 = foundBlock
@@ -133,18 +133,18 @@ func TestChainPrograms(t *testing.T) {
 	//
 
 	// Create from cached current block
-	scriptBlock := programs.NewBlockProgramsForScript(blockId3)
+	scriptBlock := programs.NewDerivedBlockDataForScript(blockId3)
 	require.NotNil(t, scriptBlock)
 	require.NotSame(t, block2, scriptBlock)
 	require.NotSame(t, block3, scriptBlock)
 
-	entry = scriptBlock.GetForTestingOnly(loc1)
+	entry = scriptBlock.programs.GetForTestingOnly(loc1)
 	require.NotNil(t, entry)
-	require.Same(t, prog1, entry.Program)
+	require.Same(t, prog1, entry.Value)
 
-	entry = scriptBlock.GetForTestingOnly(loc2)
+	entry = scriptBlock.programs.GetForTestingOnly(loc2)
 	require.NotNil(t, entry)
-	require.Same(t, prog2, entry.Program)
+	require.Same(t, prog2, entry.Value)
 
 	foundBlock = programs.Get(blockId3)
 	require.Same(t, block3, foundBlock)

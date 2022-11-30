@@ -44,11 +44,12 @@ require (
 	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-ipld-format v0.3.0
 	github.com/ipfs/go-log v1.0.5
+	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.23.3
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.8.1-0.20220908052023-8866ca88a105
+	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221102045350-1e161006c43f
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-base32 v0.1.0 // indirect
@@ -62,7 +63,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa
 	github.com/onflow/flow-go-sdk v0.29.0
 	github.com/onflow/flow-go/crypto v0.24.4
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20220928152135-125c8698be55
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221116225618-de1bb3dad013
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -98,6 +99,11 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
+)
+
+require (
+	github.com/montanaflynn/stats v0.6.6
+	github.com/pkg/profile v1.7.0
 )
 
 require (
@@ -142,6 +148,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
+	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
@@ -175,7 +182,6 @@ require (
 	github.com/ipfs/go-ipfs-pq v0.0.2 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
 	github.com/ipfs/go-ipns v0.2.0 // indirect
-	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-peertaskqueue v0.7.0 // indirect
 	github.com/ipfs/go-verifcid v0.0.1 // indirect

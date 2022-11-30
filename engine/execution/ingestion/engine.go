@@ -404,12 +404,28 @@ func (e *Engine) reloadBlock(
 		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
 	}
 
-	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
+	// enqueue the block and check if there is any missing collections
+	missingCollections, err := e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
 		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
+	// forward the missing collections to requester engine for requesting them from collection nodes,
+	// adding the missing collections to mempool in order to trigger the block execution as soon as
+	// all missing collections are received.
+	err = e.fetchAndHandleCollection(blockID, block.Header.Height, missingCollections, func(collection *flow.Collection) error {
+		err := e.addCollectionToMempool(collection, blockByCollection)
+
+		if err != nil {
+			return fmt.Errorf("could not add collection to mempool: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not fetch or handle collection %w", err)
+	}
 	return nil
 }
 
@@ -467,27 +483,33 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 		return nil
 	}
 
+	var missingCollections []*flow.CollectionGuarantee
 	// unexecuted block
 	// acquiring the lock so that there is only one process modifying the queue
 	err = e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
-		return e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
+		missing, err := e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
+		if err != nil {
+			return err
+		}
+		missingCollections = missing
+		return nil
 	})
 
 	if err != nil {
 		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
-	return nil
+	return e.addOrFetch(blockID, block.Header.Height, missingCollections)
 }
 
 func (e *Engine) enqueueBlockAndCheckExecutable(
 	blockByCollection *stdmap.BlockByCollectionBackdata,
 	executionQueues *stdmap.QueuesBackdata,
 	block *flow.Block,
-	checkStateSync bool) error {
+	checkStateSync bool) ([]*flow.CollectionGuarantee, error) {
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
@@ -509,7 +531,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
 			Int("block_height", int(executableBlock.Height())).
 			Msg("block already exists in the execution queue")
-		return nil
+		return nil, nil
 	}
 
 	firstUnexecutedHeight := queue.Head.Item.Height()
@@ -550,9 +572,9 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	}
 
 	// check if we have all the collections for the block, and request them if there is missing.
-	err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+	missingCollections, err := e.matchAndFindMissingCollections(executableBlock, blockByCollection)
 	if err != nil {
-		return fmt.Errorf("cannot send collection requests: %w", err)
+		return nil, fmt.Errorf("cannot send collection requests: %w", err)
 	}
 
 	complete := false
@@ -572,7 +594,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Bool("head_of_queue", head).
 		Msg("block is enqueued")
 
-	return nil
+	return missingCollections, nil
 }
 
 // executeBlock will execute the block.
@@ -660,6 +682,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		len(computationResult.TransactionResults),
 		len(computationResult.ExecutableBlock.CompleteCollections),
 	)
+
 	for computationKind, intensity := range computationResult.ComputationIntensities {
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}
@@ -701,6 +724,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 
 	// e.checkStateSyncStop(executed.Block.Header.Height)
 
+	missingCollections := make(map[*entity.ExecutableBlock][]*flow.CollectionGuarantee)
 	err := e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -735,9 +759,12 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 				child := queue.Head.Item.(*entity.ExecutableBlock)
 				child.StartState = &finalState
 
-				err := e.matchOrRequestCollections(child, blockByCollection)
+				missing, err := e.matchAndFindMissingCollections(child, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
+				}
+				if len(missing) > 0 {
+					missingCollections[child] = append(missingCollections[child], missing...)
 				}
 
 				completed := e.executeBlockIfComplete(child)
@@ -764,6 +791,13 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 		e.log.Err(err).
 			Hex("block", logging.Entity(executed)).
 			Msg("error while requeueing blocks after execution")
+	}
+
+	for child, missing := range missingCollections {
+		err := e.addOrFetch(child.ID(), child.Block.Header.Height, missing)
+		if err != nil {
+			return fmt.Errorf("fail to add missing collections: %w", err)
+		}
 	}
 
 	return nil
@@ -864,56 +898,60 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
-			blockByCollectionID, exists := backdata.ByID(collID)
-
-			// if we don't find any block for this collection, then
-			// means we don't need this collection any more.
-			// or it was ejected from the mempool when it was full.
-			// either way, we will return
-			if !exists {
-				lg.Debug().Msg("could not find block for collection")
-				return nil
-			}
-
-			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
-				blockID := executableBlock.ID()
-
-				completeCollection, ok := executableBlock.CompleteCollections[collID]
-				if !ok {
-					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
-						blockID)
-				}
-
-				// record collection max height metrics
-				blockHeight := executableBlock.Block.Header.Height
-				if blockHeight > e.maxCollectionHeight {
-					e.metrics.UpdateCollectionMaxHeight(blockHeight)
-					e.maxCollectionHeight = blockHeight
-				}
-
-				if completeCollection.IsCompleted() {
-					// already received transactions for this collection
-					continue
-				}
-
-				// update the transactions of the collection
-				// Note: it's guaranteed the transactions are for this collection, because
-				// the collection id matches with the CollectionID from the collection guarantee
-				completeCollection.Transactions = collection.Transactions
-
-				// check if the block becomes executable
-				_ = e.executeBlockIfComplete(executableBlock)
-			}
-
-			// since we've received this collection, remove it from the index
-			// this also prevents from executing the same block twice, because the second
-			// time when the collection arrives, it will not be found in the blockByCollectionID
-			// index.
-			backdata.Remove(collID)
-
-			return nil
+			return e.addCollectionToMempool(collection, backdata)
 		},
 	)
+}
+
+func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *stdmap.BlockByCollectionBackdata) error {
+	collID := collection.ID()
+	blockByCollectionID, exists := backdata.ByID(collID)
+
+	// if we don't find any block for this collection, then
+	// means we don't need this collection any more.
+	// or it was ejected from the mempool when it was full.
+	// either way, we will return
+	if !exists {
+		return nil
+	}
+
+	for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
+		blockID := executableBlock.ID()
+
+		completeCollection, ok := executableBlock.CompleteCollections[collID]
+		if !ok {
+			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
+				blockID)
+		}
+
+		// record collection max height metrics
+		blockHeight := executableBlock.Block.Header.Height
+		if blockHeight > e.maxCollectionHeight {
+			e.metrics.UpdateCollectionMaxHeight(blockHeight)
+			e.maxCollectionHeight = blockHeight
+		}
+
+		if completeCollection.IsCompleted() {
+			// already received transactions for this collection
+			continue
+		}
+
+		// update the transactions of the collection
+		// Note: it's guaranteed the transactions are for this collection, because
+		// the collection id matches with the CollectionID from the collection guarantee
+		completeCollection.Transactions = collection.Transactions
+
+		// check if the block becomes executable
+		_ = e.executeBlockIfComplete(executableBlock)
+	}
+
+	// since we've received this collection, remove it from the index
+	// this also prevents from executing the same block twice, because the second
+	// time when the collection arrives, it will not be found in the blockByCollectionID
+	// index.
+	backdata.Remove(collID)
+
+	return nil
 }
 
 func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
@@ -962,10 +1000,12 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 // if a block has 3 collection, it would be 3 reqs to fetch them.
 // mark the collection belongs to the block,
 // mark the block contains this collection.
-func (e *Engine) matchOrRequestCollections(
+// It returns the missing collections to be fetched
+// TODO: to rename
+func (e *Engine) matchAndFindMissingCollections(
 	executableBlock *entity.ExecutableBlock,
 	collectionsBackdata *stdmap.BlockByCollectionBackdata,
-) error {
+) ([]*flow.CollectionGuarantee, error) {
 	// if the state syncing is on, it will fetch deltas for sealed and
 	// unexecuted blocks. However, for any new blocks, we are still fetching
 	// collections for them, which is not necessary, because the state deltas
@@ -983,13 +1023,7 @@ func (e *Engine) matchOrRequestCollections(
 	// 	}
 	// }
 
-	// make sure that the requests are dispatched immediately by the requester
-	if len(executableBlock.Block.Payload.Guarantees) > 0 {
-		defer e.request.Force()
-		defer e.metrics.ExecutionCollectionRequestSent()
-	}
-
-	actualRequested := 0
+	missingCollections := make([]*flow.CollectionGuarantee, 0, len(executableBlock.Block.Payload.Guarantees))
 
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 		coll := &entity.CompleteCollection{
@@ -1011,25 +1045,6 @@ func (e *Engine) matchOrRequestCollections(
 			continue
 		}
 
-		// if we are not requesting this collection, then there are two cases here:
-		// 1) we have never seen this collection
-		// 2) we have seen this collection from some other block
-
-		// if we've requested this collection, we will store it in the storage,
-		// so check the storage to see whether we've seen it.
-		collection, err := e.collections.ByID(guarantee.CollectionID)
-
-		if err == nil {
-			// we found the collection, update the transactions
-			coll.Transactions = collection.Transactions
-			continue
-		}
-
-		// check if there was exception
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("error while querying for collection: %w", err)
-		}
-
 		// the storage doesn't have this collection, meaning this is our first time seeing this
 		// collection guarantee, create an entry to store in collectionsBackdata in order to
 		// update the executable blocks when the collection is received.
@@ -1041,40 +1056,13 @@ func (e *Engine) matchOrRequestCollections(
 		added := collectionsBackdata.Add(blocksNeedingCollection.ID(), blocksNeedingCollection)
 		if !added {
 			// sanity check, should not happen, unless mempool implementation has a bug
-			return fmt.Errorf("collection already mapped to block")
+			return nil, fmt.Errorf("collection already mapped to block")
 		}
 
-		e.log.Debug().
-			Hex("block", logging.Entity(executableBlock)).
-			Hex("collection_id", logging.ID(guarantee.ID())).
-			Msg("requesting collection")
-
-		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
-		if err != nil {
-			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
-			// have validated the block payload. And that validation includes checking the guarantors are correct.
-			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
-			// should be treated as fatal error
-			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
-				guarantee.ID(),
-				executableBlock.ID(),
-				executableBlock.Height(),
-			)
-			return fmt.Errorf("could not find guarantors: %w", err)
-		}
-		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
-		actualRequested++
+		missingCollections = append(missingCollections, guarantee)
 	}
 
-	e.log.Debug().
-		Hex("block", logging.Entity(executableBlock)).
-		Uint64("height", executableBlock.Block.Header.Height).
-		Int("num_col", len(executableBlock.Block.Payload.Guarantees)).
-		Int("actual_req", actualRequested).
-		Msg("requested all collections")
-
-	return nil
+	return missingCollections, nil
 }
 
 func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
@@ -1320,4 +1308,96 @@ func GenerateExecutionReceipt(
 	receipt.ExecutorSignature = sig
 
 	return receipt, nil
+}
+
+// addOrFetch checks if there are stored collections for the given guarantees, if there is,
+// forward them to mempool to process the collection, otherwise fetch the collections.
+// any error returned are exception
+func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees []*flow.CollectionGuarantee) error {
+	return e.fetchAndHandleCollection(blockID, height, guarantees, func(collection *flow.Collection) error {
+		err := e.mempool.BlockByCollection.Run(
+			func(backdata *stdmap.BlockByCollectionBackdata) error {
+				return e.addCollectionToMempool(collection, backdata)
+			})
+
+		if err != nil {
+			return fmt.Errorf("could not add collection to mempool: %w", err)
+		}
+		return nil
+	})
+}
+
+// addOrFetch checks if there are stored collections for the given guarantees, if there is,
+// forward them to the handler to process the collection, otherwise fetch the collections.
+// any error returned are exception
+func (e *Engine) fetchAndHandleCollection(
+	blockID flow.Identifier,
+	height uint64,
+	guarantees []*flow.CollectionGuarantee,
+	handleCollection func(*flow.Collection) error,
+) error {
+	fetched := false
+	for _, guarantee := range guarantees {
+		// if we've requested this collection, we will store it in the storage,
+		// so check the storage to see whether we've seen it.
+		collection, err := e.collections.ByID(guarantee.CollectionID)
+
+		if err == nil {
+			// we found the collection from storage, forward this collection to handler
+			err = handleCollection(collection)
+			if err != nil {
+				return fmt.Errorf("could not handle collection: %w", err)
+			}
+
+			continue
+		}
+
+		// check if there was exception
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("error while querying for collection: %w", err)
+		}
+
+		err = e.fetchCollection(blockID, height, guarantee)
+		if err != nil {
+			return fmt.Errorf("could not fetch collection: %w", err)
+		}
+		fetched = true
+	}
+
+	// make sure that the requests are dispatched immediately by the requester
+	if fetched {
+		e.request.Force()
+		e.metrics.ExecutionCollectionRequestSent()
+	}
+
+	return nil
+}
+
+// fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
+// any error returned are fatal error
+func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+	e.log.Debug().
+		Hex("block", blockID[:]).
+		Hex("collection_id", logging.ID(guarantee.ID())).
+		Msg("requesting collection")
+
+	guarantors, err := protocol.FindGuarantors(e.state, guarantee)
+	if err != nil {
+		// execution node executes certified blocks, which means there is a quorum of consensus nodes who
+		// have validated the block payload. And that validation includes checking the guarantors are correct.
+		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
+		// should be treated as fatal error
+		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+			guarantee.ID(),
+			blockID,
+			height,
+		)
+		return fmt.Errorf("could not find guarantors: %w", err)
+	}
+	// queue the collection to be requested from one of the guarantors
+	e.request.EntityByID(guarantee.ID(), filter.And(
+		filter.HasNodeID(guarantors...),
+	))
+
+	return nil
 }

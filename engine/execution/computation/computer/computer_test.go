@@ -121,7 +121,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
@@ -157,7 +157,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		programs := programs.NewEmptyBlockPrograms()
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -171,7 +171,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TrieUpdates, 1)
@@ -203,10 +203,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		progs := programs.NewEmptyBlockPrograms()
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
-			fvm.WithBlockPrograms(progs),
+			fvm.WithDerivedBlockData(derivedBlockData),
 		}
 
 		opts := append(baseOpts, contextOptions...)
@@ -248,7 +248,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TrieUpdates, 1)
@@ -289,7 +289,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		programs := programs.NewEmptyBlockPrograms()
+		derivedBlockData := programs.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -310,7 +310,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
@@ -360,10 +360,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(
 			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(
-				// we don't need to check signatures or sequence numbers
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		collectionCount := 2
@@ -457,7 +455,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
@@ -546,16 +544,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
-			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvoker(),
-			),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
 
 		address := common.Address{0x1}
@@ -640,7 +637,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -844,7 +841,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -855,8 +852,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		Key:   state.AccountStatusKey,
 	}
 
-	require.Contains(t, registerTouches, id.String())
-	require.Equal(t, id, registerTouches[id.String()])
+	require.Contains(t, registerTouches, id)
 }
 
 func Test_ExecutingSystemCollection(t *testing.T) {
@@ -927,7 +923,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	view := delta.NewView(ledger.Get)
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyBlockPrograms())
+	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
 	assert.Len(t, result.TransactionResults, 1)
