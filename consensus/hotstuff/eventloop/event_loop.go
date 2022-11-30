@@ -102,7 +102,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	partialTCs := el.partialTcCreatedNotifier.Channel()
 
 	for {
-		// Giving timeout events the priority to be processed first
+		// Giving timeout events the priority to be processed first.
 		// This is to prevent attacks from malicious nodes that attempt
 		// to block honest nodes' pacemaker from progressing by sending
 		// other events.

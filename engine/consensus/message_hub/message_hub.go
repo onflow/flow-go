@@ -266,7 +266,6 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		return nil
 	}
 	log.Info().Msg("consensus timeout was broadcast")
-
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageTimeoutObject)
 
 	return nil

@@ -216,14 +216,17 @@ func (hc *HotstuffCollector) SetQCView(view uint64) {
 	hc.qcView.Set(float64(view))
 }
 
+// SetTCView reports the view of the newest known TC
 func (hc *HotstuffCollector) SetTCView(view uint64) {
 	hc.tcView.Set(float64(view))
 }
 
+// VoteProcessingDuration reports the processing time for a single vote 
 func (hc *HotstuffCollector) VoteProcessingDuration(duration time.Duration) {
 	hc.voteProcessingDuration.Observe(duration.Seconds())
 }
 
+// TimeoutObjectProcessingDuration reports the processing time for a TimeoutObject
 func (hc *HotstuffCollector) TimeoutObjectProcessingDuration(duration time.Duration) {
 	hc.timeoutProcessingDuration.Observe(duration.Seconds())
 }

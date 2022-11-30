@@ -78,6 +78,8 @@ type NetworkMetrics interface {
 	InboundConnections(connectionCount uint)
 }
 
+// EngineMetrics is a generic metrics consumer for node-internal data processing
+// components (aka engines). Implementations must be non-blocking and concurrency safe. 
 type EngineMetrics interface {
 	// MessageSent reports that the engine transmitted the message over the network.
 	// Unicasts, broadcasts, and multicasts are all reported once.

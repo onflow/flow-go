@@ -127,8 +127,7 @@ func (t *NewestBlockTracker) NewestBlock() *model.Block {
 	return (*model.Block)(t.newestBlock.Load())
 }
 
-// NewestPartialTcTracker is a helper structure which keeps track of the newest partial TC(by view)
-// in concurrency safe way.
+// NewestPartialTcTracker tracks the newest partial TC (by view) in a concurrency safe way.
 type NewestPartialTcTracker struct {
 	newestPartialTc *atomic.UnsafePointer
 }
@@ -143,13 +142,13 @@ func NewNewestPartialTcTracker() *NewestPartialTcTracker {
 // Track updates local state of newestPartialTc if the provided instance is newer (by view)
 // Concurrently safe.
 func (t *NewestPartialTcTracker) Track(partialTc *hotstuff.PartialTcCreated) bool {
-	// to record the newest value that we have ever seen we need to use loop
+	// To record the newest value that we have ever seen, we need to use loop
 	// with CAS atomic operation to make sure that we always write the latest value
 	// in case of shared access to updated value.
 	for {
 		// take a snapshot
 		newestPartialTc := t.NewestPartialTc()
-		// verify that our update makes sense
+		// verify that our partial TC is from a newer view
 		if newestPartialTc != nil && newestPartialTc.View >= partialTc.View {
 			return false
 		}

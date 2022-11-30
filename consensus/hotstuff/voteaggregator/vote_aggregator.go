@@ -275,7 +275,6 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 			Hex("voter", vote.SignerID[:]).
 			Str("vote_id", vote.ID().String()).
 			Msg("drop stale votes")
-
 		va.engineMetrics.MessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 		return
 	}
