@@ -6,6 +6,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// topicIDFixtureLen is the length of the topic ID fixture for testing.
+	topicIDFixtureLen = 10
+	// messageIDFixtureLen is the length of the message ID fixture for testing.
+	messageIDFixtureLen = 10
+)
+
 type GossipSubCtrlOption func(*pubsubpb.ControlMessage)
 
 // GossipSubCtrlFixture returns a ControlMessage with the given options.
@@ -35,13 +42,13 @@ func WithIHave(msgCount int, msgSize int) GossipSubCtrlOption {
 // gossipSubMessageIdFixture returns a random gossipSub message ID.
 func gossipSubMessageIdFixture() string {
 	// TODO: messageID length should be a parameter.
-	return unittest.GenerateRandomStringWithLen(10)
+	return unittest.GenerateRandomStringWithLen(messageIDFixtureLen)
 }
 
 // gossipSubTopicIdFixture returns a random gossipSub topic ID.
 func gossipSubTopicIdFixture() string {
 	// TODO: topicID length should be a parameter.
-	return unittest.GenerateRandomStringWithLen(10)
+	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
 }
 
 // gossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
