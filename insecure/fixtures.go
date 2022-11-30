@@ -41,8 +41,10 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
-	eventID, err := p2p.EventId(channel, payload)
+	eventIDHash, err := p2p.EventId(channel, payload)
 	require.NoError(t, err)
+
+	eventID := flow.HashToID(eventIDHash)
 
 	// creates egress message that goes over gRPC.
 	egressMsg := &EgressMessage{
@@ -64,7 +66,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 		CorruptOriginId:     originId,
 		Channel:             channel,
 		FlowProtocolEvent:   content,
-		FlowProtocolEventID: eventID.Hex(),
+		FlowProtocolEventID: eventID,
 		Protocol:            protocol,
 		TargetNum:           targetNum,
 		TargetIds:           targetIds,

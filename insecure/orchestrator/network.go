@@ -160,16 +160,18 @@ func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 
 	channel := channels.Channel(message.ChannelID)
 
-	egressEventID, err := p2p.EventId(channel, message.Payload)
+	egressEventIDHash, err := p2p.EventId(channel, message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not create egress event ID: %w", err)
 	}
+
+	egressEventID := flow.HashToID(egressEventIDHash)
 
 	err = on.orchestrator.HandleEgressEvent(&insecure.EgressEvent{
 		CorruptOriginId:     sender,
 		Channel:             channel,
 		FlowProtocolEvent:   event,
-		FlowProtocolEventID: egressEventID.Hex(),
+		FlowProtocolEventID: egressEventID,
 		Protocol:            message.Protocol,
 		TargetNum:           message.TargetNum,
 		TargetIds:           targetIds,
@@ -204,16 +206,19 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 	defer on.orchestratorMutex.Unlock()
 
 	channel := channels.Channel(message.ChannelID)
-	ingressEventID, err := p2p.EventId(channel, message.Payload)
+	ingressEventIDHash, err := p2p.EventId(channel, message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not create ingress event ID: %w", err)
 	}
+
+	ingressEventID := flow.HashToID(ingressEventIDHash)
+
 	err = on.orchestrator.HandleIngressEvent(&insecure.IngressEvent{
 		OriginID:            senderId,
 		CorruptTargetID:     targetId,
 		Channel:             channel,
 		FlowProtocolEvent:   event,
-		FlowProtocolEventID: ingressEventID.Hex(),
+		FlowProtocolEventID: ingressEventID,
 	})
 	if err != nil {
 		return fmt.Errorf("could not handle ingress event by orchestrator: %w", err)

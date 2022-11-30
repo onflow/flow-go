@@ -37,10 +37,10 @@ type TopicValidatorAttackOrchestrator struct {
 	logger                     zerolog.Logger
 	orchestratorNetwork        insecure.OrchestratorNetwork
 	codec                      network.Codec
-	unauthorizedEventsReceived []string
-	authorizedEventsReceived   []string
-	unauthorizedEvents         map[string]*insecure.EgressEvent
-	authorizedEvents           map[string]*insecure.EgressEvent
+	unauthorizedEventsReceived []flow.Identifier
+	authorizedEventsReceived   []flow.Identifier
+	unauthorizedEvents         map[flow.Identifier]*insecure.EgressEvent
+	authorizedEvents           map[flow.Identifier]*insecure.EgressEvent
 	authorizedEventReceivedWg  sync.WaitGroup
 	attackerAN                 flow.Identifier
 	attackerEN                 flow.Identifier
@@ -55,10 +55,10 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN
 		t:                          t,
 		logger:                     logger.With().Str("component", "bft-test-orchestrator").Logger(),
 		codec:                      unittest.NetworkCodec(),
-		unauthorizedEventsReceived: make([]string, 0),
-		authorizedEventsReceived:   make([]string, 0),
-		unauthorizedEvents:         make(map[string]*insecure.EgressEvent),
-		authorizedEvents:           make(map[string]*insecure.EgressEvent),
+		unauthorizedEventsReceived: make([]flow.Identifier, 0),
+		authorizedEventsReceived:   make([]flow.Identifier, 0),
+		unauthorizedEvents:         make(map[flow.Identifier]*insecure.EgressEvent),
+		authorizedEvents:           make(map[flow.Identifier]*insecure.EgressEvent),
 		authorizedEventReceivedWg:  sync.WaitGroup{},
 		attackerAN:                 attackerAN,
 		attackerEN:                 attackerEN,
@@ -88,7 +88,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleEgressEvent(event *insecure.Egr
 		return err
 	}
 
-	lg.Info().Str("event_id", event.FlowProtocolEventID).Msg("egress event passed through successfully")
+	lg.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("egress event passed through successfully")
 	return nil
 }
 
@@ -107,7 +107,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 	// dropped at the topic validator level.
 	if _, ok := o.unauthorizedEvents[event.FlowProtocolEventID]; ok {
 		o.unauthorizedEventsReceived = append(o.unauthorizedEventsReceived, event.FlowProtocolEventID)
-		lg.Warn().Str("event_id", event.FlowProtocolEventID).Msg("unauthorized ingress event received")
+		lg.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
 	}
 
 	// track all authorized events sent during test
@@ -122,7 +122,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 		lg.Error().Err(err).Msg("could not pass through ingress event")
 		return err
 	}
-	lg.Info().Str("event_id", event.FlowProtocolEventID).Msg("ingress event passed through successfully")
+	lg.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("ingress event passed through successfully")
 	return nil
 }
 
@@ -271,10 +271,10 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 	}
 }
 
-func (o *TopicValidatorAttackOrchestrator) getFlowProtocolEventID(channel channels.Channel, event interface{}) string {
+func (o *TopicValidatorAttackOrchestrator) getFlowProtocolEventID(channel channels.Channel, event interface{}) flow.Identifier {
 	payload, err := o.codec.Encode(event)
 	require.NoError(o.t, err)
-	eventID, err := p2p.EventId(channel, payload)
+	eventIDHash, err := p2p.EventId(channel, payload)
 	require.NoError(o.t, err)
-	return eventID.Hex()
+	return flow.HashToID(eventIDHash)
 }
