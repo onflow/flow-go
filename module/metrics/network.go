@@ -82,7 +82,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
-			Help:      "number of duplicate messages inboundDropped",
+			Help:      "number of duplicate messages dropped",
 		}, []string{LabelChannel, LabelMessage},
 	)
 
@@ -128,7 +128,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_lookup_requests_dropped_total",
-			Help:      "the number of dns lookup requests inboundDropped",
+			Help:      "the number of dns lookup requests dropped",
 		},
 	)
 
@@ -238,7 +238,7 @@ func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, 
 	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkDuplicateMessagesDropped tracks the number of messages inboundDropped by the network layer due to duplication
+// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
 func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
 	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
 }
@@ -312,7 +312,7 @@ func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
 }
 
-// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are inboundDropped due to a full queue
+// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
 func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
 	nc.dnsLookupRequestDroppedCount.Inc()
 }
