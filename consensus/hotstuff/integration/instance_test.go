@@ -594,12 +594,17 @@ func (in *Instance) Run() error {
 			case *flow.QuorumCertificate:
 				err := in.handler.OnReceiveQc(m)
 				if err != nil {
-					return fmt.Errorf("could not process received qc: %w", err)
+					return fmt.Errorf("could not process received QC: %w", err)
 				}
 			case *flow.TimeoutCertificate:
 				err := in.handler.OnReceiveTc(m)
 				if err != nil {
-					return fmt.Errorf("could not process received tc: %w", err)
+					return fmt.Errorf("could not process received TC: %w", err)
+				}
+			case *hotstuff.PartialTcCreated:
+				err := in.handler.OnPartialTcCreated(m)
+				if err != nil {
+					return fmt.Errorf("could not process partial TC: %w", err)
 				}
 			}
 		}
@@ -631,7 +636,11 @@ func (in *Instance) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 }
 
 func (in *Instance) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
-	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+	in.queue <- &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
 }
 
 func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
