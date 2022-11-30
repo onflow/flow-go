@@ -34,7 +34,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(20_000, b) } // 10_000
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 1_000_000_000 // 500_000_000
+		bootstrapSize      = 500_000_000 // 1_000_000_000 // 500_000_000
 		numInsPerStep      = 1000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
@@ -51,7 +51,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 		opts := badger.
 			DefaultOptions(dir).
 			WithKeepL0InMemory(true).
-
 			// the ValueLogFileSize option specifies how big the value of a
 			// key-value pair is allowed to be saved into badger.
 			// exceeding this limit, will fail with an error like this:
@@ -63,6 +62,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		db, err := badger.Open(opts)
 		require.NoError(b, err)
+		defer db.Close()
 
 		storage, err := delta.NewBadgerStore(db)
 		require.NoError(b, err)
