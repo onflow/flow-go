@@ -48,6 +48,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	unittest.RunWithTempDir(b, func(dir string) {
 		b.Logf("badger dir: %s", dir)
 
+		dir = "/mnt/disks/test/flow"
 		// //// BadgerDB
 		// opts := badger.
 		// 	DefaultOptions(dir).
