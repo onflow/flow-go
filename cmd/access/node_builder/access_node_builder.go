@@ -408,6 +408,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
+	var execDataStore execution_data.ExecutionDataStore
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -534,10 +535,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			blobStore := blobs.NewBlobstore(ds)
+			execDataStore = execution_data.NewExecutionDataStore(blobStore, execution_data.DefaultSerializer)
 			builder.StateStreamEng = state_stream.NewEng(
 				conf,
-				blobStore,
-				execution_data.DefaultSerializer,
+				execDataStore,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,

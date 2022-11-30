@@ -12,7 +12,6 @@ import (
 	logging "github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -44,8 +43,7 @@ type Engine struct {
 // New returns a new ingress server.
 func NewEng(
 	config Config,
-	bs blobs.Blobstore,
-	serializer execution_data.Serializer,
+	execDataStore execution_data.ExecutionDataStore,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -81,8 +79,6 @@ func NewEng(
 	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	server := grpc.NewServer(grpcOpts...)
-
-	execDataStore := execution_data.NewExecutionDataStore(bs, serializer)
 
 	backend := New(headers, seals, results, execDataStore)
 
