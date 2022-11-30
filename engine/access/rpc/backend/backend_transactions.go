@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -16,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"

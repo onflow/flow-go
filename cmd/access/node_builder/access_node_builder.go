@@ -528,9 +528,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, nil
 			}
 			conf := state_stream.Config{
-				ListenAddr:        builder.rpcConf.StateStreamListenAddr,
-				MaxBlockMsgSize:   builder.rpcConf.MaxBlockMsgSize,
-				RpcMetricsEnabled: builder.rpcMetricsEnabled,
+				ListenAddr:              builder.rpcConf.StateStreamListenAddr,
+				MaxExecutionDataMsgSize: builder.rpcConf.MaxExecutionDataMsgSize,
+				RpcMetricsEnabled:       builder.rpcMetricsEnabled,
 			}
 
 			blobStore := blobs.NewBlobstore(ds)
@@ -594,7 +594,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
-		flags.IntVar(&builder.rpcConf.MaxBlockMsgSize, "max-block-msg-size", defaultConfig.rpcConf.MaxBlockMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.IntVar(&builder.rpcConf.MaxExecutionDataMsgSize, "max-block-msg-size", defaultConfig.rpcConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")

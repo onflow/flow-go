@@ -40,7 +40,7 @@ type Config struct {
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
-	MaxBlockMsgSize           int                              // GRPC max message size for block execution data
+	MaxExecutionDataMsgSize   int                              // GRPC max message size for block execution data
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
 	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
@@ -118,7 +118,7 @@ func NewBuilder(log zerolog.Logger,
 	}
 
 	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, loggingInterceptor(log)...)
+	interceptors = append(interceptors, LoggingInterceptor(log)...)
 
 	// create a chained unary interceptor
 	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)

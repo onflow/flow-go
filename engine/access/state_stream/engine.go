@@ -1,35 +1,36 @@
 package state_stream
 
 import (
+	"fmt"
 	"net"
-	"sync"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/engine"
+	logging "github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr        string
-	MaxBlockMsgSize   int  // in bytes
-	RpcMetricsEnabled bool // enable GRPC metrics
+	ListenAddr              string
+	MaxExecutionDataMsgSize int  // in bytes
+	RpcMetricsEnabled       bool // enable GRPC metrics
 }
 
-// Engine exposes the server with a simplified version of the Access API.
-// An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
-// port 8000) are brought up.
+// Engine exposes the server with the state stream API.
+// By default, this engine is not enabled.
+// In order to run this engine a port for the GRPC server to be served on should be specified in the run config.
 type Engine struct {
-	unit    *engine.Unit
+	*component.ComponentManager
 	log     zerolog.Logger
 	backend *StateStreamBackend
 	server  *grpc.Server
@@ -37,7 +38,6 @@ type Engine struct {
 	chain   flow.Chain
 	handler *Handler
 
-	addrLock               sync.RWMutex
 	stateStreamGrpcAddress net.Addr
 }
 
@@ -51,17 +51,13 @@ func NewEng(
 	results storage.ExecutionResults,
 	log zerolog.Logger,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
-	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
 ) *Engine {
-	if config.MaxBlockMsgSize == 0 {
-		config.MaxBlockMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxBlockMsgSize),
-		grpc.MaxSendMsgSize(config.MaxBlockMsgSize),
+		grpc.MaxRecvMsgSize(config.MaxExecutionDataMsgSize),
+		grpc.MaxSendMsgSize(config.MaxExecutionDataMsgSize),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -77,6 +73,9 @@ func NewEng(
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
+	// add the logging interceptor, ensure it is innermost wrapper
+	interceptors = append(interceptors, logging.LoggingInterceptor(log)...)
+
 	// create a chained unary interceptor
 	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
 	grpcOpts = append(grpcOpts, chainedInterceptors)
@@ -88,7 +87,6 @@ func NewEng(
 	backend := New(headers, seals, results, execDataStore)
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "state_stream_rpc").Logger(),
 		backend: backend,
 		server:  server,
@@ -97,45 +95,35 @@ func NewEng(
 		handler: NewHandler(backend, chainID.Chain()),
 	}
 
+	componentBuilder := component.NewComponentManagerBuilder()
+	componentBuilder.AddWorker(e.serve)
+	e.ComponentManager = component.NewComponentManagerBuilder().Build()
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
 
 	return e
 }
 
-// Ready returns a ready channel that is closed once the module has fully
-// started. The ingress module is ready when the gRPC server has successfully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the module has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
-}
-
-// serve starts the gRPC server .
-//
+// serve starts the gRPC server.
 // When this function returns, the server is considered ready.
-func (e *Engine) serve() {
+func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	e.log.Info().Str("state_stream_address", e.config.ListenAddr).Msg("starting grpc server on address")
-
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to start server")
-		return
+		ctx.Throw(fmt.Errorf("error starting grpc server: %w", err))
 	}
 
-	e.addrLock.Lock()
 	e.stateStreamGrpcAddress = l.Addr()
-	e.addrLock.Unlock()
-
 	e.log.Debug().Str("state_stream_address", e.stateStreamGrpcAddress.String()).Msg("listening on port")
 
 	err = e.server.Serve(l) // blocking call
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error in secure grpc server")
+		ctx.Throw(fmt.Errorf("error trying to serve grpc server: %w", err))
+	}
+
+	select {
+	case <-ctx.Done():
+		e.server.GracefulStop()
+	default:
 	}
 }
