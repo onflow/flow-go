@@ -200,7 +200,8 @@ func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 	hc.idleDuration.Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
-// HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
+// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration - the time between receiving and
+// enqueueing a message to beginning to process that message.
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }

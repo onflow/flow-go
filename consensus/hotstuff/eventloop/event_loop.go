@@ -18,13 +18,21 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
+// queuedProposal is a helper structure that is used to transmit proposal in channel
+// it contains an attached insertionTime that is used to measure how long we have waited between queening proposal and
+// actually processing by `EventHandler`.
+type queuedProposal struct {
+	proposal      *model.Proposal
+	insertionTime time.Time
+}
+
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
 	log                      zerolog.Logger
 	eventHandler             hotstuff.EventHandler
 	metrics                  module.HotstuffMetrics
-	proposals                chan *model.Proposal
+	proposals                chan queuedProposal
 	newestSubmittedTc        *tracker.NewestTCTracker
 	newestSubmittedQc        *tracker.NewestQCTracker
 	newestSubmittedPartialTc *tracker.NewestPartialTcTracker
@@ -45,7 +53,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 	// we will fill the buffer and block compliance engine worker but that should happen only if compliance engine receives
 	// large number of blocks in short period of time(when catching up for instance).
 	// TODO(active-pacemaker) add metrics for length of inbound channels
-	proposals := make(chan *model.Proposal, 1000)
+	proposals := make(chan queuedProposal, 1000)
 
 	el := &EventLoop{
 		log:                      log,
@@ -187,26 +195,32 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			}
 
 		// if we have a new proposal, process it
-		case p := <-el.proposals:
+		case queuedItem := <-el.proposals:
+			// the wait duration is measured as how long it takes from a block being
+			// received to event handler commencing the processing of the block
+			el.metrics.HotStuffWaitDuration(time.Since(queuedItem.insertionTime), metrics.HotstuffEventTypeOnProposal)
+
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveProposal(p)
+			proposal := queuedItem.proposal
+
+			err := el.eventHandler.OnReceiveProposal(proposal)
 
 			// measure how long it takes for a proposal to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
 
 			if err != nil {
-				return fmt.Errorf("could not process proposal %v: %w", p.Block.BlockID, err)
+				return fmt.Errorf("could not process proposal %v: %w", proposal.Block.BlockID, err)
 			}
 
 			el.log.Info().
 				Dur("dur_ms", time.Since(processStart)).
-				Uint64("view", p.Block.View).
-				Hex("block_id", p.Block.BlockID[:]).
+				Uint64("view", proposal.Block.View).
+				Hex("block_id", proposal.Block.BlockID[:]).
 				Msg("block proposal has been processed successfully")
 
 		// if we have a new QC, process it
@@ -261,17 +275,16 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 // SubmitProposal pushes the received block to the proposals channel
 func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
-	received := time.Now()
-
+	queueItem := queuedProposal{
+		proposal:      proposal,
+		insertionTime: time.Now(),
+	}
 	select {
-	case el.proposals <- proposal:
+	case el.proposals <- queueItem:
 	case <-el.ComponentManager.ShutdownSignal():
 		return
 	}
 
-	// the wait duration is measured as how long it takes from a block being
-	// received to event handler commencing the processing of the block
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
 // onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel

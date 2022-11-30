@@ -139,7 +139,8 @@ type HotstuffMetrics interface {
 	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
 
-	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration - the time between receiving and
+	// enqueueing a message to beginning to process that message.
 	HotStuffWaitDuration(duration time.Duration, event string)
 
 	// SetCurView reports Metrics C8: Current View maintained by Pacemaker.
