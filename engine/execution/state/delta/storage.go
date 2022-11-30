@@ -368,29 +368,29 @@ func (s *RocksStore) GenerateSSTFileWithRandomKeyValues(sstFilePath string, numb
 		return fmt.Errorf("error writing data: %w", err)
 	}
 
-	for i := uint64(0); i < numberOfKeys; i++ {
-		// the first 8 bytes of the key would be the big endian encoding of i
-		// the rest would be populated randomly
-		// so keys would always be strictly increasing in order
-		key := make([]byte, 8)
-		binary.BigEndian.PutUint64(key, i)
-		randomBytes := make([]byte, keySize-8)
-		rand.Read(randomBytes)
-		key = append(key, randomBytes...)
+	// for i := uint64(0); i < numberOfKeys; i++ {
+	// 	// the first 8 bytes of the key would be the big endian encoding of i
+	// 	// the rest would be populated randomly
+	// 	// so keys would always be strictly increasing in order
+	// 	key := make([]byte, 8)
+	// 	binary.BigEndian.PutUint64(key, i)
+	// 	randomBytes := make([]byte, keySize-8)
+	// 	rand.Read(randomBytes)
+	// 	key = append(key, randomBytes...)
 
-		// decide on the value byte size
-		var byteSize = maxValueSize
-		if minValueSize < maxValueSize {
-			byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
-		}
-		// randomly fill in the value
-		value := make([]byte, byteSize)
-		rand.Read(value)
-		err = writer.Add(key, value)
-		if err != nil {
-			return fmt.Errorf("error writing data: %w", err)
-		}
-	}
+	// 	// decide on the value byte size
+	// 	var byteSize = maxValueSize
+	// 	if minValueSize < maxValueSize {
+	// 		byteSize = minValueSize + rand.Intn(maxValueSize-minValueSize)
+	// 	}
+	// 	// randomly fill in the value
+	// 	value := make([]byte, byteSize)
+	// 	rand.Read(value)
+	// 	err = writer.Add(key, value)
+	// 	if err != nil {
+	// 		return fmt.Errorf("error writing data: %w", err)
+	// 	}
+	// }
 	err = writer.Finish()
 	if err != nil {
 		return fmt.Errorf("error finishing writer: %w", err)
