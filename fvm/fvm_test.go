@@ -1967,7 +1967,7 @@ func TestInteractionLimit(t *testing.T) {
 		},
 		{
 			name:             "default limit succeeds",
-			interactionLimit: state.DefaultMaxInteractionSize,
+			interactionLimit: fvm.DefaultMaxInteractionSize,
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)

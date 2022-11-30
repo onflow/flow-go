@@ -1,6 +1,8 @@
 package programs
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -10,18 +12,34 @@ import (
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived
 // data for a particular block.
 type DerivedBlockData struct {
-	*BlockDerivedData[common.AddressLocation, *interpreter.Program]
+	programs *DerivedDataTable[common.AddressLocation, *interpreter.Program]
+
+	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
 }
 
 // DerivedTransactionData is the derived data scratch space for a single
 // transaction.
 type DerivedTransactionData struct {
-	*TransactionDerivedData[common.AddressLocation, *interpreter.Program]
+	programs *TableTransaction[
+		common.AddressLocation,
+		*interpreter.Program,
+	]
+
+	// There's only a single entry in this table.  For simplicity, we'll use
+	// struct{} as the entry's key.
+	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
 }
 
 func NewEmptyDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		NewEmptyBlockDerivedData[common.AddressLocation, *interpreter.Program](),
+		programs: NewEmptyTable[
+			common.AddressLocation,
+			*interpreter.Program,
+		](),
+		meterParamOverrides: NewEmptyTable[
+			struct{},
+			MeterParamOverrides,
+		](),
 	}
 }
 
@@ -29,13 +47,21 @@ func NewEmptyDerivedBlockData() *DerivedBlockData {
 // beginning of the block.
 func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
 	return &DerivedBlockData{
-		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, *interpreter.Program](offset),
+		programs: NewEmptyTableWithOffset[
+			common.AddressLocation,
+			*interpreter.Program,
+		](offset),
+		meterParamOverrides: NewEmptyTableWithOffset[
+			struct{},
+			MeterParamOverrides,
+		](offset),
 	}
 }
 
 func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
-		block.NewChildBlockDerivedData(),
+		programs:            block.programs.NewChildTable(),
+		meterParamOverrides: block.meterParamOverrides.NewChildTable(),
 	}
 }
 
@@ -46,7 +72,14 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txn, err := block.NewSnapshotReadTransactionDerivedData(
+	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {
@@ -54,7 +87,8 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	}
 
 	return &DerivedTransactionData{
-		TransactionDerivedData: txn,
+		programs:            txnPrograms,
+		meterParamOverrides: txnMeterParamOverrides,
 	}, nil
 }
 
@@ -65,14 +99,35 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	*DerivedTransactionData,
 	error,
 ) {
-	txn, err := block.NewTransactionDerivedData(snapshotTime, executionTime)
+	txnPrograms, err := block.programs.NewTableTransaction(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewTableTransaction(
+		snapshotTime,
+		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DerivedTransactionData{
-		TransactionDerivedData: txn,
+		programs:            txnPrograms,
+		meterParamOverrides: txnMeterParamOverrides,
 	}, nil
+}
+
+func (block *DerivedBlockData) NextTxIndexForTestingOnly() uint32 {
+	// NOTE: We can use next tx index from any table since they are identical.
+	return block.programs.NextTxIndexForTestingOnly()
+}
+
+func (block *DerivedBlockData) GetProgramForTestingOnly(
+	addressLocation common.AddressLocation,
+) *invalidatableEntry[*interpreter.Program] {
+	return block.programs.GetForTestingOnly(addressLocation)
 }
 
 func (transaction *DerivedTransactionData) GetProgram(
@@ -82,7 +137,7 @@ func (transaction *DerivedTransactionData) GetProgram(
 	*state.State,
 	bool,
 ) {
-	return transaction.TransactionDerivedData.Get(addressLocation)
+	return transaction.programs.Get(addressLocation)
 }
 
 func (transaction *DerivedTransactionData) SetProgram(
@@ -90,19 +145,54 @@ func (transaction *DerivedTransactionData) SetProgram(
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	transaction.TransactionDerivedData.Set(addressLocation, program, state)
+	transaction.programs.Set(addressLocation, program, state)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(
-	invalidator DerivedDataInvalidator[common.AddressLocation, *interpreter.Program],
+	invalidator TransactionInvalidator,
 ) {
-	transaction.TransactionDerivedData.AddInvalidator(invalidator)
+	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
+	transaction.meterParamOverrides.AddInvalidator(
+		invalidator.MeterParamOverridesInvalidator())
 }
 
-func (transaction *DerivedTransactionData) Validate() RetryableError {
-	return transaction.TransactionDerivedData.Validate()
+func (transaction *DerivedTransactionData) GetMeterParamOverrides(
+	txnState *state.TransactionState,
+	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+) (
+	MeterParamOverrides,
+	error,
+) {
+	return transaction.meterParamOverrides.GetOrCompute(
+		txnState,
+		struct{}{},
+		getMeterParamOverrides)
 }
 
-func (transaction *DerivedTransactionData) Commit() RetryableError {
-	return transaction.TransactionDerivedData.Commit()
+func (transaction *DerivedTransactionData) Validate() error {
+	err := transaction.programs.Validate()
+	if err != nil {
+		return fmt.Errorf("programs validate failed: %w", err)
+	}
+
+	err = transaction.meterParamOverrides.Validate()
+	if err != nil {
+		return fmt.Errorf("meter param overrides validate failed: %w", err)
+	}
+
+	return nil
+}
+
+func (transaction *DerivedTransactionData) Commit() error {
+	err := transaction.programs.Commit()
+	if err != nil {
+		return fmt.Errorf("programs commit failed: %w", err)
+	}
+
+	err = transaction.meterParamOverrides.Commit()
+	if err != nil {
+		return fmt.Errorf("meter param overrides commit failed: %w", err)
+	}
+
+	return nil
 }

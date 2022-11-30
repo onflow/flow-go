@@ -711,7 +711,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 			func() uint { return uint(runtime.MemProfileRate) },
 			func(r uint) error { runtime.MemProfileRate = int(r); return nil }),
 	).Msg("could not register profiler setting")
-	// There is no way to get the current block progile rate so we keep track of it ourselves.
+	// There is no way to get the current block profile rate so we keep track of it ourselves.
 	currentRate := new(uint)
 	fnb.MustNot(
 		fnb.ConfigManager.RegisterUintConfig(
@@ -726,9 +726,11 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 			func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil }),
 	).Msg("could not register profiler setting")
 
-	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+	// registering as a DependableComponent with no dependencies so that it's started immediately on startup
+	// without being blocked by other component's Ready()
+	fnb.DependableComponent("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
-	})
+	}, NewDependencyList())
 }
 
 func (fnb *FlowNodeBuilder) initDB() {
@@ -1113,7 +1115,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Run all components
 	for _, f := range fnb.components {
 		// Components with explicit dependencies are not started serially
-		if f.dependencies != nil && len(f.dependencies.components) > 0 {
+		if f.dependencies != nil {
 			asyncComponents = append(asyncComponents, f)
 			continue
 		}
@@ -1336,6 +1338,8 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 // MUST be idempotent.
 func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder {
+	// Note: dependencies are passed as a struct to allow updating the list after calling this method.
+	// Passing a slice instead would result in out of sync metadata since slices are passed by reference
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:           f,
 		name:         name,
@@ -1486,7 +1490,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		NodeConfig: &NodeConfig{
 			BaseConfig:              *config,
 			Logger:                  zerolog.New(os.Stderr),
-			PeerManagerDependencies: &DependencyList{},
+			PeerManagerDependencies: NewDependencyList(),
 			ConfigManager:           updatable_configs.NewManager(),
 		},
 		flags:                    pflag.CommandLine,

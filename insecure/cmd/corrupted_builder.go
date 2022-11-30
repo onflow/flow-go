@@ -105,6 +105,9 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)
 		}
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
+
+		// override the original flow network with the corruptible network.
+		cnb.Network = corruptibleNetwork
 		return corruptibleNetwork, nil
 	})
 }

@@ -93,3 +93,15 @@ func TestOrderingChangesHash(t *testing.T) {
 
 	assert.NotEqual(t, payload1.Hash(), payload2.Hash())
 }
+
+func TestBlock_Status(t *testing.T) {
+	statuses := map[flow.BlockStatus]string{
+		flow.BlockStatusUnknown:   "BLOCK_UNKNOWN",
+		flow.BlockStatusFinalized: "BLOCK_FINALIZED",
+		flow.BlockStatusSealed:    "BLOCK_SEALED",
+	}
+
+	for status, value := range statuses {
+		assert.Equal(t, status.String(), value)
+	}
+}
