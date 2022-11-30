@@ -34,7 +34,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(20_000, b) } // 10_000
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
 	const (
-		bootstrapSize      = 500_000_000 // 1_000_000_000 // 500_000_000
+		bootstrapSize      = 1_000_000_000 // 1_000_000_000 // 500_000_000
 		numInsPerStep      = 1000
 		keyNumberOfParts   = 2
 		keyPartMinByteSize = 1
