@@ -276,7 +276,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		return nil
 	}
 	log.Info().Msg("cluster timeout was broadcast")
-	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterTimeoutObject)
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 
 	return nil
 }
@@ -298,7 +298,7 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		return nil
 	}
 	log.Info().Msg("collection vote transmitted")
-	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockVote)
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 
 	return nil
 }
@@ -351,7 +351,7 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 		return nil
 	}
 	log.Info().Msg("cluster proposal was broadcast")
-	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockProposal)
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageBlockProposal)
 
 	return nil
 }
@@ -380,7 +380,7 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 	if ok := h.ownOutboundVotes.Push(packed); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	} else {
-		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockVote)
+		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 	}
 }
 
@@ -391,7 +391,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
 		h.ownOutboundMessageNotifier.Notify()
 	} else {
-		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageClusterTimeoutObject)
+		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 	}
 }
 
@@ -417,7 +417,7 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 		if ok := h.ownOutboundProposals.Push(proposal); ok {
 			h.ownOutboundMessageNotifier.Notify()
 		} else {
-			h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockProposal)
+			h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageBlockProposal)
 		}
 	}()
 }
@@ -453,7 +453,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 // forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs vote and forwards it to own `voteAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote, originID flow.Identifier) {
-	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageClusterBlockVote)
+	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 	v := &model.Vote{
 		View:     vote.View,
 		BlockID:  vote.BlockID,
@@ -472,7 +472,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote,
 // forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
-	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageClusterTimeoutObject)
+	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 	h.log.Info().
 		Hex("origin_id", t.SignerID[:]).
 		Uint64("view", t.View).

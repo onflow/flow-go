@@ -12,6 +12,7 @@ import (
 type NoopCollector struct{}
 
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
+var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 
 func NewNoopCollector() *NoopCollector {
@@ -42,6 +43,7 @@ func (nc *NoopCollector) MessageSent(engine string, message string)             
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
 func (nc *NoopCollector) InboundMessageDropped(engine string, message string)                    {}
+func (nc *NoopCollector) OutboundMessageDropped(engine string, messages string)                  {}
 func (nc *NoopCollector) OutboundConnections(_ uint)                                             {}
 func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
 func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)                               {}
