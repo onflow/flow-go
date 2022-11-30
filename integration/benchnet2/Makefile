@@ -45,6 +45,14 @@ gen-helm-l2:
 # runs level 2 automation to generate values.yml based on template and data values from previous step
 gen-helm-values: validate gen-bootstrap gen-helm-l1 gen-helm-l2
 
+# main target for deployment
+deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
+
+# main target for cleaning up a deployment
+clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap
+
+clean-bootstrap:
+	rm -rf ./bootstrap
 
 k8s-secrets-create:
 	bash ./create-secrets.sh
