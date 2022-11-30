@@ -117,7 +117,6 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-	baseOptions                  []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
 }
@@ -523,17 +522,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	return builder
 }
 
-type Option func(*AccessNodeConfig)
-
-func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
-	config := DefaultAccessNodeConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		AccessNodeConfig:        DefaultAccessNodeConfig(),
+		FlowNodeBuilder:         nodeBuilder,
 		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
 	}
 }
