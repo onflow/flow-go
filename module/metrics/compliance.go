@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 type ComplianceCollector struct {
@@ -14,7 +15,6 @@ type ComplianceCollector struct {
 	sealedHeight                    prometheus.Gauge
 	finalizedBlocks                 *prometheus.CounterVec
 	sealedBlocks                    prometheus.Counter
-	blockProposalDuration           prometheus.Counter
 	finalizedPayload                *prometheus.CounterVec
 	sealedPayload                   *prometheus.CounterVec
 	lastBlockFinalizedAt            time.Time
@@ -28,6 +28,8 @@ type ComplianceCollector struct {
 	currentDKGPhase3FinalView       prometheus.Gauge
 	epochEmergencyFallbackTriggered prometheus.Gauge
 }
+
+var _ module.ComplianceMetrics = (*ComplianceCollector)(nil)
 
 func NewComplianceCollector() *ComplianceCollector {
 
@@ -109,13 +111,6 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "the number of sealed blocks",
 		}),
 
-		blockProposalDuration: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "consensus_committee_block_proposal_duration_seconds_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
-			Help:      "time spent processing block proposals in seconds",
-		}),
-
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_payload_total",
 			Namespace: namespaceConsensus,
@@ -186,10 +181,6 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
-}
-
-func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
-	cc.blockProposalDuration.Add(duration.Seconds())
 }
 
 func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {

@@ -38,6 +38,7 @@ type HotstuffCollector struct {
 	timeoutDuration               prometheus.Gauge
 	voteProcessingDuration        prometheus.Histogram
 	timeoutProcessingDuration     prometheus.Histogram
+	blockProcessingDuration       prometheus.Histogram
 	committeeComputationsDuration prometheus.Histogram
 	signerComputationsDuration    prometheus.Histogram
 	validatorComputationsDuration prometheus.Histogram
@@ -113,7 +114,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "timeouts_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The number of times we timed out during a view",
+			Help:        "The number of views that this replica left due to observing a TC",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -160,6 +161,14 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
+		blockProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "block_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long compliance engine processes one block",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
 		voteProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace:   "vote_processing_seconds",
 			Subsystem:   namespaceConsensus,
@@ -201,7 +210,7 @@ func (hc *HotstuffCollector) CountSkipped() {
 	hc.skips.Inc()
 }
 
-// CountTimeout counts the number of timeouts we had.
+// CountTimeout tracks the number of views that this replica left due to observing a TC.
 func (hc *HotstuffCollector) CountTimeout() {
 	hc.timeouts.Inc()
 }
@@ -219,6 +228,12 @@ func (hc *HotstuffCollector) SetQCView(view uint64) {
 // SetTCView reports the view of the newest known TC
 func (hc *HotstuffCollector) SetTCView(view uint64) {
 	hc.tcView.Set(float64(view))
+}
+
+// BlockProcessingDuration measures the time which the compliance engine
+// spends to process one block proposal.
+func (hc *HotstuffCollector) BlockProcessingDuration(duration time.Duration) {
+	hc.blockProcessingDuration.Observe(duration.Seconds())
 }
 
 // VoteProcessingDuration reports the processing time for a single vote

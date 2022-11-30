@@ -561,9 +561,10 @@ func createNode(
 	compCore, err := compliance.NewCore(
 		log,
 		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
 		tracer,
-		metricsCollector,
-		metricsCollector,
 		cleaner,
 		headersDB,
 		payloadsDB,

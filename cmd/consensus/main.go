@@ -691,9 +691,10 @@ func main() {
 
 			complianceCore, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
-				node.Tracer,
 				node.Metrics.Mempool,
+				mainMetrics,
 				node.Metrics.Compliance,
+				node.Tracer,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,

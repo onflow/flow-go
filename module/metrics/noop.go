@@ -66,7 +66,6 @@ func (nc *NoopCollector) FinalizedHeight(height uint64)                         
 func (nc *NoopCollector) SealedHeight(height uint64)                                             {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
-func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
 func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
 func (nc *NoopCollector) CurrentEpochCounter(counter uint64)                                     {}
 func (nc *NoopCollector) CurrentEpochPhase(phase flow.EpochPhase)                                {}
@@ -89,6 +88,7 @@ func (nc *NoopCollector) SetQCView(view uint64)                                 
 func (nc *NoopCollector) SetTCView(uint64)                                                       {}
 func (nc *NoopCollector) CountSkipped()                                                          {}
 func (nc *NoopCollector) CountTimeout()                                                          {}
+func (nc *NoopCollector) BlockProcessingDuration(time.Duration)                                  {}
 func (nc *NoopCollector) VoteProcessingDuration(time.Duration)                                   {}
 func (nc *NoopCollector) TimeoutObjectProcessingDuration(time.Duration)                          {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                                      {}

@@ -5,6 +5,7 @@ package compliance
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -37,6 +38,7 @@ type Core struct {
 	config            compliance.Config
 	engineMetrics     module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
+	hotstuffMetrics   module.HotstuffMetrics
 	collectionMetrics module.CollectionMetrics
 	headers           storage.Headers
 	state             clusterkv.MutableState
@@ -56,6 +58,7 @@ func NewCore(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
 	mempool module.MempoolMetrics,
+	hotstuffMetrics module.HotstuffMetrics,
 	collectionMetrics module.CollectionMetrics,
 	headers storage.Headers,
 	state clusterkv.MutableState,
@@ -78,6 +81,7 @@ func NewCore(
 		config:            config,
 		engineMetrics:     collector,
 		mempoolMetrics:    mempool,
+		hotstuffMetrics:   hotstuffMetrics,
 		collectionMetrics: collectionMetrics,
 		headers:           headers,
 		state:             state,
@@ -105,6 +109,9 @@ func NewCore(
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+	startTime := time.Now()
+	defer c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+
 	header := proposal.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()

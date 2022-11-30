@@ -18,7 +18,7 @@ type ResolverMetrics interface {
 	// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
 	OnDNSCacheMiss()
 
-	// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
+	// OnDNSCacheHit tracks the total number of dns requests resolved through the cache without
 	// looking up the network.
 	OnDNSCacheHit()
 
@@ -51,7 +51,6 @@ type NetworkMetrics interface {
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string, messageType string)
 
-	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
 
@@ -79,7 +78,7 @@ type NetworkMetrics interface {
 }
 
 // EngineMetrics is a generic metrics consumer for node-internal data processing
-// components (aka engines). Implementations must be non-blocking and concurrency safe. 
+// components (aka engines). Implementations must be non-blocking and concurrency safe.
 type EngineMetrics interface {
 	// MessageSent reports that the engine transmitted the message over the network.
 	// Unicasts, broadcasts, and multicasts are all reported once.
@@ -101,7 +100,6 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
-	BlockProposalDuration(duration time.Duration)
 	CurrentEpochCounter(counter uint64)
 	CurrentEpochPhase(phase flow.EpochPhase)
 	CurrentEpochFinalView(view uint64)
@@ -153,11 +151,15 @@ type HotstuffMetrics interface {
 	// CountSkipped counts the number of skips we did.
 	CountSkipped()
 
-	// CountTimeout counts the number of timeouts we had.
+	// CountTimeout tracks the number of views that this replica left due to observing a TC.
 	CountTimeout()
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
+
+	// BlockProcessingDuration measures the time which the compliance engine
+	// spends to process one block proposal.
+	BlockProcessingDuration(duration time.Duration)
 
 	// VoteProcessingDuration measures the time which the hotstuff.VoteAggregator
 	// spends to process one vote.

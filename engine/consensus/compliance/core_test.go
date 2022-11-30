@@ -253,9 +253,10 @@ func (cs *CommonSuite) SetupTest() {
 	e, err := NewCore(
 		unittest.Logger(),
 		cs.metrics,
+		cs.metrics,
+		cs.metrics,
+		cs.metrics,
 		cs.tracer,
-		cs.metrics,
-		cs.metrics,
 		cs.cleaner,
 		cs.headers,
 		cs.payloads,

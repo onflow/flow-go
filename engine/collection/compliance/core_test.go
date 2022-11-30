@@ -172,6 +172,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
+		cs.metrics,
 		cs.headers,
 		cs.state,
 		cs.pending,
