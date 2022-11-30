@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultMaxMsgSize use 16MB as the default message size limit.
+// DefaultMaxMsgSize use 20MB as the default message size limit.
 // grpc library default is 4MB
-const DefaultMaxMsgSize = 1024 * 1024 * 16
+const DefaultMaxMsgSize = 1024 * 1024 * 20
 
 // X509Certificate generates a self-signed x509 TLS certificate from the given key. The generated certificate
 // includes a libp2p extension that specifies the public key and the signature. The certificate does not include any
