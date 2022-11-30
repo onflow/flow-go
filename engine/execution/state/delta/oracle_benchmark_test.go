@@ -3,6 +3,7 @@ package delta_test
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -86,14 +87,14 @@ func benchmarkStorage(steps int, b *testing.B) {
 		storage, err := delta.NewRocksStore(db, opts)
 		require.NoError(b, err)
 
-		// //// bootstrap with sst files
-		// // tempdir, err := os.MkdirTemp("", "flow-temp-data")
-		// // require.NoError(b, err)
+		// bootstrap with sst files
+		tempdir, err := os.MkdirTemp("", "flow-temp-data")
+		require.NoError(b, err)
 
-		// // err = storage.GenerateSSTFileWithRandomKeyValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
-		// // require.NoError(b, err)
+		err = storage.GenerateSSTFileWithRandomKeyValues(tempdir, bootstrapSize, 32, 32, valueMaxByteSize)
+		require.NoError(b, err)
 
-		tempdir := "/tmp/flow-temp-data3172611116/"
+		// tempdir := "/tmp/flow-temp-data3172611116/"
 		err = storage.BootstrapWithSSTFiles(tempdir)
 		require.NoError(b, err)
 
@@ -113,7 +114,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		}
 		blockProductionIndex := 0
 		blockSealedIndex := 1
-		sealLatency := 1 // 10
+		sealLatency := 2 // 10
 
 		keysToRead := make([]ledger.Key, 0)
 
@@ -178,12 +179,12 @@ func benchmarkStorage(steps int, b *testing.B) {
 			totalReadCount++
 		}
 
-		// ////// read special key
-		// key := "random key"
-		// start := time.Now()
-		// _, _, err = storage.UnsafeRead(key)
-		// fmt.Println(">>>>>", time.Since(start))
-		// require.NoError(b, err)
+		////// read special key
+		key := []byte{0, 0, 0, 0, 0, 0, 0, 1}
+		start := time.Now()
+		_, _, err = storage.UnsafeRead(string(key))
+		fmt.Println(">>>>>", time.Since(start))
+		require.NoError(b, err)
 
 		b.ReportMetric(float64(totalUpdateTimeNS/steps), "update_time_(ns)")
 		b.ReportMetric(float64(totalUpdateTimeNS/totalUpdateCount), "update_time_per_reg_(ns)")

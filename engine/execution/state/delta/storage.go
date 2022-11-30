@@ -356,9 +356,8 @@ func (s *RocksStore) GenerateSSTFileWithRandomKeyValues(sstFilePath string, numb
 		return fmt.Errorf("error opening the path for sst writer: %w", err)
 	}
 
-	// TODO: fix this THIS is problematic as its the first value
 	// special key to be fetched later to evaulate latency
-	key := []byte("random key")
+	key := []byte{0, 0, 0, 0, 0, 0, 0, 1}
 	value := make([]byte, 1000)
 	rand.Read(value)
 	err = writer.Add(key, value)
