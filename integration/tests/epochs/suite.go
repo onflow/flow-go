@@ -238,8 +238,8 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	}
 }
 
-// WaitForPhase waits for epoch phase and will timeout after 2 minutes
-func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
+// WaitForPhase waits for the given epoch phase.
+func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase, waitFor, tick time.Duration) {
 	condition := func() bool {
 		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
@@ -249,11 +249,7 @@ func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
 
 		return currentPhase == phase
 	}
-	require.Eventually(s.T(),
-		condition,
-		waitTimeout,
-		100*time.Millisecond,
-		fmt.Sprintf("did not reach epoch phase (%s) within %v seconds", phase, waitTimeout))
+	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach epoch phase (%s) within %s", phase, waitTimeout)
 }
 
 // transfers tokens to receiver from service account
@@ -767,7 +763,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get the latest snapshot and start new container with it
@@ -785,7 +781,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+1)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+1)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace removed from smart contract state
@@ -804,7 +800,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait some time after pausing our container to replace before we assert healthy network
 	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10, 30*time.Second, 500*time.Millisecond)
 	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node

@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -38,7 +39,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 // This is equivalent to runTestEpochJoinAndLeave, without any committee changes.
 func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup, time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -53,9 +54,9 @@ func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	epoch1Counter, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 
-	// wait for the final view of the first epoch
-	s.TimedLogf("waiting for the final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
+	// wait for the first view of the second epoch
+	s.TimedLogf("waiting for the first view (%d) of second epoch %d", epoch1FinalView+1, epoch1Counter+1)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("sealed final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
 
 	// assert transition to second epoch happened as expected
