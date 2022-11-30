@@ -580,7 +580,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 				resultID flow.Identifier
 				event    flow.ServiceEvent
 			}{
-				height:   parent.Header.Height,
+				height:   header.Height,
 				resultID: result.ID(),
 				event:    event})
 
