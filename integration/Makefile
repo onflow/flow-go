@@ -38,7 +38,7 @@ consensus-tests:
 
 .PHONY: epochs-tests
 epochs-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/...
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/...
 
 .PHONY: ghost-tests
 ghost-tests:
