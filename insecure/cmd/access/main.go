@@ -8,7 +8,7 @@ import (
 
 func main() {
 	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleAccess.String())
-	builder := nodebuilder.FlowAccessNode(nodebuilder.WithFlowNodeBuilder(corruptedBuilder.FlowNodeBuilder)) // use the Access Node builder
+	builder := nodebuilder.FlowAccessNode(corruptedBuilder.FlowNodeBuilder) // use the corrupted Flow Node builder
 	builder.PrintBuildVersionDetails()
 
 	corruptedBuilder.LoadCorruptFlags()
