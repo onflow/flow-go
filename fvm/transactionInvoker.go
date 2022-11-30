@@ -305,13 +305,11 @@ func (executor *transactionExecutor) normalExecution() (
 	// The storage limit check for the payer assumes that the payers
 	// balance is max_fees lower than the current payers balance,
 	// because the payer will have to pay for this tx.
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.CheckStorageLimits(
-			executor.env,
-			executor.txnState.UpdatedAddresses(),
-			executor.proc.Transaction.Payer,
-			maxTxFees)
-	})
+	err = executor.CheckStorageLimits(
+		executor.env,
+		executor.txnState.UpdatedAddresses(),
+		executor.proc.Transaction.Payer,
+		maxTxFees)
 
 	if err != nil {
 		return

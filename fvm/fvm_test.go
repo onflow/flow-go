@@ -1409,6 +1409,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
 			maxExecutionEffort := uint64(997)
+
+			executionEffortForStorageCheck := uint64(1)
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
@@ -1416,7 +1419,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetGasLimit(maxExecutionEffort)
+				SetGasLimit(maxExecutionEffort + executionEffortForStorageCheck)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1427,7 +1430,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, tx.Err)
 
 			// expected used is number of loops.
-			assert.Equal(t, loops, tx.ComputationUsed)
+			assert.Equal(t, loops+executionEffortForStorageCheck, tx.ComputationUsed)
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
@@ -1990,7 +1993,7 @@ func TestInteractionLimit(t *testing.T) {
 		},
 		{
 			name:             "low limit succeeds",
-			interactionLimit: 170000,
+			interactionLimit: 250000,
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Events, 5)
