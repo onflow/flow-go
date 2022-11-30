@@ -882,34 +882,34 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 	}, nil
 }
 
-func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chain) (execution_data.BlockExecutionData, error) {
+func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chain) (*execution_data.BlockExecutionData, error) {
 	if m == nil {
-		return execution_data.BlockExecutionData{}, ErrEmptyMessage
+		return nil, ErrEmptyMessage
 	}
 	chunks := make([]*execution_data.ChunkExecutionData, len(m.ChunkExecutionData))
 	for i, chunk := range m.GetChunkExecutionData() {
 		convertedChunk, err := MessageToChunkExecutionData(chunk, chain)
 		if err != nil {
-			return execution_data.BlockExecutionData{}, err
+			return nil, err
 		}
-		chunks[i] = &convertedChunk
+		chunks[i] = convertedChunk
 	}
 
-	return execution_data.BlockExecutionData{
+	return &execution_data.BlockExecutionData{
 		BlockID:             MessageToIdentifier(m.GetBlockId()),
 		ChunkExecutionDatas: chunks,
 	}, nil
 }
 
-func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (execution_data.ChunkExecutionData, error) {
+func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (*execution_data.ChunkExecutionData, error) {
 	collection, err := messageToExecutionDataCollection(m.GetCollection(), chain)
 	if err != nil {
-		return execution_data.ChunkExecutionData{}, err
+		return nil, err
 	}
 
 	trieUpdate, err := messageToTrieUpdate(m.GetTrieUpdate())
 	if err != nil {
-		return execution_data.ChunkExecutionData{}, err
+		return nil, err
 	}
 
 	events := MessagesToEvents(m.GetEvents())
@@ -917,7 +917,7 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 		events = nil
 	}
 
-	return execution_data.ChunkExecutionData{
+	return &execution_data.ChunkExecutionData{
 		Collection: collection,
 		Events:     events,
 		TrieUpdate: trieUpdate,

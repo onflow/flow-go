@@ -128,7 +128,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 
 		chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
 		assert.Nil(t, err)
-		assert.Equal(t, bed.ChunkExecutionDatas[0], &chunkReConverted)
+		assert.Equal(t, bed.ChunkExecutionDatas[0], chunkReConverted)
 	})
 
 	t.Run("block execution data conversions", func(t *testing.T) {
@@ -137,6 +137,6 @@ func TestConvertBlockExecutionData(t *testing.T) {
 
 		bedReConverted, err := convert.MessageToBlockExecutionData(blockMsg, flow.Testnet.Chain())
 		assert.Nil(t, err)
-		assert.Equal(t, bed, &bedReConverted)
+		assert.Equal(t, bed, bedReConverted)
 	})
 }
