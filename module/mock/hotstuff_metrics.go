@@ -13,6 +13,11 @@ type HotstuffMetrics struct {
 	mock.Mock
 }
 
+// BlockProcessingDuration provides a mock function with given fields: duration
+func (_m *HotstuffMetrics) BlockProcessingDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
 // CommitteeProcessingDuration provides a mock function with given fields: duration
 func (_m *HotstuffMetrics) CommitteeProcessingDuration(duration time.Duration) {
 	_m.Called(duration)

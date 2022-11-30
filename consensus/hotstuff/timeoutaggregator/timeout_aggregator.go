@@ -188,7 +188,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("drop stale timeouts")
-		t.engineMetrics.MessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
+		t.engineMetrics.InboundMessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("no queue capacity, dropping timeout")
-		t.engineMetrics.MessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
+		t.engineMetrics.InboundMessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 	t.queuedTimeoutsNotifier.Notify()

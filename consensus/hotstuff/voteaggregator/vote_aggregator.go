@@ -273,7 +273,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
 		log.Debug().Msg("drop stale votes")
-		va.engineMetrics.MessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 		return
 	}
 
@@ -283,7 +283,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 		va.queuedMessagesNotifier.Notify()
 	} else {
 		log.Info().Msg("no queue capacity, dropping vote")
-		va.engineMetrics.MessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 	}
 }
 

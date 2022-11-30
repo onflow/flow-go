@@ -8,10 +8,11 @@ import (
 )
 
 type EngineCollector struct {
-	sent     *prometheus.CounterVec
-	received *prometheus.CounterVec
-	handled  *prometheus.CounterVec
-	dropped  *prometheus.CounterVec
+	sent            *prometheus.CounterVec
+	received        *prometheus.CounterVec
+	handled         *prometheus.CounterVec
+	inboundDropped  *prometheus.CounterVec
+	outboundDropped *prometheus.CounterVec
 }
 
 var _ module.EngineMetrics = (*EngineCollector)(nil)
@@ -41,11 +42,18 @@ func NewEngineCollector() *EngineCollector {
 			Help:      "the number of messages handled by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
-		dropped: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "messages_dropped_total",
+		inboundDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "inbound_messages_dropped_total",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,
-			Help:      "the number of messages dropped by engines",
+			Help:      "the number of inbound messages dropped by engines",
+		}, []string{EngineLabel, LabelMessage}),
+
+		outboundDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "outbound_messages_dropped_total",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
+			Help:      "the number of outbound messages dropped by engines",
 		}, []string{EngineLabel, LabelMessage}),
 	}
 
@@ -64,6 +72,10 @@ func (ec *EngineCollector) MessageHandled(engine string, message string) {
 	ec.handled.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
 }
 
-func (ec *EngineCollector) MessageDropped(engine string, message string) {
-	ec.dropped.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
+func (ec *EngineCollector) InboundMessageDropped(engine string, message string) {
+	ec.inboundDropped.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
+}
+
+func (ec *EngineCollector) OutboundMessageDropped(engine string, message string) {
+	ec.outboundDropped.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
 }

@@ -121,7 +121,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
 		Name:      cacheName + "_" + "write_drop_count_total",
-		Help:      "total number of put queries dropped due to full capacity",
+		Help:      "total number of put queries inboundDropped due to full capacity",
 	})
 
 	countKeyPutSuccess := prometheus.NewCounter(prometheus.CounterOpts{
@@ -215,7 +215,7 @@ func (h *HeroCacheCollector) OnKeyPutSuccess(size uint32) {
 }
 
 // OnKeyPutDeduplicated is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
-// A duplicate key is dropped by the cache when it is written to the cache.
+// A duplicate key is inboundDropped by the cache when it is written to the cache.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 // a duplicate entity.
 func (h *HeroCacheCollector) OnKeyPutDeduplicated() {
@@ -245,7 +245,7 @@ func (h *HeroCacheCollector) OnKeyPutAttempt(size uint32) {
 	h.size.Set(float64(size))
 }
 
-// OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
+// OnKeyPutDrop is called whenever a new (key, entity) pair is inboundDropped from the cache due to full cache.
 func (h *HeroCacheCollector) OnKeyPutDrop() {
 	h.countKeyPutDrop.Inc()
 }

@@ -89,9 +89,12 @@ type EngineMetrics interface {
 	// Both invalid and valid messages should be reported.
 	// A message must be reported as either handled or dropped, not both.
 	MessageHandled(engine string, messages string)
-	// MessageDropped reports that the engine has dropped the message without processing it.
-	// A message must be reported as either handled or dropped, not both.
-	MessageDropped(engine string, messages string)
+	// InboundMessageDropped reports that the engine has dropped inbound message without processing it.
+	// Inbound messages must be reported as either handled or dropped, not both.
+	InboundMessageDropped(engine string, messages string)
+	// OutboundMessageDropped reports that the engine has dropped outbound message without processing it.
+	// Outbound messages must be reported as either sent or dropped, not both.
+	OutboundMessageDropped(engine string, messages string)
 }
 
 type ComplianceMetrics interface {

@@ -151,7 +151,7 @@ func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.Cluster
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
-		e.core.engineMetrics.MessageDropped(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 	}
 }
 
@@ -162,7 +162,7 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.Cluste
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
-		e.core.engineMetrics.MessageDropped(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 	}
 }
 

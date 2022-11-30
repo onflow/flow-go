@@ -9,8 +9,8 @@ type EngineMetrics struct {
 	mock.Mock
 }
 
-// MessageDropped provides a mock function with given fields: engine, messages
-func (_m *EngineMetrics) MessageDropped(engine string, messages string) {
+// InboundMessageDropped provides a mock function with given fields: engine, messages
+func (_m *EngineMetrics) InboundMessageDropped(engine string, messages string) {
 	_m.Called(engine, messages)
 }
 
@@ -27,6 +27,11 @@ func (_m *EngineMetrics) MessageReceived(engine string, message string) {
 // MessageSent provides a mock function with given fields: engine, message
 func (_m *EngineMetrics) MessageSent(engine string, message string) {
 	_m.Called(engine, message)
+}
+
+// OutboundMessageDropped provides a mock function with given fields: engine, messages
+func (_m *EngineMetrics) OutboundMessageDropped(engine string, messages string) {
+	_m.Called(engine, messages)
 }
 
 type mockConstructorTestingTNewEngineMetrics interface {

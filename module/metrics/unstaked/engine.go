@@ -8,6 +8,8 @@ type EngineCollector struct {
 	metrics module.EngineMetrics
 }
 
+var _ module.EngineMetrics = (*EngineCollector)(nil)
+
 func NewUnstakedEngineCollector(metrics module.EngineMetrics) *EngineCollector {
 	return &EngineCollector{metrics}
 }
@@ -24,6 +26,10 @@ func (ec *EngineCollector) MessageHandled(engine string, message string) {
 	ec.metrics.MessageHandled("unstaked_"+engine, message)
 }
 
-func (ec *EngineCollector) MessageDropped(engine string, message string) {
-	ec.metrics.MessageDropped("unstaked_"+engine, message)
+func (ec *EngineCollector) InboundMessageDropped(engine string, message string) {
+	ec.metrics.InboundMessageDropped("unstaked_"+engine, message)
+}
+
+func (ec *EngineCollector) OutboundMessageDropped(engine string, message string) {
+	ec.metrics.OutboundMessageDropped("unstaked_"+engine, message)
 }

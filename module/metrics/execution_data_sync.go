@@ -93,7 +93,7 @@ func NewExecutionDataRequesterV2Collector() *ExecutionDataRequesterV2Collector {
 			Name:      "responses_dropped",
 			Namespace: namespaceExecutionDataSync,
 			Subsystem: subsystemExeDataRequester,
-			Help:      "the number of dropped responses",
+			Help:      "the number of inboundDropped responses",
 		}),
 	}
 }
