@@ -180,7 +180,10 @@ func benchmarkStorage(steps int, b *testing.B) {
 		}
 
 		////// read special key
-		key := []byte{0, 0, 0, 0, 0, 0, 0, 1}
+		key := []byte{0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 1}
 		start := time.Now()
 		_, _, err = storage.UnsafeRead(string(key))
 		fmt.Println(">>>>>", time.Since(start))
