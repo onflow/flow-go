@@ -110,7 +110,9 @@ func NewCore(
 // No errors are expected during normal operation.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	startTime := time.Now()
-	defer c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	defer func() {
+		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	}()
 
 	header := proposal.Header
 	blockID := header.ID()

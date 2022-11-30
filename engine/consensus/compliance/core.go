@@ -319,7 +319,9 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
 	startTime := time.Now()
-	defer c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	defer func() {
+		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	}()
 
 	header := proposal.Header
 	blockID := header.ID()
