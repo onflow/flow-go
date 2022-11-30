@@ -266,15 +266,13 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
+	log := va.log.With().Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("voter", vote.SignerID[:]).
+		Str("vote_id", vote.ID().String()).Logger()
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
-
-		va.log.Info().
-			Uint64("block_view", vote.View).
-			Hex("block_id", vote.BlockID[:]).
-			Hex("voter", vote.SignerID[:]).
-			Str("vote_id", vote.ID().String()).
-			Msg("drop stale votes")
+		log.Debug().Msg("drop stale votes")
 		va.engineMetrics.MessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 		return
 	}
@@ -284,6 +282,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	if ok := va.queuedVotes.Push(vote); ok {
 		va.queuedMessagesNotifier.Notify()
 	} else {
+		log.Info().Msg("no queue capacity, dropping vote")
 		va.engineMetrics.MessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 	}
 }

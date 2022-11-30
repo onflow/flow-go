@@ -89,7 +89,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "qc_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The view of the newest known qc from HotStuff",
+			Help:        "The view of the newest known QC from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -97,7 +97,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "tc_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The view of the newest known tc from HotStuff",
+			Help:        "The view of the newest known TC from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -221,7 +221,7 @@ func (hc *HotstuffCollector) SetTCView(view uint64) {
 	hc.tcView.Set(float64(view))
 }
 
-// VoteProcessingDuration reports the processing time for a single vote 
+// VoteProcessingDuration reports the processing time for a single vote
 func (hc *HotstuffCollector) VoteProcessingDuration(duration time.Duration) {
 	hc.voteProcessingDuration.Observe(duration.Seconds())
 }

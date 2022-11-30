@@ -195,7 +195,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 	placedInQueue := t.queuedTimeouts.Push(timeoutObject)
 	if !placedInQueue { // processing pipeline `queuedTimeouts` is full
 		// It's ok to silently drop timeouts, because we are probably catching up.
-		t.log.Debug().
+		t.log.Info().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("no queue capacity, dropping timeout")
