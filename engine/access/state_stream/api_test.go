@@ -36,9 +36,9 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	suite.headers = new(storagemock.Headers)
-	suite.seals = new(storagemock.Seals)
-	suite.results = new(storagemock.ExecutionResults)
+	suite.headers = storagemock.NewHeaders(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
+	suite.results = storagemock.NewExecutionResults(suite.T())
 }
 
 func (suite *Suite) TestGetExecutionDataByBlockID() {
