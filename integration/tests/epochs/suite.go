@@ -90,6 +90,7 @@ func (s *Suite) SetupTest() {
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -105,18 +106,21 @@ func (s *Suite) SetupTest() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
-
 	s.net.Start(s.ctx)
 
 	// start tracking blocks
 	s.Track(s.T(), s.ctx, s.Ghost())
 
-	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
+	// use AN1 for test-related queries - the AN join/leave test will replace AN2
+	port, ok := s.net.AccessPortsByContainerName["access_1"]
+	require.True(s.T(), ok)
+	addr := fmt.Sprintf(":%s", port)
 	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
 
 	s.client = client
 
+	// log network info periodically to aid in debugging future flaky tests
 	go lib.LogStatusPeriodically(s.T(), s.ctx, s.log, s.client, 5*time.Second)
 }
 
@@ -744,7 +748,6 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	var containerToReplace *testnet.Container
 
 	// replace access_2, avoid replacing access_1 the container used for client connections
-	// TODO - access_2 is ghost node - is this why we're failing here?
 	if role == flow.RoleAccess {
 		containerToReplace = s.net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
