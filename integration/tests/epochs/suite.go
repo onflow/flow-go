@@ -38,10 +38,10 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, s
 // Suite encapsulates common functionality for epoch integration tests.
 type Suite struct {
 	suite.Suite
-	log zerolog.Logger
 	lib.TestnetStateTracker
 	ctx     context.Context
 	cancel  context.CancelFunc
+	log     zerolog.Logger
 	net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 	client  *testnet.Client
@@ -51,6 +51,9 @@ type Suite struct {
 	DKGPhaseLen                uint64
 	EpochLen                   uint64
 	EpochCommitSafetyThreshold uint64
+	// Whether approvals are required for sealing (we only enable for VN tests because
+	// requiring approvals requires a longer DKG period to avoid flakiness)
+	RequiredSealApprovals uint // defaults to 0 (no approvals required)
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
@@ -69,17 +72,13 @@ func (s *Suite) SetupTest() {
 
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.WarnLevel),
-	}
+		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		// we disable requiring approvals on epoch tests, because it increases time-to-seal
-		// which can interferes with the time-sensitive DKG and cause test flakiness
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 0)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 0)),
-		testnet.WithLogLevel(zerolog.WarnLevel),
-	}
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
+		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
@@ -90,13 +89,13 @@ func (s *Suite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
 	}
 
@@ -117,6 +116,8 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.client = client
+
+	go lib.LogStatusPeriodically(s.T(), s.ctx, s.log, s.client, 5*time.Second)
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -126,8 +127,10 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
-// TimedLogf logs the message using t.Log, but prefixes the current time.
+// TimedLogf logs the message using t.Log and the suite logger, but prefixes the current time.
+// This enables viewing logs inline with Docker logs as well as other test logs.
 func (s *Suite) TimedLogf(msg string, args ...interface{}) {
+	s.log.Info().Msgf(msg, args...)
 	args = append([]interface{}{time.Now().String()}, args...)
 	s.T().Logf("%s - "+msg, args...)
 }
@@ -769,12 +772,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// get the latest snapshot and start new container with it
 	rootSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 	require.NoError(s.T(), err)
-	testContainer.WriteRootSnapshot(rootSnapshot)
-	testContainer.Container.Start(s.ctx)
 
 	header, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
-	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+	segment, err := rootSnapshot.SealingSegment()
+	require.NoError(s.T(), err)
+
+	s.TimedLogf("retrieved header after entering EpochSetup phase: root_height=%d, root_view=%d, segment_heights=[%d-%d], segment_views=[%d-%d]",
+		header.Height, header.View,
+		segment.Lowest().Header.Height, segment.Highest().Header.Height,
+		segment.Lowest().Header.View, segment.Highest().Header.Height)
+
+	testContainer.WriteRootSnapshot(rootSnapshot)
+	testContainer.Container.Start(s.ctx)
 
 	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
