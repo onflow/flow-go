@@ -78,7 +78,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -147,7 +147,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -215,7 +215,20 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	success := unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	if !success {
+		t.Logf("dumping state of system:")
+		for i, inst := range instances {
+			t.Logf(
+				"instance %d: %d %d %d %d",
+				i,
+				inst.pacemaker.CurView(),
+				inst.pacemaker.NewestQC().View,
+				inst.forks.FinalizedBlock().View,
+				inst.forks.NewestView(),
+			)
+		}
+	}
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -300,7 +313,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
@@ -382,7 +395,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second, "expect to finish before timeout")
 
 	// check that all instances have the same finalized block
 	ref := instances[0]

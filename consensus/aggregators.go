@@ -12,12 +12,16 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
+	"github.com/onflow/flow-go/module"
 )
 
 // NewVoteAggregator creates new VoteAggregator and subscribes for finalization events.
 // No error returns are expected during normal operations.
 func NewVoteAggregator(
 	log zerolog.Logger,
+	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
@@ -28,7 +32,15 @@ func NewVoteAggregator(
 	voteCollectors := voteaggregator.NewVoteCollectors(log, lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, lowestRetainedView, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(
+		log,
+		hotstuffMetrics,
+		engineMetrics,
+		mempoolMetrics,
+		notifier,
+		lowestRetainedView,
+		voteCollectors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
@@ -40,17 +52,28 @@ func NewVoteAggregator(
 // NewTimeoutAggregator creates new TimeoutAggregator and connects Hotstuff event source with event handler.
 // No error returns are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
-	lowestRetainedView uint64,
+	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	notifier *pubsub.Distributor,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
 	distributor *pubsub.TimeoutCollectorDistributor,
+	lowestRetainedView uint64,
 ) (hotstuff.TimeoutAggregator, error) {
 
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, distributor, timeoutProcessorFactory)
 	collectors := timeoutaggregator.NewTimeoutCollectors(log, lowestRetainedView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	aggregator, err := timeoutaggregator.NewTimeoutAggregator(log, notifier, lowestRetainedView, collectors)
+	aggregator, err := timeoutaggregator.NewTimeoutAggregator(
+		log,
+		hotstuffMetrics,
+		engineMetrics,
+		mempoolMetrics,
+		notifier,
+		lowestRetainedView,
+		collectors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}

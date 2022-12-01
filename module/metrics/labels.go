@@ -23,19 +23,22 @@ const (
 
 const (
 	// collection
-	EngineClusterCompliance      = "proposal"
+	EngineClusterCompliance      = "collection_compliance"
+	EngineCollectionMessageHub   = "collection_message_hub"
 	EngineCollectionIngest       = "collection_ingest"
 	EngineCollectionProvider     = "collection_provider"
 	EngineClusterSynchronization = "cluster-sync"
 	// consensus
-	EnginePropagation        = "propagation"
-	EngineCompliance         = "compliance"
-	EngineConsensusProvider  = "consensus_provider"
-	EngineConsensusIngestion = "consensus_ingestion"
-	EngineSealing            = "sealing"
-	EngineSynchronization    = "sync"
+	EnginePropagation         = "propagation"
+	EngineCompliance          = "compliance"
+	EngineConsensusMessageHub = "consensus_message_hub"
+	EngineConsensusIngestion  = "consensus_ingestion"
+	EngineSealing             = "sealing"
+	EngineSynchronization     = "sync"
 	// common
-	EngineFollower = "follower"
+	EngineFollower          = "follower"
+	EngineVoteAggregator    = "vote_aggregator"
+	EngineTimeoutAggregator = "timeout_aggregator"
 )
 
 const (
@@ -82,7 +85,6 @@ const (
 	ResourceNetworkingDnsTxtCache        = "networking_dns_txt_cache"           // networking layer
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
-	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
 	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
@@ -90,7 +92,8 @@ const (
 	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
 	ResourceBlockResponseQueue        = "compliance_block_response_queue"   // consensus node, compliance engine
 	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
-	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
+	ResourceBlockVoteQueue            = "vote_aggregator_queue"             // consensus/collection node, vote aggregator
+	ResourceTimeoutObjectQueue        = "timeout_aggregator_queue"          // consensus/collection node, timeout aggregator
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
 	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
 	ResourceChunkDataPackRequests     = "chunk_data_pack_request"           // execution node
@@ -102,27 +105,25 @@ const (
 )
 
 const (
-	MessageCollectionGuarantee  = "guarantee"
-	MessageBlockProposal        = "proposal"
-	MessageBlockVote            = "vote"
-	MessageExecutionReceipt     = "receipt"
-	MessageResultApproval       = "approval"
-	MessageSyncRequest          = "ping"
-	MessageSyncResponse         = "pong"
-	MessageRangeRequest         = "range"
-	MessageBatchRequest         = "batch"
-	MessageBlockResponse        = "block"
-	MessageSyncedBlock          = "synced_block"
-	MessageClusterBlockProposal = "cluster_proposal"
-	MessageClusterBlockVote     = "cluster_vote"
-	MessageClusterBlockResponse = "cluster_block_response"
-	MessageSyncedClusterBlock   = "synced_cluster_block"
-	MessageTransaction          = "transaction"
-	MessageSubmitGuarantee      = "submit_guarantee"
-	MessageCollectionRequest    = "collection_request"
-	MessageCollectionResponse   = "collection_response"
-	MessageEntityRequest        = "entity_request"
-	MessageEntityResponse       = "entity_response"
+	MessageCollectionGuarantee = "guarantee"
+	MessageBlockProposal       = "proposal"
+	MessageBlockVote           = "vote"
+	MessageTimeoutObject       = "timeout_object"
+	MessageExecutionReceipt    = "receipt"
+	MessageResultApproval      = "approval"
+	MessageSyncRequest         = "ping"
+	MessageSyncResponse        = "pong"
+	MessageRangeRequest        = "range"
+	MessageBatchRequest        = "batch"
+	MessageBlockResponse       = "block"
+	MessageSyncedBlock         = "synced_block"
+	MessageSyncedClusterBlock  = "synced_cluster_block"
+	MessageTransaction         = "transaction"
+	MessageSubmitGuarantee     = "submit_guarantee"
+	MessageCollectionRequest   = "collection_request"
+	MessageCollectionResponse  = "collection_response"
+	MessageEntityRequest       = "entity_request"
+	MessageEntityResponse      = "entity_response"
 )
 
 const ExecutionDataRequestRetryable = "retryable"

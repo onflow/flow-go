@@ -48,7 +48,7 @@ var _ hotstuff.Forks = (*Forks)(nil)
 
 func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
-		return nil, model.NewConfigurationErrorf("invalid root: root qc is not pointing to root block")
+		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
 
 	forks := Forks{
@@ -213,7 +213,7 @@ func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	return nil
 }
 
-// checkForConflictingQCs checks if qc conflicts with a stored Quorum Certificate.
+// checkForConflictingQCs checks if QC conflicts with a stored Quorum Certificate.
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:

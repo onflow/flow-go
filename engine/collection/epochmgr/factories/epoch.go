@@ -159,6 +159,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 
 	complianceEng, err := factory.compliance.Create(
+		metrics,
 		mutableState,
 		headers,
 		payloads,

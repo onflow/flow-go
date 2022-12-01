@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	clusterkv "github.com/onflow/flow-go/state/cluster"
@@ -76,6 +77,7 @@ type MessageHub struct {
 	notifications.NoopConsumer
 	log                        zerolog.Logger
 	me                         module.Local
+	engineMetrics              module.EngineMetrics
 	state                      protocol.State
 	payloads                   storage.ClusterPayloads
 	con                        network.Conduit
@@ -98,6 +100,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // NewMessageHub constructs new instance of message hub
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
+	engineMetrics module.EngineMetrics,
 	net network.Network,
 	me module.Local,
 	compliance collection.Compliance,
@@ -140,6 +143,7 @@ func NewMessageHub(log zerolog.Logger,
 	hub := &MessageHub{
 		log:                        log.With().Str("engine", "cluster_message_hub").Logger(),
 		me:                         me,
+		engineMetrics:              engineMetrics,
 		state:                      state,
 		payloads:                   payloads,
 		compliance:                 compliance,
@@ -272,10 +276,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		return nil
 	}
 	log.Info().Msg("cluster timeout was broadcast")
-
-	// TODO(active-pacemaker): update metrics
-	//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-	//e.core.collectionMetrics.ClusterBlockProposed(block)
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 
 	return nil
 }
@@ -296,9 +297,8 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 		log.Err(err).Msg("could not send vote")
 		return nil
 	}
-	// TODO(active-pacemaker): update metrics
-	//h.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 	log.Info().Msg("collection vote transmitted")
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 
 	return nil
 }
@@ -351,11 +351,8 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 		return nil
 	}
 	log.Info().Msg("cluster proposal was broadcast")
+	h.engineMetrics.MessageSent(metrics.EngineCollectionMessageHub, metrics.MessageBlockProposal)
 
-	//TODO(active-pacemaker): update metrics
-	//e.engineMetrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
-	//TODO(active-pacemaker): add metrics for ClusterBlockProposed
 	return nil
 }
 
@@ -382,6 +379,8 @@ func (h *MessageHub) OnOwnVote(blockID flow.Identifier, view uint64, sigData []b
 	}
 	if ok := h.ownOutboundVotes.Push(packed); ok {
 		h.ownOutboundMessageNotifier.Notify()
+	} else {
+		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 	}
 }
 
@@ -391,6 +390,8 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	h.forwardToOwnTimeoutAggregator(timeout) // forward timeout to my own `timeoutAggregator`
 	if ok := h.ownOutboundTimeouts.Push(timeout); ok {
 		h.ownOutboundMessageNotifier.Notify()
+	} else {
+		h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 	}
 }
 
@@ -415,6 +416,8 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 
 		if ok := h.ownOutboundProposals.Push(proposal); ok {
 			h.ownOutboundMessageNotifier.Notify()
+		} else {
+			h.engineMetrics.OutboundMessageDropped(metrics.EngineCollectionMessageHub, metrics.MessageBlockProposal)
 		}
 	}()
 }
@@ -450,6 +453,7 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 // forwardToOwnVoteAggregator converts vote to generic `model.Vote`, logs vote and forwards it to own `voteAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote, originID flow.Identifier) {
+	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageBlockVote)
 	v := &model.Vote{
 		View:     vote.View,
 		BlockID:  vote.BlockID,
@@ -468,6 +472,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *messages.ClusterBlockVote,
 // forwardToOwnTimeoutAggregator logs timeout and forwards it to own `timeoutAggregator`.
 // Per API convention, timeoutAggregator` is non-blocking, hence, this call returns quickly.
 func (h *MessageHub) forwardToOwnTimeoutAggregator(t *model.TimeoutObject) {
+	h.engineMetrics.MessageReceived(metrics.EngineCollectionMessageHub, metrics.MessageTimeoutObject)
 	h.log.Info().
 		Hex("origin_id", t.SignerID[:]).
 		Uint64("view", t.View).

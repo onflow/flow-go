@@ -7,15 +7,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // HotStuff Metrics
 const (
-	HotstuffEventTypeTimeout    = "timeout"
-	HotstuffEventTypeOnProposal = "onproposal"
-	HotstuffEventTypeOnVote     = "onvote"
-	HotstuffEventTypeOnQC       = "onqc"
-	HotstuffEventTypeOnTC       = "ontc"
+	HotstuffEventTypeLocalTimeout = "localtimeout"
+	HotstuffEventTypeOnProposal   = "onproposal"
+	HotstuffEventTypeOnQC         = "onqc"
+	HotstuffEventTypeOnTC         = "ontc"
+	HotstuffEventTypeOnPartialTc  = "onpartialtc"
 )
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
@@ -31,14 +32,20 @@ type HotstuffCollector struct {
 	waitDuration                  *prometheus.HistogramVec
 	curView                       prometheus.Gauge
 	qcView                        prometheus.Gauge
+	tcView                        prometheus.Gauge
 	skips                         prometheus.Counter
 	timeouts                      prometheus.Counter
 	timeoutDuration               prometheus.Gauge
+	voteProcessingDuration        prometheus.Histogram
+	timeoutProcessingDuration     prometheus.Histogram
+	blockProcessingDuration       prometheus.Histogram
 	committeeComputationsDuration prometheus.Histogram
 	signerComputationsDuration    prometheus.Histogram
 	validatorComputationsDuration prometheus.Histogram
 	payloadProductionDuration     prometheus.Histogram
 }
+
+var _ module.HotstuffMetrics = (*HotstuffCollector)(nil)
 
 func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
@@ -83,7 +90,15 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "qc_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The view of the newest known qc from HotStuff",
+			Help:        "The view of the newest known QC from HotStuff",
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
+
+		tcView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "tc_view",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "The view of the newest known TC from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -99,7 +114,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "timeouts_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The number of times we timed out during a view",
+			Help:        "The number of views that this replica left due to observing a TC",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -146,6 +161,30 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
+		blockProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "block_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long compliance engine processes one block",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
+		voteProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "vote_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long VoteAggregator processes one message",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
+		timeoutProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace:   "timeout_object_processing_seconds",
+			Subsystem:   namespaceConsensus,
+			Name:        subsystemHotstuff,
+			Help:        "duration [seconds; measured with float64 precision] of how long TimeoutAggregator processes one message",
+			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
 	}
 
 	return hc
@@ -161,19 +200,10 @@ func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 	hc.idleDuration.Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
-// HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
+// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration - the time between receiving and
+// enqueueing a message to beginning to process that message.
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds()) // unit: seconds; with float64 precision
-}
-
-// HotstuffCollector reports Metrics C8: Current View
-func (hc *HotstuffCollector) SetCurView(view uint64) {
-	hc.curView.Set(float64(view))
-}
-
-// NewestKnownQC reports Metrics C9: View of Newest Known QC
-func (hc *HotstuffCollector) SetQCView(view uint64) {
-	hc.qcView.Set(float64(view))
 }
 
 // CountSkipped counts the number of skips we did.
@@ -181,9 +211,40 @@ func (hc *HotstuffCollector) CountSkipped() {
 	hc.skips.Inc()
 }
 
-// CountTimeout counts the number of timeouts we had.
+// CountTimeout tracks the number of views that this replica left due to observing a TC.
 func (hc *HotstuffCollector) CountTimeout() {
 	hc.timeouts.Inc()
+}
+
+// SetCurView reports Metrics C8: Current View
+func (hc *HotstuffCollector) SetCurView(view uint64) {
+	hc.curView.Set(float64(view))
+}
+
+// SetQCView reports Metrics C9: View of Newest Known QC
+func (hc *HotstuffCollector) SetQCView(view uint64) {
+	hc.qcView.Set(float64(view))
+}
+
+// SetTCView reports the view of the newest known TC
+func (hc *HotstuffCollector) SetTCView(view uint64) {
+	hc.tcView.Set(float64(view))
+}
+
+// BlockProcessingDuration measures the time which the compliance engine
+// spends to process one block proposal.
+func (hc *HotstuffCollector) BlockProcessingDuration(duration time.Duration) {
+	hc.blockProcessingDuration.Observe(duration.Seconds())
+}
+
+// VoteProcessingDuration reports the processing time for a single vote
+func (hc *HotstuffCollector) VoteProcessingDuration(duration time.Duration) {
+	hc.voteProcessingDuration.Observe(duration.Seconds())
+}
+
+// TimeoutObjectProcessingDuration reports the processing time for a TimeoutObject
+func (hc *HotstuffCollector) TimeoutObjectProcessingDuration(duration time.Duration) {
+	hc.timeoutProcessingDuration.Observe(duration.Seconds())
 }
 
 // SetTimeout sets the current timeout duration.

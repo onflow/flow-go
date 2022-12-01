@@ -500,7 +500,15 @@ func createNode(
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
-	voteAggregator, err := voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	voteAggregator, err := voteaggregator.NewVoteAggregator(
+		log,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		notifier,
+		livenessData.CurrentView,
+		voteCollectors,
+	)
 	require.NoError(t, err)
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
@@ -510,7 +518,15 @@ func createNode(
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, timeoutCollectorDistributor, timeoutProcessorFactory)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
 
-	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
+	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(
+		log,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		notifier,
+		livenessData.CurrentView,
+		timeoutCollectors,
+	)
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{
@@ -545,9 +561,10 @@ func createNode(
 	compCore, err := compliance.NewCore(
 		log,
 		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
 		tracer,
-		metricsCollector,
-		metricsCollector,
 		cleaner,
 		headersDB,
 		payloadsDB,
@@ -595,6 +612,7 @@ func createNode(
 
 	messageHub, err := message_hub.NewMessageHub(
 		log,
+		metricsCollector,
 		net,
 		me,
 		comp,

@@ -29,7 +29,7 @@ func New(
 	}
 }
 
-// ValidateTC validates the TimeoutCertificate `tc`.
+// ValidateTC validates the TimeoutCertificate `TC`.
 // During normal operations, the following error returns are expected:
 //   - model.InvalidTCError if the TC is invalid
 //   - model.ErrViewForUnknownEpoch if the TC refers unknown epoch
@@ -159,7 +159,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", qc.View, err)
 	}
 	if signers.TotalWeight() < threshold {
-		return newInvalidQCError(qc, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
+		return newInvalidQCError(qc, fmt.Errorf("QC signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC

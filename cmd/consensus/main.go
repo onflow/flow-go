@@ -582,6 +582,9 @@ func main() {
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				node.Logger,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
@@ -594,10 +597,13 @@ func main() {
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
-				lowestViewForVoteProcessing,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				notifier,
 				timeoutProcessorFactory,
 				timeoutCollectorDistributor,
+				lowestViewForVoteProcessing,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
@@ -685,9 +691,10 @@ func main() {
 
 			complianceCore, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
-				node.Tracer,
 				node.Metrics.Mempool,
+				mainMetrics,
 				node.Metrics.Compliance,
+				node.Tracer,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
@@ -721,6 +728,7 @@ func main() {
 		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			messageHub, err := message_hub.NewMessageHub(
 				node.Logger,
+				node.Metrics.Engine,
 				node.Network,
 				node.Me,
 				comp,

@@ -339,6 +339,8 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Me,
 		node.PublicDB,
 		node.State,
+		node.Metrics,
+		node.Metrics,
 		createMetrics,
 	)
 	require.NoError(t, err)
@@ -347,6 +349,7 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Log,
 		node.Net,
 		node.Me,
+		node.Metrics,
 		node.State,
 	)
 

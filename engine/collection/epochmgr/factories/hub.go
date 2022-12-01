@@ -14,21 +14,24 @@ import (
 )
 
 type MessageHubFactory struct {
-	log        zerolog.Logger
-	me         module.Local
-	net        network.Network
-	protoState protocol.State
+	log           zerolog.Logger
+	me            module.Local
+	net           network.Network
+	protoState    protocol.State
+	engineMetrics module.EngineMetrics
 }
 
 func NewMessageHubFactory(log zerolog.Logger,
 	net network.Network,
 	me module.Local,
+	engineMetrics module.EngineMetrics,
 	protoState protocol.State) *MessageHubFactory {
 	return &MessageHubFactory{
-		log:        log,
-		me:         me,
-		net:        net,
-		protoState: protoState,
+		log:           log,
+		me:            me,
+		net:           net,
+		protoState:    protoState,
+		engineMetrics: engineMetrics,
 	}
 }
 
@@ -41,6 +44,7 @@ func (f *MessageHubFactory) Create(
 ) (*message_hub.MessageHub, error) {
 	return message_hub.NewMessageHub(
 		f.log,
+		f.engineMetrics,
 		f.net,
 		f.me,
 		compliance,

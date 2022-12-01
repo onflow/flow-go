@@ -40,6 +40,7 @@ type Core struct {
 	config            compliance.Config
 	engineMetrics     module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
+	hotstuffMetrics   module.HotstuffMetrics
 	complianceMetrics module.ComplianceMetrics
 	tracer            module.Tracer
 	cleaner           storage.Cleaner
@@ -61,9 +62,10 @@ type Core struct {
 func NewCore(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
-	tracer module.Tracer,
 	mempool module.MempoolMetrics,
+	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
+	tracer module.Tracer,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -88,6 +90,7 @@ func NewCore(
 		engineMetrics:     collector,
 		tracer:            tracer,
 		mempoolMetrics:    mempool,
+		hotstuffMetrics:   hotstuffMetrics,
 		complianceMetrics: complianceMetrics,
 		cleaner:           cleaner,
 		headers:           headers,
@@ -316,7 +319,9 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
 	startTime := time.Now()
-	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
+	defer func() {
+		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	}()
 
 	header := proposal.Header
 	blockID := header.ID()

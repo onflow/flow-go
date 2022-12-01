@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"
@@ -149,8 +150,10 @@ func (s *MessageHubSuite) SetupTest() {
 		nil,
 	)
 
+	engineMetrics := metrics.NewNoopCollector()
 	hub, err := NewMessageHub(
 		unittest.Logger(),
+		engineMetrics,
 		s.net,
 		s.me,
 		s.compliance,
@@ -255,8 +258,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		header.ProposerID = s.myID
 	})
 
-	// should fail with changed (missing) parent
-	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
+	// should fail since we can't query payload
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
