@@ -34,6 +34,7 @@ func NewCorruptLibP2PNodeFactory(
 	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
+	topicValidatorDisabled bool,
 ) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		if chainID != flow.BftTestnet {
@@ -54,7 +55,9 @@ func NewCorruptLibP2PNodeFactory(
 			peerScoringEnabled,
 			connectionPruning,
 			updateInterval)
-		builder.SetCreateNode(NewCorruptLibP2PNode)
+		if topicValidatorDisabled {
+			builder.SetCreateNode(NewCorruptLibP2PNode)
+		}
 		overrideWithCorruptGossipSub(builder)
 		return builder.Build()
 	}
