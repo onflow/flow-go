@@ -28,7 +28,7 @@ int check_membership_Zr_star(const bn_t a){
     return VALID;
 }
 
-// Checks if input point s is in the subgroup G1. 
+// Checks if input point p is in the subgroup G1. 
 // The function assumes the input is known to be on the curve E1.
 int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK

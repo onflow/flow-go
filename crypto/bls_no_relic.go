@@ -9,7 +9,7 @@ import (
 
 // The functions below are the non-Relic versions of the public APIs
 // requiring the Relic library.
-// All BLS functionalties in the package require the Relic dependency,
+// All BLS functionalities in the package require the Relic dependency,
 // and therefore the "relic" build tag.
 // Building without the "relic" tag is successful, but and calling one of the
 // BLS functions results in a runtime panic. This allows projects depending on the
