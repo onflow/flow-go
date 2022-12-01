@@ -4,8 +4,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -18,6 +22,8 @@ const (
 )
 
 type NetworkCollector struct {
+	logger zerolog.Logger
+
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -44,6 +50,36 @@ type NetworkCollector struct {
 	gossipSubIncomingRpcAcceptedOnlyControlCount prometheus.Counter
 	gossipSubIncomingRpcRejectedCount            prometheus.Counter
 	gossipSubReceivedPublishMessageCount         prometheus.Counter
+
+	// libp2p resource manager metrics
+	// connections
+	libp2pAllowInboundConnectionCount  prometheus.Counter
+	libp2pAllowOutboundConnectionCount prometheus.Counter
+	libp2pBlockInboundConnectionCount  prometheus.Counter
+	libp2pBlockOutboundConnectionCount prometheus.Counter
+	// streams
+	libp2pAllowInboundStreamCount  prometheus.Counter
+	libp2pAllowOutboundStreamCount prometheus.Counter
+	libp2pBlockInboundStreamCount  prometheus.Counter
+	libp2pBlockOutboundStreamCount prometheus.Counter
+	// peers
+	libp2pAllowPeerCount prometheus.Counter
+	libp2pBlockPeerCount prometheus.Counter
+	// protocol
+	libp2pAllowProtocolCount prometheus.Counter
+	libp2pBlockProtocolCount prometheus.Counter
+	// protocol peer
+	libp2pAllowProtocolPeerCount prometheus.Counter
+	libp2pBlockProtocolPeerCount prometheus.Counter
+	// services
+	libp2pAllowServiceCount prometheus.Counter
+	libp2pBlockServiceCount prometheus.Counter
+	// service peer
+	libp2pAllowServicePeerCount prometheus.Counter
+	libp2pBlockServicePeerCount prometheus.Counter
+	// memory
+	libp2pAllowMemoryCount prometheus.Counter
+	libp2pBlockMemoryCount prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -463,4 +499,74 @@ func (nc *NetworkCollector) OnIncomingRpcRejected() {
 // RPC message.
 func (nc *NetworkCollector) OnPublishedGossipMessagesReceived(count int) {
 	nc.gossipSubReceivedPublishMessageCount.Add(float64(count))
+}
+
+func (nc *NetworkCollector) AllowConn(dir network.Direction, usefd bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockConn(dir network.Direction, usefd bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) AllowStream(p peer.ID, dir network.Direction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockStream(p peer.ID, dir network.Direction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) AllowPeer(p peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockPeer(p peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) AllowProtocol(proto protocol.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockProtocol(proto protocol.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) AllowService(svc string) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockService(svc string) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockServicePeer(svc string, p peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) AllowMemory(size int) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (nc *NetworkCollector) BlockMemory(size int) {
+	//TODO implement me
+	panic("implement me")
 }
