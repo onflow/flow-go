@@ -1,7 +1,9 @@
 package corruptlibp2p
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
@@ -40,6 +42,10 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 
 func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 	// Corrupt does not support score options. This is a no-op.
+}
+
+func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ func(peer.ID, *pubsub.RPC) error) {
+	// Corrupt does not support app-specific inspector for now. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
