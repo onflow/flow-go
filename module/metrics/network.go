@@ -345,6 +345,106 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.libp2pAllowInboundConnectionCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_allow_inbound_connection_total",
+			Help:      "total number of inbound connections allowed by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pAllowOutboundConnectionCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_allow_outbound_connection_total",
+			Help:      "total number of outbound connections allowed by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pBlockInboundConnectionCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_inbound_connection_total",
+			Help:      "total number of inbound connections blocked by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pBlockOutboundConnectionCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_outbound_connection_total",
+			Help:      "total number of outbound connections blocked by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pAllowInboundStreamCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_allow_inbound_stream_total",
+			Help:      "total number of inbound streams allowed by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pAllowOutboundStreamCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_allow_outbound_stream_total",
+			Help:      "total number of outbound streams allowed by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pBlockInboundStreamCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_inbound_stream_total",
+			Help:      "total number of inbound streams blocked by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pBlockOutboundStreamCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_outbound_stream_total",
+			Help:      "total number of outbound streams blocked by the libp2p resource manager",
+		},
+	)
+
+	nc.libp2pAllowPeerCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_allow_peer_total",
+			Help:      "total number of remote peers allowed by the libp2p resource manager to attach to their relevant incoming/outgoing connections/streams",
+		},
+	)
+
+	nc.libp2pBlockPeerCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_peer_total",
+			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing connections/streams",
+		},
+	)
+
+	// Note: this is a higher level metric than libp2pBlockPeerCount (belongs to lifecycle of upgrading a connection to a stream)
+	nc.libp2pBlockProtocolPeerCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemLibp2p,
+			Name:      nc.prefix + "resource_manager_block_protocol_peer_total",
+			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
+		},
+	)
+
 	return nc
 }
 
