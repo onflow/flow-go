@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -21,11 +20,13 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
@@ -157,12 +158,7 @@ type BaseConfig struct {
 	level                       string
 	metricsPort                 uint
 	BootstrapDir                string
-	profilerEnabled             bool
-	uploaderEnabled             bool
-	profilerDir                 string
-	profilerInterval            time.Duration
-	profilerDuration            time.Duration
-	profilerMemProfileRate      int
+	profilerConfig              profiler.ProfilerConfig
 	tracerEnabled               bool
 	tracerSensitivity           uint
 	MetricsEnabled              bool
@@ -276,6 +272,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
+			DNSCacheTTL:                     dns.DefaultTimeToLive,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
@@ -289,18 +286,21 @@ func DefaultBaseConfig() *BaseConfig {
 		secretsDBEnabled: true,
 		level:            "info",
 
-		metricsPort:            8080,
-		profilerEnabled:        false,
-		uploaderEnabled:        false,
-		profilerDir:            "profiler",
-		profilerInterval:       15 * time.Minute,
-		profilerDuration:       10 * time.Second,
-		profilerMemProfileRate: runtime.MemProfileRate,
-		tracerEnabled:          false,
-		tracerSensitivity:      4,
-		MetricsEnabled:         true,
-		receiptsCacheSize:      bstorage.DefaultCacheSize,
-		guaranteesCacheSize:    bstorage.DefaultCacheSize,
+		metricsPort:         8080,
+		tracerEnabled:       false,
+		tracerSensitivity:   4,
+		MetricsEnabled:      true,
+		receiptsCacheSize:   bstorage.DefaultCacheSize,
+		guaranteesCacheSize: bstorage.DefaultCacheSize,
+
+		profilerConfig: profiler.ProfilerConfig{
+			Enabled:         false,
+			UploaderEnabled: false,
+
+			Dir:      "profiler",
+			Interval: 15 * time.Minute,
+			Duration: 10 * time.Second,
+		},
 
 		HeroCacheMetricsEnable: false,
 		SyncCoreConfig:         chainsync.DefaultConfig(),
@@ -313,6 +313,12 @@ func DefaultBaseConfig() *BaseConfig {
 // to define the list of depenencies that must be ready before starting the component.
 type DependencyList struct {
 	components []module.ReadyDoneAware
+}
+
+func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
+	return &DependencyList{
+		components: components,
+	}
 }
 
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.

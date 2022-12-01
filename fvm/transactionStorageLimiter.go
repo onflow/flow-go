@@ -18,7 +18,7 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 	return TransactionStorageLimiter{}
 }
 
-func (d TransactionStorageLimiter) CheckLimits(
+func (d TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
 	addresses []flow.Address,
 ) error {

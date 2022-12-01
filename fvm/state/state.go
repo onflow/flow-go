@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	DefaultMaxKeySize         = 16_000      // ~16KB
-	DefaultMaxValueSize       = 256_000_000 // ~256MB
-	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+	DefaultMaxKeySize   = 16_000      // ~16KB
+	DefaultMaxValueSize = 256_000_000 // ~256MB
 
 	// Service level keys (owner is empty):
 	UUIDKey         = "uuid"
@@ -91,6 +90,9 @@ func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParamet
 	return newParams
 }
 
+// TODO(patrick): rm once https://github.com/onflow/flow-emulator/pull/245
+// is integrated.
+//
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
 func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
 	newParams := params
@@ -120,15 +122,23 @@ func NewState(view View, params StateParameters) *State {
 	}
 }
 
-// NewChild generates a new child state
-func (s *State) NewChild() *State {
+// NewChildWithMeterParams generates a new child state using the provide meter
+// parameters.
+func (s *State) NewChildWithMeterParams(
+	params meter.MeterParameters,
+) *State {
 	return &State{
 		committed:        false,
 		view:             s.view.NewChild(),
-		meter:            s.meter.NewChild(),
+		meter:            meter.NewMeter(params),
 		updatedAddresses: make(map[flow.Address]struct{}),
 		stateLimits:      s.stateLimits,
 	}
+}
+
+// NewChild generates a new child state using the parent's meter parameters.
+func (s *State) NewChild() *State {
+	return s.NewChildWithMeterParams(s.meter.MeterParameters)
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)

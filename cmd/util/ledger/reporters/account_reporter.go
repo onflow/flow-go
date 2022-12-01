@@ -3,7 +3,6 @@ package reporters
 import (
 	"context"
 	"fmt"
-	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -66,10 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	txnState := state.NewTransactionState(
-		l,
-		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
-	)
+	txnState := state.NewTransactionState(l, state.DefaultParameters())
 	gen := environment.NewAddressGenerator(txnState, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
@@ -137,25 +133,26 @@ type balanceProcessor struct {
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
-	blockPrograms := programs.NewEmptyBlockPrograms()
+	derivedBlockData := programs.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
-		fvm.WithBlockPrograms(blockPrograms))
+		fvm.WithDerivedBlockData(derivedBlockData))
 
 	v := view.NewChild()
-	txnState := state.NewTransactionState(
-		v,
-		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
-	)
+	txnState := state.NewTransactionState(v, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(0, 0)
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	env := fvm.NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
 
 	return &balanceProcessor{
 		vm:       vm,

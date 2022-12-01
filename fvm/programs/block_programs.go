@@ -1,116 +1,202 @@
 package programs
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// BlockPrograms is a simple fork-aware OCC database for "caching" programs
-// for a particular block.
-type BlockPrograms struct {
-	*BlockDerivedData[common.AddressLocation, ProgramEntry]
+// DerivedBlockData is a simple fork-aware OCC database for "caching" derived
+// data for a particular block.
+type DerivedBlockData struct {
+	programs *DerivedDataTable[common.AddressLocation, *interpreter.Program]
+
+	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
 }
 
-// TransactionPrograms is the scratch space for programs of a single transaction.
-type TransactionPrograms struct {
-	*TransactionDerivedData[common.AddressLocation, ProgramEntry]
+// DerivedTransactionData is the derived data scratch space for a single
+// transaction.
+type DerivedTransactionData struct {
+	programs *TableTransaction[
+		common.AddressLocation,
+		*interpreter.Program,
+	]
+
+	// There's only a single entry in this table.  For simplicity, we'll use
+	// struct{} as the entry's key.
+	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
 }
 
-func NewEmptyBlockPrograms() *BlockPrograms {
-	return &BlockPrograms{
-		NewEmptyBlockDerivedData[common.AddressLocation, ProgramEntry](),
+func NewEmptyDerivedBlockData() *DerivedBlockData {
+	return &DerivedBlockData{
+		programs: NewEmptyTable[
+			common.AddressLocation,
+			*interpreter.Program,
+		](),
+		meterParamOverrides: NewEmptyTable[
+			struct{},
+			MeterParamOverrides,
+		](),
 	}
 }
 
 // This variant is needed by the chunk verifier, which does not start at the
 // beginning of the block.
-func NewEmptyBlockProgramsWithTransactionOffset(offset uint32) *BlockPrograms {
-	return &BlockPrograms{
-		NewEmptyBlockDerivedDataWithOffset[common.AddressLocation, ProgramEntry](offset),
+func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
+	return &DerivedBlockData{
+		programs: NewEmptyTableWithOffset[
+			common.AddressLocation,
+			*interpreter.Program,
+		](offset),
+		meterParamOverrides: NewEmptyTableWithOffset[
+			struct{},
+			MeterParamOverrides,
+		](offset),
 	}
 }
 
-func (block *BlockPrograms) NewChildBlockPrograms() *BlockPrograms {
-	return &BlockPrograms{
-		block.NewChildBlockDerivedData(),
+func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
+	return &DerivedBlockData{
+		programs:            block.programs.NewChildTable(),
+		meterParamOverrides: block.meterParamOverrides.NewChildTable(),
 	}
 }
 
-func (block *BlockPrograms) NewSnapshotReadTransactionPrograms(
+func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*TransactionPrograms,
+	*DerivedTransactionData,
 	error,
 ) {
-	txn, err := block.NewSnapshotReadTransactionDerivedData(
+	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
 		snapshotTime,
 		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TransactionPrograms{
-		TransactionDerivedData: txn,
-	}, nil
-}
-
-func (block *BlockPrograms) NewTransactionPrograms(
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
-) (
-	*TransactionPrograms,
-	error,
-) {
-	txn, err := block.NewTransactionDerivedData(snapshotTime, executionTime)
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTableTransaction(
+		snapshotTime,
+		executionTime)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TransactionPrograms{
-		TransactionDerivedData: txn,
+	return &DerivedTransactionData{
+		programs:            txnPrograms,
+		meterParamOverrides: txnMeterParamOverrides,
 	}, nil
 }
 
-func (transaction *TransactionPrograms) Get(
+func (block *DerivedBlockData) NewDerivedTransactionData(
+	snapshotTime LogicalTime,
+	executionTime LogicalTime,
+) (
+	*DerivedTransactionData,
+	error,
+) {
+	txnPrograms, err := block.programs.NewTableTransaction(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	txnMeterParamOverrides, err := block.meterParamOverrides.NewTableTransaction(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DerivedTransactionData{
+		programs:            txnPrograms,
+		meterParamOverrides: txnMeterParamOverrides,
+	}, nil
+}
+
+func (block *DerivedBlockData) NextTxIndexForTestingOnly() uint32 {
+	// NOTE: We can use next tx index from any table since they are identical.
+	return block.programs.NextTxIndexForTestingOnly()
+}
+
+func (block *DerivedBlockData) GetProgramForTestingOnly(
+	addressLocation common.AddressLocation,
+) *invalidatableEntry[*interpreter.Program] {
+	return block.programs.GetForTestingOnly(addressLocation)
+}
+
+func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
 	*interpreter.Program,
 	*state.State,
 	bool,
 ) {
-	programEntry := transaction.TransactionDerivedData.Get(addressLocation)
-	if programEntry == nil {
-		return nil, nil, false
-	}
-
-	return programEntry.Program, programEntry.State, true
+	return transaction.programs.Get(addressLocation)
 }
 
-func (transaction *TransactionPrograms) Set(
+func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
 	program *interpreter.Program,
 	state *state.State,
 ) {
-	transaction.TransactionDerivedData.Set(addressLocation, ProgramEntry{
-		Location: addressLocation,
-		Program:  program,
-		State:    state,
-	})
+	transaction.programs.Set(addressLocation, program, state)
 }
 
-func (transaction *TransactionPrograms) AddInvalidator(
-	invalidator DerivedDataInvalidator[ProgramEntry],
+func (transaction *DerivedTransactionData) AddInvalidator(
+	invalidator TransactionInvalidator,
 ) {
-	transaction.TransactionDerivedData.AddInvalidator(invalidator)
+	if invalidator == nil {
+		return
+	}
+
+	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
+	transaction.meterParamOverrides.AddInvalidator(
+		invalidator.MeterParamOverridesInvalidator())
 }
 
-func (transaction *TransactionPrograms) Validate() RetryableError {
-	return transaction.TransactionDerivedData.Validate()
+func (transaction *DerivedTransactionData) GetMeterParamOverrides(
+	txnState *state.TransactionState,
+	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+) (
+	MeterParamOverrides,
+	error,
+) {
+	return transaction.meterParamOverrides.GetOrCompute(
+		txnState,
+		struct{}{},
+		getMeterParamOverrides)
 }
 
-func (transaction *TransactionPrograms) Commit() RetryableError {
-	return transaction.TransactionDerivedData.Commit()
+func (transaction *DerivedTransactionData) Validate() error {
+	err := transaction.programs.Validate()
+	if err != nil {
+		return fmt.Errorf("programs validate failed: %w", err)
+	}
+
+	err = transaction.meterParamOverrides.Validate()
+	if err != nil {
+		return fmt.Errorf("meter param overrides validate failed: %w", err)
+	}
+
+	return nil
+}
+
+func (transaction *DerivedTransactionData) Commit() error {
+	err := transaction.programs.Commit()
+	if err != nil {
+		return fmt.Errorf("programs commit failed: %w", err)
+	}
+
+	err = transaction.meterParamOverrides.Commit()
+	if err != nil {
+		return fmt.Errorf("meter param overrides commit failed: %w", err)
+	}
+
+	return nil
 }

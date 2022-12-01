@@ -9,12 +9,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type workerStats struct {
-	workers                  int
-	txsSent                  int
-	txsExecuted              int
-	txsSentMovingAverage     float64
-	txsExecutedMovingAverage float64
+type WorkerStats struct {
+	Workers                  int
+	TxsSent                  int
+	TxsTimedout              int
+	TxsExecuted              int
+	TxsSentMovingAverage     float64
+	TxsExecutedMovingAverage float64
 }
 
 // WorkerStatsTracker keeps track of worker stats
@@ -24,7 +25,7 @@ type WorkerStatsTracker struct {
 	wg     sync.WaitGroup
 
 	mux             sync.Mutex
-	stats           workerStats
+	stats           WorkerStats
 	txsSentEWMA     ewma.MovingAverage
 	txsExecutedEWMA ewma.MovingAverage
 }
@@ -52,11 +53,11 @@ func (st *WorkerStatsTracker) updateEWMAforever() {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 
-	lastStats := st.getStats()
+	lastStats := st.GetStats()
 	for {
 		select {
 		case <-t.C:
-			stats := st.getStats()
+			stats := st.GetStats()
 			st.updateEWMAonce(lastStats, stats)
 			lastStats = stats
 		case <-st.ctx.Done():
@@ -66,12 +67,14 @@ func (st *WorkerStatsTracker) updateEWMAforever() {
 }
 
 // updateEWMAonce updates all Exponentially Weighted Moving Averages with the given stats.
-func (st *WorkerStatsTracker) updateEWMAonce(lastStats, stats workerStats) {
+func (st *WorkerStatsTracker) updateEWMAonce(lastStats, stats WorkerStats) {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.txsSentEWMA.Add(float64(stats.txsSent - lastStats.txsSent))
-	st.txsExecutedEWMA.Add(float64(stats.txsExecuted - lastStats.txsExecuted))
+	st.txsSentEWMA.Add(float64(stats.TxsSent - lastStats.TxsSent))
+	st.stats.TxsSentMovingAverage = st.txsSentEWMA.Value()
+	st.txsExecutedEWMA.Add(float64(stats.TxsExecuted - lastStats.TxsExecuted))
+	st.stats.TxsExecutedMovingAverage = st.txsExecutedEWMA.Value()
 }
 
 func (st *WorkerStatsTracker) Stop() {
@@ -79,59 +82,51 @@ func (st *WorkerStatsTracker) Stop() {
 	st.wg.Wait()
 }
 
+func (st *WorkerStatsTracker) IncTxTimedout() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.TxsTimedout++
+}
+
 func (st *WorkerStatsTracker) IncTxExecuted() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.stats.txsExecuted++
-}
-
-func (st *WorkerStatsTracker) GetTxExecuted() int {
-	st.mux.Lock()
-	defer st.mux.Unlock()
-
-	return st.stats.txsExecuted
+	st.stats.TxsExecuted++
 }
 
 func (st *WorkerStatsTracker) AddWorkers(i int) {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.stats.workers += i
+	st.stats.Workers += i
 }
 
 func (st *WorkerStatsTracker) IncTxSent() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.stats.txsSent++
+	st.stats.TxsSent++
 }
 
-func (st *WorkerStatsTracker) GetTxSent() int {
+func (st *WorkerStatsTracker) GetStats() WorkerStats {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	return st.stats.txsSent
-}
-
-func (st *WorkerStatsTracker) getStats() workerStats {
-	st.mux.Lock()
-	defer st.mux.Unlock()
-
-	st.stats.txsSentMovingAverage = st.txsSentEWMA.Value()
-	st.stats.txsExecutedMovingAverage = st.txsExecutedEWMA.Value()
 	return st.stats
 }
 
 func NewPeriodicStatsLogger(st *WorkerStatsTracker, log zerolog.Logger) *Worker {
 	w := NewWorker(0, 1*time.Second, func(workerID int) {
-		stats := st.getStats()
+		stats := st.GetStats()
 		log.Info().
-			Int("workers", stats.workers).
-			Int("txsSent", stats.txsSent).
-			Int("txsExecuted", stats.txsExecuted).
-			Float64("txsSentEWMA", stats.txsSentMovingAverage).
-			Float64("txsExecutedEWMA", stats.txsExecutedMovingAverage).
+			Int("Workers", stats.Workers).
+			Int("TxsSent", stats.TxsSent).
+			Int("TxsTimedout", stats.TxsTimedout).
+			Int("TxsExecuted", stats.TxsExecuted).
+			Float64("TxsSentMovingAverage", stats.TxsSentMovingAverage).
+			Float64("TxsExecutedMovingAverage", stats.TxsExecutedMovingAverage).
 			Msg("worker stats")
 	})
 
