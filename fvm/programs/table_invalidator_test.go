@@ -3,7 +3,6 @@ package programs
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -26,42 +25,6 @@ func (invalidator testInvalidator) ShouldInvalidateEntry(
 ) bool {
 	return invalidator.invalidateAll ||
 		invalidator.invalidateName == key
-}
-
-func TestModifiedSetsProgramInvalidator(t *testing.T) {
-	invalidator := ModifiedSetsInvalidator{}.ProgramInvalidator()
-
-	require.False(t, invalidator.ShouldInvalidateEntries())
-	require.False(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
-
-	invalidator = ModifiedSetsInvalidator{
-		ContractUpdateKeys: []ContractUpdateKey{
-			{}, // For now, the entry's value does not matter.
-		},
-		FrozenAccounts: nil,
-	}.ProgramInvalidator()
-
-	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
-
-	invalidator = ModifiedSetsInvalidator{
-		ContractUpdateKeys: nil,
-		FrozenAccounts: []common.Address{
-			{}, // For now, the entry's value does not matter
-		},
-	}.ProgramInvalidator()
-
-	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
 }
 
 func TestChainedInvalidator(t *testing.T) {
