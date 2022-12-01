@@ -3,6 +3,7 @@
 package synchronization
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -370,7 +371,7 @@ func (e *Engine) pollHeight() {
 		Height: head.Height,
 	}
 	err = e.con.Multicast(req, synccore.DefaultPollNodes, e.participants.NodeIDs()...)
-	if err != nil {
+	if err != nil && !errors.Is(err, network.EmptyTargetList) {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
 	}
