@@ -69,7 +69,6 @@ type NetworkCollector struct {
 	libp2pAllowProtocolCount prometheus.Counter
 	libp2pBlockProtocolCount prometheus.Counter
 	// protocol peer
-	libp2pAllowProtocolPeerCount prometheus.Counter
 	libp2pBlockProtocolPeerCount prometheus.Counter
 	// services
 	libp2pAllowServiceCount prometheus.Counter
@@ -422,26 +421,29 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
 			Name:      nc.prefix + "resource_manager_allow_peer_total",
-			Help:      "total number of remote peers allowed by the libp2p resource manager to attach to their relevant incoming/outgoing connections/streams",
+			Help:      "total number of remote peers allowed by the libp2p resource manager to attach to their relevant incoming/outgoing streams",
 		},
 	)
 
+	// Note: this is a low level metric than libp2pBlockProtocolPeerCount.
+	// This metric is incremented when a peer is blocked by the libp2p resource manager on attaching as one end of a stream (on any protocol).
 	nc.libp2pBlockPeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
 			Name:      nc.prefix + "resource_manager_block_peer_total",
-			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing connections/streams",
+			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
 		},
 	)
 
-	// Note: this is a higher level metric than libp2pBlockPeerCount (belongs to lifecycle of upgrading a connection to a stream)
+	// Note: this is a higher level metric than libp2pBlockPeerCount.
+	// This metric is incremented when a peer is already attached as one end of a stream but on a different reserved protocol.
 	nc.libp2pBlockProtocolPeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
 			Name:      nc.prefix + "resource_manager_block_protocol_peer_total",
-			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
+			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams on a specific protocol",
 		},
 	)
 
