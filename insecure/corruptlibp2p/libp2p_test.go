@@ -49,5 +49,7 @@ func TestSpam(t *testing.T) {
 	spammer := corruptlibp2p.NewGossipSubSpammer(corruptAdapter.GetRouter())
 
 	// start spamming the first peer
-	spammer.SpamIHave(victimPeerId, 10, 1)
+	spammer.SpamIHave(victimPeerId, 1, 1)
+
+	time.Sleep(10 * time.Second)
 }

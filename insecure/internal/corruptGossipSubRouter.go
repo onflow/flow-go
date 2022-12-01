@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -46,6 +47,7 @@ func (m *CorruptGossipSubRouter) AcceptFrom(pid peer.ID) corrupt.AcceptStatus {
 }
 
 func (m *CorruptGossipSubRouter) HandleRPC(rpc *corrupt.RPC) {
+	fmt.Println("HandleRPC called: ", rpc.String())
 	m.router.HandleRPC(rpc)
 }
 
@@ -98,5 +100,7 @@ func (m *CorruptGossipSubRouter) GetPeerGater() *corrupt.PeerGater {
 }
 
 func (m *CorruptGossipSubRouter) SendControl(p peer.ID, ctl *pb.ControlMessage) {
+	fmt.Println("SendControl called: ", ctl.String())
+
 	m.router.SendControl(p, ctl)
 }
