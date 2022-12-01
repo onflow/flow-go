@@ -56,11 +56,21 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 			return corrupt.ValidationReject
 		default:
 			// should never happen, indicates a bug in the topic validator
-			c.logger.Fatal().Msgf("invalid validation result: %v", result)
+			c.logger.Fatal().
+				Bool(logging.KeySuspicious, true).
+				Str("topic", topic).
+				Str("origin_peer", from.String()).
+				Str("result", fmt.Sprintf("%v", result)).
+				Str("message_type", fmt.Sprintf("%T", message.Data)).
+				Msgf("invalid validation result, should be a bug in the topic validator")
 		}
 		// should never happen, indicates a bug in the topic validator, but we need to return something
 		c.logger.Warn().
 			Bool(logging.KeySuspicious, true).
+			Str("topic", topic).
+			Str("origin_peer", from.String()).
+			Str("result", fmt.Sprintf("%v", result)).
+			Str("message_type", fmt.Sprintf("%T", message.Data)).
 			Msg("invalid validation result, returning reject")
 		return corrupt.ValidationReject
 	}

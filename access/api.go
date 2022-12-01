@@ -15,13 +15,13 @@ type API interface {
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) NetworkParameters
 
-	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error)
-	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error)
-	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error)
+	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
-	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, error)
-	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, error)
-	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, error)
+	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error)
+	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
+	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
 

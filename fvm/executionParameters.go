@@ -18,6 +18,9 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+// getBasicMeterParameters returns the set of meter parameters used for
+// general procedure execution.  Subparts of the procedure execution may
+// specify custom meter parameters via nested transactions.
 func getBasicMeterParameters(
 	ctx Context,
 	proc Procedure,
@@ -38,10 +41,12 @@ func getBasicMeterParameters(
 	return params
 }
 
-func getMeterParameters(
+// getBodyMeterParameters returns the set of meter parameters used for
+// transaction/script body execution.
+func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	view state.View,
+	txnState *state.TransactionState,
 	derivedTxnData *programs.DerivedTransactionData,
 ) (
 	meter.MeterParameters,
@@ -49,14 +54,6 @@ func getMeterParameters(
 ) {
 	procParams := getBasicMeterParameters(ctx, proc)
 
-	txnState := state.NewTransactionState(
-		view,
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(procParams))
-
-	// TODO(patrick): cache meter param overrides
 	overrides, err := derivedTxnData.GetMeterParamOverrides(
 		txnState,
 		meterParamOverridesComputer{ctx, derivedTxnData})
