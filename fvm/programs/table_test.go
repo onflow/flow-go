@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func newEmptyTestBlock() *DerivedDataTable[string, *string] {
@@ -864,7 +865,8 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
-		assert.True(t, view.Ledger.RegisterTouches[utils.FullKey("addr", key)])
+		_, ok := view.Ledger.RegisterTouches[flow.RegisterID{Owner: "addr", Key: key}]
+		assert.True(t, ok)
 
 		// Commit to setup the next test.
 		err = txnDerivedData.Commit()
@@ -884,6 +886,7 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
-		assert.True(t, view.Ledger.RegisterTouches[utils.FullKey("addr", key)])
+		_, ok := view.Ledger.RegisterTouches[flow.RegisterID{Owner: "addr", Key: key}]
+		assert.True(t, ok)
 	})
 }

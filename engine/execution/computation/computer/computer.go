@@ -140,6 +140,54 @@ func (e *blockComputer) ExecuteBlock(
 	return results, nil
 }
 
+func (e *blockComputer) getCollections(
+	block *entity.ExecutableBlock,
+	derivedBlockData *programs.DerivedBlockData,
+) (
+	[]collectionItem,
+	error,
+) {
+	rawCollections := block.Collections()
+	collections := make([]collectionItem, 0, len(rawCollections)+1)
+
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(block.Block.Header),
+		fvm.WithDerivedBlockData(derivedBlockData))
+
+	for _, collection := range rawCollections {
+		collections = append(
+			collections,
+			collectionItem{
+				CompleteCollection: collection,
+				ctx:                blockCtx,
+				isSystemCollection: false,
+			})
+	}
+
+	systemTxn, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"could not get system chunk transaction: %w",
+			err)
+	}
+
+	collections = append(
+		collections,
+		collectionItem{
+			CompleteCollection: &entity.CompleteCollection{
+				Transactions: []*flow.TransactionBody{systemTxn},
+			},
+			ctx: fvm.NewContextFromParent(
+				e.systemChunkCtx,
+				fvm.WithBlockHeader(block.Block.Header),
+				fvm.WithDerivedBlockData(derivedBlockData)),
+			isSystemCollection: true,
+		})
+
+	return collections, nil
+}
+
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	blockSpan otelTrace.Span,
@@ -153,20 +201,14 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	blockCtx := fvm.NewContextFromParent(
-		e.vmCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithDerivedBlockData(derivedBlockData))
-	systemChunkCtx := fvm.NewContextFromParent(
-		e.systemChunkCtx,
-		fvm.WithBlockHeader(block.Block.Header),
-		fvm.WithDerivedBlockData(derivedBlockData))
-	collections := block.Collections()
+	collections, err := e.getCollections(block, derivedBlockData)
+	if err != nil {
+		return nil, err
+	}
 
 	res := execution.NewEmptyComputationResult(block)
 
 	var txIndex uint32
-	var err error
 	var wg sync.WaitGroup
 	wg.Add(2) // block commiter and event hasher
 
@@ -200,49 +242,52 @@ func (e *blockComputer) executeBlock(
 		wg.Done()
 	}()
 
-	collectionIndex := 0
-
-	for i, collection := range collections {
+	for collectionIndex, collection := range collections {
 		colView := stateView.NewChild()
-		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, colView, collectionItem{collection, blockCtx, false}, res)
+		txIndex, err = e.executeCollection(
+			blockSpan,
+			collectionIndex,
+			txIndex,
+			colView,
+			collection,
+			res)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
+			collectionPrefix := ""
+			if collection.isSystemCollection {
+				collectionPrefix = "system "
+			}
+
+			return nil, fmt.Errorf(
+				"failed to execute %scollection at txIndex %v: %w",
+				collectionPrefix,
+				txIndex,
+				err)
 		}
 		bc.Commit(colView)
-		eh.Hash(res.Events[i])
-		err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
+		eh.Hash(res.Events[collectionIndex])
+		err = e.mergeView(
+			stateView,
+			colView,
+			blockSpan,
+			trace.EXEMergeCollectionView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
-
-		collectionIndex++
 	}
 
-	// executing system chunk
-	colView := stateView.NewChild()
-	systemCol, err := e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, res)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
-	}
-
-	bc.Commit(colView)
-	eh.Hash(res.Events[len(res.Events)-1])
 	// close the views and wait for all views to be committed
 	bc.Close()
 	eh.Close()
-
-	err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
-	if err != nil {
-		return nil, fmt.Errorf("cannot merge view: %w", err)
-	}
-
 	wg.Wait()
 
-	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block)).
+		Msg("all views committed")
 
-	executionData := generateExecutionData(res, collections, systemCol)
-
-	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
+	executionDataID, err := e.executionDataProvider.Provide(
+		ctx,
+		block.Height(),
+		generateExecutionData(res, collections))
 	if err != nil {
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
@@ -254,12 +299,14 @@ func (e *blockComputer) executeBlock(
 
 func generateExecutionData(
 	res *execution.ComputationResult,
-	collections []*entity.CompleteCollection,
-	systemCol *flow.Collection,
+	collections []collectionItem,
 ) *execution_data.BlockExecutionData {
 	executionData := &execution_data.BlockExecutionData{
-		BlockID:             res.ExecutableBlock.ID(),
-		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0, len(collections)+1),
+		BlockID: res.ExecutableBlock.ID(),
+		ChunkExecutionDatas: make(
+			[]*execution_data.ChunkExecutionData,
+			0,
+			len(collections)),
 	}
 
 	for i, collection := range collections {
@@ -271,50 +318,7 @@ func generateExecutionData(
 		})
 	}
 
-	executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
-		Collection: systemCol,
-		Events:     res.Events[len(res.Events)-1],
-		TrieUpdate: res.TrieUpdates[len(res.TrieUpdates)-1],
-	})
-
 	return executionData
-}
-
-func (e *blockComputer) executeSystemCollection(
-	blockSpan otelTrace.Span,
-	collectionIndex int,
-	txIndex uint32,
-	systemChunkCtx fvm.Context,
-	collectionView state.View,
-	res *execution.ComputationResult,
-) (*flow.Collection, error) {
-	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
-	if err != nil {
-		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-	}
-
-	collection := collectionItem{
-		CompleteCollection: &entity.CompleteCollection{
-			Transactions: []*flow.TransactionBody{tx},
-		},
-		ctx:                systemChunkCtx,
-		isSystemCollection: true,
-	}
-
-	_, err = e.executeCollection(
-		blockSpan,
-		collectionIndex,
-		txIndex,
-		collectionView,
-		collection,
-		res)
-	if err != nil {
-		return nil, err
-	}
-
-	return &flow.Collection{
-		Transactions: collection.Transactions,
-	}, err
 }
 
 func (e *blockComputer) executeCollection(
