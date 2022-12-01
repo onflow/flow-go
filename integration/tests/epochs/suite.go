@@ -678,12 +678,13 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 	require.NoError(s.T(), err)
 }
 
-// assertNetworkHealthyAfterANChange after an access node is removed or added to the network
-// this func can be used to perform sanity.
-// 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
-// 2. Check that the chain moved atleast 20 blocks from when the node was bootstrapped by comparing
-// head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
-// 3. Check that we can execute a script on the AN
+// assertNetworkHealthyAfterANChange performs a basic network health check after replacing an access node.
+//  1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
+//  2. Check that the chain moved at least 20 blocks from when the node was bootstrapped by comparing
+//     head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
+//  3. Check that we can execute a script on the AN
+//
+// TODO test sending and observing result of a transaction via the new AN (blocked by https://github.com/onflow/flow-go/issues/3642)
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, info *StakedNodeOperationInfo) {
 
 	// get snapshot directly from new AN and compare head with head from the
