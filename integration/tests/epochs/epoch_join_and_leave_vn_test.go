@@ -10,6 +10,8 @@ import (
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
+	// TODO this test is blocked by https://github.com/dapperlabs/flow-go/issues/6443
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this test is flaky due to an unhandled case in service event processing following epoch transition https://github.com/dapperlabs/flow-go/issues/6443")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
 }
 
@@ -31,7 +33,5 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
-	// TODO this test is blocked by https://github.com/dapperlabs/flow-go/issues/6443
-	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "this test is flaky due to an unhandled case in service event processing following epoch transition https://github.com/dapperlabs/flow-go/issues/6443")
 	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
 }
