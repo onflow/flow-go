@@ -238,13 +238,14 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	defer span.End()
 
 	header := proposal.Header
+	blockID := header.ID()
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -261,14 +262,14 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
-	_, cached := e.pending.ByID(header.ID())
+	_, cached := e.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := e.headers.ByBlockID(header.ID())
+	_, err := e.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -288,6 +289,12 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 		log.Debug().
 			Uint64("final_height", final.Height).
 			Msg("dropping block too far ahead of locally finalized height")
+		return nil
+	}
+	if header.Height <= final.Height {
+		log.Debug().
+			Uint64("final_height", final.Height).
+			Msg("dropping block below finalized threshold")
 		return nil
 	}
 
@@ -350,7 +357,7 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	// state and should process it to see whether to forward to hotstuff or not
 	err = e.processBlockAndDescendants(ctx, proposal)
 	if err != nil {
-		return fmt.Errorf("could not process block proposal: %w", err)
+		return fmt.Errorf("could not process block proposal (id=%x, height=%d, view=%d): %w", blockID, header.Height, header.View, err)
 	}
 
 	// most of the heavy database checks are done at this point, so this is a
