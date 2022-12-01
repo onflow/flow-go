@@ -267,11 +267,11 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	programs.ModifiedSetsInvalidator,
+	programs.TransactionInvalidator,
 	error,
 ) {
 	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSetsInvalidator{
+	return DerivedDataInvalidator{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),
 	}, err

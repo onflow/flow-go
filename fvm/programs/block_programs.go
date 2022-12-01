@@ -151,6 +151,10 @@ func (transaction *DerivedTransactionData) SetProgram(
 func (transaction *DerivedTransactionData) AddInvalidator(
 	invalidator TransactionInvalidator,
 ) {
+	if invalidator == nil {
+		return
+	}
+
 	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
 	transaction.meterParamOverrides.AddInvalidator(
 		invalidator.MeterParamOverridesInvalidator())
