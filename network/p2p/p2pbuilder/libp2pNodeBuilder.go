@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
@@ -266,6 +267,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
+
+			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+
+			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
+			psOpts = append(psOpts, pubsub.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+				gossipSubMetrics.ObserveRPC(from, rpc)
+				return nil
+			}))
 
 			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 			if err != nil {
