@@ -271,11 +271,11 @@ docker-build-execution-debug:
 .PHONY: docker-build-execution-corrupt
 docker-build-execution-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	./insecure/cmd/build_helper1.sh
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
-	./insecure/cmd/build_helper2.sh
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-verification
 docker-build-verification:
@@ -292,11 +292,11 @@ docker-build-verification-debug:
 .PHONY: docker-build-verification-corrupt
 docker-build-verification-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	./insecure/cmd/build_helper1.sh
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
-	./insecure/cmd/build_helper2.sh
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-access
 docker-build-access:
