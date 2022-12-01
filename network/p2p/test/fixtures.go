@@ -152,7 +152,7 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
-	GossipSubFactory   p2pbuilder.GossipSubFactoryFuc
+	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 }
 

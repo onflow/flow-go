@@ -62,7 +62,7 @@ func NewCorruptLibP2PNodeFactory(
 
 // CorruptibleGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
 // github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
-func CorruptibleGossipSubFactory() (p2pbuilder.GossipSubFactoryFuc, *internal.CorruptGossipSubRouter) {
+func CorruptibleGossipSubFactory() (p2pbuilder.GossipSubFactoryFunc, *internal.CorruptGossipSubRouter) {
 	var rt *internal.CorruptGossipSubRouter
 	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
