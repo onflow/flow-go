@@ -463,6 +463,28 @@ type AccessMetrics interface {
 	ConnectionFromPoolEvicted()
 }
 
+type ExecutionResultStats struct {
+	ComputationUsed                 uint64
+	MemoryUsed                      uint64
+	EventCounts                     int
+	EventSize                       int
+	NumberOfRegistersTouched        int
+	NumberOfBytesWrittenToRegisters int
+	NumberOfCollections             int
+	NumberOfTransactions            int
+}
+
+func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
+	stats.ComputationUsed += other.ComputationUsed
+	stats.MemoryUsed += other.MemoryUsed
+	stats.EventCounts += other.EventCounts
+	stats.EventSize += other.EventSize
+	stats.NumberOfRegistersTouched += other.NumberOfRegistersTouched
+	stats.NumberOfBytesWrittenToRegisters += other.NumberOfBytesWrittenToRegisters
+	stats.NumberOfCollections += other.NumberOfCollections
+	stats.NumberOfTransactions += other.NumberOfTransactions
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
@@ -484,20 +506,13 @@ type ExecutionMetrics interface {
 	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
-		txCounts, colCounts int)
+	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
-		numberOfRegistersTouched, totalBytesWrittenToRegisters int,
-		txCounts int)
+	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(dur time.Duration,

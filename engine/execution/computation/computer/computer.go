@@ -351,14 +351,7 @@ func (e *blockComputer) executeCollection(
 		collection,
 		collectionView)
 
-	// TODO(patrick): refactor
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
-		stats.ComputationUsed, stats.MemoryUsed,
-		stats.EventCounts, stats.EventSize,
-		stats.NumberOfRegistersTouched,
-		stats.NumberOfBytesWrittenToRegisters,
-		stats.NumberOfTransactions,
-	)
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), stats)
 	return txIndex, nil
 }
 
