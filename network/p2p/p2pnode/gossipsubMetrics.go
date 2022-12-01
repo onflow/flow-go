@@ -25,10 +25,11 @@ func NewGossipSubControlMessageMetrics(metrics module.GossipSubRouterMetrics, lo
 // ObserveRPC is invoked to record metrics on incoming RPC messages.
 func (o *GossipSubControlMessageMetrics) ObserveRPC(from peer.ID, rpc *pubsub.RPC) {
 	lg := o.logger.With().Str("peer_id", from.String()).Logger()
+	includedMessages := len(rpc.GetPublish())
 
 	ctl := rpc.GetControl()
-	if ctl == nil {
-		lg.Warn().Msg("received rpc with no control message")
+	if ctl == nil && includedMessages == 0 {
+		lg.Trace().Msg("received rpc with no control message and no publish messages")
 		return
 	}
 
@@ -36,7 +37,6 @@ func (o *GossipSubControlMessageMetrics) ObserveRPC(from peer.ID, rpc *pubsub.RP
 	iWantCount := len(ctl.GetIwant())
 	graftCount := len(ctl.GetGraft())
 	pruneCount := len(ctl.GetPrune())
-	includedMessages := len(rpc.GetPublish())
 
 	lg.Trace().
 		Int("iHaveCount", iHaveCount).
