@@ -5,8 +5,11 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/spf13/pflag"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/insecure/corruptnet"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
@@ -19,17 +22,33 @@ const CorruptNetworkPort = 4300
 // CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
+	TopicValidatorDisabled bool
 }
 
 func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
 	return &CorruptedNodeBuilder{
-		FlowNodeBuilder: cmd.FlowNode(role),
+		FlowNodeBuilder:        cmd.FlowNode(role),
+		TopicValidatorDisabled: true,
 	}
 }
 
+// LoadCorruptFlags load additional flags for corrupt nodes.
+func (cnb *CorruptedNodeBuilder) LoadCorruptFlags() {
+	cnb.FlowNodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.BoolVar(&cnb.TopicValidatorDisabled, "topic-validator-disabled", true, "enable the libp2p topic validator for corrupt nodes")
+	})
+}
+
 func (cnb *CorruptedNodeBuilder) Initialize() error {
-	if err := cnb.FlowNodeBuilder.Initialize(); err != nil {
-		return fmt.Errorf("could not initilized flow node builder: %w", err)
+
+	// skip FlowNodeBuilder initialization if node role is access. This is because the AN builder uses
+	// a slightly different build flow than the other node roles. Flags and components are initialized
+	// in calls to anBuilder.ParseFlags & anBuilder.Initialize . Another call to FlowNodeBuilder.Initialize will
+	// end up calling BaseFlags() and causing a flags redefined error.
+	if cnb.NodeRole != flow.RoleAccess.String() {
+		if err := cnb.FlowNodeBuilder.Initialize(); err != nil {
+			return fmt.Errorf("could not initilized flow node builder: %w", err)
+		}
 	}
 
 	cnb.enqueueNetworkingLayer() // initializes corrupted networking layer.
@@ -44,6 +63,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
+		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
 			cnb.RootChainID,
@@ -60,6 +80,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			// run peer manager with the specified interval and let it also prune connections
 			cnb.NetworkConnectionPruning,
 			cnb.PeerUpdateInterval,
+			cnb.TopicValidatorDisabled,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -67,7 +88,12 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
 		cnb.LibP2PNode = libp2pNode
-		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", myAddr).Msg("corrupted libp2p node initialized")
+		cnb.Logger.Info().
+			Hex("node_id", logging.ID(cnb.NodeID)).
+			Str("address", myAddr).
+			Bool("topic_validator_disabled", cnb.TopicValidatorDisabled).
+			Msg("corrupted libp2p node initialized")
+
 		return libp2pNode, nil
 	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -108,6 +134,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// override the original flow network with the corruptible network.
 		cnb.Network = corruptibleNetwork
+
 		return corruptibleNetwork, nil
 	})
 }

@@ -314,6 +314,16 @@ docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
+# build corrupted access node for BFT testing
+.PHONY: docker-build-access-corrupted
+docker-build-access-corrupted:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	mv insecure/go.mod insecure/go2.mod
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
+	mv insecure/go2.mod insecure/go.mod
+
 .PHONY: docker-build-observer
 docker-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
@@ -362,7 +372,7 @@ docker-build-loader:
 docker-build-flow: docker-build-flow-corrupted docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-flow-corrupted
-docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted
+docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted docker-build-access-corrupted
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader

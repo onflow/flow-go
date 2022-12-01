@@ -30,6 +30,7 @@ func NewCorruptLibP2PNodeFactory(
 	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
+	topicValidatorDisabled bool,
 ) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		if chainID != flow.BftTestnet {
@@ -37,7 +38,11 @@ func NewCorruptLibP2PNodeFactory(
 		}
 
 		builder := p2pbuilder.DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
-		builder.SetCreateNode(NewCorruptLibP2PNode)
+
+		if topicValidatorDisabled {
+			builder.SetCreateNode(NewCorruptLibP2PNode)
+		}
+
 		return builder.Build()
 	}
 }
