@@ -367,7 +367,7 @@ docker-build-loader:
 docker-build-flow: docker-build-flow-corrupt docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-flow-corrupt
-docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted docker-build-access-corrupted
+docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupted
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
