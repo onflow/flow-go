@@ -5,57 +5,33 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-type PendingBlocks struct {
-	backend *backend
+type PendingBlocks[P flow.AnyPayload] struct {
+	// TODO move backend into PendingBlocks
+	backend *backend[P]
 }
 
 var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 
-func NewPendingBlocks() *PendingBlocks {
-	b := &PendingBlocks{backend: newBackend()}
+func NewPendingBlocks[P flow.AnyPayload]() *PendingBlocks[P] {
+	b := &PendingBlocks[P]{backend: newBackend[P]()}
 	return b
 }
 
-func (b *PendingBlocks) Add(originID flow.Identifier, block *flow.Block) bool {
-	return b.backend.add(originID, block.Header, block.Payload)
+func (b *PendingBlocks[P]) Add(block flow.Slashable[flow.AnyBlock[P]]) bool {
+	return b.backend.add(block)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool) {
-	item, ok := b.backend.byID(blockID)
-	if !ok {
-		return nil, false
-	}
-
-	block := &flow.Slashable[flow.Block]{
-		OriginID: item.originID,
-		Message: &flow.Block{
-			Header:  item.header,
-			Payload: item.payload.(*flow.Payload),
-		},
-	}
-
-	return block, true
+func (b *PendingBlocks[P]) ByID(blockID flow.Identifier) (flow.Slashable[flow.AnyBlock[P]], bool) {
+	block, ok := b.backend.byID(blockID)
+	return block, ok
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.Slashable[flow.Block], bool) {
+func (b *PendingBlocks[P]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[flow.AnyBlock[P]], bool) {
 	items, ok := b.backend.byParentID(parentID)
+	return items, ok
 	if !ok {
 		return nil, false
 	}
-
-	blocks := make([]*flow.Slashable[flow.Block], 0, len(items))
-	for _, item := range items {
-		block := &flow.Slashable[flow.Block]{
-			OriginID: item.originID,
-			Message: &flow.Block{
-				Header:  item.header,
-				Payload: item.payload.(*flow.Payload),
-			},
-		}
-		blocks = append(blocks, block)
-	}
-
-	return blocks, true
 }
 
 func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {

@@ -2,6 +2,10 @@
 
 package flow
 
+import (
+	"github.com/onflow/flow-go/model/cluster"
+)
+
 func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
@@ -34,6 +38,10 @@ func Genesis(chainID ChainID) *Block {
 type Block struct {
 	Header  *Header
 	Payload *Payload
+}
+
+func ToGeneric(block *Block) *AnyBlock[*Payload] {
+	return &AnyBlock[P]{}
 }
 
 // SetPayload sets the payload and updates the payload hash.
@@ -72,4 +80,20 @@ const (
 // String returns the string representation of a transaction status.
 func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
+}
+
+// AnyPayload is a type constraint matching either main chain (consensus) or cluster payloads.
+// NOTE: this is experimental while we explore introducing generics to the codebase.
+type AnyPayload interface {
+	*Payload | *cluster.Payload
+	Hash() Identifier
+}
+
+// AnyBlock is a generic type which can be used to represent both consensus and cluster blocks.
+// This enables code which only operates on payload-generic aspects of the block to be
+// implemented once and applied to both consensus and cluster blocks.
+// NOTE: this is experimental while we explore introducing generics to the codebase.
+type AnyBlock[P AnyPayload] struct {
+	Header  *Header
+	Payload P
 }

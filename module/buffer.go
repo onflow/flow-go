@@ -10,7 +10,7 @@ import (
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
 type PendingBlockBuffer interface {
-	Add(originID flow.Identifier, block *flow.Block) bool
+	Add(originID flow.Identifier, block flow.Slashable[flow.Block]) bool
 
 	ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool)
 
