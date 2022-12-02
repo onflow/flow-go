@@ -223,7 +223,8 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	return result, err
 }
 
-// GetLatestProtocolSnapshot returns the latest sealed protocol state snapshot.
+// GetLatestProtocolSnapshot returns the latest protocol state snapshot.
+// The snapshot head is latest finalized - tail of sealing segment is latest sealed.
 func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot, error) {
 	b, err := c.client.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {

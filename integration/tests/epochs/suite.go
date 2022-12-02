@@ -170,6 +170,7 @@ type StakedNodeOperationInfo struct {
 // 4. Add additional funds to staking account for storage
 // 5. Create Staking collection for node
 // 6. Register node using staking collection object
+// NOTE: assumes staking occurs in first epoch (counter 0)
 func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
 
 	stakingAccountKey, networkingKey, stakingKey, machineAccountKey, machineAccountPubKey := s.generateAccountKeys(role)
@@ -228,7 +229,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), result.Error)
 
 	// ensure we are still in staking auction
-	s.assertInPhase(ctx, flow.EpochPhaseStaking)
+	s.AssertInEpochPhase(ctx, 0, flow.EpochPhaseStaking)
 
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
@@ -243,20 +244,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
-}
-
-// WaitForPhase waits for the given epoch phase.
-func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase, waitFor, tick time.Duration) {
-	condition := func() bool {
-		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-		require.NoError(s.T(), err)
-
-		currentPhase, err := snapshot.Phase()
-		require.NoError(s.T(), err)
-
-		return currentPhase == phase
-	}
-	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach epoch phase (%s) within %s", phase, waitTimeout)
 }
 
 // transfers tokens to receiver from service account
@@ -451,13 +438,15 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
+// removeNodeFromProtocol removes the given node from the protocol.
+// NOTE: assumes staking occurs in first epoch (counter 0)
 func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
 	// ensure we submit transaction while in staking phase
-	s.assertInPhase(ctx, flow.EpochPhaseStaking)
+	s.AssertInEpochPhase(ctx, 0, flow.EpochPhaseStaking)
 }
 
 // submitAdminRemoveNodeTx will submit the admin remove node transaction
@@ -626,38 +615,85 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 	return nil
 }
 
-// assertInPhase checks if we are in the phase provided and returns the current view
-func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase) {
+// AwaitEpochPhase waits for the given phase, in the given epoch.
+func (s *Suite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase, waitFor, tick time.Duration) {
+	condition := func() bool {
+		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
+
+		actualEpoch, err := snapshot.Epochs().Current().Counter()
+		require.NoError(s.T(), err)
+		actualPhase, err := snapshot.Phase()
+		require.NoError(s.T(), err)
+
+		return actualEpoch == expectedEpoch && actualPhase == expectedPhase
+	}
+	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s", expectedEpoch, expectedPhase, waitFor)
+}
+
+// AssertInEpochPhase checks if we are in the phase of the given epoch.
+func (s *Suite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 	actualPhase, err := snapshot.Phase()
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), expectedPhase, actualPhase)
+	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
+	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")
 }
 
-// assertEpochCounter requires actual epoch counter is equal to counter provided
-func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) {
+// AssertInEpoch requires actual epoch counter is equal to counter provided.
+func (s *Suite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	actualCounter, err := snapshot.Epochs().Current().Counter()
+	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
-	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
+	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
 }
 
-// awaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
+// AwaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
 // sealed block height has exceeded the snapshot height by numOfBlocks
 // the snapshot height and latest finalized height is greater than numOfBlocks.
-func (s *Suite) awaitSealedBlockHeightExceedsSnapshot(ctx context.Context, snapshot *inmem.Snapshot, threshold uint64, waitFor, tick time.Duration) {
+func (s *Suite) AwaitSealedBlockHeightExceedsSnapshot(ctx context.Context, snapshot *inmem.Snapshot, threshold uint64, waitFor, tick time.Duration) {
 	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	snapshotHeight := header.Height
 
 	require.Eventually(s.T(), func() bool {
-		latestSealed, err := s.client.GetLatestSealedBlockHeader(ctx)
-		require.NoError(s.T(), err)
+		latestSealed := s.getLatestSealedHeader(ctx)
 		s.TimedLogf("waiting for sealed block height: %d+%d < %d", snapshotHeight, threshold, latestSealed.Height)
 		return snapshotHeight+threshold < latestSealed.Height
 	}, waitFor, tick)
+}
+
+// AwaitFinalizedView polls until it observes that the latest finalized block has a view
+// greater than or equal to the input view. This is used to wait until when an epoch
+// transition must have happened.
+func (s *Suite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		sealed := s.getLatestFinalizedHeader(ctx)
+		return sealed.View >= view
+	}, waitFor, tick)
+}
+
+// getLatestSealedHeader retrieves the latest sealed block, as reported in LatestSnapshot.
+func (s *Suite) getLatestSealedHeader(ctx context.Context) *flow.Header {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	segment, err := snapshot.SealingSegment()
+	require.NoError(s.T(), err)
+	sealed := segment.Lowest()
+	return sealed.Header
+}
+
+// getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
+func (s *Suite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	finalized, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	return finalized
 }
 
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
@@ -696,7 +732,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
 	s.client = client
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.awaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -708,7 +744,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 //  1. Ensure sealing continues into the second epoch (post-replacement) by observing
 //     at least 10 blocks of sealing progress within the epoch
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.awaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
 // assertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
@@ -770,7 +806,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
+	s.AwaitEpochPhase(s.ctx, 0, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get the latest snapshot and start new container with it
@@ -794,16 +830,16 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NoError(s.T(), err)
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
-	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+1)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
-	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+1)
+	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
+	s.AwaitFinalizedView(s.ctx, epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
-	s.assertEpochCounter(s.ctx, 1)
+	s.AssertInEpoch(s.ctx, 1)
 
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
@@ -811,11 +847,6 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// retrieve a snapshot after observing that we have entered the second epoch
 	secondEpochSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 	require.NoError(s.T(), err)
-
-	// wait some time after pausing our container to replace before we assert healthy network
-	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10, 30*time.Second, 500*time.Millisecond)
-	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(s.ctx, env, secondEpochSnapshot, info)
