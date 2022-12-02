@@ -355,10 +355,11 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 
 	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
+    // use a temporary buffer to mask the header bits and read a.x 
     byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
-    if (fp_read_bin_safe(a->x, temp, Fp_BYTES) != RLC_OK) {
+    if (fp_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
         return RLC_ERR;
     }
 
@@ -492,18 +493,17 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     } 
     
 	a->coord = BASIC;
-	fp_set_dig(a->z[0], 1);
-	fp_zero(a->z[1]);
+    fp2_set_dig(a->z, 1);   // a.z
+    // use a temporary buffer to mask the header bits and read a.x
     byte temp[Fp2_BYTES];
     memcpy(temp, bin, Fp2_BYTES);
-    // clear the header bits
-    temp[0] &= 0x1F;
-    if (fp2_read_bin_safe(a->x, temp, Fp2_BYTES) != RLC_OK) {
+    temp[0] &= 0x1F;        // clear the header bits
+    if (fp2_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
         return RLC_ERR;
     }
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){
+        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){ 
             return RLC_ERR;
         }
         // check read point is on curve
