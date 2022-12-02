@@ -2,6 +2,8 @@ package fvm
 
 import (
 	"context"
+	"fmt"
+	"math"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -16,42 +18,124 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func getEnvironmentMeterParameters(
+// getBasicMeterParameters returns the set of meter parameters used for
+// general procedure execution.  Subparts of the procedure execution may
+// specify custom meter parameters via nested transactions.
+func getBasicMeterParameters(
 	ctx Context,
-	view state.View,
-	programs *programs.TransactionPrograms,
-	params meter.MeterParameters,
-) (
-	meter.MeterParameters,
-	error,
-) {
-	sth := state.NewTransactionState(
-		view,
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+	proc Procedure,
+) meter.MeterParameters {
+	params := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx)).
+		WithEventEmitByteLimit(ctx.EventCollectionByteSizeLimit).
+		WithStorageInteractionLimit(ctx.MaxStateInteractionSize)
 
-	sth.DisableAllLimitEnforcements()
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		params = params.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
+	}
 
-	env := NewScriptEnv(context.Background(), ctx, sth, programs)
-
-	return fillEnvironmentMeterParameters(ctx, env, params)
+	return params
 }
 
-func fillEnvironmentMeterParameters(
+// getBodyMeterParameters returns the set of meter parameters used for
+// transaction/script body execution.
+func getBodyMeterParameters(
 	ctx Context,
-	env environment.Environment,
-	params meter.MeterParameters,
+	proc Procedure,
+	txnState *state.TransactionState,
+	derivedTxnData *programs.DerivedTransactionData,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
+	procParams := getBasicMeterParameters(ctx, proc)
 
+	overrides, err := derivedTxnData.GetMeterParamOverrides(
+		txnState,
+		NewMeterParamOverridesComputer(ctx, derivedTxnData))
+	if err != nil {
+		return procParams, err
+	}
+
+	if overrides.ComputationWeights != nil {
+		procParams = procParams.WithComputationWeights(
+			overrides.ComputationWeights)
+	}
+
+	if overrides.MemoryWeights != nil {
+		procParams = procParams.WithMemoryWeights(overrides.MemoryWeights)
+	}
+
+	if overrides.MemoryLimit != nil {
+		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
+	}
+
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		procParams = procParams.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
+	}
+
+	return procParams, nil
+}
+
+type MeterParamOverridesComputer struct {
+	ctx            Context
+	derivedTxnData *programs.DerivedTransactionData
+}
+
+func NewMeterParamOverridesComputer(
+	ctx Context,
+	derivedTxnData *programs.DerivedTransactionData,
+) MeterParamOverridesComputer {
+	return MeterParamOverridesComputer{ctx, derivedTxnData}
+}
+
+func (computer MeterParamOverridesComputer) Compute(
+	txnState *state.TransactionState,
+	_ struct{},
+) (
+	programs.MeterParamOverrides,
+	error,
+) {
+	var overrides programs.MeterParamOverrides
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		overrides, err = computer.getMeterParamOverrides(txnState)
+	})
+
+	if err != nil {
+		return overrides, fmt.Errorf(
+			"error getting environment meter parameter overrides: %w",
+			err)
+	}
+
+	return overrides, nil
+}
+
+func (computer MeterParamOverridesComputer) getMeterParamOverrides(
+	txnState *state.TransactionState,
+) (
+	programs.MeterParamOverrides,
+	error,
+) {
 	// Check that the service account exists because all the settings are
 	// stored in it
-	serviceAddress := ctx.Chain.ServiceAddress()
+	serviceAddress := computer.ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
+
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		computer.ctx.EnvironmentParams,
+		txnState,
+		computer.derivedTxnData)
+
+	overrides := programs.MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -59,7 +143,7 @@ func fillEnvironmentMeterParameters(
 		err, fatal = errors.SplitErrorTypes(err)
 		if fatal != nil {
 			// this is a fatal error. return it
-			ctx.Logger.
+			computer.ctx.Logger.
 				Error().
 				Err(fatal).
 				Msgf("error getting %s", prop)
@@ -70,7 +154,7 @@ func fillEnvironmentMeterParameters(
 			// could be that no setting was present in the state,
 			// or that the setting was not parseable,
 			// or some other deterministic thing.
-			ctx.Logger.
+			computer.ctx.Logger.
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
@@ -85,30 +169,30 @@ func fillEnvironmentMeterParameters(
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { params = params.WithComputationWeights(computationWeights) })
+		func() { overrides.ComputationWeights = computationWeights })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
 	memoryWeights, err := GetExecutionMemoryWeights(env, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { params = params.WithMemoryWeights(memoryWeights) })
+		func() { overrides.MemoryWeights = memoryWeights })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
 	memoryLimit, err := GetExecutionMemoryLimit(env, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { params = params.WithMemoryLimit(memoryLimit) })
+		func() { overrides.MemoryLimit = &memoryLimit })
 	if err != nil {
-		return params, err
+		return overrides, err
 	}
 
-	return params, nil
+	return overrides, nil
 }
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](

@@ -245,6 +245,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
@@ -254,6 +255,7 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 // TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
@@ -278,6 +280,7 @@ func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
 	// should fail to extend block with invalid payload
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
@@ -296,6 +299,7 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// try to extend with the invalid block
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsOutdatedExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_Success() {
@@ -325,7 +329,7 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 	suite.Assert().Nil(err)
 }
 
-// an unknown reference block is invalid
+// an unknown reference block is unverifiable
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	block := suite.Block()
 	tx := suite.Tx()
@@ -335,9 +339,10 @@ func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	block.SetPayload(payload)
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsUnverifiableExtensionError(err))
 }
 
-// a collection with an expired reference block is a VALID extensino of chain state
+// a collection with an expired reference block is a VALID extension of chain state
 func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	// build enough blocks so that using genesis as a reference block causes
 	// the collection to be expired
@@ -391,6 +396,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
@@ -417,6 +423,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.state.Extend(&block2)
 	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
@@ -523,5 +530,6 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		block.SetPayload(payload)
 		err = suite.state.Extend(&block)
 		assert.Error(t, err)
+		suite.Assert().True(state.IsInvalidExtensionError(err))
 	})
 }

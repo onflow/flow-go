@@ -35,6 +35,10 @@ func AllDone(components ...module.ReadyDoneAware) <-chan struct{} {
 // AllClosed returns a channel that is closed when all input channels are closed.
 func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
+	if len(channels) == 0 {
+		close(done)
+		return done
+	}
 
 	go func() {
 		for _, ch := range channels {
@@ -168,4 +172,16 @@ var _ module.Startable = (*readyDoneAwareMerger)(nil)
 // MergeReadyDone merges []module.ReadyDoneAware into one module.ReadyDoneAware.
 func MergeReadyDone(components ...module.ReadyDoneAware) module.ReadyDoneAware {
 	return readyDoneAwareMerger{components: components}
+}
+
+// DetypeSlice converts a typed slice containing any kind of elements into an
+// untyped []any type, in effect removing the element type information from the slice.
+// It is useful for passing data into structpb.NewValue, which accepts []any but not
+// []T for any specific type T.
+func DetypeSlice[T any](typedSlice []T) []any {
+	untypedSlice := make([]any, len(typedSlice))
+	for i, t := range typedSlice {
+		untypedSlice[i] = t
+	}
+	return untypedSlice
 }

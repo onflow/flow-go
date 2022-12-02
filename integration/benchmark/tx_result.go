@@ -14,9 +14,8 @@ import (
 // WaitForTransactionResult waits for the transaction to get into the terminal state and returns the result.
 func WaitForTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) (*flowsdk.TransactionResult, error) {
 	var b retry.Backoff
-	b = retry.NewFibonacci(100 * time.Millisecond)
+	b = retry.NewConstant(500 * time.Millisecond)
 	b = retry.WithMaxDuration(60*time.Second, b)
-	b = retry.WithCappedDuration(10*time.Second, b)
 
 	var result *flowsdk.TransactionResult
 	err := retry.Do(ctx, b, func(ctx context.Context) (err error) {

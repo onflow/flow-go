@@ -345,13 +345,16 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid
 			// TODO: we should slash the block proposer
 			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
-		}
-		if state.IsOutdatedExtensionError(err) {
+		} else if state.IsOutdatedExtensionError(err) {
 			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
+		} else if state.IsUnverifiableExtensionError(err) {
+			return engine.NewUnverifiableInputError("unverifiable extension of cluster state (block_id: %x, height: %d): %w",
+				header.ID(), header.Height, err)
+		} else {
+			// unexpected error: potentially corrupted internal state => abort processing and escalate error
+			return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)
 		}
-		// unexpected error: potentially corrupted internal state => abort processing and escalate error
-		return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)
 	}
 
 	// notify vote aggregator about a new block, so that it can start verifying

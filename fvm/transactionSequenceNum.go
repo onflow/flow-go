@@ -5,28 +5,23 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
 
-func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
-	return &TransactionSequenceNumberChecker{}
-}
-
-func (c *TransactionSequenceNumberChecker) Process(
-	ctx Context,
+func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	_ *programs.TransactionPrograms,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
 	txnState.RunWithAllLimitsDisabled(func() {
-		err = c.checkAndIncrementSequenceNumber(proc, ctx, txnState)
+		err = c.checkAndIncrementSequenceNumber(tracer, proc, txnState)
 	})
 
 	if err != nil {
@@ -36,13 +31,15 @@ func (c *TransactionSequenceNumberChecker) Process(
 	return nil
 }
 
-func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
+func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
-	ctx Context,
 	txnState *state.TransactionState,
 ) error {
 
-	defer proc.StartSpanFromProcTraceSpan(ctx.Tracer, trace.FVMSeqNumCheckTransaction).End()
+	defer proc.StartSpanFromProcTraceSpan(
+		tracer,
+		trace.FVMSeqNumCheckTransaction).End()
 
 	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {

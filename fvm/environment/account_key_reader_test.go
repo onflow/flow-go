@@ -1,4 +1,4 @@
-package environment
+package environment_test
 
 import (
 	"testing"
@@ -11,16 +11,20 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/environment/mock"
 )
 
-func newDummyAccountKeyReader(t *testing.T, keyCount uint64) AccountKeyReader {
-	params := DefaultTracerParams()
-	tracer := NewTracer(params)
+func newDummyAccountKeyReader(
+	t *testing.T,
+	keyCount uint64,
+) environment.AccountKeyReader {
+	params := environment.DefaultTracerParams()
+	tracer := environment.NewTracer(params)
 	meter := mock.NewMeter(t)
 	meter.On("MeterComputation", testMock.Anything, testMock.Anything).Return(nil)
 	accounts := &FakeAccounts{keyCount: keyCount}
-	return NewAccountKeyReader(tracer, meter, accounts)
+	return environment.NewAccountKeyReader(tracer, meter, accounts)
 }
 
 func bytesToAddress(bytes ...uint8) common.Address {
@@ -36,7 +40,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 		accountKey := FakePublicKey{}.toAccountPublicKey()
 		accountKey.HashAlgo = hash.UnknownHashingAlgorithm
 
-		rtKey, err := FlowToRuntimeAccountKey(accountKey)
+		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
 		require.Error(t, err)
 		require.Nil(t, rtKey)
 	})
@@ -47,7 +51,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 		accountKey := FakePublicKey{}.toAccountPublicKey()
 		accountKey.SignAlgo = crypto.UnknownSigningAlgorithm
 
-		rtKey, err := FlowToRuntimeAccountKey(accountKey)
+		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
 		require.Error(t, err)
 		require.Nil(t, rtKey)
 	})
@@ -57,7 +61,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 
 		accountKey := FakePublicKey{}.toAccountPublicKey()
 
-		rtKey, err := FlowToRuntimeAccountKey(accountKey)
+		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
 		require.NoError(t, err)
 		require.NotNil(t, rtKey)
 
@@ -71,7 +75,7 @@ func TestAccountKeyReader_get_valid_key(t *testing.T) {
 	res, err := newDummyAccountKeyReader(t, 10).GetAccountKey(address, 0)
 	require.NoError(t, err)
 
-	expected, err := FlowToRuntimeAccountKey(
+	expected, err := environment.FlowToRuntimeAccountKey(
 		FakePublicKey{}.toAccountPublicKey(),
 	)
 

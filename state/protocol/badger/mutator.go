@@ -112,13 +112,13 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// find the last seal at the parent block
 	last, err := m.lastSealed(candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -140,25 +140,25 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload guarantee(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
+		return fmt.Errorf("payload receipt(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized state
 	lastSeal, err := m.sealExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -239,8 +239,8 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 			// for instance:
 			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
 			//                  ^- G             ^- H             ^- I
-			// block G is not a valid block, because it does not include C which has been finalized.
-			// block H and I are a valid, because its their includes C.
+			// block G is not a valid block, because it does not have C (which has been finalized) as an ancestor
+			// block H and I are valid, because they do have C as an ancestor
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
 				header.Height, ancestor.Height, finalizedHeight)

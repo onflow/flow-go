@@ -118,9 +118,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-	baseOptions                  []cmd.Option
-
-	PublicNetworkConfig PublicNetworkConfig
+	PublicNetworkConfig          PublicNetworkConfig
 }
 
 type PublicNetworkConfig struct {
@@ -528,17 +526,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	return builder
 }
 
-type Option func(*AccessNodeConfig)
-
-func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
-	config := DefaultAccessNodeConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		AccessNodeConfig:        DefaultAccessNodeConfig(),
+		FlowNodeBuilder:         nodeBuilder,
 		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
 	}
 }
@@ -1023,7 +1014,12 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 	return func() (p2p.LibP2PNode, error) {
 		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
-		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+		libp2pNode, err := p2pbuilder.NewNodeBuilder(
+			builder.Logger,
+			builder.Metrics.Network,
+			builder.PublicNetworkConfig.BindAddress,
+			networkKey,
+			builder.SporkID).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(

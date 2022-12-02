@@ -133,6 +133,20 @@ func (_m *LibP2PNode) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return r0
 }
 
+// HasSubscription provides a mock function with given fields: topic
+func (_m *LibP2PNode) HasSubscription(topic channels.Topic) bool {
+	ret := _m.Called(topic)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(channels.Topic) bool); ok {
+		r0 = rf(topic)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // Host provides a mock function with given fields:
 func (_m *LibP2PNode) Host() host.Host {
 	ret := _m.Called()

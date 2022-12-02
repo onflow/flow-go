@@ -421,12 +421,13 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	}, nil
 }
 
-// AddEncodedAccountKey adds an encoded public key to an existing account.
+// InternalAddEncodedAccountKey adds an encoded public key to an existing
+// account.
 //
 // This function returns following error
 // * NewAccountNotFoundError - if the specified account does not exist
 // * ValueError - if the provided encodedPublicKey is not valid public key
-func (updater *accountKeyUpdater) addEncodedAccountKey(
+func (updater *accountKeyUpdater) InternalAddEncodedAccountKey(
 	address runtime.Address,
 	encodedPublicKey []byte,
 ) error {
@@ -537,7 +538,7 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	//
 	// don't enforce limit during adding a key
 	updater.txnState.RunWithAllLimitsDisabled(func() {
-		err = updater.addEncodedAccountKey(address, publicKey)
+		err = updater.InternalAddEncodedAccountKey(address, publicKey)
 	})
 
 	if err != nil {

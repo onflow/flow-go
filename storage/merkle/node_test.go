@@ -60,7 +60,13 @@ func TestLeafHash(t *testing.T) {
 	ref := "1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc"
 
 	l := leaf{val: payload1}
-	require.Equal(t, ref, hex.EncodeToString(l.Hash()))
+	require.Equal(t, ref, hex.EncodeToString(l.Hash(false)))
+	// this first time doens't have cached value
+	require.Nil(t, l.cachedHashValue)
+	require.Equal(t, ref, hex.EncodeToString(l.Hash(true)))
+	// second time returns the cached value
+	require.NotNil(t, l.cachedHashValue)
+	require.Equal(t, ref, hex.EncodeToString(l.Hash(true)))
 }
 
 // TestShortHash verifies that the hash of a short node returns the expected value.
@@ -81,7 +87,11 @@ func TestShortHash(t *testing.T) {
 			count: 13,
 			child: &leaf{val: payload1},
 		}
-		require.Equal(t, ref, hex.EncodeToString(s.Hash()))
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(false)))
+		// this first time doens't have cached value
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(true)))
+		// second time returns the cached value
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(true)))
 	})
 
 	t.Run("maxKeyLenBits-bit path", func(t *testing.T) {
@@ -100,7 +110,11 @@ func TestShortHash(t *testing.T) {
 			count: maxKeyLenBits,
 			child: &leaf{val: payload1},
 		}
-		require.Equal(t, ref, hex.EncodeToString(s.Hash()))
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(false)))
+		// this first time doens't have cached value
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(true)))
+		// second time returns the cached value
+		require.Equal(t, ref, hex.EncodeToString(s.Hash(true)))
 	})
 }
 
@@ -135,5 +149,38 @@ func TestFullHash(t *testing.T) {
 		left:  &leaf{val: payload1},
 		right: &leaf{val: payload2},
 	}
-	require.Equal(t, ref, hex.EncodeToString(f.Hash()))
+	require.Equal(t, ref, hex.EncodeToString(f.Hash(false)))
+	// this first time doens't have cached value
+	require.Equal(t, ref, hex.EncodeToString(f.Hash(true)))
+	// second time returns the cached value
+	require.Equal(t, ref, hex.EncodeToString(f.Hash(true)))
+}
+
+// TestMaxDepthOfDescendants validates the functionality of the max depth of the decendencts
+func TestMaxDepthOfDescendants(t *testing.T) {
+	////   consturcted trie
+	//          full
+	//         /    \
+	//       short  leaf
+	//         |
+	//        full
+	//       /   \
+	//     leaf  short
+	//             |
+	//             leaf
+	////
+
+	f := full{
+		left: &short{
+			child: &full{
+				left: &leaf{},
+				right: &short{
+					child: &leaf{},
+				},
+			},
+		},
+		right: &leaf{},
+	}
+
+	require.Equal(t, f.MaxDepthOfDescendants(), uint(4))
 }

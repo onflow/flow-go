@@ -24,15 +24,6 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 	}
 }
 
-type TransactionProcessor interface {
-	Process(
-		Context,
-		*TransactionProcedure,
-		*state.TransactionState,
-		*programs.TransactionPrograms,
-	) error
-}
-
 type TransactionProcedure struct {
 	ID                     flow.Identifier
 	Transaction            *flow.TransactionBody
@@ -69,25 +60,9 @@ func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
+	derivedTxnData *programs.DerivedTransactionData,
 ) error {
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
-
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
-		}
-	}
-
-	return nil
+	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
