@@ -12,9 +12,9 @@ import (
 type PendingBlockBuffer interface {
 	Add(originID flow.Identifier, block *flow.Block) bool
 
-	ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[flow.Block], bool)
 
-	ByParentID(parentID flow.Identifier) ([]*flow.Slashable[flow.Block], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[flow.Block], bool)
 
 	DropForParent(parentID flow.Identifier)
 
@@ -29,9 +29,9 @@ type PendingBlockBuffer interface {
 type PendingClusterBlockBuffer interface {
 	Add(originID flow.Identifier, block *cluster.Block) bool
 
-	ByID(blockID flow.Identifier) (*flow.Slashable[cluster.Block], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[cluster.Block], bool)
 
-	ByParentID(parentID flow.Identifier) ([]*flow.Slashable[cluster.Block], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[cluster.Block], bool)
 
 	DropForParent(parentID flow.Identifier)
 

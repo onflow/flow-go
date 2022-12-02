@@ -206,8 +206,8 @@ func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockPropos
 }
 
 // AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
-func AsSlashable[T any](msg *T) *flow.Slashable[T] {
-	slashable := &flow.Slashable[T]{
+func AsSlashable[T any](msg *T) flow.Slashable[T] {
+	slashable := flow.Slashable[T]{
 		OriginID: IdentifierFixture(),
 		Message:  msg,
 	}

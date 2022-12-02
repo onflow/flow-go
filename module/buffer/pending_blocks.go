@@ -20,13 +20,13 @@ func (b *PendingBlocks) Add(originID flow.Identifier, block *flow.Block) bool {
 	return b.backend.add(originID, block.Header, block.Payload)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool) {
+func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[flow.Block], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return nil, false
+		return flow.Slashable[flow.Block]{}, false
 	}
 
-	block := &flow.Slashable[flow.Block]{
+	block := flow.Slashable[flow.Block]{
 		OriginID: item.originID,
 		Message: &flow.Block{
 			Header:  item.header,
@@ -37,15 +37,15 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.Slashable[flow.Bloc
 	return block, true
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.Slashable[flow.Block], bool) {
+func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[flow.Block], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]*flow.Slashable[flow.Block], 0, len(items))
+	blocks := make([]flow.Slashable[flow.Block], 0, len(items))
 	for _, item := range items {
-		block := &flow.Slashable[flow.Block]{
+		block := flow.Slashable[flow.Block]{
 			OriginID: item.originID,
 			Message: &flow.Block{
 				Header:  item.header,

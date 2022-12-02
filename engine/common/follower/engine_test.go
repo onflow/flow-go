@@ -211,7 +211,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once().Return(make(<-chan struct{}))
 
 	// we have one pending child cached
-	pending := []*flow.Slashable[flow.Block]{
+	pending := []flow.Slashable[flow.Block]{
 		{
 			OriginID: originID,
 			Message:  &child,

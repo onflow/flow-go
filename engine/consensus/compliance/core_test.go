@@ -46,8 +46,8 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]*flow.Slashable[flow.Block]
-	childrenDB map[flow.Identifier][]*flow.Slashable[flow.Block]
+	pendingDB  map[flow.Identifier]flow.Slashable[flow.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[flow.Block]
 
 	// mocked dependencies
 	me             *module.Local
@@ -92,8 +92,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]*flow.Slashable[flow.Block])
-	cs.childrenDB = make(map[flow.Identifier][]*flow.Slashable[flow.Block])
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[flow.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[flow.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.Header
@@ -206,7 +206,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Slashable[flow.Block] {
+		func(blockID flow.Identifier) flow.Slashable[flow.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -215,7 +215,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.Slashable[flow.Block] {
+		func(blockID flow.Identifier) []flow.Slashable[flow.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
