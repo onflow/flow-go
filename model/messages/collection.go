@@ -47,7 +47,7 @@ type UntrustedClusterBlock struct {
 }
 
 // ToInternal returns the internal representation of the type.
-func (ub UntrustedClusterBlock) ToInternal() *cluster.Block {
+func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
 	block := &cluster.Block{
 		Header: &ub.Header,
 		Payload: &cluster.Payload{

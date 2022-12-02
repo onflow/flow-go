@@ -19,7 +19,7 @@ type UntrustedExecutionResult struct {
 }
 
 // ToInternal returns the internal representation of the type.
-func (ur UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
+func (ur *UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
 	result := flow.ExecutionResult{
 		PreviousResultID: ur.PreviousResultID,
 		BlockID:          ur.BlockID,
@@ -74,7 +74,7 @@ type UntrustedBlock struct {
 }
 
 // ToInternal returns the internal representation of the type.
-func (ub UntrustedBlock) ToInternal() *flow.Block {
+func (ub *UntrustedBlock) ToInternal() *flow.Block {
 	block := flow.Block{
 		Header:  &ub.Header,
 		Payload: &flow.Payload{},
