@@ -410,6 +410,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var bsDependable *module.ProxiedReadyDoneAware
 
 	builder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -700,13 +703,9 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
-	builder.
-		AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-		}).
-		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
-		})
+	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+	})
 
 	// if this is an access node that supports public followers, enqueue the public network
 	if builder.supportsObserver {
