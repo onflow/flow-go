@@ -27,8 +27,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const waitTimeout = 2 * time.Minute
-
 // nodeUpdateValidation func that will be used to validate the health of the network
 // after an identity table change during an epoch transition. This is used in
 // tandem with runTestEpochJoinAndLeave.
