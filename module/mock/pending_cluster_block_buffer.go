@@ -36,9 +36,7 @@ func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashab
 	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[cluster.Block]); ok {
 		r0 = rf(blockID)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Slashable[cluster.Block])
-		}
+		r0 = ret.Get(0).(flow.Slashable[cluster.Block])
 	}
 
 	var r1 bool

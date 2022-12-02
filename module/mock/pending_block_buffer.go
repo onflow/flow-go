@@ -34,9 +34,7 @@ func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[flow
 	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[flow.Block]); ok {
 		r0 = rf(blockID)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Slashable[flow.Block])
-		}
+		r0 = ret.Get(0).(flow.Slashable[flow.Block])
 	}
 
 	var r1 bool
