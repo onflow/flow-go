@@ -160,6 +160,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminCert, "admin-cert", defaultConfig.AdminCert, "admin cert file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
+	fnb.flags.UintVar(&fnb.BaseConfig.AdminMaxMsgSize, "admin-max-response-size", defaultConfig.AdminMaxMsgSize, "admin server max response size in bytes")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
@@ -404,7 +405,9 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 			}
 
-			var opts []admin.CommandRunnerOption
+			opts := []admin.CommandRunnerOption{
+				admin.WithMaxMsgSize(int(fnb.AdminMaxMsgSize)),
+			}
 
 			if node.AdminCert != NotSet {
 				serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
