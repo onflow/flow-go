@@ -119,8 +119,7 @@ func New(
 
 // setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
 func (e *Engine) setupResponseMessageHandler() error {
-	syncResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(defaultSyncResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for sync responses: %w", err)
 	}
@@ -129,8 +128,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(defaultBlockResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for block responses: %w", err)
 	}

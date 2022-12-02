@@ -35,6 +35,11 @@ func AllDone(components ...module.ReadyDoneAware) <-chan struct{} {
 // AllClosed returns a channel that is closed when all input channels are closed.
 func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
+	if len(channels) == 0 {
+		close(done)
+		return done
+	}
+
 	var wg sync.WaitGroup
 
 	for _, ch := range channels {

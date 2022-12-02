@@ -538,12 +538,14 @@ func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channe
 
 	msg, err := n.eventToIngressMessage(event, channel, originId)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not convert event to ingress message")
+		lg.Error().Err(err).Msg("could not convert event to ingress message")
+		return false
 	}
 
 	err = n.attackerInboundStream.Send(msg)
 	if err != nil {
 		lg.Error().Err(err).Msg("could not send message to attack orchestrator to observe")
+		return false
 	}
 
 	lg.Info().Msg("ingress event successfully sent to attack orchestrator")

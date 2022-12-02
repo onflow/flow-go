@@ -1,4 +1,4 @@
-package test_test
+package p2ptest_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -39,12 +40,12 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -114,12 +115,12 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	logger := unittest.Logger()
 
-	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -175,12 +176,12 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -231,12 +232,12 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, _ := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus), p2pfixtures.WithLogger(logger))
+	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	topic := channels.Topic("invalid-topic")
 
@@ -285,13 +286,13 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, t.Name(), p2pfixtures.WithRole(flow.RoleAccess))
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleAccess))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -397,12 +398,12 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", p2ptest.WithRole(flow.RoleConsensus))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -470,13 +471,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2pfixtures.NodeFixture(t, sporkId, "consensus_1", p2pfixtures.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "consensus_2", p2pfixtures.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2pfixtures.NodeFixture(t, sporkId, "access_1", p2pfixtures.WithRole(flow.RoleAccess))
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", p2ptest.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", p2ptest.WithRole(flow.RoleAccess))
 
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -565,13 +566,13 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	ln1, identity1 := p2pfixtures.NodeFixture(t, sporkId, "collection_1", p2pfixtures.WithRole(flow.RoleCollection))
-	ln2, identity2 := p2pfixtures.NodeFixture(t, sporkId, "collection_2", p2pfixtures.WithRole(flow.RoleCollection))
-	ln3, identity3 := p2pfixtures.NodeFixture(t, sporkId, "collection_3", p2pfixtures.WithRole(flow.RoleCollection))
+	ln1, identity1 := p2ptest.NodeFixture(t, sporkId, "collection_1", p2ptest.WithRole(flow.RoleCollection))
+	ln2, identity2 := p2ptest.NodeFixture(t, sporkId, "collection_2", p2ptest.WithRole(flow.RoleCollection))
+	ln3, identity3 := p2ptest.NodeFixture(t, sporkId, "collection_3", p2ptest.WithRole(flow.RoleCollection))
 
 	nodes := []p2p.LibP2PNode{ln1, ln2, ln3}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)

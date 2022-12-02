@@ -56,7 +56,7 @@ func getBodyMeterParameters(
 
 	overrides, err := derivedTxnData.GetMeterParamOverrides(
 		txnState,
-		meterParamOverridesComputer{ctx, derivedTxnData})
+		NewMeterParamOverridesComputer(ctx, derivedTxnData))
 	if err != nil {
 		return procParams, err
 	}
@@ -84,12 +84,19 @@ func getBodyMeterParameters(
 	return procParams, nil
 }
 
-type meterParamOverridesComputer struct {
+type MeterParamOverridesComputer struct {
 	ctx            Context
 	derivedTxnData *programs.DerivedTransactionData
 }
 
-func (computer meterParamOverridesComputer) Compute(
+func NewMeterParamOverridesComputer(
+	ctx Context,
+	derivedTxnData *programs.DerivedTransactionData,
+) MeterParamOverridesComputer {
+	return MeterParamOverridesComputer{ctx, derivedTxnData}
+}
+
+func (computer MeterParamOverridesComputer) Compute(
 	txnState *state.TransactionState,
 	_ struct{},
 ) (
@@ -111,7 +118,7 @@ func (computer meterParamOverridesComputer) Compute(
 	return overrides, nil
 }
 
-func (computer meterParamOverridesComputer) getMeterParamOverrides(
+func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 	txnState *state.TransactionState,
 ) (
 	programs.MeterParamOverrides,

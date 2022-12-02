@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,11 +34,11 @@ func TestConnectionGating(t *testing.T) {
 
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := p2pfixtures.NodeFixture(
+	node1, node1Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
 			if _, ok := node1Peers[p]; !ok {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -45,11 +46,11 @@ func TestConnectionGating(t *testing.T) {
 		})))
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := p2pfixtures.NodeFixture(
+	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
 			if _, ok := node2Peers[p]; !ok {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -58,8 +59,8 @@ func TestConnectionGating(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -116,15 +117,15 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 
 	connectionGater := mockp2p.NewConnectionGater(t)
 	for i := 0; i < count; i++ {
-		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
-		node, _ := p2pfixtures.NodeFixture(
+		handler, inbound := p2ptest.StreamHandlerFixture(t)
+		node, _ := p2ptest.NodeFixture(
 			t,
 			sporkId,
 			t.Name(),
-			p2pfixtures.WithRole(flow.RoleConsensus),
-			p2pfixtures.WithDefaultStreamHandler(handler),
+			p2ptest.WithRole(flow.RoleConsensus),
+			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, pid := range allPeerIds {
 					if _, ok := disallowedPeerIds[pid]; !ok {
@@ -133,7 +134,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 				}
 				return list
 			}),
-			p2pfixtures.WithConnectionGater(connectionGater))
+			p2ptest.WithConnectionGater(connectionGater))
 
 		nodes = append(nodes, node)
 		allPeerIds = append(allPeerIds, node.Host().ID())
@@ -159,8 +160,8 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
 
 	// starts the nodes
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
+	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
 	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
 
@@ -200,15 +201,15 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	disallowedList := map[*flow.Identity]struct{}{}
 
 	for i := 0; i < count; i++ {
-		handler, inbound := p2pfixtures.StreamHandlerFixture(t)
-		node, id := p2pfixtures.NodeFixture(
+		handler, inbound := p2ptest.StreamHandlerFixture(t)
+		node, id := p2ptest.NodeFixture(
 			t,
 			sporkId,
 			t.Name(),
-			p2pfixtures.WithRole(flow.RoleConsensus),
-			p2pfixtures.WithDefaultStreamHandler(handler),
+			p2ptest.WithRole(flow.RoleConsensus),
+			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2pfixtures.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
 					if _, ok := disallowedList[id]; ok {
@@ -222,7 +223,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				}
 				return list
 			}),
-			p2pfixtures.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+			p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
 				for id := range disallowedList {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
@@ -239,10 +240,10 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 		inbounds = append(inbounds, inbound)
 	}
 
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
+	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes, inbounds)
