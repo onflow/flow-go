@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 
@@ -61,7 +62,7 @@ func PayloadGrouping(groups *PayloadGroup, payload ledger.Payload) (*PayloadGrou
 
 // AccountMigrator takes all the payloads that belong to the given account
 // and return the migrated payloads
-type AccountMigrator func(account string, payloads []ledger.Payload) ([]ledger.Payload, error)
+type AccountMigrator func(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error)
 
 // MigrateByAccount teaks a migrator function and all the payloads, and return the migrated payloads
 func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pathFinderVersion uint8) (
@@ -93,6 +94,8 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not migrate group: %w", err)
 	}
+
+	log.Info().Msgf("finished migrating payloads for %v account", len(groups.Accounts))
 
 	nonAccountPaths, err := pathfinder.PathsFromPayloads(groups.NonAccountPayloads, pathFinderVersion)
 	if err != nil {
@@ -128,7 +131,7 @@ func MigrateGroupSequentially(
 			payloads[i] = d.Payload
 		}
 
-		accountMigrated, err := migrator(address, payloads)
+		accountMigrated, err := migrator(address, payloads, pathFinderVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
 		}
@@ -185,15 +188,19 @@ func MigrateGroupConcurrently(
 	}()
 
 	resultCh := make(chan *resultMigrating)
+	var done sync.Once
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
 			for job := range jobs {
-				accountMigrated, err := migrator(job.Account, job.Payloads)
+				accountMigrated, err := migrator(job.Account, job.Payloads, pathFinderVersion)
 				resultCh <- &resultMigrating{
 					Migrated: accountMigrated,
 					Err:      err,
 				}
 			}
+			done.Do(func() {
+				close(resultCh)
+			})
 		}()
 	}
 
@@ -219,5 +226,6 @@ func MigrateGroupConcurrently(
 		logAccount(i)
 		i++
 	}
+
 	return migrated, migratedPaths, nil
 }
