@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -78,15 +78,15 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
 			if !c.Protocols.Contains(message.ProtocolPublish) {
-				require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+				require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 			} else {
-				require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+				require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
 			}
 		})
 	}
 }
 
-// TestValidatorCallback_UnAuthorizedSender checks that AuthorizedSenderValidator.Validate return's pubsub.ValidationReject
+// TestValidatorCallback_UnAuthorizedSender checks that AuthorizedSenderValidator.Validate return's p2p.ValidationReject
 // validation error for all possible invalid combinations (unauthorized sender role, message type).
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedSender() {
 	for _, c := range s.unauthorizedSenderTestCases {
@@ -99,7 +99,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+			require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 		})
 	}
 }
@@ -157,7 +157,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedM
 
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+			require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 		})
 	}
 }
@@ -182,7 +182,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	// ensure ClusterBlockProposal is allowed to be sent via pubsub by authorized sender
 	validateCollConsensusPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCluster(clusterID))
 	pubsubResult := validateCollConsensusPubsub(pid, &messages.ClusterBlockProposal{})
-	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+	require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
 
 	// validate collection sync cluster SyncRequest is not allowed to be sent on channel via unicast
 	msgType, err = authorizedSenderValidator.Validate(pid, &messages.SyncRequest{}, channels.SyncCluster(clusterID), message.ProtocolUnicast)
@@ -192,7 +192,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	// ensure SyncRequest is allowed to be sent via pubsub by authorized sender
 	validateSyncClusterPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCluster(clusterID))
 	pubsubResult = validateSyncClusterPubsub(pid, &messages.SyncRequest{})
-	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+	require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
 }
 
 // TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator.Validate returns the expected validation error.
@@ -212,7 +212,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 
 		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCommittee)
 		pubsubResult := validatePubsub(pid, &messages.SyncRequest{})
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
 
 	s.Run("unknown message type", func() {
@@ -239,14 +239,14 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
 		require.Equal(s.T(), "", msgType)
 		pubsubResult := validatePubsub(pid, m)
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 
 		// nil messages are rejected
 		msgType, err = authorizedSenderValidator.Validate(pid, nil, channels.ConsensusCommittee, message.ProtocolUnicast)
 		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
 		require.Equal(s.T(), "", msgType)
 		pubsubResult = validatePubsub(pid, nil)
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
 
 	s.Run("sender is not staked getIdentityFunc does not return identity ", func() {
@@ -266,7 +266,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 
 		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCommittee)
 		pubsubResult := validatePubsub(pid, &messages.SyncRequest{})
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
 }
 
