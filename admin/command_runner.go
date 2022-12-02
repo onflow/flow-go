@@ -55,6 +55,12 @@ func WithGRPCAddress(address string) CommandRunnerOption {
 	}
 }
 
+func WithMaxMsgSize(size int) CommandRunnerOption {
+	return func(r *CommandRunner) {
+		r.maxMsgSize = size
+	}
+}
+
 type CommandRunnerBootstrapper struct {
 	handlers   map[string]CommandHandler
 	validators map[string]CommandValidator
@@ -120,6 +126,7 @@ type CommandRunner struct {
 	validators  map[string]CommandValidator
 	grpcAddress string
 	httpAddress string
+	maxMsgSize  int
 	tlsConfig   *tls.Config
 	logger      zerolog.Logger
 
@@ -187,7 +194,11 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		return fmt.Errorf("failed to listen on admin server address: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	opts := []grpc.ServerOption{
+		grpc.MaxSendMsgSize(r.maxMsgSize),
+	}
+
+	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r))
 
 	r.workersStarted.Add(1)
@@ -204,8 +215,8 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 
 	// Initialize gRPC and HTTP muxers
 	gwmux := runtime.NewServeMux()
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, opts)
+	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, dialOpts)
 	if err != nil {
 		return fmt.Errorf("failed to register http handlers for admin service: %w", err)
 	}
