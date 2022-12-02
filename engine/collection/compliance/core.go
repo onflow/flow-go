@@ -246,11 +246,11 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 	// process block itself
 	err := c.processBlockProposal(proposal, parent)
 	if err != nil {
-		if checkForAndLogOutdatedInputError(err, log) {
+		if checkForAndLogOutdatedInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			return nil
 		}
-		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
-			// in both cases, notify VoteAggregator about the invalid block
+		if checkForAndLogInvalidInputError(err, log) {
+			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
@@ -319,17 +319,9 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// We have received a proposal, but we don't know the epoch its view is within.
-			// We know:
-			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
-			//  - if we then see this for the child, one of two things must have happened:
-			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
-			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
-			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
-			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
-			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
+			// The cluster committee never returns ErrViewForUnknownEpoch, therefore this case
+			// is an unexpected error in cluster consensus.
+			return fmt.Errorf("unexpected error: cluster committee reported unknown epoch : %w", err)
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
@@ -415,7 +407,7 @@ func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
 func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
 	if engine.IsUnverifiableInputError(err) {
 		// the block cannot be validated
-		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
+		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of a proposal that cannot be verified under current state")
 		return true
 	}
 	return false

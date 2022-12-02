@@ -270,8 +270,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 		if checkForAndLogOutdatedInputError(err, log) {
 			return nil
 		}
-		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
-			// in both cases, notify VoteAggregator about the invalid block
+		if checkForAndLogInvalidInputError(err, log) {
+			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
@@ -316,7 +316,6 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
-//   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
 	startTime := time.Now()
 	defer func() {
@@ -350,8 +349,8 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 			//    2. no blocks have been finalized within  the epoch commitment deadline, and the epoch ended
 			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
-			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
+			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
+			return engine.NewInvalidInputErrorf("invalid proposal with view from unknown epoch: %w", err)
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
@@ -434,19 +433,6 @@ func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
 	if engine.IsInvalidInputError(err) {
 		// the block is invalid; log as error as we desire honest participation
 		log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-		return true
-	}
-	return false
-}
-
-// checkForAndLogUnverifiableInputError checks whether error is an `engine.UnverifiableInputError`.
-// If this is the case, we emit a log message and return true.
-// For any error other than `engine.UnverifiableInputError`, this function is a no-op
-// and returns false.
-func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
-	if engine.IsUnverifiableInputError(err) {
-		// the block cannot be validated
-		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
 		return true
 	}
 	return false
