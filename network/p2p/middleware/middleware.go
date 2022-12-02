@@ -584,7 +584,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = p2putils.AllowAllPeerFilter()
+		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,

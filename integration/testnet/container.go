@@ -121,14 +121,14 @@ func (c *ContainerConfig) ImageName() string {
 	if c.Ghost {
 		return defaultRegistry + "/ghost:latest"
 	}
-	debugSuffix := ""
+	imageSuffix := ""
 	if c.Debug {
-		debugSuffix = "-debug"
+		imageSuffix = "-debug"
 	} else if c.Corrupted {
-		debugSuffix = "-corrupted"
+		imageSuffix = "-corrupted"
 	}
 
-	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
+	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), imageSuffix)
 }
 
 // Container represents a test Docker container for a generic Flow node.
