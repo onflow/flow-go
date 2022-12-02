@@ -94,12 +94,12 @@ func IsUnverifiableExtensionError(err error) bool {
 // Since all blocks are validated before being inserted to the state, this is
 // equivalent to have no stored child.
 type NoChildBlockError struct {
-	err error
+	error
 }
 
 func NewNoChildBlockError(msg string) error {
 	return NoChildBlockError{
-		err: fmt.Errorf(msg),
+		error: fmt.Errorf(msg),
 	}
 }
 
@@ -108,12 +108,9 @@ func NewNoChildBlockErrorf(msg string, args ...interface{}) error {
 }
 
 func (e NoChildBlockError) Unwrap() error {
-	return e.err
+	return e.error
 }
 
-func (e NoChildBlockError) Error() string {
-	return e.err.Error()
-}
 
 func IsNoChildBlockError(err error) bool {
 	return errors.As(err, &NoChildBlockError{})
