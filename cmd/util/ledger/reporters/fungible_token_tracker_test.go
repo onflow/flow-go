@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,7 +29,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	view := migrations.NewView(payloads)
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),

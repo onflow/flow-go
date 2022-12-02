@@ -6,10 +6,10 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -44,7 +44,7 @@ type Procedure interface {
 	Run(
 		ctx Context,
 		txnState *state.TransactionState,
-		derivedTxnData *programs.DerivedTransactionData,
+		derivedTxnData *derived.DerivedTransactionData,
 	) error
 
 	ComputationLimit(ctx Context) uint64
@@ -60,11 +60,11 @@ type Procedure interface {
 	//
 	// For scripts, since they can only be executed after the block has been
 	// executed, the initial snapshot time is EndOfBlockExecutionTime.
-	InitialSnapshotTime() programs.LogicalTime
+	InitialSnapshotTime() derived.LogicalTime
 
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
-	ExecutionTime() programs.LogicalTime
+	ExecutionTime() derived.LogicalTime
 }
 
 func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
@@ -87,11 +87,11 @@ func (vm *VirtualMachine) Run(
 ) error {
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = programs.NewEmptyDerivedBlockDataWithTransactionOffset(
+		derivedBlockData = derived.NewEmptyDerivedBlockDataWithTransactionOffset(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var derivedTxnData *programs.DerivedTransactionData
+	var derivedTxnData *derived.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
@@ -154,12 +154,12 @@ func (vm *VirtualMachine) GetAccount(
 
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = programs.NewEmptyDerivedBlockData()
+		derivedBlockData = derived.NewEmptyDerivedBlockData()
 	}
 
 	derviedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		programs.EndOfBlockExecutionTime,
-		programs.EndOfBlockExecutionTime)
+		derived.EndOfBlockExecutionTime,
+		derived.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error creating derived transaction data for GetAccount: %w",

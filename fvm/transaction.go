@@ -3,9 +3,9 @@ package fvm
 import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -60,7 +60,7 @@ func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
 func (proc *TransactionProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) error {
 	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
 }
@@ -105,10 +105,10 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
+func (proc *TransactionProcedure) InitialSnapshotTime() derived.LogicalTime {
+	return derived.LogicalTime(proc.InitialSnapshotTxIndex)
 }
 
-func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {
+	return derived.LogicalTime(proc.TxIndex)
 }

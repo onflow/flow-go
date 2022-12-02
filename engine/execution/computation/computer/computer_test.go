@@ -29,9 +29,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -121,7 +121,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			block,
+			view,
+			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
@@ -157,7 +161,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -203,7 +207,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
@@ -289,7 +293,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -455,7 +459,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
@@ -544,7 +548,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -637,7 +641,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -841,7 +845,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+	_, err = exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -923,7 +927,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	view := delta.NewView(ledger.Get)
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
 	assert.Len(t, result.TransactionResults, 1)

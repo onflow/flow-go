@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -190,7 +190,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -200,7 +200,7 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
