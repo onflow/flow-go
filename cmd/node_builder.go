@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -145,6 +146,7 @@ type BaseConfig struct {
 	AdminCert                   string
 	AdminKey                    string
 	AdminClientCAs              string
+	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
 	DynamicStartupANAddress     string
@@ -269,6 +271,7 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
