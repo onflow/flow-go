@@ -88,6 +88,46 @@ func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
+// OnGraftReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnGraftReceived(count int) {
+	_m.Called(count)
+}
+
+// OnIHaveReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnIHaveReceived(count int) {
+	_m.Called(count)
+}
+
+// OnIWantReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnIWantReceived(count int) {
+	_m.Called(count)
+}
+
+// OnIncomingRpcAcceptedFully provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIncomingRpcAcceptedFully() {
+	_m.Called()
+}
+
+// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
+	_m.Called()
+}
+
+// OnIncomingRpcRejected provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIncomingRpcRejected() {
+	_m.Called()
+}
+
+// OnPruneReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnPruneReceived(count int) {
+	_m.Called(count)
+}
+
+// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
+func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
+	_m.Called(count)
+}
+
 // OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
 func (_m *NetworkMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string, reason string) {
 	_m.Called(role, msgType, topic, reason)

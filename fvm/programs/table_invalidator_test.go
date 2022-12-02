@@ -3,7 +3,6 @@ package programs
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -28,83 +27,47 @@ func (invalidator testInvalidator) ShouldInvalidateEntry(
 		invalidator.invalidateName == key
 }
 
-func TestModifiedSetsProgramInvalidator(t *testing.T) {
-	invalidator := ModifiedSetsInvalidator{}.ProgramInvalidator()
-
-	require.False(t, invalidator.ShouldInvalidateEntries())
-	require.False(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
-
-	invalidator = ModifiedSetsInvalidator{
-		ContractUpdateKeys: []ContractUpdateKey{
-			{}, // For now, the entry's value does not matter.
-		},
-		FrozenAccounts: nil,
-	}.ProgramInvalidator()
-
-	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
-
-	invalidator = ModifiedSetsInvalidator{
-		ContractUpdateKeys: nil,
-		FrozenAccounts: []common.Address{
-			{}, // For now, the entry's value does not matter
-		},
-	}.ProgramInvalidator()
-
-	require.True(t, invalidator.ShouldInvalidateEntries())
-	require.True(t, invalidator.ShouldInvalidateEntry(
-		common.AddressLocation{},
-		nil,
-		nil))
-}
-
 func TestChainedInvalidator(t *testing.T) {
-	var chain chainedDerivedDataInvalidators[string, *string]
+	var chain chainedTableInvalidators[string, *string]
 	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[string, *string]{}
+	chain = chainedTableInvalidators[string, *string]{}
 	require.False(t, chain.ShouldInvalidateEntries())
 	require.False(t, chain.ShouldInvalidateEntry("", nil, nil))
 
-	chain = chainedDerivedDataInvalidators[string, *string]{
+	chain = chainedTableInvalidators[string, *string]{
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          1,
+			TableInvalidator: testInvalidator{},
+			executionTime:    1,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          2,
+			TableInvalidator: testInvalidator{},
+			executionTime:    2,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{},
+			executionTime:    3,
 		},
 	}
 	require.False(t, chain.ShouldInvalidateEntries())
 
-	chain = chainedDerivedDataInvalidators[string, *string]{
+	chain = chainedTableInvalidators[string, *string]{
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "1"},
-			executionTime:          1,
+			TableInvalidator: testInvalidator{invalidateName: "1"},
+			executionTime:    1,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "3a"},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{invalidateName: "3a"},
+			executionTime:    3,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "3b"},
-			executionTime:          3,
+			TableInvalidator: testInvalidator{invalidateName: "3b"},
+			executionTime:    3,
 		},
 		{
-			DerivedDataInvalidator: testInvalidator{invalidateName: "7"},
-			executionTime:          7,
+			TableInvalidator: testInvalidator{invalidateName: "7"},
+			executionTime:    7,
 		},
 	}
 	require.True(t, chain.ShouldInvalidateEntries())

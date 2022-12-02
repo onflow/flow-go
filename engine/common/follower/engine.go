@@ -372,7 +372,6 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, block *flow.Blo
 		if state.IsInvalidExtensionError(err) {
 			log.Warn().
 				Err(err).
-				Bool(logging.KeySuspicious, true).
 				Msg("received invalid block from other node (potential slashing evidence?)")
 			return nil
 		}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -1140,8 +1141,8 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 // it returns the path of all the copied files
 // any error returned are exceptions
 func CopyCheckpointFile(filename string, from string, to string) (
-	copied []string,
-	errToReturn error,
+	[]string,
+	error,
 ) {
 	// It's possible that the trie dir does not yet exist. If not this will create the the required path
 	err := os.MkdirAll(to, 0700)
@@ -1157,31 +1158,27 @@ func CopyCheckpointFile(filename string, from string, to string) (
 	}
 
 	newPaths := make([]string, len(matched))
-	for i, match := range matched {
-		in, err := os.Open(match)
-		if err != nil {
-			return nil, fmt.Errorf("can not open file %v to copy: %w", match, err)
-		}
-		defer func() {
-			errToReturn = closeAndMergeError(in, errToReturn)
-		}()
+	// copy the root checkpoint concurrently
+	var group errgroup.Group
 
+	for i, match := range matched {
 		_, partfile := filepath.Split(match)
 		newPath := filepath.Join(to, partfile)
-		out, err := os.Create(newPath)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			errToReturn = closeAndMergeError(out, errToReturn)
-		}()
-
-		_, err = io.Copy(out, in)
-		if err != nil {
-			return nil, fmt.Errorf("can not copy file %v: %w", match, err)
-		}
-
 		newPaths[i] = newPath
+
+		match := match
+		group.Go(func() error {
+			err := utilsio.Copy(match, newPath)
+			if err != nil {
+				return fmt.Errorf("cannot copy file from %v to %v", match, newPath)
+			}
+			return nil
+		})
+	}
+
+	err = group.Wait()
+	if err != nil {
+		return nil, fmt.Errorf("fail to copy checkpoint files: %w", err)
 	}
 
 	return newPaths, nil

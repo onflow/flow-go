@@ -18,12 +18,9 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-type MeterParamOverrides struct {
-	ComputationWeights meter.ExecutionEffortWeights // nil indicates no override
-	MemoryWeights      meter.ExecutionMemoryWeights // nil indicates no override
-	MemoryLimit        *uint64                      // nil indicates no override
-}
-
+// getBasicMeterParameters returns the set of meter parameters used for
+// general procedure execution.  Subparts of the procedure execution may
+// specify custom meter parameters via nested transactions.
 func getBasicMeterParameters(
 	ctx Context,
 	proc Procedure,
@@ -44,10 +41,12 @@ func getBasicMeterParameters(
 	return params
 }
 
-func getMeterParameters(
+// getBodyMeterParameters returns the set of meter parameters used for
+// transaction/script body execution.
+func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	view state.View,
+	txnState *state.TransactionState,
 	derivedTxnData *programs.DerivedTransactionData,
 ) (
 	meter.MeterParameters,
@@ -55,18 +54,9 @@ func getMeterParameters(
 ) {
 	procParams := getBasicMeterParameters(ctx, proc)
 
-	txnState := state.NewTransactionState(
-		view,
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(procParams))
-
-	// TODO(patrick): cache meter param overrides
-	overrides, err := getMeterParamOverrides(
-		ctx,
+	overrides, err := derivedTxnData.GetMeterParamOverrides(
 		txnState,
-		derivedTxnData)
+		NewMeterParamOverridesComputer(ctx, derivedTxnData))
 	if err != nil {
 		return procParams, err
 	}
@@ -94,21 +84,29 @@ func getMeterParameters(
 	return procParams, nil
 }
 
-func getMeterParamOverrides(
+type MeterParamOverridesComputer struct {
+	ctx            Context
+	derivedTxnData *programs.DerivedTransactionData
+}
+
+func NewMeterParamOverridesComputer(
 	ctx Context,
-	txnState *state.TransactionState,
 	derivedTxnData *programs.DerivedTransactionData,
+) MeterParamOverridesComputer {
+	return MeterParamOverridesComputer{ctx, derivedTxnData}
+}
+
+func (computer MeterParamOverridesComputer) Compute(
+	txnState *state.TransactionState,
+	_ struct{},
 ) (
-	MeterParamOverrides,
+	programs.MeterParamOverrides,
 	error,
 ) {
-	var overrides MeterParamOverrides
+	var overrides programs.MeterParamOverrides
 	var err error
 	txnState.RunWithAllLimitsDisabled(func() {
-		overrides, err = getMeterParamOverridesFromState(
-			ctx,
-			txnState,
-			derivedTxnData)
+		overrides, err = computer.getMeterParamOverrides(txnState)
 	})
 
 	if err != nil {
@@ -120,22 +118,24 @@ func getMeterParamOverrides(
 	return overrides, nil
 }
 
-func getMeterParamOverridesFromState(
-	ctx Context,
+func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
 ) (
-	MeterParamOverrides,
+	programs.MeterParamOverrides,
 	error,
 ) {
 	// Check that the service account exists because all the settings are
 	// stored in it
-	serviceAddress := ctx.Chain.ServiceAddress()
+	serviceAddress := computer.ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, derivedTxnData)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		computer.ctx.EnvironmentParams,
+		txnState,
+		computer.derivedTxnData)
 
-	overrides := MeterParamOverrides{}
+	overrides := programs.MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -143,7 +143,7 @@ func getMeterParamOverridesFromState(
 		err, fatal = errors.SplitErrorTypes(err)
 		if fatal != nil {
 			// this is a fatal error. return it
-			ctx.Logger.
+			computer.ctx.Logger.
 				Error().
 				Err(fatal).
 				Msgf("error getting %s", prop)
@@ -154,7 +154,7 @@ func getMeterParamOverridesFromState(
 			// could be that no setting was present in the state,
 			// or that the setting was not parseable,
 			// or some other deterministic thing.
-			ctx.Logger.
+			computer.ctx.Logger.
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
