@@ -151,6 +151,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
+			MaxExecutionDataMsgSize:   grpcutils.DefaultMaxMsgSize,
 		},
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
@@ -522,11 +523,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
-		}).
-		Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.rpcConf.StateStreamListenAddr == "" {
-				return nil, nil
-			}
+		})
+
+	if builder.rpcConf.StateStreamListenAddr != "" {
+		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			conf := state_stream.Config{
 				ListenAddr:              builder.rpcConf.StateStreamListenAddr,
 				MaxExecutionDataMsgSize: builder.rpcConf.MaxExecutionDataMsgSize,
@@ -548,6 +548,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 			return builder.StateStreamEng, nil
 		})
+	}
 
 	return builder
 }

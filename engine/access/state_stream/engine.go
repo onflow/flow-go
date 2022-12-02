@@ -90,9 +90,9 @@ func NewEng(
 		handler: NewHandler(backend, chainID.Chain()),
 	}
 
-	componentBuilder := component.NewComponentManagerBuilder()
-	componentBuilder.AddWorker(e.serve)
-	e.ComponentManager = component.NewComponentManagerBuilder().Build()
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.serve).
+		Build()
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
 
 	return e
@@ -110,14 +110,14 @@ func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyF
 	e.stateStreamGrpcAddress = l.Addr()
 	e.log.Debug().Str("state_stream_address", e.stateStreamGrpcAddress.String()).Msg("listening on port")
 
-	err = e.server.Serve(l) // blocking call
-	if err != nil {
-		ctx.Throw(fmt.Errorf("error trying to serve grpc server: %w", err))
-	}
+	ready()
+	go func() {
+		err = e.server.Serve(l)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("error trying to serve grpc server: %w", err))
+		}
+	}()
 
-	select {
-	case <-ctx.Done():
-		e.server.GracefulStop()
-	default:
-	}
+	<-ctx.Done()
+	e.server.GracefulStop()
 }
