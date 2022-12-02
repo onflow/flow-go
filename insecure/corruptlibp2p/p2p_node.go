@@ -24,7 +24,7 @@ import (
 // in a pubsub.ValidationReject result returned.
 func AcceptAllTopicValidator(lg zerolog.Logger, c network.Codec) p2p.TopicValidatorFunc {
 	lg = lg.With().
-		Str("component", "corrupted_libp2pnode_topic_validator").
+		Str("component", "corrupt-libp2p-node-topic-validator").
 		Logger()
 
 	return func(ctx context.Context, from peer.ID, rawMsg *pubsub.Message) p2p.ValidationResult {

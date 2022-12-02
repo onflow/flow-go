@@ -74,7 +74,11 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 			Msg("invalid validation result, returning reject")
 		return corrupt.ValidationReject
 	}
-	return c.gossipSub.RegisterTopicValidator(topic, corruptValidator, corrupt.WithValidatorInline(true))
+	err := c.gossipSub.RegisterTopicValidator(topic, corruptValidator, corrupt.WithValidatorInline(true))
+	if err != nil {
+		return fmt.Errorf("could not register topic validator on corrupt gossipsub: %w", err)
+	}
+	return nil
 }
 
 func (c *CorruptGossipSubAdapter) UnregisterTopicValidator(topic string) error {
