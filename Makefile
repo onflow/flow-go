@@ -310,14 +310,14 @@ docker-build-access-debug:
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
 # build corrupted access node for BFT testing
-.PHONY: docker-build-access-corrupted
-docker-build-access-corrupted:
+.PHONY: docker-build-access-corrupt
+docker-build-access-corrupt:
 	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	mv insecure/go.mod insecure/go2.mod
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
-	mv insecure/go2.mod insecure/go.mod
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-observer
 docker-build-observer:
@@ -367,7 +367,7 @@ docker-build-loader:
 docker-build-flow: docker-build-flow-corrupt docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-flow-corrupt
-docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupted
+docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupt
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
