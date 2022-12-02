@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
@@ -95,6 +96,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
+	metrics                     module.NetworkMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -111,12 +113,14 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:     logger,
+		metrics:    metrics,
 		sporkID:    sporkID,
 		addr:       addr,
 		networkKey: networkKey,
@@ -264,6 +268,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				psOpts = append(psOpts, scoreOpt.BuildFlowPubSubScoreOption())
 			}
 
+			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+
+			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
+			psOpts = append(psOpts, pubsub.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+				gossipSubMetrics.ObserveRPC(from, rpc)
+				return nil
+			}))
+
 			pubSub, err := pubsub.NewGossipSub(ctx, h, psOpts...)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
@@ -391,7 +403,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
 	)
 
-	builder := NewNodeBuilder(log, address, flowKey, sporkId).
+	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

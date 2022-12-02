@@ -52,7 +52,7 @@ func (p *Programs) ChildPrograms() *Programs {
 }
 
 func (p *Programs) NextTxIndexForTestingOnly() uint32 {
-	return p.block.NextTxIndexForTestingOnly()
+	return p.block.programs.NextTxIndexForTestingOnly()
 }
 
 func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
@@ -73,11 +73,11 @@ func (p *Programs) SetProgram(location common.AddressLocation, program *interpre
 	p.currentTxn.SetProgram(location, program, state)
 }
 
-func (p *Programs) Cleanup(modifiedSets ModifiedSetsInvalidator) {
+func (p *Programs) Cleanup(invalidator TransactionInvalidator) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.currentTxn.AddInvalidator(modifiedSets)
+	p.currentTxn.AddInvalidator(invalidator)
 
 	var err error
 	err = p.currentTxn.Commit()

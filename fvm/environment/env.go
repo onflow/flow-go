@@ -1,8 +1,6 @@
 package environment
 
 import (
-	"context"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -11,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -60,7 +57,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
 	FlushPendingUpdates() (
-		programs.ModifiedSetsInvalidator,
+		programs.TransactionInvalidator,
 		error,
 	)
 
@@ -102,21 +99,4 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
 	}
-}
-
-func NewScriptEnvironment(
-	ctx context.Context,
-	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
-) Environment {
-	return newScriptFacadeEnvironment(ctx, params, txnState, derivedTxnData)
-}
-
-func NewTransactionEnvironment(
-	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
-) Environment {
-	return newTransactionFacadeEnvironment(params, txnState, derivedTxnData)
 }

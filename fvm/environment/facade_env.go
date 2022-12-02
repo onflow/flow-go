@@ -140,7 +140,7 @@ func newFacadeEnvironment(
 	return env
 }
 
-func newScriptFacadeEnvironment(
+func NewScriptEnvironment(
 	ctx context.Context,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
@@ -157,7 +157,7 @@ func newScriptFacadeEnvironment(
 	return env
 }
 
-func newTransactionFacadeEnvironment(
+func NewTransactionEnvironment(
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	derivedTxnData DerivedTransactionData,
@@ -267,11 +267,11 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	programs.ModifiedSetsInvalidator,
+	programs.TransactionInvalidator,
 	error,
 ) {
 	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSetsInvalidator{
+	return DerivedDataInvalidator{
 		ContractUpdateKeys: keys,
 		FrozenAccounts:     env.FrozenAccounts(),
 	}, err
