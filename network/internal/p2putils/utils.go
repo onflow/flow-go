@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
@@ -163,11 +162,4 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 		return ipOrHostname, port, nil
 	}
 	return "", "", fmt.Errorf("ip address or hostname not found")
-}
-
-// AllowAllPeerFilter returns a peer filter that does not do any filtering.
-func AllowAllPeerFilter() p2p.PeerFilter {
-	return func(p peer.ID) error {
-		return nil
-	}
 }
