@@ -68,41 +68,56 @@ type UntrustedBlockPayload struct {
 // flow.Block type.
 // Deprecated: Please update flow.Payload to use []flow.Guarantee etc., then
 // replace instances of this type with flow.Block
-type UntrustedBlock struct {
+type UntrustedBlock[P SomeUntrustedBlockPayload] struct {
 	Header  flow.Header
-	Payload UntrustedBlockPayload
+	Payload P
+}
+
+type SomeUntrustedBlockPayload interface {
+	UntrustedBlockPayload | UntrustedClusterBlockPayload
+	ToInternal() // how to make the return value generic?
 }
 
 // ToInternal returns the internal representation of the type.
-func (ub *UntrustedBlock) ToInternal() *flow.Block {
+func (ub *UntrustedBlock[P]) ToInternal() *flow.Block {
 	block := flow.Block{
 		Header:  &ub.Header,
 		Payload: &flow.Payload{},
 	}
-	for _, guarantee := range ub.Payload.Guarantees {
-		guarantee := guarantee
-		block.Payload.Guarantees = append(block.Payload.Guarantees, &guarantee)
+
+	switch any(ub.Payload).(type) {
+	case UntrustedBlockPayload:
+	case UntrustedClusterBlockPayload:
 	}
-	for _, seal := range ub.Payload.Seals {
-		seal := seal
-		block.Payload.Seals = append(block.Payload.Seals, &seal)
-	}
-	for _, receipt := range ub.Payload.Receipts {
-		receipt := receipt
-		block.Payload.Receipts = append(block.Payload.Receipts, &receipt)
-	}
-	for _, result := range ub.Payload.Results {
-		result := result
-		block.Payload.Results = append(block.Payload.Results, result.ToInternal())
-	}
+
+	ub.Payload
+
+	//x := ub.Payload.(UntrustedBlockPayload)
+
+	//for _, guarantee := range ub.Payload.Guarantees {
+	//	guarantee := guarantee
+	//	block.Payload.Guarantees = append(block.Payload.Guarantees, &guarantee)
+	//}
+	//for _, seal := range ub.Payload.Seals {
+	//	seal := seal
+	//	block.Payload.Seals = append(block.Payload.Seals, &seal)
+	//}
+	//for _, receipt := range ub.Payload.Receipts {
+	//	receipt := receipt
+	//	block.Payload.Receipts = append(block.Payload.Receipts, &receipt)
+	//}
+	//for _, result := range ub.Payload.Results {
+	//	result := result
+	//	block.Payload.Results = append(block.Payload.Results, result.ToInternal())
+	//}
 
 	return &block
 }
 
 // UntrustedBlockFromInternal converts the internal flow.Block representation
 // to the representation used in untrusted messages.
-func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
-	block := UntrustedBlock{
+func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock[UntrustedBlockPayload] {
+	block := UntrustedBlock[UntrustedBlockPayload]{
 		Header: *flowBlock.Header,
 	}
 	for _, guarantee := range flowBlock.Payload.Guarantees {
@@ -123,7 +138,7 @@ func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 // BlockProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
 type BlockProposal struct {
-	Block UntrustedBlock
+	Block UntrustedBlock[UntrustedBlockPayload]
 }
 
 func NewBlockProposal(internal *flow.Block) *BlockProposal {
