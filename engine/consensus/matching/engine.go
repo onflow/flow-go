@@ -55,15 +55,14 @@ func NewEngine(
 
 	// FIFO queue for execution receipts
 	receiptsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultReceiptQueueCapacity),
+		defaultReceiptQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
-	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(defaultIncorporatedBlockQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for incorporated block events: %w", err)
 	}
