@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	logging "github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -72,7 +71,7 @@ func NewEng(
 	}
 
 	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, logging.LoggingInterceptor(log)...)
+	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
 
 	// create a chained unary interceptor
 	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
@@ -102,7 +101,6 @@ func NewEng(
 // serve starts the gRPC server.
 // When this function returns, the server is considered ready.
 func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
 	e.log.Info().Str("state_stream_address", e.config.ListenAddr).Msg("starting grpc server on address")
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {

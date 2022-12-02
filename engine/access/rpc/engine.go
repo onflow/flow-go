@@ -118,7 +118,7 @@ func NewBuilder(log zerolog.Logger,
 	}
 
 	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, LoggingInterceptor(log)...)
+	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
 
 	// create a chained unary interceptor
 	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
