@@ -16,3 +16,10 @@ type Connector interface {
 }
 
 type PeerFilter func(peer.ID) error
+
+// AllowAllPeerFilter returns a peer filter that does not do any filtering.
+func AllowAllPeerFilter() PeerFilter {
+	return func(p peer.ID) error {
+		return nil
+	}
+}

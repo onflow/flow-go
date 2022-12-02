@@ -2,17 +2,19 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // readSubscriptionCB the callback called when a new message is received on the read subscription
@@ -23,13 +25,13 @@ type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}
 type readSubscription struct {
 	ctx      context.Context
 	log      zerolog.Logger
-	sub      *pubsub.Subscription
+	sub      p2p.Subscription
 	metrics  module.NetworkMetrics
 	callback readSubscriptionCB
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context, sub *pubsub.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
+func newReadSubscription(ctx context.Context, sub p2p.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
 
 	log = log.With().
 		Str("channel", sub.Topic()).
@@ -80,7 +82,11 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		validatorData, ok := rawMsg.ValidatorData.(validator.TopicValidatorData)
 		if !ok {
-			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
+			r.log.Error().
+				Str("raw_msg", rawMsg.String()).
+				Bool(logging.KeySuspicious, true).
+				Str("received_validator_data_type", fmt.Sprintf("%T", rawMsg.ValidatorData)).
+				Msg("[BUG] validator data missing!")
 			return
 		}
 

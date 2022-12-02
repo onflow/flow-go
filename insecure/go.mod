@@ -7,14 +7,14 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/libp2p/go-libp2p v0.23.3
-	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221102045350-1e161006c43f
+	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221201175637-3d2eab35722e
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/rs/zerolog v1.28.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
