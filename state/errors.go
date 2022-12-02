@@ -90,7 +90,6 @@ func IsUnverifiableExtensionError(err error) bool {
 	return errors.As(err, &errUnverifiableExtensionError)
 }
 
-
 // NoChildBlockError is returned where a certain block has no valid child.
 // Since all blocks are validated before being inserted to the state, this is
 // equivalent to have no stored child.
