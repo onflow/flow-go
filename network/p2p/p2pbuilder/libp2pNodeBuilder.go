@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -229,7 +230,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		opts = append(opts, libp2p.ConnectionGater(builder.connGater))
 	}
 
-	h, err := DefaultLibP2PHost(builder.addr, builder.networkKey, opts...)
+	h, err := DefaultLibP2PHost(builder.addr, builder.networkKey, builder.metrics, opts...)
 
 	if err != nil {
 		return nil, err
@@ -320,8 +321,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
-	defaultOptions, err := defaultLibP2POptions(address, key)
+func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, metrics module.LibP2PMetrics, options ...config.Option) (host.Host, error) {
+	defaultOptions, err := defaultLibP2POptions(address, key, metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +339,7 @@ func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config
 }
 
 // defaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
-func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
+func defaultLibP2POptions(address string, key fcrypto.PrivateKey, metrics module.LibP2PMetrics) ([]config.Option, error) {
 
 	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	if err != nil {
@@ -364,11 +365,20 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
 	})
 
+	// setting up libp2p resource manager by hooking in the resource manager metrics reporter.
+	limits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&limits)
+	mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.AutoScale()), rcmgr.WithMetrics(metrics))
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
+	}
+
 	// gather all the options for the libp2p node
 	options := []config.Option{
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(libp2pKey),          // pass in the networking key
 		t,                                   // set the transport
+		libp2p.ResourceManager(mgr),         // set the resource manager
 	}
 
 	return options, nil
