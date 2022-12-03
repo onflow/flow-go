@@ -628,7 +628,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:    metrics.NewNetworkCollector(),
+			Network:    metrics.NewNetworkCollector(fnb.Logger),
 			Engine:     metrics.NewEngineCollector(),
 			Compliance: metrics.NewComplianceCollector(),
 			// CacheControl metrics has been causing memory abuse, disable for now
