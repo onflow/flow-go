@@ -4,9 +4,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
@@ -22,8 +19,7 @@ const (
 )
 
 type NetworkCollector struct {
-	logger zerolog.Logger
-
+	*LibP2PResourceManagerMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -51,28 +47,6 @@ type NetworkCollector struct {
 	gossipSubIncomingRpcRejectedCount            prometheus.Counter
 	gossipSubReceivedPublishMessageCount         prometheus.Counter
 
-	// libp2p resource manager metrics
-	// connections
-	libp2pAllowConnectionCount *prometheus.CounterVec
-	libp2pBlockConnectionCount *prometheus.CounterVec
-	// streams
-	libp2pAllowStreamCount *prometheus.CounterVec
-	libp2pBlockStreamCount *prometheus.CounterVec
-	// peers
-	libp2pAllowPeerCount prometheus.Counter
-	libp2pBlockPeerCount prometheus.Counter
-	// protocol
-	libp2pAllowProtocolCount     prometheus.Counter
-	libp2pBlockProtocolCount     prometheus.Counter
-	libp2pBlockProtocolPeerCount prometheus.Counter
-	// services
-	libp2pAllowServiceCount     prometheus.Counter
-	libp2pBlockServiceCount     prometheus.Counter
-	libp2pBlockServicePeerCount prometheus.Counter
-	// memory
-	libp2pAllowMemoryHistogram prometheus.Histogram
-	libp2pBlockMemoryHistogram prometheus.Histogram
-
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
 	rateLimitedUnicastMessagesCount *prometheus.CounterVec
@@ -92,12 +66,14 @@ func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	}
 }
 
-func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
 	nc := &NetworkCollector{}
 
 	for _, opt := range opts {
 		opt(nc)
 	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -337,144 +313,6 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
-	nc.libp2pAllowConnectionCount = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allow_connection_total",
-			Help:      "total number of connections allowed by the libp2p resource manager",
-
-			// labels are: "inbound", "outbound" and whether the connection is using a file descriptor
-		}, []string{LabelConnectionDirection, LabelConnectionUseFD},
-	)
-
-	nc.libp2pBlockConnectionCount = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_connection_total",
-			Help:      "total number of connections blocked by the libp2p resource manager",
-
-			// labels are: "inbound", "outbound" and whether the connection is using a file descriptor
-		}, []string{LabelConnectionDirection, LabelConnectionUseFD},
-	)
-
-	nc.libp2pAllowStreamCount = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allow_stream_total",
-			Help:      "total number of streams allowed by the libp2p resource manager",
-		}, []string{LabelConnectionDirection},
-	)
-
-	nc.libp2pBlockStreamCount = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_stream_total",
-			Help:      "total number of streams blocked by the libp2p resource manager",
-		}, []string{LabelConnectionDirection},
-	)
-
-	nc.libp2pAllowPeerCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allow_peer_total",
-			Help:      "total number of remote peers allowed by the libp2p resource manager to attach to their relevant incoming/outgoing streams",
-		},
-	)
-
-	// Note: this is a low level metric than libp2pBlockProtocolPeerCount.
-	// This metric is incremented when a peer is blocked by the libp2p resource manager on attaching as one end of a stream (on any protocol).
-	nc.libp2pBlockPeerCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_peer_total",
-			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
-		},
-	)
-
-	nc.libp2pAllowProtocolCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allow_protocol_total",
-			Help:      "total number of protocols allowed by the libp2p resource manager to attach to their relevant incoming/outgoing streams",
-		},
-	)
-
-	nc.libp2pBlockProtocolCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_protocol_total",
-			Help:      "total number of protocols blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
-		},
-	)
-
-	// Note: this is a higher level metric than libp2pBlockPeerCount and libp2pBlockProtocolCount.
-	// This metric is incremented when a peer is already attached as one end of a stream but on a different reserved protocol.
-	nc.libp2pBlockProtocolPeerCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_protocol_peer_total",
-			Help:      "total number of remote peers blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams on a specific protocol",
-		},
-	)
-
-	nc.libp2pAllowServiceCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allow_service_total",
-			Help:      "total number of remote services (e.g., ping, relay) allowed by the libp2p resource manager to attach to their relevant incoming/outgoing streams",
-		},
-	)
-
-	nc.libp2pBlockServiceCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_service_total",
-			Help:      "total number of remote services (e.g., ping, relay) blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams",
-		},
-	)
-
-	// Note: this is a higher level metric than libp2pBlockServiceCount and libp2pBlockPeerCount.
-	// This metric is incremented when a service is already attached as one end of a stream but on a different reserved protocol.
-	nc.libp2pBlockServicePeerCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_block_service_peer_total",
-			Help:      "total number of remote services (e.g., ping, relay) blocked by the libp2p resource manager from attaching to their relevant incoming/outgoing streams on a specific peer",
-		},
-	)
-
-	nc.libp2pAllowMemoryHistogram = promauto.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_allowed_memory_bytes",
-			Help:      "size of memory allocation requests allowed by the libp2p resource manager",
-			Buckets:   []float64{KiB, 10 * KiB, 100 * KiB, 500 * KiB, 1 * MiB, 10 * MiB, 100 * MiB, 500 * MiB, 1 * GiB},
-		},
-	)
-
-	nc.libp2pBlockMemoryHistogram = promauto.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemLibp2p,
-			Name:      nc.prefix + "resource_manager_blocked_memory_bytes",
-			Help:      "size of memory allocation requests blocked by the libp2p resource manager",
-			Buckets:   []float64{KiB, 10 * KiB, 100 * KiB, 500 * KiB, 1 * MiB, 10 * MiB, 100 * MiB, 500 * MiB, 1 * GiB},
-		},
-	)
-
 	return nc
 }
 
@@ -629,74 +467,4 @@ func (nc *NetworkCollector) OnIncomingRpcRejected() {
 // RPC message.
 func (nc *NetworkCollector) OnPublishedGossipMessagesReceived(count int) {
 	nc.gossipSubReceivedPublishMessageCount.Add(float64(count))
-}
-
-func (nc *NetworkCollector) AllowConn(dir network.Direction, usefd bool) {
-	nc.libp2pAllowConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
-	nc.logger.Trace().Str("direction", dir.String()).Bool("use_file_descriptor", usefd).Msg("allowing connection")
-}
-
-func (nc *NetworkCollector) BlockConn(dir network.Direction, usefd bool) {
-	nc.libp2pBlockConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
-	nc.logger.Warn().Str("direction", dir.String()).Bool("using_file_descriptor", usefd).Msg("blocking connection")
-}
-
-func (nc *NetworkCollector) AllowStream(p peer.ID, dir network.Direction) {
-	nc.libp2pAllowStreamCount.WithLabelValues(dir.String()).Inc()
-	nc.logger.Trace().Str("peer", p.String()).Str("direction", dir.String()).Msg("allowing stream")
-}
-
-func (nc *NetworkCollector) BlockStream(p peer.ID, dir network.Direction) {
-	nc.libp2pBlockStreamCount.WithLabelValues(dir.String()).Inc()
-	nc.logger.Warn().Str("peer", p.String()).Str("direction", dir.String()).Msg("blocking stream")
-}
-
-func (nc *NetworkCollector) AllowPeer(p peer.ID) {
-	nc.libp2pAllowPeerCount.Inc()
-	nc.logger.Trace().Str("peer", p.String()).Msg("allowing peer")
-}
-
-func (nc *NetworkCollector) BlockPeer(p peer.ID) {
-	nc.libp2pBlockPeerCount.Inc()
-	nc.logger.Warn().Str("peer", p.String()).Msg("blocking peer")
-}
-
-func (nc *NetworkCollector) AllowProtocol(proto protocol.ID) {
-	nc.libp2pAllowProtocolCount.Inc()
-	nc.logger.Trace().Str("protocol", string(proto)).Msg("allowing protocol")
-}
-
-func (nc *NetworkCollector) BlockProtocol(proto protocol.ID) {
-	nc.libp2pBlockProtocolCount.Inc()
-	nc.logger.Warn().Str("protocol", string(proto)).Msg("blocking protocol")
-}
-
-func (nc *NetworkCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID) {
-	nc.libp2pBlockProtocolPeerCount.Inc()
-	nc.logger.Warn().Str("protocol", string(proto)).Str("peer", p.String()).Msg("blocking protocol for peer")
-}
-
-func (nc *NetworkCollector) AllowService(svc string) {
-	nc.libp2pAllowServiceCount.Inc()
-	nc.logger.Trace().Str("service", svc).Msg("allowing service")
-}
-
-func (nc *NetworkCollector) BlockService(svc string) {
-	nc.libp2pBlockServiceCount.Inc()
-	nc.logger.Warn().Str("service", svc).Msg("blocking service")
-}
-
-func (nc *NetworkCollector) BlockServicePeer(svc string, p peer.ID) {
-	nc.libp2pBlockServicePeerCount.Inc()
-	nc.logger.Warn().Str("service", svc).Str("peer", p.String()).Msg("blocking service for peer")
-}
-
-func (nc *NetworkCollector) AllowMemory(size int) {
-	nc.libp2pAllowMemoryHistogram.Observe(float64(size))
-	nc.logger.Trace().Int("size", size).Msg("allowing memory")
-}
-
-func (nc *NetworkCollector) BlockMemory(size int) {
-	nc.libp2pBlockMemoryHistogram.Observe(float64(size))
-	nc.logger.Warn().Int("size", size).Msg("blocking memory")
 }
