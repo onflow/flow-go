@@ -765,7 +765,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	if err == nil {
 		node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 		preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-	} else if err != nil && exeNode.exeConf.preferredExeNodeIDStr != "" {
+	} else if exeNode.exeConf.preferredExeNodeIDStr != "" {
 		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 	}
 
