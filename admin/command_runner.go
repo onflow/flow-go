@@ -217,7 +217,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	// Initialize gRPC and HTTP muxers
 	gwmux := runtime.NewServeMux()
 	dialOpts := []grpc.DialOption{
-		grpc.WithMaxMsgSize(r.maxMsgSize),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(r.maxMsgSize)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, dialOpts)
