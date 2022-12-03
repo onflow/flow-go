@@ -51,7 +51,7 @@ func NewVoteAggregator(
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
-	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	queuedVotes, err := fifoqueue.NewFifoQueue(defaultVoteQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}

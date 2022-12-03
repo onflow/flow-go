@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
 )
 
@@ -39,13 +39,13 @@ func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer
 
 // PubSubMessageValidator wraps Validate and returns PubSubMessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Channel) PubSubMessageValidator {
-	return func(from peer.ID, msg interface{}) pubsub.ValidationResult {
+	return func(from peer.ID, msg interface{}) p2p.ValidationResult {
 		_, err := av.Validate(from, msg, channel, message.ProtocolPublish)
 		if err != nil {
-			return pubsub.ValidationReject
+			return p2p.ValidationReject
 		}
 
-		return pubsub.ValidationAccept
+		return p2p.ValidationAccept
 	}
 }
 
