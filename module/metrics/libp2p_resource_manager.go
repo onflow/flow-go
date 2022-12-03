@@ -16,25 +16,25 @@ type LibP2PResourceManagerMetrics struct {
 	logger zerolog.Logger
 	// libp2p resource manager metrics
 	// connections
-	libp2pAllowConnectionCount *prometheus.CounterVec
-	libp2pBlockConnectionCount *prometheus.CounterVec
+	allowConnectionCount *prometheus.CounterVec
+	blockConnectionCount *prometheus.CounterVec
 	// streams
-	libp2pAllowStreamCount *prometheus.CounterVec
-	libp2pBlockStreamCount *prometheus.CounterVec
+	allowStreamCount *prometheus.CounterVec
+	blockStreamCount *prometheus.CounterVec
 	// peers
-	libp2pAllowPeerCount prometheus.Counter
-	libp2pBlockPeerCount prometheus.Counter
+	allowPeerCount prometheus.Counter
+	blockPeerCount prometheus.Counter
 	// protocol
-	libp2pAllowProtocolCount     prometheus.Counter
-	libp2pBlockProtocolCount     prometheus.Counter
-	libp2pBlockProtocolPeerCount prometheus.Counter
+	allowProtocolCount     prometheus.Counter
+	blockProtocolCount     prometheus.Counter
+	blockProtocolPeerCount prometheus.Counter
 	// services
-	libp2pAllowServiceCount     prometheus.Counter
-	libp2pBlockServiceCount     prometheus.Counter
-	libp2pBlockServicePeerCount prometheus.Counter
+	allowServiceCount     prometheus.Counter
+	blockServiceCount     prometheus.Counter
+	blockServicePeerCount prometheus.Counter
 	// memory
-	libp2pAllowMemoryHistogram prometheus.Histogram
-	libp2pBlockMemoryHistogram prometheus.Histogram
+	allowMemoryHistogram prometheus.Histogram
+	blockMemoryHistogram prometheus.Histogram
 
 	prefix string
 }
@@ -44,7 +44,7 @@ var _ rcmgr.MetricsReporter = (*LibP2PResourceManagerMetrics)(nil)
 func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP2PResourceManagerMetrics {
 	l := &LibP2PResourceManagerMetrics{logger: logger, prefix: prefix}
 
-	l.libp2pAllowConnectionCount = promauto.NewCounterVec(
+	l.allowConnectionCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -55,7 +55,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		}, []string{LabelConnectionDirection, LabelConnectionUseFD},
 	)
 
-	l.libp2pBlockConnectionCount = promauto.NewCounterVec(
+	l.blockConnectionCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -66,7 +66,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		}, []string{LabelConnectionDirection, LabelConnectionUseFD},
 	)
 
-	l.libp2pAllowStreamCount = promauto.NewCounterVec(
+	l.allowStreamCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -75,7 +75,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		}, []string{LabelConnectionDirection},
 	)
 
-	l.libp2pBlockStreamCount = promauto.NewCounterVec(
+	l.blockStreamCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -84,7 +84,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		}, []string{LabelConnectionDirection},
 	)
 
-	l.libp2pAllowPeerCount = promauto.NewCounter(
+	l.allowPeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -93,9 +93,9 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	// Note: this is a low level metric than libp2pBlockProtocolPeerCount.
+	// Note: this is a low level metric than blockProtocolPeerCount.
 	// This metric is incremented when a peer is blocked by the libp2p resource manager on attaching as one end of a stream (on any protocol).
-	l.libp2pBlockPeerCount = promauto.NewCounter(
+	l.blockPeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -104,7 +104,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pAllowProtocolCount = promauto.NewCounter(
+	l.allowProtocolCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -113,7 +113,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pBlockProtocolCount = promauto.NewCounter(
+	l.blockProtocolCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -122,9 +122,9 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	// Note: this is a higher level metric than libp2pBlockPeerCount and libp2pBlockProtocolCount.
+	// Note: this is a higher level metric than blockPeerCount and blockProtocolCount.
 	// This metric is incremented when a peer is already attached as one end of a stream but on a different reserved protocol.
-	l.libp2pBlockProtocolPeerCount = promauto.NewCounter(
+	l.blockProtocolPeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -133,7 +133,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pAllowServiceCount = promauto.NewCounter(
+	l.allowServiceCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -142,7 +142,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pBlockServiceCount = promauto.NewCounter(
+	l.blockServiceCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -151,9 +151,9 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	// Note: this is a higher level metric than libp2pBlockServiceCount and libp2pBlockPeerCount.
+	// Note: this is a higher level metric than blockServiceCount and blockPeerCount.
 	// This metric is incremented when a service is already attached as one end of a stream but on a different reserved protocol.
-	l.libp2pBlockServicePeerCount = promauto.NewCounter(
+	l.blockServicePeerCount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -162,7 +162,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pAllowMemoryHistogram = promauto.NewHistogram(
+	l.allowMemoryHistogram = promauto.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -172,7 +172,7 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 		},
 	)
 
-	l.libp2pBlockMemoryHistogram = promauto.NewHistogram(
+	l.blockMemoryHistogram = promauto.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemLibp2p,
@@ -186,71 +186,71 @@ func NewLibP2PResourceManagerMetrics(logger zerolog.Logger, prefix string) *LibP
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowConn(dir network.Direction, usefd bool) {
-	l.libp2pAllowConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
+	l.allowConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
 	l.logger.Trace().Str("direction", dir.String()).Bool("use_file_descriptor", usefd).Msg("allowing connection")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockConn(dir network.Direction, usefd bool) {
-	l.libp2pBlockConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
+	l.blockConnectionCount.WithLabelValues(dir.String(), strconv.FormatBool(usefd)).Inc()
 	l.logger.Warn().Str("direction", dir.String()).Bool("using_file_descriptor", usefd).Msg("blocking connection")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowStream(p peer.ID, dir network.Direction) {
-	l.libp2pAllowStreamCount.WithLabelValues(dir.String()).Inc()
+	l.allowStreamCount.WithLabelValues(dir.String()).Inc()
 	l.logger.Trace().Str("peer", p.String()).Str("direction", dir.String()).Msg("allowing stream")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockStream(p peer.ID, dir network.Direction) {
-	l.libp2pBlockStreamCount.WithLabelValues(dir.String()).Inc()
+	l.blockStreamCount.WithLabelValues(dir.String()).Inc()
 	l.logger.Warn().Str("peer", p.String()).Str("direction", dir.String()).Msg("blocking stream")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowPeer(p peer.ID) {
-	l.libp2pAllowPeerCount.Inc()
+	l.allowPeerCount.Inc()
 	l.logger.Trace().Str("peer", p.String()).Msg("allowing peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockPeer(p peer.ID) {
-	l.libp2pBlockPeerCount.Inc()
+	l.blockPeerCount.Inc()
 	l.logger.Warn().Str("peer", p.String()).Msg("blocking peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowProtocol(proto protocol.ID) {
-	l.libp2pAllowProtocolCount.Inc()
+	l.allowProtocolCount.Inc()
 	l.logger.Trace().Str("protocol", string(proto)).Msg("allowing protocol")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockProtocol(proto protocol.ID) {
-	l.libp2pBlockProtocolCount.Inc()
+	l.blockProtocolCount.Inc()
 	l.logger.Warn().Str("protocol", string(proto)).Msg("blocking protocol")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockProtocolPeer(proto protocol.ID, p peer.ID) {
-	l.libp2pBlockProtocolPeerCount.Inc()
+	l.blockProtocolPeerCount.Inc()
 	l.logger.Warn().Str("protocol", string(proto)).Str("peer", p.String()).Msg("blocking protocol for peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowService(svc string) {
-	l.libp2pAllowServiceCount.Inc()
+	l.allowServiceCount.Inc()
 	l.logger.Trace().Str("service", svc).Msg("allowing service")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockService(svc string) {
-	l.libp2pBlockServiceCount.Inc()
+	l.blockServiceCount.Inc()
 	l.logger.Warn().Str("service", svc).Msg("blocking service")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockServicePeer(svc string, p peer.ID) {
-	l.libp2pBlockServicePeerCount.Inc()
+	l.blockServicePeerCount.Inc()
 	l.logger.Warn().Str("service", svc).Str("peer", p.String()).Msg("blocking service for peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowMemory(size int) {
-	l.libp2pAllowMemoryHistogram.Observe(float64(size))
+	l.allowMemoryHistogram.Observe(float64(size))
 	l.logger.Trace().Int("size", size).Msg("allowing memory")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockMemory(size int) {
-	l.libp2pBlockMemoryHistogram.Observe(float64(size))
+	l.blockMemoryHistogram.Observe(float64(size))
 	l.logger.Warn().Int("size", size).Msg("blocking memory")
 }
