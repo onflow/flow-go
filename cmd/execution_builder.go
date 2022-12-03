@@ -175,6 +175,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
+		Module("page cache adviser", exeNode.PagecacheAdviser).
 		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
@@ -271,6 +272,15 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 
 func (exeNode *ExecutionNode) LoadPendingBlockCache(node *NodeConfig) error {
 	exeNode.pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
+	return nil
+}
+
+func (exeNode *ExecutionNode) PagecacheAdviser(node *NodeConfig) error {
+	logger := node.Logger.With().Str("component_name", "checkpointer").Logger()
+	_, err := wal.EvictAllCheckpointsFromLinuxPageCache(exeNode.exeConf.triedir, &logger)
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to evict checkpoint files from Linux page cache")
+	}
 	return nil
 }
 

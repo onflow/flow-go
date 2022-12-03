@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/multierr"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
@@ -1072,11 +1073,11 @@ func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 // successfully advised to evict and first error encountered (if any).
 // Even after error advising eviction, it continues to advise eviction of remaining files.
 func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) ([]string, error) {
-	var err error
 	matches, err := filepath.Glob(filepath.Join(dir, checkpointFilenamePrefix+"*"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to enumerate checkpoints: %w", err)
 	}
+
 	evictedFileNames := make([]string, 0, len(matches))
 	for _, fn := range matches {
 		base := filepath.Base(fn)
@@ -1084,21 +1085,20 @@ func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) (
 			continue
 		}
 		justNumber := base[len(checkpointFilenamePrefix):]
-		_, err := strconv.Atoi(justNumber)
-		if err != nil {
+		_, strconvErr := strconv.Atoi(justNumber)
+		if strconvErr != nil {
+			logger.Info().Str("filename", fn).Msg("skipped pagecache eviction")
 			continue
 		}
 		evictErr := evictFileFromLinuxPageCacheByName(fn, false, logger)
 		if evictErr != nil {
-			if err == nil {
-				err = evictErr // Save first evict error encountered
-			}
-			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
+			multierr.AppendInto(&err, evictErr)
+			logger.Warn().Err(err).Str("filename", fn).Msg("failed to evict filefrom Linux page cache")
 			continue
 		}
 		evictedFileNames = append(evictedFileNames, fn)
 	}
-	// return the first error encountered
+	// return the all errors encountered
 	return evictedFileNames, err
 }
 
@@ -1126,13 +1126,13 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 		return err
 	}
 
+	size := int64(0)
 	fstat, err := f.Stat()
 	if err == nil {
-		fsize := fstat.Size()
-		logger.Debug().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
-	} else {
-		logger.Debug().Msgf("advised Linux to evict file %s from page cache", f.Name())
+		size = fstat.Size()
 	}
+
+	logger.Info().Str("filename", f.Name()).Int64("size_mb", size/1024/1024).Msg("evicted file from Linux page cache")
 	return nil
 }
 
