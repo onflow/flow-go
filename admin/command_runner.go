@@ -195,6 +195,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	}
 
 	opts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(r.maxMsgSize),
 		grpc.MaxSendMsgSize(r.maxMsgSize),
 	}
 
