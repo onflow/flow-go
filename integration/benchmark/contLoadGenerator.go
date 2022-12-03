@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
-	"go.uber.org/multierr"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/integration/benchmark/account"
@@ -234,15 +233,17 @@ func (lg *ContLoadGenerator) populateServiceAccountKeys(num int) error {
 		return fmt.Errorf("error signing transaction: %w", err)
 	}
 
-	_, err = lg.sendTx(0, addKeysTx)
+	ch, err := lg.sendTx(0, addKeysTx)
 	if err != nil {
 		return fmt.Errorf("error sending transaction: %w", err)
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
-	result, err := WaitForTransactionResult(lg.ctx, lg.flowClient, addKeysTx.ID(), true)
-	if err != nil || result.Error != nil {
-		return fmt.Errorf("failed to get transactions result: %w", multierr.Combine(err, result.Error))
+	var result flowsdk.TransactionResult
+	select {
+	case result = <-ch:
+	case <-lg.Done():
+		return fmt.Errorf("load generator stopped")
 	}
 
 	lg.log.Info().Stringer("result", result.Status).Msg("add key tx")
@@ -356,7 +357,7 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	if err != nil {
 		return err
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -507,7 +508,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	if err != nil {
 		return err
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	var result flowsdk.TransactionResult
 	select {
@@ -568,7 +569,7 @@ func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numb
 
 	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
 	for i := uint(0); i < numberOfKeysToAdd; i++ {
-		accountKey := *key.AccountKey
+		accountKey := key.AccountKey
 		cadenceKeys[i] = bytesToCadenceArray(accountKey.PublicKey.Encode())
 	}
 	cadenceKeysArray := cadence.NewArray(cadenceKeys)
@@ -636,7 +637,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 }
@@ -673,7 +674,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *acco
 	if err != nil {
 		return err
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -697,7 +698,9 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScriptNoComment).
-		SetGasLimit(10) // const-exec tx has empty transaction
+		SetGasLimit(10). // const-exec tx has empty transaction
+		SetProposalKey(*proposerKey.Address, proposerKey.Index, proposerKey.SequenceNumber).
+		SetPayer(*proposerKey.Address)
 
 	txArgStr := generateRandomStringWithLen(lg.constExecParams.ArgSizeInByte)
 	txArg, err := cadence.NewString(txArgStr)
@@ -778,7 +781,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		log.Error().Err(err).Msg("const-exec tx failed")
 		return
 	}
-	defer proposerKey.Success()
+	defer proposerKey.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -847,7 +850,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
 	log.Trace().Msg("transaction sent")
@@ -924,7 +927,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 	<-ch
 }
 

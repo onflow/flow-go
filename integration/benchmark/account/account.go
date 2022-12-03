@@ -23,7 +23,7 @@ func New(i int, address *flowsdk.Address, accountKeys []*flowsdk.AccountKey, sig
 	keys := make([]*accountKey, 0, len(accountKeys))
 	for _, key := range accountKeys {
 		keys = append(keys, &accountKey{
-			AccountKey: key,
+			AccountKey: *key,
 			Address:    address,
 			Signer:     signer,
 		})

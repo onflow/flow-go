@@ -12,7 +12,7 @@ import (
 var ErrNoKeysAvailable = fmt.Errorf("no keys available")
 
 type accountKey struct {
-	*flowsdk.AccountKey
+	flowsdk.AccountKey
 
 	mu      sync.Mutex
 	ks      *keystore
@@ -74,9 +74,9 @@ func (k *accountKey) Done() {
 	k.ks.availableKeys <- k
 }
 
-// Success is called when a key was successfully used to sign a transaction as the proposer
+// IncrementSequenceNumber is called when a key was successfully used to sign a transaction as the proposer.
 // It increments the sequence number.
-func (k *accountKey) Success() {
+func (k *accountKey) IncrementSequenceNumber() {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
