@@ -238,7 +238,7 @@ func (lg *ContLoadGenerator) populateServiceAccountKeys(num int) error {
 	if err != nil {
 		return fmt.Errorf("error sending transaction: %w", err)
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	result, err := WaitForTransactionResult(lg.ctx, lg.flowClient, addKeysTx.ID(), true)
 	if err != nil || result.Error != nil {
@@ -356,7 +356,7 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	if err != nil {
 		return err
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -511,12 +511,12 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	if err != nil {
 		return err
 	}
-	defer key.Success()
 
 	result, err := WaitForTransactionResult(lg.ctx, lg.flowClient, createAccountTx.ID(), false)
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
+	key.IncrementSequenceNumber()
 	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
@@ -636,7 +636,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 }
@@ -673,7 +673,7 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *acco
 	if err != nil {
 		return err
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -697,7 +697,9 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScriptNoComment).
-		SetGasLimit(10) // const-exec tx has empty transaction
+		SetGasLimit(10). // const-exec tx has empty transaction
+		SetProposalKey(*proposerKey.Address, proposerKey.Index, proposerKey.SequenceNumber).
+		SetPayer(*proposerKey.Address)
 
 	txArgStr := generateRandomStringWithLen(lg.constExecParams.ArgSizeInByte)
 	txArg, err := cadence.NewString(txArgStr)
@@ -778,7 +780,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		log.Error().Err(err).Msg("const-exec tx failed")
 		return
 	}
-	defer proposerKey.Success()
+	defer proposerKey.IncrementSequenceNumber()
 
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
@@ -847,7 +849,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 
 	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
 	log.Trace().Msg("transaction sent")
@@ -917,7 +919,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	if err != nil {
 		return
 	}
-	defer key.Success()
+	defer key.IncrementSequenceNumber()
 	<-ch
 }
 
