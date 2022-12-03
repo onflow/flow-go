@@ -216,7 +216,10 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 
 	// Initialize gRPC and HTTP muxers
 	gwmux := runtime.NewServeMux()
-	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	dialOpts := []grpc.DialOption{
+		grpc.WithMaxMsgSize(r.maxMsgSize),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
 	err = pb.RegisterAdminHandlerFromEndpoint(ctx, gwmux, "unix:///"+r.grpcAddress, dialOpts)
 	if err != nil {
 		return fmt.Errorf("failed to register http handlers for admin service: %w", err)
