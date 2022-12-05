@@ -192,10 +192,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
 
-		blockProposalMsg := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		blockProposalMsg := messages.NewClusterBlockProposal(&block)
 		expectedComplianceMsg := flow.Slashable[messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -277,10 +274,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
@@ -347,10 +341,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  proposal.Header,
-			Payload: proposal.Payload,
-		}
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

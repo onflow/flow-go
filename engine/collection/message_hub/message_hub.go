@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -122,21 +123,15 @@ func NewMessageHub(log zerolog.Logger,
 		return nil, fmt.Errorf("could not find cluster for self")
 	}
 
-	ownOutboundVotes, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-	)
+	ownOutboundVotes, err := fifoqueue.NewFifoQueue(defaultVoteQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
-	ownOutboundProposals, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultProposalQueueCapacity),
-	)
+	ownOutboundProposals, err := fifoqueue.NewFifoQueue(defaultProposalQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
-	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
-	)
+	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(defaultTimeoutQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
@@ -337,10 +332,10 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	}
 
 	// create the proposal message for the collection
-	proposal := &messages.ClusterBlockProposal{
+	proposal := messages.NewClusterBlockProposal(&cluster.Block{
 		Header:  header,
 		Payload: payload,
-	}
+	})
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposal, recipients.NodeIDs()...)
