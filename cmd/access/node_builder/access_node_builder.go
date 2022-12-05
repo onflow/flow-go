@@ -119,8 +119,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-
-	PublicNetworkConfig PublicNetworkConfig
+	PublicNetworkConfig          PublicNetworkConfig
 }
 
 type PublicNetworkConfig struct {

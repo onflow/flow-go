@@ -22,24 +22,16 @@ int get_sk_len() {
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
 int check_membership_Zr_star(const bn_t a){
-    int ret; // return value
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) ret = INVALID; 
-    else ret = VALID;
-    bn_free(r);
-    return ret;
+    if (bn_cmp(a, &core_get()->ep_r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) {
+        return INVALID; 
+    }
+    return VALID;
 }
 
-// checks if input point s is on the curve E1
-// and is in the subgroup G1. 
+// Checks if input point p is in the subgroup G1. 
+// The function assumes the input is known to be on the curve E1.
 int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
-    // check p is on curve
-    if (!ep_on_curve(p))
-        return INVALID;
-    // check p is in G1
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
     return simple_subgroup_check_G1(p);
     #elif MEMBERSHIP_CHECK_G1 == BOWE
@@ -185,7 +177,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
     if (ret != RLC_OK) goto out;
 
-    // check s is on curve and in G1
+    // check s is in G1
     ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
@@ -269,7 +261,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
     if (ret != RLC_OK) goto out;
 
-    // check s is on curve and in G1
+    // check s in G1
     ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
@@ -347,12 +339,12 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     ep_t s;
     ep_new(s);
     
-    // deserialize the signature
+    // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s is on curve and in G1
+    // check s is in G1
     if (check_membership_G1(s) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
     

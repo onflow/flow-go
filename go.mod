@@ -49,7 +49,7 @@ require (
 	github.com/libp2p/go-libp2p v0.23.3
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221102045350-1e161006c43f
+	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221201175637-3d2eab35722e
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-base32 v0.1.0 // indirect
