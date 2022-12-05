@@ -33,18 +33,13 @@ func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
 	return meter.GetStorageKeyValueSizeForTesting(ik, payload.Value()), nil
 }
 
-func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error) {
-	// iteration through each payload
-	// and find the one payload that is for account status
-	// with the key state.AccountStatusKey, which will return a AccountStatus obj
-	// and sum up the size of all payloads.
-	// the size of a payload can be calculated by constructing
-	// a StorageInteractionKey and call GetStorageKeyValueSizeForTesting
-	// and update account storage size by updating the original AccountStatus obj
-	// with SetStorageUsed method
-	// use toBytes to get new value for the payload
-	// and create a new payload with NewPayload to replace the old payload with the new value
+func isAccountKey(key ledger.Key) bool {
+	return string(key.KeyParts[1].Value) == state.AccountStatusKey
+}
 
+// AccountUsageMigrator iterate through each payload, and calculate the storage usage
+// and update the accoutns status with the updated storage usage
+func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error) {
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)
@@ -53,7 +48,7 @@ func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderV
 		if err != nil {
 			return nil, err
 		}
-		if string(key.KeyParts[1].Value) == state.AccountStatusKey {
+		if isAccountKey(key) {
 			statusIndex = i
 			status, err = environment.AccountStatusFromBytes(payload.Value())
 			if err != nil {
@@ -87,6 +82,8 @@ func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderV
 	return payloads, nil
 }
 
+// newPayloadWithValue returns a new payload with the key from the given payload, and
+// the value from the argument
 func newPayloadWithValue(payload ledger.Payload, value ledger.Value) (ledger.Payload, error) {
 	key, err := payload.Key()
 	if err != nil {

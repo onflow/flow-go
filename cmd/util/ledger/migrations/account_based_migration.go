@@ -2,7 +2,6 @@ package migrations
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog/log"
 
@@ -16,43 +15,38 @@ import (
 // - (address, true, nil) if the payload is for an account, the account address is returned
 // - ("", false, nil) if the payload is not for an account
 // - ("", false, err) if running into any exception
-func PayloadToAccount(p ledger.Payload) (string, DecodedPayload, bool, error) {
+func PayloadToAccount(p ledger.Payload) (string, bool, error) {
 	k, err := p.Key()
 	if err != nil {
-		return "", DecodedPayload{}, false, fmt.Errorf("could not find key for payload: %w", err)
+		return "", false, fmt.Errorf("could not find key for payload: %w", err)
 	}
 	id, err := KeyToRegisterID(k)
 	if err != nil {
-		return "", DecodedPayload{}, false, fmt.Errorf("error converting key to register ID")
+		return "", false, fmt.Errorf("error converting key to register ID")
 	}
 	if len([]byte(id.Owner)) != flow.AddressLength {
-		return "", DecodedPayload{}, false, nil
+		return "", false, nil
 	}
-	return id.Owner, DecodedPayload{Key: k, Payload: p}, true, nil
-}
-
-type DecodedPayload struct {
-	Payload ledger.Payload
-	Key     ledger.Key
+	return id.Owner, true, nil
 }
 
 // PayloadGroup groups payloads by account.
 // For global payloads, it's stored under NonAccountPayloads field
 type PayloadGroup struct {
 	NonAccountPayloads []ledger.Payload
-	Accounts           map[string][]DecodedPayload
+	Accounts           map[string][]ledger.Payload
 }
 
 // PayloadGrouping is a reducer function that adds the given payload to the corresponding
 // group under its account
 func PayloadGrouping(groups *PayloadGroup, payload ledger.Payload) (*PayloadGroup, error) {
-	address, decoded, isAccount, err := PayloadToAccount(payload)
+	address, isAccount, err := PayloadToAccount(payload)
 	if err != nil {
 		return nil, err
 	}
 
 	if isAccount {
-		groups.Accounts[address] = append(groups.Accounts[address], decoded)
+		groups.Accounts[address] = append(groups.Accounts[address], payload)
 	} else {
 		groups.NonAccountPayloads = append(groups.NonAccountPayloads, payload)
 	}
@@ -69,7 +63,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 	[]ledger.Payload, []ledger.Path, error) {
 	groups := &PayloadGroup{
 		NonAccountPayloads: make([]ledger.Payload, 0),
-		Accounts:           make(map[string][]DecodedPayload),
+		Accounts:           make(map[string][]ledger.Payload),
 	}
 
 	log.Info().Msgf("start grouping for a total of %v payloads", len(allPayloads))
@@ -115,7 +109,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 // using the migrator
 func MigrateGroupSequentially(
 	migrator AccountMigrator,
-	payloadsByAccount map[string][]DecodedPayload,
+	payloadsByAccount map[string][]ledger.Payload,
 	pathFinderVersion uint8,
 ) (
 	[]ledger.Payload, []ledger.Path, error) {
@@ -125,12 +119,7 @@ func MigrateGroupSequentially(
 	i := 0
 	migrated := make([]ledger.Payload, 0)
 	migratedPaths := make([]ledger.Path, 0)
-	for address, decoded := range payloadsByAccount {
-		payloads := make([]ledger.Payload, len(decoded))
-		for i, d := range decoded {
-			payloads[i] = d.Payload
-		}
-
+	for address, payloads := range payloadsByAccount {
 		accountMigrated, err := migrator(address, payloads, pathFinderVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
@@ -164,7 +153,7 @@ type resultMigrating struct {
 // It's similar to MigrateGroupSequentially, except it will migrate different groups concurrently
 func MigrateGroupConcurrently(
 	migrator AccountMigrator,
-	payloadsByAccount map[string][]DecodedPayload,
+	payloadsByAccount map[string][]ledger.Payload,
 	pathFinderVersion uint8,
 ) (
 	[]ledger.Payload, []ledger.Path, error) {
@@ -172,13 +161,7 @@ func MigrateGroupConcurrently(
 
 	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
 	go func() {
-		for account, decoded := range payloadsByAccount {
-
-			payloads := make([]ledger.Payload, len(decoded))
-			for i, d := range decoded {
-				payloads[i] = d.Payload
-			}
-
+		for account, payloads := range payloadsByAccount {
 			jobs <- jobMigrateAccountGroup{
 				Account:  account,
 				Payloads: payloads,
@@ -188,7 +171,6 @@ func MigrateGroupConcurrently(
 	}()
 
 	resultCh := make(chan *resultMigrating)
-	var done sync.Once
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
 			for job := range jobs {
@@ -198,19 +180,17 @@ func MigrateGroupConcurrently(
 					Err:      err,
 				}
 			}
-			done.Do(func() {
-				close(resultCh)
-			})
 		}()
 	}
 
 	// read job results
 	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
 
-	i := 0
 	migrated := make([]ledger.Payload, 0)
 	migratedPaths := make([]ledger.Path, 0)
-	for result := range resultCh {
+
+	for i := 0; i < len(payloadsByAccount); i++ {
+		result := <-resultCh
 		if result.Err != nil {
 			return nil, nil, fmt.Errorf("fail to migrate payload: %w", result.Err)
 		}
@@ -224,7 +204,6 @@ func MigrateGroupConcurrently(
 		}
 		migratedPaths = append(migratedPaths, paths...)
 		logAccount(i)
-		i++
 	}
 
 	return migrated, migratedPaths, nil
