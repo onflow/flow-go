@@ -208,10 +208,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	// we broadcast to correct nodes
 	header.ChainID = "test"
 	header.Height = 11
-	msg := &messages.ClusterBlockProposal{
-		Header:  header,
-		Payload: block.Payload,
-	}
+	msg := messages.NewClusterBlockProposal(&block)
 
 	done := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -278,10 +275,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// create a proposal that directly descends from the latest finalized header
 		originID := cs.cluster[1].NodeID
 		block := unittest.ClusterBlockWithParent(cs.head)
-		proposal := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		proposal := messages.NewClusterBlockProposal(&block)
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
