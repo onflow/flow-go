@@ -192,9 +192,11 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
+		// an empty list of signatures is not allowed
 		if crypto.IsBLSAggregateEmptyListError(err) {
 			return nil, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
 		}
+		// invalid signature serialization, regardless of the signer's public key
 		if crypto.IsInvalidSignatureError(err) {
 			return nil, nil, NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
 		}
@@ -205,11 +207,12 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	if !ok {
-		// check for identity signature (invalid signature)
+		// check for identity signature (invalid aggregated signature)
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
 			return nil, nil, InvalidAggregatedSignatureError
 		}
-		// this case can only happen if at least one added signature via TrustedAdd is invalid
+		// this case can only happen if at least one added signature via TrustedAdd does not verify against
+		// the signer's corresponding public key
 		return nil, nil, NewInvalidSignatureIncludedErrorf("invalid signature(s) have been included via TrustedAdd")
 	}
 	s.cachedSignature = aggregatedSignature

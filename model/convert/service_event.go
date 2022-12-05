@@ -404,7 +404,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 		}
 
 		// check that aggregated signature is not identity, because an identity signature
-		// is invalid if verified under an identtiy public key. This can happen in two cases:
+		// is invalid if verified under an identity public key. This can happen in two cases:
 		//  - if the quorum has at least one honest signer, the aggrgeted public is uniformly sampled
 		//    and the identity key probability is negligible
 		//  - if all quorum is malicious and intentionally forge an identity aggregate. This is also

@@ -165,6 +165,9 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 			//      guaranteed by the protocol to be BLS keys.
 
 			// check case (i)
+			// TODO: this should not happen because the case `len(signers) == 0`
+			// is checked upfront and ruled out. This is because `Unpack` does not
+			// handle the empty list case properly.
 			if crypto.IsBLSAggregateEmptyListError(err) {
 				return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
 			}
