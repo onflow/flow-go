@@ -305,10 +305,7 @@ func (s *Suite) TestProcessSyncedBlock() {
 
 	s.engine.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message: &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		},
+		Message:  messages.NewBlockProposal(&block),
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }

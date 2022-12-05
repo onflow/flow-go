@@ -163,10 +163,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := &messages.ClusterBlockProposal{
-				Header:  unittest.BlockHeaderWithParentFixture(cs.head.Header),
-				Payload: unittest.ClusterPayloadFixture(1),
-			}
+			block := unittest.ClusterBlockWithParent(cs.head)
+			proposal := messages.NewClusterBlockProposal(&block)
 			// store the data for retrieval
 			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
@@ -176,7 +174,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			// execute the block submission
 			cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  block,
+				Message:  proposal,
 			})
 		}
 		wg.Done()

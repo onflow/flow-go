@@ -528,12 +528,12 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := cs.participants[1].NodeID
-	block := unittest.BlockWithParentFixture(cs.head)
-	missing := unittest.ProposalFromBlock(block)
+	missingBlock := unittest.BlockWithParentFixture(cs.head)
+	missingProposal := unittest.ProposalFromBlock(missingBlock)
 
 	// create a chain of descendants
 	var proposals []*messages.BlockProposal
-	parent := missing
+	parent := missingProposal
 	for i := 0; i < 3; i++ {
 		descendant := unittest.BlockWithParentFixture(&parent.Block.Header)
 		proposal := unittest.ProposalFromBlock(descendant)
@@ -545,7 +545,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.core.pending = real.NewPendingBlocks()
 
 	// check that we request the ancestor block each time
-	cs.sync.On("RequestBlock", parent.Header.ID(), parent.Header.Height).Times(len(proposals))
+	cs.sync.On("RequestBlock", missingBlock.Header.ID(), missingBlock.Header.Height).Times(len(proposals))
 
 	// process all the descendants
 	for _, proposal := range proposals {
@@ -554,20 +554,20 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.ProposalFromFlow(proposal.Header))
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.ProposalFromFlow(&proposal.Block.Header))
 	}
 
 	// check that we submit each proposal in a valid order
-	//  - we must process the missing parent first
+	//  - we must process the missingProposal parent first
 	//  - we can process the children next, in any order
 	cs.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(4)
 
 	calls := 0                                   // track # of calls to SubmitProposal
 	unprocessed := map[flow.Identifier]struct{}{ // track un-processed proposals
-		missing.Header.ID():      {},
-		proposals[0].Header.ID(): {},
-		proposals[1].Header.ID(): {},
-		proposals[2].Header.ID(): {},
+		missingProposal.Block.Header.ID(): {},
+		proposals[0].Block.Header.ID():    {},
+		proposals[1].Block.Header.ID():    {},
+		proposals[2].Block.Header.ID():    {},
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
@@ -575,7 +575,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			header := proposal.Block
 			if calls == 0 {
 				// first header processed must be the common parent
-				assert.Equal(cs.T(), missing.Header.ID(), header.BlockID)
+				assert.Equal(cs.T(), missingProposal.Block.Header.ID(), header.BlockID)
 			}
 			// mark the proposal as processed
 			delete(unprocessed, header.BlockID)
@@ -586,7 +586,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(originID, missing)
+	err := cs.core.OnBlockProposal(originID, missingProposal)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// all proposals should be processed

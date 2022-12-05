@@ -304,8 +304,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		synced := flow.Slashable[messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message: &messages.ClusterBlockProposal{
-				Header:  block.Header,
-				Payload: block.Payload,
+				Block: block,
 			},
 		}
 		// forward the block to the compliance engine for validation and processing
