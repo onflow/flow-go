@@ -2,20 +2,19 @@ package corruptlibp2p
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/onflow/flow-go/insecure/internal"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 )
 
 type ControlMessage int
 
-// GossipSubSpammer is a wrapper around the GossipSubRouter that allows us to
+// SpammerGossipSub is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
-type GossipSubSpammer struct {
-	router *internal.CorruptGossipSubRouter
+type SpammerGossipSub struct {
+	router *pubsub.GossipSubRouter
 }
 
-func NewGossipSubSpammer(router *internal.CorruptGossipSubRouter) *GossipSubSpammer {
-	return &GossipSubSpammer{
+func NewSpammerGossipSubRouter(router *pubsub.GossipSubRouter) *SpammerGossipSub {
+	return &SpammerGossipSub{
 		router: router,
 	}
 }
@@ -23,7 +22,7 @@ func NewGossipSubSpammer(router *internal.CorruptGossipSubRouter) *GossipSubSpam
 // SpamIHave spams the victim with junk iHave messages.
 // msgCount is the number of iHave messages to send.
 // msgSize is the number of messageIDs to include in each iHave message.
-func (s *GossipSubSpammer) SpamIHave(victim peer.ID, msgCount int, msgSize int) {
+func (s *SpammerGossipSub) SpamIHave(victim peer.ID, msgCount int, msgSize int) {
 	for i := 0; i < msgCount; i++ {
 		ctlIHave := GossipSubCtrlFixture(WithIHave(msgCount, msgSize))
 		s.router.SendControl(victim, ctlIHave)

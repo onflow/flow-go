@@ -5,11 +5,12 @@ package crypto
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls12381_utils.h"
+// #include "bls_include.h"
 import "C"
 import (
 	"errors"
@@ -203,28 +204,40 @@ func readPointG1(a *pointG1, src []byte) error {
 	}
 }
 
-// This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
+// checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
-// if inG1 is true, the function tests the membership of a point in G1,
-// otherwise, a point in E1\G1 membership is tested.
-// method is the index of the membership check method as defined in bls12381_utils.h
-func checkG1Test(inG1 int, method int) bool {
-	return C.subgroup_check_G1_test((C.int)(inG1), (C.int)(method)) == valid
+func checkMembershipG1(pt *pointG1) int {
+	return int(C.check_membership_G1((*C.ep_st)(pt)))
 }
 
-// This is only a TEST function.
-// It wraps a call to a subgroup check in G1 since cgo can't be used
+// checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
-func checkInG1Test(pt *pointG1) bool {
-	return C.check_membership_G1((*C.ep_st)(pt)) == valid
+func checkMembershipG2(pt *pointG2) int {
+	return int(C.check_membership_G2((*C.ep2_st)(pt)))
 }
 
-// This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
-// in go test files.
-func benchG1Test() {
-	_ = C.subgroup_check_G1_bench()
+// randPointG1 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G1 and stores it in input point.
+func randPointG1(pt *pointG1) {
+	C.ep_rand_G1((*C.ep_st)(pt))
+}
+
+// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E1\G1 and stores it in input point.
+func randPointG1Complement(pt *pointG1) {
+	C.ep_rand_G1complement((*C.ep_st)(pt))
+}
+
+// randPointG2 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G2 and stores it in input point.
+func randPointG2(pt *pointG2) {
+	C.ep2_rand_G2((*C.ep2_st)(pt))
+}
+
+// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E2\G2 and stores it in input point.
+func randPointG2Complement(pt *pointG2) {
+	C.ep2_rand_G2complement((*C.ep2_st)(pt))
 }
 
 // This is only a TEST function.

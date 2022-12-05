@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -41,7 +42,7 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
-type GossipSubFactoryFuc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
+type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
 type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
@@ -78,7 +79,7 @@ type NodeBuilder interface {
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
-	SetGossipSubFactory(GossipSubFactoryFuc, GossipSubAdapterConfigFunc) NodeBuilder
+	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -94,7 +95,7 @@ type LibP2PNodeBuilder struct {
 	connManager                 connmgr.ConnManager
 	connGater                   connmgr.ConnectionGater
 	idProvider                  module.IdentityProvider
-	gossipSubFactory            GossipSubFactoryFuc
+	gossipSubFactory            GossipSubFactoryFunc
 	gossipSubConfigFunc         GossipSubAdapterConfigFunc
 	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
 	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
@@ -123,7 +124,7 @@ func NewNodeBuilder(
 	}
 }
 
-func defaultGossipSubFactory() GossipSubFactoryFuc {
+func defaultGossipSubFactory() GossipSubFactoryFunc {
 	return func(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg)
 	}
@@ -192,7 +193,7 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFuc, cf GossipSubAdapterConfigFunc) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, cf GossipSubAdapterConfigFunc) NodeBuilder {
 	builder.gossipSubFactory = gf
 	builder.gossipSubConfigFunc = cf
 	return builder
@@ -280,6 +281,13 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
 				gossipSubConfigs.WithScoreOption(scoreOpt)
 			}
+
+			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
+			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+				gossipSubMetrics.ObserveRPC(from, rpc)
+				return nil
+			})
 
 			// builds GossipSub with the given factory
 			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)

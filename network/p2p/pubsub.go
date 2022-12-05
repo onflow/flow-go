@@ -49,6 +49,7 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
+	WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error)
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

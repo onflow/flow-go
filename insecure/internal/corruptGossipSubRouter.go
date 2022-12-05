@@ -1,22 +1,20 @@
 package internal
 
 import (
-	"fmt"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
 )
 
 // CorruptGossipSubRouter is a wrapper around GossipSubRouter that allows us to access the internal
 // fields of the router for BFT testing and attack implementations.
 type CorruptGossipSubRouter struct {
-	router *corrupt.GossipSubRouter
+	router *pubsub.GossipSubRouter
 }
 
-var _ corrupt.GossipPubSubRouter = (*CorruptGossipSubRouter)(nil)
+var _ pubsub.GossipPubSubRouter = (*CorruptGossipSubRouter)(nil)
 
-func NewCorruptGossipSubRouter(router *corrupt.GossipSubRouter) *CorruptGossipSubRouter {
+func NewCorruptGossipSubRouter(router *pubsub.GossipSubRouter) *CorruptGossipSubRouter {
 	return &CorruptGossipSubRouter{
 		router: router,
 	}
@@ -26,7 +24,7 @@ func (m *CorruptGossipSubRouter) Protocols() []protocol.ID {
 	return m.router.Protocols()
 }
 
-func (m *CorruptGossipSubRouter) Attach(sub *corrupt.PubSub) {
+func (m *CorruptGossipSubRouter) Attach(sub *pubsub.PubSub) {
 	m.router.Attach(sub)
 }
 
@@ -42,16 +40,15 @@ func (m *CorruptGossipSubRouter) EnoughPeers(topic string, suggested int) bool {
 	return m.router.EnoughPeers(topic, suggested)
 }
 
-func (m *CorruptGossipSubRouter) AcceptFrom(pid peer.ID) corrupt.AcceptStatus {
+func (m *CorruptGossipSubRouter) AcceptFrom(pid peer.ID) pubsub.AcceptStatus {
 	return m.router.AcceptFrom(pid)
 }
 
-func (m *CorruptGossipSubRouter) HandleRPC(rpc *corrupt.RPC) {
-	fmt.Println("HandleRPC called: ", rpc.String())
+func (m *CorruptGossipSubRouter) HandleRPC(rpc *pubsub.RPC) {
 	m.router.HandleRPC(rpc)
 }
 
-func (m *CorruptGossipSubRouter) Publish(message *corrupt.Message) {
+func (m *CorruptGossipSubRouter) Publish(message *pubsub.Message) {
 	m.router.Publish(message)
 }
 
@@ -63,27 +60,27 @@ func (m *CorruptGossipSubRouter) Leave(topic string) {
 	m.router.Leave(topic)
 }
 
-func (m *CorruptGossipSubRouter) SetPeerScore(score *corrupt.PeerScore) {
+func (m *CorruptGossipSubRouter) SetPeerScore(score *pubsub.PeerScore) {
 	m.router.SetPeerScore(score)
 }
 
-func (m *CorruptGossipSubRouter) GetPeerScore() *corrupt.PeerScore {
+func (m *CorruptGossipSubRouter) GetPeerScore() *pubsub.PeerScore {
 	return m.router.GetPeerScore()
 }
 
-func (m *CorruptGossipSubRouter) SetPeerScoreThresholds(thresholds *corrupt.PeerScoreThresholds) {
+func (m *CorruptGossipSubRouter) SetPeerScoreThresholds(thresholds *pubsub.PeerScoreThresholds) {
 	m.router.SetPeerScoreThresholds(thresholds)
 }
 
-func (m *CorruptGossipSubRouter) SetGossipTracer(tracer *corrupt.GossipTracer) {
+func (m *CorruptGossipSubRouter) SetGossipTracer(tracer *pubsub.GossipTracer) {
 	m.router.SetGossipTracer(tracer)
 }
 
-func (m *CorruptGossipSubRouter) GetGossipTracer() *corrupt.GossipTracer {
+func (m *CorruptGossipSubRouter) GetGossipTracer() *pubsub.GossipTracer {
 	return m.router.GetGossipTracer()
 }
 
-func (m *CorruptGossipSubRouter) GetTagTracer() *corrupt.TagTracer {
+func (m *CorruptGossipSubRouter) GetTagTracer() *pubsub.TagTracer {
 	return m.router.GetTagTracer()
 }
 
@@ -91,16 +88,10 @@ func (m *CorruptGossipSubRouter) SetDirectPeers(direct map[peer.ID]struct{}) {
 	m.router.SetDirectPeers(direct)
 }
 
-func (m *CorruptGossipSubRouter) SetPeerGater(gater *corrupt.PeerGater) {
+func (m *CorruptGossipSubRouter) SetPeerGater(gater *pubsub.PeerGater) {
 	m.router.SetPeerGater(gater)
 }
 
-func (m *CorruptGossipSubRouter) GetPeerGater() *corrupt.PeerGater {
+func (m *CorruptGossipSubRouter) GetPeerGater() *pubsub.PeerGater {
 	return m.router.GetPeerGater()
-}
-
-func (m *CorruptGossipSubRouter) SendControl(p peer.ID, ctl *pb.ControlMessage) {
-	fmt.Println("SendControl called: ", ctl.String())
-
-	m.router.SendControl(p, ctl)
 }

@@ -152,15 +152,8 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
-	GossipSubFactory   p2pbuilder.GossipSubFactoryFuc
+	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
-}
-
-func WithGossipSub(factory p2pbuilder.GossipSubFactoryFuc, config p2pbuilder.GossipSubAdapterConfigFunc) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.GossipSubFactory = factory
-		p.GossipSubConfig = config
-	}
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
