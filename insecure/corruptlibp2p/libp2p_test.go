@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
@@ -29,14 +30,22 @@ func TestSpam(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
-		internal.WithCorruptGossipSub(factory, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(factory,
+			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				// here we can inspect the incoming RPC message to the spammer node
+				return nil
+			})),
 	)
 
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		internal.WithCorruptGossipSub(factory, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(factory,
+			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				// here we can inspect the incoming RPC message to the victim node
+				return nil
+			})),
 	)
 	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)

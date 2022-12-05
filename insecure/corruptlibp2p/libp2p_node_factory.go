@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
@@ -81,6 +82,14 @@ func CorruptibleGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p
 func CorruptibleGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return NewCorruptPubSubAdapterConfig(base)
+	}
+}
+
+// CorruptibleGossipSubConfigFactoryWithInspector returns a factory function that creates a new instance of the forked gossipsub config
+// from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
+func CorruptibleGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt.RPC) error) p2pbuilder.GossipSubAdapterConfigFunc {
+	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
+		return NewCorruptPubSubAdapterConfigWithInspector(base, inspector)
 	}
 }
 
