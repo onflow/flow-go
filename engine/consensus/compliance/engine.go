@@ -69,7 +69,7 @@ func NewEngine(
 	core *Core) (*Engine, error) {
 
 	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
+		defaultRangeResponseQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
 	)
 
@@ -83,7 +83,7 @@ func NewEngine(
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -96,7 +96,7 @@ func NewEngine(
 
 	// FIFO queue for block votes
 	votesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+		defaultVoteQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
