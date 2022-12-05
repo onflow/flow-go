@@ -110,8 +110,8 @@ func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyF
 	e.stateStreamGrpcAddress = l.Addr()
 	e.log.Debug().Str("state_stream_address", e.stateStreamGrpcAddress.String()).Msg("listening on port")
 
-	ready()
 	go func() {
+		ready()
 		err = e.server.Serve(l)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("error trying to serve grpc server: %w", err))
