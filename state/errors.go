@@ -111,7 +111,6 @@ func (e NoChildBlockError) Unwrap() error {
 	return e.error
 }
 
-
 func IsNoChildBlockError(err error) bool {
 	return errors.As(err, &NoChildBlockError{})
 }
