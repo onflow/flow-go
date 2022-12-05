@@ -222,10 +222,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		}
 
 		// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
-		m := &msg{&messages.BlockProposal{
-			Header:  nil,
-			Payload: nil,
-		}}
+		m := &msg{unittest.ProposalFixture()}
 
 		getIdentityFunc := s.getIdentity(identity)
 		pid, err := unittest.PeerIDFromFlowID(identity)

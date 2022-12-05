@@ -96,12 +96,12 @@ func (suite *Suite) TestHandlePendingBlock() {
 	block.Header.Height = 12
 
 	// not in cache
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
 	suite.snapshot.On("Head").Return(head.Header, nil)
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
@@ -128,8 +128,8 @@ func (suite *Suite) TestHandleProposal() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// the parent is the last finalized state
@@ -163,7 +163,7 @@ func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
 	block.Header.Height = final.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 
 	// not in cache or storage
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// submit the block
@@ -196,8 +196,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// both parent and child not in cache
 	// suite.cache.On("ByID", child.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
@@ -211,11 +211,10 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once().Return(make(<-chan struct{}))
 
 	// we have one pending child cached
-	pending := []*flow.PendingBlock{
+	pending := []flow.Slashable[flow.Block]{
 		{
 			OriginID: originID,
-			Header:   child.Header,
-			Payload:  child.Payload,
+			Message:  &child,
 		},
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
