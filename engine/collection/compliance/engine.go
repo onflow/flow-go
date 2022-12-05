@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -294,6 +295,13 @@ func (e *Engine) processAvailableMessages() error {
 		if ok {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.ClusterBlockProposal))
 			if err != nil {
+				// unverifiable extentions can happen when a node does not have all of the necessary
+				// information to verify that the block extends the chain. Instead of returning and
+				// crashing, skip the block and continue.
+				if state.IsUnverifiableExtensionError(err) {
+					e.log.Warn().Err(err).Msg("received unverifiable extension")
+					continue
+				}
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
 			continue
