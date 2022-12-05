@@ -297,9 +297,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
-		// the expected error should be handled within the Core
+		// this error is not expected should raise an exception
 		err := cs.core.OnBlockProposal(originID, proposal)
-		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
+		require.Error(cs.T(), err, "proposal with invalid extension should fail")
+		require.ErrorIs(cs.T(), err, model.ErrViewForUnknownEpoch)
 
 		// we should not extend the state with the header
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
