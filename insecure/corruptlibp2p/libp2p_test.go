@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
+	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -17,19 +18,21 @@ import (
 func TestSpam(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	var spammerAdapter p2p.PubSubAdapter
+	gossipSubFactoryFunc, corruptGossipSubRouter := corruptlibp2p.CorruptibleGossipSubFactory()
+	require.NotNil(t, corruptGossipSubRouter)
+
 	spammerNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		p2ptest.WithGossipSub(corruptlibp2p.CorruptibleGossipSubFactory(func(adapter p2p.PubSubAdapter) { spammerAdapter = adapter }), corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(gossipSubFactoryFunc, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
 	)
 
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		p2ptest.WithGossipSub(corruptlibp2p.CorruptibleGossipSubFactory(func(adapter p2p.PubSubAdapter) {}), corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(gossipSubFactoryFunc, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
 	)
 	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)
@@ -42,14 +45,10 @@ func TestSpam(t *testing.T) {
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
 	// create new spammer
-	require.NotNil(t, spammerAdapter)
-	corruptAdapter, ok := spammerAdapter.(*corruptlibp2p.CorruptGossipSubAdapter)
-	require.True(t, ok)
-
-	spammer := corruptlibp2p.NewGossipSubSpammer(corruptAdapter.GetRouter())
+	spammer := corruptlibp2p.NewSpammerGossipSubRouter(corruptGossipSubRouter.GetRouter())
 
 	// start spamming the first peer
 	spammer.SpamIHave(victimPeerId, 1, 1)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 }

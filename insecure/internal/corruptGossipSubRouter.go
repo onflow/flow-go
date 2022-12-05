@@ -20,6 +20,10 @@ func NewCorruptGossipSubRouter(router *pubsub.GossipSubRouter) *CorruptGossipSub
 	}
 }
 
+func (m *CorruptGossipSubRouter) GetRouter() *pubsub.GossipSubRouter {
+	return m.router
+}
+
 func (m *CorruptGossipSubRouter) Protocols() []protocol.ID {
 	return m.router.Protocols()
 }
