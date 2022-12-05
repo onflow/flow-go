@@ -18,33 +18,12 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): rm.  call proc.Run directly.
+// TODO(patrick): rm once emulator is updated.
 type TransactionInvoker struct {
 }
 
 func NewTransactionInvoker() *TransactionInvoker {
 	return &TransactionInvoker{}
-}
-
-func (i TransactionInvoker) NewExecutor(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
-) *transactionExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (i TransactionInvoker) Process(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
-) error {
-	// TODO(patrick): switch to run(i.NewExecutor(...))
-	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
-	defer executor.Cleanup()
-	return executor.Execute()
 }
 
 type TransactionExecutorParams struct {

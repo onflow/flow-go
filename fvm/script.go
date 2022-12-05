@@ -81,14 +81,6 @@ func (proc *ScriptProcedure) NewExecutor(
 	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
 }
 
-func (proc *ScriptProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
-) error {
-	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
-}
-
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
 	computationLimit := ctx.ComputationLimit
 	// if ctx.ComputationLimit is also zero, fallback to the default computation limit
