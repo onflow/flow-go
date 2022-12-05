@@ -309,7 +309,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 			OriginID: originID,
 			Message: &messages.BlockProposal{
-				block,
+				Block: block,
 			},
 		})
 	}
