@@ -281,8 +281,8 @@ func (s *Suite) TestProcessSyncedBlock() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
