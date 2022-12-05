@@ -114,7 +114,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
@@ -126,9 +127,9 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("ref_block_id", proposal.Payload.ReferenceBlockID[:]).
-		Hex("collection_id", logging.Entity(proposal.Payload.Collection)).
-		Int("tx_count", proposal.Payload.Collection.Len()).
+		Hex("ref_block_id", block.Payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(block.Payload.Collection)).
+		Int("tx_count", block.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
@@ -136,7 +137,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("finalized_view", finalView).
 		Logger()
 	if log.Debug().Enabled() {
-		log = log.With().Strs("tx_ids", flow.IdentifierList(proposal.Payload.Collection.Light().Transactions).Strings()).Logger()
+		log = log.With().Strs("tx_ids", flow.IdentifierList(block.Payload.Collection.Light().Transactions).Strings()).Logger()
 	}
 	log.Info().Msg("block proposal received")
 
@@ -192,7 +193,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -203,7 +204,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// and request the parent
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
+
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -220,7 +222,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal, parent)
+	err = c.processBlockAndDescendants(block, parent)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -233,9 +235,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-// No errors are expected during normal operation.
-func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
-	blockID := proposal.Header.ID()
+func (c *Core) processBlockAndDescendants(proposal *cluster.Block, parent *flow.Header) error {
+	blockID := proposal.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", proposal.Header.Height).
@@ -273,11 +274,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.ClusterBlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		cpr := c.processBlockAndDescendants(childProposal, proposal.Header)
+		cpr := c.processBlockAndDescendants(child.Message, proposal.Header)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -296,7 +293,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposa
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, parent *flow.Header) error {
+func (c *Core) processBlockProposal(proposal *cluster.Block, parent *flow.Header) error {
 	header := proposal.Header
 	blockID := header.ID()
 	log := c.log.With().
@@ -327,11 +324,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal, par
 	}
 
 	// see if the block is a valid extension of the protocol state
-	block := &cluster.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
-	err = c.state.Extend(block)
+	err = c.state.Extend(proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid

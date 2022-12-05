@@ -185,10 +185,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
 		block := unittest.ClusterBlockWithParent(cs.head)
-		proposal := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		proposal := messages.NewClusterBlockProposal(&block)
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head

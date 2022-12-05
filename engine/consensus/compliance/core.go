@@ -120,10 +120,24 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
+
+	var traceID string
+
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	if isSampled {
+		span.SetAttributes(
+			attribute.Int64("view", int64(header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", header.ProposerID.String()),
+		)
+		traceID = span.SpanContext().TraceID().String()
+	}
+	defer span.End()
 
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
@@ -136,22 +150,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Uint64("finalized_height", finalHeight).
 		Uint64("finalized_view", finalView).
 		Logger()
 	log.Info().Msg("block proposal received")
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), blockID, trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(proposal.Header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
-		)
-		traceID := span.SpanContext().TraceID().String()
-		log = log.With().Str("traceID", traceID).Logger() // traceID is used to connect logs to traces
-	}
-	defer span.End()
 
 	// drop proposals below the finalized threshold
 	if header.Height <= finalHeight || header.View <= finalView {
@@ -205,7 +208,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -216,7 +219,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// and request the parent
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -233,7 +236,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal, parent)
+	err = c.processBlockAndDescendants(block, parent)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -254,7 +257,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, parent *flow.Header) error {
+func (c *Core) processBlockAndDescendants(proposal *flow.Block, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
 
 	log := c.log.With().
@@ -294,11 +297,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		cpr := c.processBlockAndDescendants(childProposal, proposal.Header)
+		cpr := c.processBlockAndDescendants(child.Message, proposal.Header)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -316,7 +315,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
+func (c *Core) processBlockProposal(proposal *flow.Block, parent *flow.Header) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))

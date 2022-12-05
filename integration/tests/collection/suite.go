@@ -213,11 +213,8 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
-			block := cluster.Block{
-				Header:  val.Header,
-				Payload: val.Payload,
-			}
-			blocks = append(blocks, block)
+			block := val.Block.ToInternal()
+			blocks = append(blocks, *block)
 			if len(blocks) == int(n) {
 				return blocks
 			}
@@ -265,8 +262,9 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
-			header := val.Header
-			collection := val.Payload.Collection
+			block := val.Block.ToInternal()
+			header := block.Header
+			collection := block.Payload.Collection
 			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {

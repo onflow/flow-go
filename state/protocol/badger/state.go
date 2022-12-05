@@ -503,7 +503,19 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
+	head, err := finalSnapshot.Head()
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error to get finalized block: %w", err)
+	}
+	metrics.FinalizedHeight(head.Height)
+
+	sealed, err := state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block: %w", err)
+	}
+	metrics.SealedHeight(sealed.Height)
 
 	// update all epoch related metrics
 	err = state.updateEpochMetrics(finalSnapshot)

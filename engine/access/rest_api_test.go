@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+
 	"math/rand"
 	"net/http"
 	"os"
@@ -100,7 +101,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
+		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
+		false, nil, nil)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

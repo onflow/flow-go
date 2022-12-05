@@ -205,28 +205,20 @@ func ProposalFixture() *messages.BlockProposal {
 }
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	proposal := &messages.BlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-	return proposal
+	return messages.NewBlockProposal(block)
 }
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-	return proposal
+	return messages.NewClusterBlockProposal(block)
 }
 
-func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
-	pending := flow.PendingBlock{
-		OriginID: block.Header.ProposerID,
-		Header:   block.Header,
-		Payload:  block.Payload,
+// AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
+func AsSlashable[T any](msg *T) flow.Slashable[T] {
+	slashable := flow.Slashable[T]{
+		OriginID: IdentifierFixture(),
+		Message:  msg,
 	}
-	return &pending
+	return slashable
 }
 
 func StateDeltaFixture() *messages.ExecutionStateDelta {

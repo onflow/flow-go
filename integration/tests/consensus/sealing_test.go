@@ -176,9 +176,10 @@ SearchLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// make sure we skip duplicates
-		proposalID := proposal.Header.ID()
+		proposalID := block.Header.ID()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -186,12 +187,12 @@ SearchLoop:
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
-		parentID := proposal.Header.ParentID
+		parentID := block.Header.ParentID
 		parents[proposalID] = parentID
 
 		ss.T().Logf("received block proposal height %v, view %v, id %v",
-			proposal.Header.Height,
-			proposal.Header.View,
+			block.Header.Height,
+			block.Header.View,
 			proposalID)
 
 		// we add one confirmation for each ancestor
@@ -363,10 +364,11 @@ SealingLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// log the proposal details
-		proposalID := proposal.Header.ID()
-		seals := proposal.Payload.Seals
+		proposalID := block.Header.ID()
+		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we
 		// monitor for confirmations
