@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
@@ -18,21 +20,32 @@ import (
 func TestSpam(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	gossipSubFactoryFunc, corruptGossipSubRouter := corruptlibp2p.CorruptibleGossipSubFactory()
-	require.NotNil(t, corruptGossipSubRouter)
+	var router *corrupt.GossipSubRouter
+	factory := corruptlibp2p.CorruptibleGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+		require.NotNil(t, r)
+		router = r // save the router at the initialization time of the factory
+	})
 
 	spammerNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		internal.WithCorruptGossipSub(gossipSubFactoryFunc, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(factory,
+			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				// here we can inspect the incoming RPC message to the spammer node
+				return nil
+			})),
 	)
 
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		internal.WithCorruptGossipSub(gossipSubFactoryFunc, corruptlibp2p.CorruptibleGossipSubConfigFactory()),
+		internal.WithCorruptGossipSub(factory,
+			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				// here we can inspect the incoming RPC message to the victim node
+				return nil
+			})),
 	)
 	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)
@@ -45,7 +58,7 @@ func TestSpam(t *testing.T) {
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
 	// create new spammer
-	spammer := corruptlibp2p.NewSpammerGossipSubRouter(corruptGossipSubRouter.GetRouter())
+	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
 
 	// start spamming the first peer
 	spammer.SpamIHave(victimPeerId, 1, 1)

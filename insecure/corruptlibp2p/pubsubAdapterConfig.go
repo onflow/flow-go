@@ -21,7 +21,8 @@ import (
 // implementation, it is designed to be completely isolated in the "insecure" package, and
 // totally separated from the rest of the codebase.
 type CorruptPubSubAdapterConfig struct {
-	options []corrupt.Option
+	options   []corrupt.Option
+	inspector func(peer.ID, *corrupt.RPC) error
 }
 
 var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
@@ -29,6 +30,13 @@ var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
 	return &CorruptPubSubAdapterConfig{
 		options: defaultCorruptPubsubOptions(base),
+	}
+}
+
+func NewCorruptPubSubAdapterConfigWithInspector(base *p2p.BasePubSubAdapterConfig, inspector func(peer.ID, *corrupt.RPC) error) *CorruptPubSubAdapterConfig {
+	return &CorruptPubSubAdapterConfig{
+		options:   defaultCorruptPubsubOptions(base),
+		inspector: inspector,
 	}
 }
 
@@ -45,10 +53,16 @@ func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 }
 
 func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ func(peer.ID, *pubsub.RPC) error) {
-	// Corrupt does not support app-specific inspector for now. This is a no-op.
+	// Corrupt does not support app specific rpc inspectors. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
+	if c.inspector != nil {
+		c.options = append(c.options, corrupt.WithAppSpecificRpcInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			return c.inspector(id, rpc)
+		}))
+	}
+
 	c.options = append(c.options, corrupt.WithMessageIdFn(func(pmsg *pb.Message) string {
 		return f(pmsg.Data)
 	}))
