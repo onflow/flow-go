@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
@@ -26,13 +25,13 @@ func TestProtocolPeerCache(t *testing.T) {
 	defer cancel()
 
 	// create three hosts, and a pcache for the first
-	h1, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1), metrics.NewNoopCollector())
+	h1, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
 	pcache, err := p2pnode.NewProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
-	h2, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1), metrics.NewNoopCollector())
+	h2, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	h3, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1), metrics.NewNoopCollector())
+	h3, err := p2pbuilder.DefaultLibP2PHost("0.0.0.0:0", unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
 
 	// register each host on a separate protocol
@@ -50,21 +49,25 @@ func TestProtocolPeerCache(t *testing.T) {
 	require.NoError(t, h2.Connect(ctx, *host.InfoFromHost(h3)))
 
 	// check that h1's pcache reflects the protocols supported by h2 and h3
-	assert.Eventually(t, func() bool {
-		peers2 := pcache.GetPeers(p2)
-		peers3 := pcache.GetPeers(p3)
-		_, ok2 := peers2[h2.ID()]
-		_, ok3 := peers3[h3.ID()]
-		return len(peers2) == 1 && len(peers3) == 1 && ok2 && ok3
-	}, 3*time.Second, 50*time.Millisecond)
+	assert.Eventually(
+		t, func() bool {
+			peers2 := pcache.GetPeers(p2)
+			peers3 := pcache.GetPeers(p3)
+			_, ok2 := peers2[h2.ID()]
+			_, ok3 := peers3[h3.ID()]
+			return len(peers2) == 1 && len(peers3) == 1 && ok2 && ok3
+		}, 3*time.Second, 50*time.Millisecond,
+	)
 
 	// remove h2's support for p2
 	h2.RemoveStreamHandler(p2)
 
 	// check that h1's pcache reflects the change
-	assert.Eventually(t, func() bool {
-		return len(pcache.GetPeers(p2)) == 0
-	}, 3*time.Second, 50*time.Millisecond)
+	assert.Eventually(
+		t, func() bool {
+			return len(pcache.GetPeers(p2)) == 0
+		}, 3*time.Second, 50*time.Millisecond,
+	)
 
 	// add support for p4 on h2 and h3
 	p4 := protocol.ID("p4")
@@ -72,10 +75,12 @@ func TestProtocolPeerCache(t *testing.T) {
 	h3.SetStreamHandler(p4, noopHandler)
 
 	// check that h1's pcache reflects the change
-	assert.Eventually(t, func() bool {
-		peers4 := pcache.GetPeers(p4)
-		_, ok2 := peers4[h2.ID()]
-		_, ok3 := peers4[h3.ID()]
-		return len(peers4) == 2 && ok2 && ok3
-	}, 3*time.Second, 50*time.Millisecond)
+	assert.Eventually(
+		t, func() bool {
+			peers4 := pcache.GetPeers(p4)
+			_, ok2 := peers4[h2.ID()]
+			_, ok3 := peers4[h3.ID()]
+			return len(peers4) == 2 && ok2 && ok3
+		}, 3*time.Second, 50*time.Millisecond,
+	)
 }

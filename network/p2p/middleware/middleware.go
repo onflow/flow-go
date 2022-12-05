@@ -182,29 +182,31 @@ func NewMiddleware(
 	}
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// TODO: refactor to avoid storing ctx altogether
-			mw.ctx = ctx
+		AddWorker(
+			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+				// TODO: refactor to avoid storing ctx altogether
+				mw.ctx = ctx
 
-			if err := mw.start(ctx); err != nil {
-				ctx.Throw(err)
-			}
+				if err := mw.start(ctx); err != nil {
+					ctx.Throw(err)
+				}
 
-			ready()
+				ready()
 
-			<-ctx.Done()
-			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
+				<-ctx.Done()
+				mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
-			// wait for the readConnection and readSubscription routines to stop
-			mw.wg.Wait()
+				// wait for the readConnection and readSubscription routines to stop
+				mw.wg.Wait()
 
-			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+				mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
 
-			// clean up rate limiter resources
-			mw.unicastRateLimiters.Stop()
-			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+				// clean up rate limiter resources
+				mw.unicastRateLimiters.Stop()
+				mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
 
-		}).Build()
+			},
+		).Build()
 
 	mw.Component = cm
 
@@ -228,8 +230,20 @@ func (m *Middleware) isProtocolParticipant() p2p.PeerFilter {
 	}
 }
 
-func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
-	return blob.NewBlobService(m.libP2PNode.Host(), m.libP2PNode.Routing(), channel.String(), ds, m.bitswapMetrics, m.log, opts...)
+func (m *Middleware) NewBlobService(
+	channel channels.Channel,
+	ds datastore.Batching,
+	opts ...network.BlobServiceOption,
+) network.BlobService {
+	return blob.NewBlobService(
+		m.libP2PNode.Host(),
+		m.libP2PNode.Routing(),
+		channel.String(),
+		ds,
+		m.bitswapMetrics,
+		m.log,
+		opts...,
+	)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {
@@ -306,7 +320,11 @@ func (m *Middleware) start(ctx context.Context) error {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
-	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
+	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
+		m.log,
+		m.slashingViolationsConsumer,
+		m.ov.Identity,
+	)
 
 	err := m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
 	if err != nil {
@@ -523,7 +541,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
-			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+			violation := &slashing.Violation{
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast,
+			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
 			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
@@ -581,7 +601,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators,
+		validators = append(
+			validators,
 			m.authorizedSenderValidator.PubSubMessageValidator(channel),
 		)
 
@@ -634,13 +655,17 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
+		violation := &slashing.Violation{
+			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
 	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
+		violation := &slashing.Violation{
+			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
@@ -785,7 +810,11 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	if msgSize > p2pnode.DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
+		return fmt.Errorf(
+			"message size %d exceeds configured max message size %d",
+			msgSize,
+			p2pnode.DefaultMaxPubSubMsgSize,
+		)
 	}
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
