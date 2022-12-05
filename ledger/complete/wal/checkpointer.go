@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -1021,50 +1019,6 @@ func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error)
 	}
 
 	return tries, nil
-}
-
-// ReadLastTrieRootHashFromCheckpoint returns last trie's root hash from checkpoint file f.
-// All returned errors indicate that the given checkpoint file is eiter corrupted or
-// incompatible.  As the function is side-effect free, all failures are simple a no-op.
-func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
-
-	// read checkpoint version
-	header := make([]byte, headerSize)
-	n, err := f.Read(header)
-	if err != nil || n != headerSize {
-		return hash.DummyHash, errors.New("failed to read checkpoint header")
-	}
-
-	magic := binary.BigEndian.Uint16(header)
-	version := binary.BigEndian.Uint16(header[encMagicSize:])
-
-	if magic != MagicBytesCheckpointHeader {
-		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
-	}
-
-	if version > MaxVersion {
-		return hash.DummyHash, fmt.Errorf("unsupported version %d in checkpoint", version)
-	}
-
-	if version <= 3 {
-		_, err = f.Seek(-(hash.HashLen + crc32SumSize), 2 /* relative from end */)
-		if err != nil {
-			return hash.DummyHash, errors.New("invalid checkpoint")
-		}
-	} else {
-		_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crc32SumSize), 2 /* relative from end */)
-		if err != nil {
-			return hash.DummyHash, errors.New("invalid checkpoint")
-		}
-	}
-
-	var lastTrieRootHash hash.Hash
-	n, err = f.Read(lastTrieRootHash[:])
-	if err != nil || n != hash.HashLen {
-		return hash.DummyHash, errors.New("failed to read last trie root hash from checkpoint")
-	}
-
-	return lastTrieRootHash, nil
 }
 
 // EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files
