@@ -49,8 +49,9 @@ type BlockResponse struct {
 
 func (br *BlockResponse) BlocksInternal() []*flow.Block {
 	internal := make([]*flow.Block, len(br.Blocks))
-	for i, b := range br.Blocks {
-		internal[i] = b.ToInternal()
+	for i, block := range br.Blocks {
+		block := block
+		internal[i] = block.ToInternal()
 	}
 	return internal
 }
@@ -64,8 +65,9 @@ type ClusterBlockResponse struct {
 
 func (br *ClusterBlockResponse) BlocksInternal() []*cluster.Block {
 	internal := make([]*cluster.Block, len(br.Blocks))
-	for i, b := range br.Blocks {
-		internal[i] = b.ToInternal()
+	for i, block := range br.Blocks {
+		block := block
+		internal[i] = block.ToInternal()
 	}
 	return internal
 }
