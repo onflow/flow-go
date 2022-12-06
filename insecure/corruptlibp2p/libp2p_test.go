@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"testing"
 	"time"
@@ -33,11 +34,13 @@ func TestSpam(t *testing.T) {
 		t.Name(),
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				fmt.Println("spammerNode>RPC inspector")
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
 			})),
 	)
 
+	received := make(chan struct{})
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -45,6 +48,8 @@ func TestSpam(t *testing.T) {
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the victim node
+				fmt.Println("victimNode>RPC inspector")
+				close(received) // acknowledge victim received spammer's message
 				return nil
 			})),
 	)
@@ -64,22 +69,22 @@ func TestSpam(t *testing.T) {
 	// connect spammer and victim
 	err = spammerNode.AddPeer(ctx, victimPeerInfo)
 	require.NoError(t, err)
+	connected, err := spammerNode.IsConnected(victimPeerInfo.ID)
+	require.NoError(t, err)
+	require.True(t, connected)
 
 	// create new spammer
 	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
 	require.NotNil(t, router)
 
 	// start spamming the first peer
-	go func() {
-		spammer.SpamIHave(victimPeerId, 1, 1)
-	}()
+	spammer.SpamIHave(victimPeerId, 1, 1)
 
-	inbounds := make([]chan string, 1)
-
+	// check that victim received spammer's message
 	select {
-	case rcv := <-inbounds[0]:
-		require.Equal(t, "foo", rcv)
-	case <-time.After(3 * time.Second):
+	case <-received:
+		return
+	case <-time.After(1 * time.Second):
 		require.Fail(t, "did not receive spam message")
 	}
 }
