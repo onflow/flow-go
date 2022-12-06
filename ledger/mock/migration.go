@@ -12,27 +12,36 @@ type Migration struct {
 	mock.Mock
 }
 
-// Execute provides a mock function with given fields: payloads
-func (_m *Migration) Execute(payloads []ledger.Payload) ([]ledger.Payload, error) {
-	ret := _m.Called(payloads)
+// Execute provides a mock function with given fields: payloads, pathFinderVersion
+func (_m *Migration) Execute(payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
+	ret := _m.Called(payloads, pathFinderVersion)
 
 	var r0 []ledger.Payload
-	if rf, ok := ret.Get(0).(func([]ledger.Payload) []ledger.Payload); ok {
-		r0 = rf(payloads)
+	if rf, ok := ret.Get(0).(func([]ledger.Payload, uint8) []ledger.Payload); ok {
+		r0 = rf(payloads, pathFinderVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ledger.Payload)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func([]ledger.Payload) error); ok {
-		r1 = rf(payloads)
+	var r1 []ledger.Path
+	if rf, ok := ret.Get(1).(func([]ledger.Payload, uint8) []ledger.Path); ok {
+		r1 = rf(payloads, pathFinderVersion)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]ledger.Path)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func([]ledger.Payload, uint8) error); ok {
+		r2 = rf(payloads, pathFinderVersion)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 type mockConstructorTestingTNewMigration interface {
