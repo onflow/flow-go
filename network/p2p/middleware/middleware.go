@@ -85,7 +85,7 @@ type Middleware struct {
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                         *sync.WaitGroup
+	wg                         sync.WaitGroup
 	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
@@ -161,7 +161,6 @@ func NewMiddleware(log zerolog.Logger,
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
 		log:                        log,
-		wg:                         &sync.WaitGroup{},
 		me:                         flowID,
 		libP2PNode:                 libP2PNode,
 		metrics:                    met,
@@ -409,9 +408,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 			if err != nil {
 				err = fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
 			}
-
-			// OneToOne communication metrics are reported with topic OneToOne
-			m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 		} else {
 			resetErr := stream.Reset()
 			if resetErr != nil {
@@ -595,11 +591,14 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(s, m.processAuthenticatedMessage, m.log)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
-	go rs.receiveLoop(m.wg)
+	go func() {
+		defer m.wg.Done()
+		rs.receiveLoop(m.ctx)
+	}()
 
 	// update peers to add some nodes interested in the same topic as direct peers
 	m.libP2PNode.RequestPeerUpdate()
@@ -717,10 +716,10 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 	channel := channels.Channel(msg.ChannelID)
 	eventID, err := p2p.EventId(channel, msg.GetPayload())
 	if err != nil {
+		// this indicates there was an issue hashing, not necessarily an issue with the message itself
 		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
-			Bool(logging.KeySuspicious, true).
 			Msgf("could not generate event ID for message")
 		return
 	}
@@ -797,8 +796,6 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
-
-	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
 
 	return nil
 }

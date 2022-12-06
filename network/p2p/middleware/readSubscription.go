@@ -2,15 +2,14 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -21,28 +20,19 @@ import (
 type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID)
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
-// the context of the subscription is cancelled. Additionally, it reports metrics
+// the context of the subscription is cancelled.
 type readSubscription struct {
-	ctx      context.Context
 	log      zerolog.Logger
 	sub      p2p.Subscription
-	metrics  module.NetworkMetrics
 	callback readSubscriptionCB
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context, sub p2p.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
-
-	log = log.With().
-		Str("channel", sub.Topic()).
-		Logger()
-
+func newReadSubscription(sub p2p.Subscription, callback readSubscriptionCB, log zerolog.Logger) *readSubscription {
 	r := readSubscription{
-		ctx:      ctx,
-		log:      log,
+		log:      log.With().Str("channel", sub.Topic()).Logger(),
 		sub:      sub,
 		callback: callback,
-		metrics:  metrics,
 	}
 
 	return &r
@@ -50,20 +40,16 @@ func newReadSubscription(ctx context.Context, sub p2p.Subscription, callback rea
 
 // receiveLoop must be run in a goroutine. It continuously receives
 // messages for the topic and calls the callback synchronously
-func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
-
-	defer wg.Done()
+func (r *readSubscription) receiveLoop(ctx context.Context) {
 	defer r.log.Debug().Msg("exiting receive routine")
 
 	for {
-
 		// read the next message from libp2p's subscription (blocking call)
-		rawMsg, err := r.sub.Next(r.ctx)
+		rawMsg, err := r.sub.Next(ctx)
 
 		if err != nil {
-
 			// middleware may have cancelled the context
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
 
@@ -90,12 +76,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		msg := validatorData.Message
-
-		// log metrics
-		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
-
 		// call the callback
-		r.callback(msg, validatorData.DecodedMsgPayload, validatorData.From)
+		r.callback(validatorData.Message, validatorData.DecodedMsgPayload, validatorData.From)
 	}
 }
