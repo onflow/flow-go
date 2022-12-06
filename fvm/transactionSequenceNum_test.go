@@ -31,8 +31,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 0)
 		proc := fvm.Transaction(&tx, 0)
 
-		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
+		seqChecker := fvm.TransactionSequenceNumberChecker{}
+		err = seqChecker.CheckAndIncrementSequenceNumber(nil, proc, txnState)
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
@@ -57,8 +57,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 2)
 		proc := fvm.Transaction(&tx, 0)
 
-		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
+		seqChecker := fvm.TransactionSequenceNumberChecker{}
+		err = seqChecker.CheckAndIncrementSequenceNumber(nil, proc, txnState)
 		require.Error(t, err)
 		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
@@ -85,7 +85,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(fvm.Context{}, proc, txnState, nil)
+		err = seqChecker.CheckAndIncrementSequenceNumber(nil, proc, txnState)
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged

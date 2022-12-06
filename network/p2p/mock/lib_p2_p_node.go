@@ -24,8 +24,6 @@ import (
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-
 	routing "github.com/libp2p/go-libp2p/core/routing"
 
 	unicast "github.com/onflow/flow-go/network/p2p/unicast"
@@ -128,6 +126,20 @@ func (_m *LibP2PNode) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(peer.IDSlice)
 		}
+	}
+
+	return r0
+}
+
+// HasSubscription provides a mock function with given fields: topic
+func (_m *LibP2PNode) HasSubscription(topic channels.Topic) bool {
+	ret := _m.Called(topic)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(channels.Topic) bool); ok {
+		r0 = rf(topic)
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -289,7 +301,7 @@ func (_m *LibP2PNode) SetComponentManager(cm *component.ComponentManager) {
 }
 
 // SetPubSub provides a mock function with given fields: ps
-func (_m *LibP2PNode) SetPubSub(ps *pubsub.PubSub) {
+func (_m *LibP2PNode) SetPubSub(ps p2p.PubSubAdapter) {
 	_m.Called(ps)
 }
 
@@ -318,20 +330,20 @@ func (_m *LibP2PNode) Stop() error {
 }
 
 // Subscribe provides a mock function with given fields: topic, topicValidator
-func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	ret := _m.Called(topic, topicValidator)
 
-	var r0 *pubsub.Subscription
-	if rf, ok := ret.Get(0).(func(channels.Topic, pubsub.ValidatorEx) *pubsub.Subscription); ok {
+	var r0 p2p.Subscription
+	if rf, ok := ret.Get(0).(func(channels.Topic, p2p.TopicValidatorFunc) p2p.Subscription); ok {
 		r0 = rf(topic, topicValidator)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*pubsub.Subscription)
+			r0 = ret.Get(0).(p2p.Subscription)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(channels.Topic, pubsub.ValidatorEx) error); ok {
+	if rf, ok := ret.Get(1).(func(channels.Topic, p2p.TopicValidatorFunc) error); ok {
 		r1 = rf(topic, topicValidator)
 	} else {
 		r1 = ret.Error(1)

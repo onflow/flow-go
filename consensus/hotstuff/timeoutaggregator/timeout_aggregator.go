@@ -56,7 +56,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
-	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
+	queuedTimeouts, err := fifoqueue.NewFifoQueue(defaultTimeoutQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceTimeoutObjectQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")

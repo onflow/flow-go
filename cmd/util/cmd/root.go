@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
@@ -62,6 +63,7 @@ func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
+	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
 	rootCmd.AddCommand(truncate_database.Cmd)
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)

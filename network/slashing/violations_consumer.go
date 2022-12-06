@@ -2,7 +2,8 @@ package slashing
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
+	network "github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 )
 
 type ViolationsConsumer interface {
@@ -27,10 +28,10 @@ type ViolationsConsumer interface {
 }
 
 type Violation struct {
-	Identity  *flow.Identity
-	PeerID    string
-	MsgType   string
-	Channel   channels.Channel
-	IsUnicast bool
-	Err       error
+	Identity *flow.Identity
+	PeerID   string
+	MsgType  string
+	Channel  network.Channel
+	Protocol message.Protocol
+	Err      error
 }

@@ -13,3 +13,8 @@ type Slashable[T any] struct {
 	OriginID Identifier // this will become the inspector object, once we have message forensics
 	Message  *T
 }
+
+// NoSlashable returns the zero value for Slashable[T].
+func NoSlashable[T any]() Slashable[T] {
+	return Slashable[T]{}
+}

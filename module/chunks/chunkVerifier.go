@@ -139,14 +139,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	context = fvm.NewContextFromParent(
 		context,
-		fvm.WithBlockPrograms(
-			programs.NewEmptyBlockProgramsWithTransactionOffset(
+		fvm.WithDerivedBlockData(
+			programs.NewEmptyDerivedBlockDataWithTransactionOffset(
 				transactionOffset)))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
-	unknownRegTouch := make(map[string]*ledger.Key)
+	unknownRegTouch := make(map[flow.RegisterID]*ledger.Key)
 	var problematicTx flow.Identifier
 	getRegister := func(owner, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
@@ -164,7 +164,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		if err != nil {
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
 
-				unknownRegTouch[registerID.String()] = &registerKey
+				unknownRegTouch[registerID] = &registerKey
 
 				// don't send error just return empty byte slice
 				// we always assume empty value for missing registers (which might cause the transaction to fail)

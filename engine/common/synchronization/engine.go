@@ -113,8 +113,7 @@ func New(
 
 // setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
 func (e *Engine) setupResponseMessageHandler() error {
-	syncResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(defaultSyncResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for sync responses: %w", err)
 	}
@@ -123,8 +122,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(defaultBlockResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for block responses: %w", err)
 	}
@@ -303,16 +301,15 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
-			e.log.Debug().Uint64("height", block.Header.Height).Msg("block does not need processing")
+		if !e.core.HandleBlock(&block.Header) {
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
 		// forward the block to the compliance engine for validation and processing
 		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 			OriginID: originID,
 			Message: &messages.BlockProposal{
-				Header:  block.Header,
-				Payload: block.Payload,
+				Block: block,
 			},
 		})
 	}

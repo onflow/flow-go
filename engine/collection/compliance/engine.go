@@ -54,7 +54,7 @@ func NewEngine(
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) {
 			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockProposalQueue, uint(len))
 		}),

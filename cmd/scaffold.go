@@ -142,20 +142,19 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
-	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.Enabled, "profiler-enabled", defaultConfig.profilerConfig.Enabled, "whether to enable the auto-profiler")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.UploaderEnabled, "profile-uploader-enabled", defaultConfig.profilerConfig.UploaderEnabled,
 		"whether to enable automatic profile upload to Google Cloud Profiler. "+
 			"For autoupload to work forllowing should be true: "+
 			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
 			"2) node is running in GCE. "+
 			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerConfig.Dir, "profiler-dir", defaultConfig.profilerConfig.Dir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Interval, "profiler-interval", defaultConfig.profilerConfig.Interval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Duration, "profiler-duration", defaultConfig.profilerConfig.Duration,
 		"the duration to run the auto-profile for")
-	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
-		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
+
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
@@ -464,7 +463,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
 		return server, nil
 	})
 }
@@ -679,7 +678,7 @@ func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts 
 
 func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 	switch {
-	case fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE():
+	case fnb.BaseConfig.profilerConfig.UploaderEnabled && gcemd.OnGCE():
 		return fnb.createGCEProfileUploader(gcemd.NewClient(nil))
 	default:
 		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
@@ -688,32 +687,50 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
-	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
-	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-
 	uploader, err := fnb.createProfileUploader()
 	if err != nil {
 		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
 		uploader = &profiler.NoopUploader{}
 	}
 
-	profiler, err := profiler.New(
-		fnb.Logger,
-		uploader,
-		fnb.BaseConfig.profilerDir,
-		fnb.BaseConfig.profilerInterval,
-		fnb.BaseConfig.profilerDuration,
-		fnb.BaseConfig.profilerEnabled,
-	)
+	profiler, err := profiler.New(fnb.Logger, uploader, fnb.BaseConfig.profilerConfig)
 	fnb.MustNot(err).Msg("could not initialize profiler")
 
 	// register the enabled state of the profiler for dynamic configuring
 	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
-	fnb.MustNot(err).Msg("could not register profiler config")
+	fnb.MustNot(err).Msg("could not register profiler-enabled config")
+	err = fnb.ConfigManager.RegisterDurationConfig(
+		"profiler-trigger",
+		func() time.Duration { return fnb.BaseConfig.profilerConfig.Duration },
+		func(d time.Duration) error { return profiler.TriggerRun(d) })
+	fnb.MustNot(err).Msg("could not register profiler-trigger config")
 
-	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-mem-profile-rate",
+			func() uint { return uint(runtime.MemProfileRate) },
+			func(r uint) error { runtime.MemProfileRate = int(r); return nil }),
+	).Msg("could not register profiler setting")
+	// There is no way to get the current block profile rate so we keep track of it ourselves.
+	currentRate := new(uint)
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-block-profile-rate",
+			func() uint { return *currentRate },
+			func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil }),
+	).Msg("could not register profiler setting")
+	fnb.MustNot(
+		fnb.ConfigManager.RegisterUintConfig(
+			"profiler-set-mutex-profile-fraction",
+			func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
+			func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil }),
+	).Msg("could not register profiler setting")
+
+	// registering as a DependableComponent with no dependencies so that it's started immediately on startup
+	// without being blocked by other component's Ready()
+	fnb.DependableComponent("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
-	})
+	}, NewDependencyList())
 }
 
 func (fnb *FlowNodeBuilder) initDB() {
@@ -864,9 +881,17 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		node.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
+		node.IdentityProvider = blocklistWrapper
+
+		// register the blocklist for dynamic configuration via admin command
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
+			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+		if err != nil {
+			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
@@ -1090,7 +1115,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Run all components
 	for _, f := range fnb.components {
 		// Components with explicit dependencies are not started serially
-		if f.dependencies != nil && len(f.dependencies.components) > 0 {
+		if f.dependencies != nil {
 			asyncComponents = append(asyncComponents, f)
 			continue
 		}
@@ -1313,6 +1338,8 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 // MUST be idempotent.
 func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder {
+	// Note: dependencies are passed as a struct to allow updating the list after calling this method.
+	// Passing a slice instead would result in out of sync metadata since slices are passed by reference
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:           f,
 		name:         name,
@@ -1463,7 +1490,8 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		NodeConfig: &NodeConfig{
 			BaseConfig:              *config,
 			Logger:                  zerolog.New(os.Stderr),
-			PeerManagerDependencies: &DependencyList{},
+			PeerManagerDependencies: NewDependencyList(),
+			ConfigManager:           updatable_configs.NewManager(),
 		},
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
@@ -1506,6 +1534,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetGologLevelCommand{}
 	}).AdminCommand("get-config", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetConfigCommand(config.ConfigManager)
 	}).AdminCommand("set-config", func(config *NodeConfig) commands.AdminCommand {
@@ -1550,7 +1580,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initLogger()
-	fnb.ConfigManager = updatable_configs.NewManager()
 
 	fnb.initDB()
 	fnb.initSecretsDB()

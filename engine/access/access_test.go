@@ -393,6 +393,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
+		suite.snapshot.On("Head").Return(block1.Header, nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
@@ -621,8 +622,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, receipts,
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)

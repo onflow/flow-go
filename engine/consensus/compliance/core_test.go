@@ -54,8 +54,8 @@ type CommonSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]*flow.PendingBlock
-	childrenDB map[flow.Identifier][]*flow.PendingBlock
+	pendingDB  map[flow.Identifier]flow.Slashable[flow.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[flow.Block]
 
 	// mocked dependencies
 	me                *module.Local
@@ -96,8 +96,8 @@ func (cs *CommonSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]*flow.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*flow.PendingBlock)
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[flow.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[flow.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.Header
@@ -210,7 +210,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.PendingBlock {
+		func(blockID flow.Identifier) flow.Slashable[flow.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -219,7 +219,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.PendingBlock {
+		func(blockID flow.Identifier) []flow.Slashable[flow.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -491,15 +491,14 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(parent)
 	block1 := unittest.BlockWithParentFixture(parent.Header)
 	block2 := unittest.BlockWithParentFixture(parent.Header)
 	block3 := unittest.BlockWithParentFixture(parent.Header)
 
 	// create the pending blocks
-	pending1 := unittest.PendingFromBlock(block1)
-	pending2 := unittest.PendingFromBlock(block2)
-	pending3 := unittest.PendingFromBlock(block3)
+	pending1 := unittest.AsSlashable(block1)
+	pending2 := unittest.AsSlashable(block2)
+	pending3 := unittest.AsSlashable(block3)
 
 	// store the parent on disk
 	parentID := parent.ID()
@@ -518,7 +517,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal, cs.head)
+	err := cs.core.processBlockAndDescendants(parent, cs.head)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process
@@ -529,14 +528,14 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := cs.participants[1].NodeID
-	block := unittest.BlockWithParentFixture(cs.head)
-	missing := unittest.ProposalFromBlock(block)
+	missingBlock := unittest.BlockWithParentFixture(cs.head)
+	missingProposal := unittest.ProposalFromBlock(missingBlock)
 
 	// create a chain of descendants
 	var proposals []*messages.BlockProposal
-	parent := missing
+	parent := missingProposal
 	for i := 0; i < 3; i++ {
-		descendant := unittest.BlockWithParentFixture(parent.Header)
+		descendant := unittest.BlockWithParentFixture(&parent.Block.Header)
 		proposal := unittest.ProposalFromBlock(descendant)
 		proposals = append(proposals, proposal)
 		parent = proposal
@@ -546,7 +545,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.core.pending = real.NewPendingBlocks()
 
 	// check that we request the ancestor block each time
-	cs.sync.On("RequestBlock", parent.Header.ID(), parent.Header.Height).Times(len(proposals))
+	cs.sync.On("RequestBlock", missingBlock.Header.ID(), missingBlock.Header.Height).Times(len(proposals))
 
 	// process all the descendants
 	for _, proposal := range proposals {
@@ -555,20 +554,20 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.ProposalFromFlow(proposal.Header))
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.ProposalFromFlow(&proposal.Block.Header))
 	}
 
 	// check that we submit each proposal in a valid order
-	//  - we must process the missing parent first
+	//  - we must process the missingProposal parent first
 	//  - we can process the children next, in any order
 	cs.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(4)
 
 	calls := 0                                   // track # of calls to SubmitProposal
 	unprocessed := map[flow.Identifier]struct{}{ // track un-processed proposals
-		missing.Header.ID():      {},
-		proposals[0].Header.ID(): {},
-		proposals[1].Header.ID(): {},
-		proposals[2].Header.ID(): {},
+		missingProposal.Block.Header.ID(): {},
+		proposals[0].Block.Header.ID():    {},
+		proposals[1].Block.Header.ID():    {},
+		proposals[2].Block.Header.ID():    {},
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
@@ -576,7 +575,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			header := proposal.Block
 			if calls == 0 {
 				// first header processed must be the common parent
-				assert.Equal(cs.T(), missing.Header.ID(), header.BlockID)
+				assert.Equal(cs.T(), missingProposal.Block.Header.ID(), header.BlockID)
 			}
 			// mark the proposal as processed
 			delete(unprocessed, header.BlockID)
@@ -587,7 +586,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(originID, missing)
+	err := cs.core.OnBlockProposal(originID, missingProposal)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// all proposals should be processed

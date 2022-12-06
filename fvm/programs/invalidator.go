@@ -4,39 +4,26 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/fvm/meter"
 )
 
-type ProgramEntry struct {
-	Location common.AddressLocation
-	Program  *interpreter.Program
-	State    *state.State
-}
-type ContractUpdateKey struct {
-	Address flow.Address
-	Name    string
+type MeterParamOverrides struct {
+	ComputationWeights meter.ExecutionEffortWeights // nil indicates no override
+	MemoryWeights      meter.ExecutionMemoryWeights // nil indicates no override
+	MemoryLimit        *uint64                      // nil indicates no override
 }
 
-type ContractUpdate struct {
-	ContractUpdateKey
-	Code []byte
-}
+type ProgramInvalidator TableInvalidator[
+	common.AddressLocation,
+	*interpreter.Program,
+]
 
-var _ DerivedDataInvalidator[ProgramEntry] = ModifiedSetsInvalidator{}
+type MeterParamOverridesInvalidator TableInvalidator[
+	struct{},
+	MeterParamOverrides,
+]
 
-type ModifiedSetsInvalidator struct {
-	ContractUpdateKeys []ContractUpdateKey
-	FrozenAccounts     []common.Address
-}
-
-func (sets ModifiedSetsInvalidator) ShouldInvalidateEntries() bool {
-	return len(sets.ContractUpdateKeys) > 0 || len(sets.FrozenAccounts) > 0
-}
-
-func (sets ModifiedSetsInvalidator) ShouldInvalidateEntry(
-	entry ProgramEntry,
-) bool {
-	// TODO(rbtz): switch to fine grain invalidation.
-	return sets.ShouldInvalidateEntries()
+type TransactionInvalidator interface {
+	ProgramInvalidator() ProgramInvalidator
+	MeterParamOverridesInvalidator() MeterParamOverridesInvalidator
 }

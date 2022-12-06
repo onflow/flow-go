@@ -1,0 +1,8 @@
+args:
+  - "--bootstrapdir=/bootstrap"
+  - "--access"
+env:
+  - name: access name
+    value: access 12345
+  - name: access numbers
+    value: 123

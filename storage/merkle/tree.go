@@ -3,6 +3,7 @@
 package merkle
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/blake2b"
@@ -45,6 +46,9 @@ func init() {
 type Tree struct {
 	keyLength int
 	root      node
+	// setting this flag would prevent more writes to the trie
+	// but makes it more efficient for proof generation
+	readOnlyEnabled bool
 }
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
@@ -61,6 +65,21 @@ func NewTree(keyLength int) (*Tree, error) {
 	}, nil
 }
 
+// MakeItReadOnly makes the tree read only, this operation is not reversible.
+// when tree becomes readonly, while doing operations it starts caching hashValues
+// for faster operations.
+func (t *Tree) MakeItReadOnly() {
+	t.readOnlyEnabled = true
+}
+
+// ComputeMaxDepth returns the maximum depth of the tree by traversing all paths
+//
+// Warning: this could be a very expensive operation for large trees, as nodes
+// don't cache the depth of children and have to compute by traversing.
+func (t *Tree) ComputeMaxDepth() uint {
+	return t.root.MaxDepthOfDescendants()
+}
+
 // Put stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true. All inputs
 // are internally stored and copied where necessary, thereby allowing
@@ -73,6 +92,9 @@ func NewTree(keyLength int) (*Tree, error) {
 //   - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
 //     No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is in readonly mode, no more put operation is accepted")
+	}
 	if len(key) != t.keyLength {
 		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
 	}
@@ -323,7 +345,7 @@ ProveLoop:
 			}
 
 			index++
-			siblingHashes = append(siblingHashes, sibling.Hash())
+			siblingHashes = append(siblingHashes, sibling.Hash(t.readOnlyEnabled))
 			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
@@ -378,11 +400,14 @@ ProveLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key []byte) bool {
-	if t.keyLength != len(key) {
-		return false
+func (t *Tree) Del(key []byte) (bool, error) {
+	if t.readOnlyEnabled {
+		return false, errors.New("tree is in readonly mode, no more delete operation is accepted")
 	}
-	return t.unsafeDel(key)
+	if t.keyLength != len(key) {
+		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
+	}
+	return t.unsafeDel(key), nil
 }
 
 // unsafeDel removes the value associated with the given key from the patricia
@@ -512,7 +537,7 @@ func (t *Tree) Hash() []byte {
 	if t.root == nil {
 		return EmptyTreeRootHash
 	}
-	return t.root.Hash()
+	return t.root.Hash(t.readOnlyEnabled)
 }
 
 // merge will merge a child short node into a parent short node.

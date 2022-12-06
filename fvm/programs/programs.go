@@ -14,15 +14,15 @@ import (
 type Programs struct {
 	lock sync.RWMutex
 
-	block      *BlockPrograms
-	currentTxn *TransactionPrograms
+	block      *DerivedBlockData
+	currentTxn *DerivedTransactionData
 
 	logicalTime LogicalTime
 }
 
 func NewEmptyPrograms() *Programs {
-	block := NewEmptyBlockPrograms()
-	txn, err := block.NewTransactionPrograms(0, 0)
+	block := NewEmptyDerivedBlockData()
+	txn, err := block.NewDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -38,8 +38,8 @@ func (p *Programs) ChildPrograms() *Programs {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	childBlock := p.block.NewChildBlockPrograms()
-	txn, err := childBlock.NewTransactionPrograms(0, 0)
+	childBlock := p.block.NewChildDerivedBlockData()
+	txn, err := childBlock.NewDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -52,34 +52,32 @@ func (p *Programs) ChildPrograms() *Programs {
 }
 
 func (p *Programs) NextTxIndexForTestingOnly() uint32 {
-	return p.block.NextTxIndexForTestingOnly()
+	return p.block.programs.NextTxIndexForTestingOnly()
 }
 
-func (p *Programs) GetForTestingOnly(location common.Location) (*interpreter.Program, *state.State, bool) {
-	return p.Get(location)
+func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+	return p.GetProgram(location)
 }
 
-// Get returns stored program, state which contains changes which correspond to loading this program,
-// and boolean indicating if the value was found
-func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) GetProgram(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.currentTxn.Get(location)
+	return p.currentTxn.GetProgram(location)
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program, state *state.State) {
+func (p *Programs) SetProgram(location common.AddressLocation, program *interpreter.Program, state *state.State) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	p.currentTxn.Set(location, program, state)
+	p.currentTxn.SetProgram(location, program, state)
 }
 
-func (p *Programs) Cleanup(modifiedSets ModifiedSetsInvalidator) {
+func (p *Programs) Cleanup(invalidator TransactionInvalidator) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.currentTxn.AddInvalidator(modifiedSets)
+	p.currentTxn.AddInvalidator(invalidator)
 
 	var err error
 	err = p.currentTxn.Commit()
@@ -88,7 +86,7 @@ func (p *Programs) Cleanup(modifiedSets ModifiedSetsInvalidator) {
 	}
 
 	p.logicalTime++
-	txn, err := p.block.NewTransactionPrograms(p.logicalTime, p.logicalTime)
+	txn, err := p.block.NewDerivedTransactionData(p.logicalTime, p.logicalTime)
 	if err != nil {
 		panic(err)
 	}

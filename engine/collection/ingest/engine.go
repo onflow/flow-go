@@ -74,7 +74,7 @@ func New(
 
 	// FIFO queue for transactions
 	queue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(int(config.MaxMessageQueueSize)),
+		int(config.MaxMessageQueueSize),
 		fifoqueue.WithLengthObserver(func(len int) {
 			mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
 		}),

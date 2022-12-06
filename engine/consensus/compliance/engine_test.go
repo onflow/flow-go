@@ -68,9 +68,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := &messages.BlockProposal{
-				Header: unittest.BlockWithParentFixture(cs.head).Header,
-			}
+			block := unittest.BlockWithParentFixture(cs.head)
+			proposal := messages.NewBlockProposal(block)
 			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
@@ -79,7 +78,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			// execute the block submission
 			cs.engine.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  block,
+				Message:  proposal,
 			})
 		}
 		wg.Done()

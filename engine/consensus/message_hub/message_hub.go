@@ -109,21 +109,15 @@ func NewMessageHub(log zerolog.Logger,
 	state protocol.State,
 	payloads storage.Payloads,
 ) (*MessageHub, error) {
-	ownOutboundVotes, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-	)
+	ownOutboundVotes, err := fifoqueue.NewFifoQueue(defaultVoteQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
-	ownOutboundProposals, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultProposalQueueCapacity),
-	)
+	ownOutboundProposals, err := fifoqueue.NewFifoQueue(defaultProposalQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
-	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
-	)
+	ownOutboundTimeouts, err := fifoqueue.NewFifoQueue(defaultTimeoutQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
@@ -346,10 +340,10 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	proposal := &messages.BlockProposal{
+	proposal := messages.NewBlockProposal(&flow.Block{
 		Header:  header,
 		Payload: payload,
-	}
+	})
 
 	// broadcast the proposal to consensus nodes
 	err = h.con.Publish(proposal, consRecipients.NodeIDs()...)
@@ -371,11 +365,12 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 // provideProposal is used when we want to broadcast a local block to the rest  of the
 // network (non-consensus nodes).
 func (h *MessageHub) provideProposal(proposal *messages.BlockProposal, recipients flow.IdentityList) {
-	blockID := proposal.Header.ID()
+	header := proposal.Block.Header
+	blockID := header.ID()
 	log := h.log.With().
-		Uint64("block_view", proposal.Header.View).
+		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
-		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("parent_id", header.ParentID[:]).
 		Logger()
 	log.Info().Msg("block proposal submitted for propagation")
 
