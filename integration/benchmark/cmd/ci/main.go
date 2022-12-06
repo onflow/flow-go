@@ -57,12 +57,17 @@ func main() {
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
-	gitRepoPathFlag := flag.String("git-repo-path", "..", "git repo path of the filesystem")
+	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
 	flag.Parse()
+
+	if *gitRepoPathFlag == "" {
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 
 	chainID := flowsdk.Emulator
 
