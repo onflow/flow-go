@@ -8,10 +8,10 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -235,7 +235,7 @@ func Bootstrap(
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	_ *programs.DerivedTransactionData,
+	_ *derived.DerivedTransactionData,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
@@ -243,7 +243,7 @@ func (b *BootstrapProcedure) NewExecutor(
 func (b *BootstrapProcedure) Run(
 	ctx Context,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) error {
 	return run(b.NewExecutor(ctx, txnState, derivedTxnData))
 }
@@ -264,11 +264,11 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) InitialSnapshotTime() programs.LogicalTime {
+func (proc *BootstrapProcedure) InitialSnapshotTime() derived.LogicalTime {
 	return 0
 }
 
-func (proc *BootstrapProcedure) ExecutionTime() programs.LogicalTime {
+func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
 	return 0
 }
 
@@ -903,8 +903,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 
 	// use new derived transaction data for each meta transaction.
 	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
-	prog, err := programs.
-		NewEmptyDerivedBlockData().
+	prog, err := derived.NewEmptyDerivedBlockData().
 		NewDerivedTransactionData(0, 0)
 
 	if err != nil {

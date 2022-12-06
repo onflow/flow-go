@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -57,7 +57,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
 	FlushPendingUpdates() (
-		programs.TransactionInvalidator,
+		derived.TransactionInvalidator,
 		error,
 	)
 

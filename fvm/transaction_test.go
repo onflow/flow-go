@@ -12,9 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -58,7 +58,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -85,7 +85,7 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
-		derivedBlockData = programs.NewEmptyDerivedBlockData()
+		derivedBlockData = derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
@@ -102,7 +102,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -242,7 +242,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm := fvm.NewVirtualMachine()
 
@@ -388,7 +388,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine()
 		// create default context
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		context := fvm.NewContext(
 			fvm.WithDerivedBlockData(derivedBlockData))
 
@@ -492,7 +492,7 @@ func TestAccountFreezing(t *testing.T) {
 			}
 		`)
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),

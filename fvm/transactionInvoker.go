@@ -10,9 +10,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	programsCache "github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
@@ -30,7 +30,7 @@ func (i TransactionInvoker) NewExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
 	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
 }
@@ -39,7 +39,7 @@ func (i TransactionInvoker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) error {
 	// TODO(patrick): switch to run(i.NewExecutor(...))
 	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
@@ -81,7 +81,7 @@ type transactionExecutor struct {
 	ctx            Context
 	proc           *TransactionProcedure
 	txnState       *state.TransactionState
-	derivedTxnData *programsCache.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -98,7 +98,7 @@ func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
 	span := proc.StartSpanFromProcTraceSpan(
 		ctx.Tracer,
@@ -204,7 +204,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 		return beginErr
 	}
 
-	var invalidator programsCache.TransactionInvalidator
+	var invalidator derived.TransactionInvalidator
 	var txError error
 	invalidator, txError = executor.normalExecution()
 	if executor.errs.Collect(txError).CollectedFailure() {
@@ -272,7 +272,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 }
 
 func (executor *transactionExecutor) normalExecution() (
-	invalidator programsCache.TransactionInvalidator,
+	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
@@ -373,7 +373,7 @@ func (executor *transactionExecutor) errorExecution() {
 }
 
 func (executor *transactionExecutor) commit(
-	invalidator programsCache.TransactionInvalidator,
+	invalidator derived.TransactionInvalidator,
 ) error {
 	if executor.txnState.NumNestedTransactions() > 1 {
 		// This is a fvm internal programming error.  We forgot to call Commit

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -47,7 +47,7 @@ func TestSafetyCheck(t *testing.T) {
 					meter.DefaultParameters().WithStorageInteractionLimit(
 						context.MaxStateInteractionSize)))
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
@@ -85,7 +85,7 @@ func TestSafetyCheck(t *testing.T) {
 					meter.DefaultParameters().WithStorageInteractionLimit(
 						context.MaxStateInteractionSize)))
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 

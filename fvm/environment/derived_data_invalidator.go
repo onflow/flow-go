@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,13 +24,13 @@ type DerivedDataInvalidator struct {
 	FrozenAccounts     []common.Address
 }
 
-var _ programs.TransactionInvalidator = DerivedDataInvalidator{}
+var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
 
-func (invalidator DerivedDataInvalidator) ProgramInvalidator() programs.ProgramInvalidator {
+func (invalidator DerivedDataInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 	return ProgramInvalidator{invalidator}
 }
 
-func (invalidator DerivedDataInvalidator) MeterParamOverridesInvalidator() programs.MeterParamOverridesInvalidator {
+func (invalidator DerivedDataInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
 	return MeterParamOverridesInvalidator{invalidator}
 }
 
@@ -66,7 +66,7 @@ func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntries() bool
 
 func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntry(
 	_ struct{},
-	_ programs.MeterParamOverrides,
+	_ derived.MeterParamOverrides,
 	_ *state.State,
 ) bool {
 	return invalidator.ShouldInvalidateEntries()
