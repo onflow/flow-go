@@ -43,23 +43,17 @@ import (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
-type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (
-	p2p.PubSubAdapter,
-	error,
-)
-type CreateNodeFunc func(
-	logger zerolog.Logger,
+type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
+type CreateNodeFunc func(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
 	uniMgr *unicast.Manager,
-	peerManager *connection.PeerManager,
-) p2p.LibP2PNode
+	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(
-	log zerolog.Logger,
+func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
@@ -68,14 +62,11 @@ func DefaultLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
+	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
-	updateInterval time.Duration,
-) LibP2PFactoryFunc {
+	updateInterval time.Duration) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		builder := DefaultNodeBuilder(
-			log,
+		builder := DefaultNodeBuilder(log,
 			address,
 			flowKey,
 			sporkId,
@@ -87,8 +78,7 @@ func DefaultLibP2PNodeFactory(
 			onInterceptSecuredFilters,
 			peerScoringEnabled,
 			connectionPruning,
-			updateInterval,
-		)
+			updateInterval)
 		return builder.Build()
 	}
 }
@@ -129,13 +119,11 @@ type LibP2PNodeBuilder struct {
 	createNode                  CreateNodeFunc
 }
 
-func NewNodeBuilder(
-	logger zerolog.Logger,
+func NewNodeBuilder(logger zerolog.Logger,
 	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
-	sporkID flow.Identifier,
-) *LibP2PNodeBuilder {
+	sporkID flow.Identifier) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:              logger,
 		sporkID:             sporkID,
@@ -149,12 +137,7 @@ func NewNodeBuilder(
 }
 
 func defaultGossipSubFactory() GossipSubFactoryFunc {
-	return func(
-		ctx context.Context,
-		logger zerolog.Logger,
-		h host.Host,
-		cfg p2p.PubSubAdapterConfig,
-	) (p2p.PubSubAdapter, error) {
+	return func(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg)
 	}
 }
@@ -197,21 +180,13 @@ func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGat
 }
 
 // SetRoutingSystem sets the routing factory function.
-func (builder *LibP2PNodeBuilder) SetRoutingSystem(
-	f func(context.Context, host.Host) (
-		routing.Routing,
-		error,
-	),
-) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder {
 	builder.routingFactory = f
 	return builder
 }
 
 // EnableGossipSubPeerScoring sets builder.gossipSubPeerScoring to true.
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(
-	provider module.IdentityProvider,
-	ops ...scoring.PeerScoreParamsOption,
-) NodeBuilder {
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder {
 	builder.gossipSubPeerScoring = true
 	builder.idProvider = provider
 	builder.peerScoringParameterOptions = ops
@@ -219,10 +194,7 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(
 }
 
 // SetPeerManagerOptions sets the peer manager options.
-func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(
-	connectionPruning bool,
-	updateInterval time.Duration,
-) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
 	builder.peerManagerEnablePruning = connectionPruning
 	builder.peerManagerUpdateInterval = updateInterval
 	return builder
@@ -233,10 +205,7 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(
-	gf GossipSubFactoryFunc,
-	cf GossipSubAdapterConfigFunc,
-) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, cf GossipSubAdapterConfigFunc) NodeBuilder {
 	builder.gossipSubFactory = gf
 	builder.gossipSubConfigFunc = cf
 	return builder
@@ -268,10 +237,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		// setting up default resource manager, by hooking in the resource manager metrics reporter.
 		limits := rcmgr.DefaultLimits
 		libp2p.SetDefaultServiceLimits(&limits)
-		mgr, err := rcmgr.NewResourceManager(
-			rcmgr.NewFixedLimiter(limits.AutoScale()),
-			rcmgr.WithMetrics(builder.metrics),
-		)
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.AutoScale()), rcmgr.WithMetrics(builder.metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
@@ -298,11 +264,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 
-	unicastManager := unicast.NewUnicastManager(
-		builder.logger,
-		unicast.NewLibP2PStreamFactory(h),
-		builder.sporkID,
-	)
+	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID)
 
 	var peerManager *connection.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
@@ -317,68 +279,58 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	node := builder.createNode(builder.logger, h, pCache, unicastManager, peerManager)
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				rsys, err := builder.routingFactory(ctx, h)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			rsys, err := builder.routingFactory(ctx, h)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
+			}
+
+			node.SetRouting(rsys)
+
+			gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
+				MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
+			})
+			gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
+			gossipSubConfigs.WithRoutingDiscovery(rsys)
+			if builder.subscriptionFilter != nil {
+				gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
+			}
+
+			var scoreOpt *scoring.ScoreOption
+			if builder.gossipSubPeerScoring {
+				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
+				gossipSubConfigs.WithScoreOption(scoreOpt)
+			}
+
+			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
+			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+				gossipSubMetrics.ObserveRPC(from, rpc)
+				return nil
+			})
+
+			// builds GossipSub with the given factory
+			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+			}
+
+			if scoreOpt != nil {
+				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
+			}
+			node.SetPubSub(gossipSub)
+
+			ready()
+			<-ctx.Done()
+
+			err = node.Stop()
+			if err != nil {
+				// ignore context cancellation errors
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
 				}
-
-				node.SetRouting(rsys)
-
-				gossipSubConfigs := builder.gossipSubConfigFunc(
-					&p2p.BasePubSubAdapterConfig{
-						MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
-					},
-				)
-				gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
-				gossipSubConfigs.WithRoutingDiscovery(rsys)
-				if builder.subscriptionFilter != nil {
-					gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
-				}
-
-				var scoreOpt *scoring.ScoreOption
-				if builder.gossipSubPeerScoring {
-					scoreOpt = scoring.NewScoreOption(
-						builder.logger,
-						builder.idProvider,
-						builder.peerScoringParameterOptions...,
-					)
-					gossipSubConfigs.WithScoreOption(scoreOpt)
-				}
-
-				// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
-				gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
-				gossipSubConfigs.WithAppSpecificRpcInspector(
-					func(from peer.ID, rpc *pubsub.RPC) error {
-						gossipSubMetrics.ObserveRPC(from, rpc)
-						return nil
-					},
-				)
-
-				// builds GossipSub with the given factory
-				gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-				}
-
-				if scoreOpt != nil {
-					scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
-				}
-				node.SetPubSub(gossipSub)
-
-				ready()
-				<-ctx.Done()
-
-				err = node.Stop()
-				if err != nil {
-					// ignore context cancellation errors
-					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-						ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
-					}
-				}
-			},
-		).
+			}
+		}).
 		Build()
 
 	node.SetComponentManager(cm)
@@ -388,11 +340,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(
-	address string,
-	key fcrypto.PrivateKey,
-	options ...config.Option,
-) (host.Host, error) {
+func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 	defaultOptions, err := defaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
@@ -410,10 +358,7 @@ func DefaultLibP2PHost(
 }
 
 // defaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
-func defaultLibP2POptions(address string, key fcrypto.PrivateKey) (
-	[]config.Option,
-	error,
-) {
+func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
 	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	if err != nil {
@@ -435,11 +380,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) (
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	t := libp2p.Transport(
-		func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-			return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
-		},
-	)
+	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+	})
 
 	// gather all the options for the libp2p node
 	options := []config.Option{
@@ -452,19 +395,16 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) (
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
-func DefaultCreateNodeFunc(
-	logger zerolog.Logger,
+func DefaultCreateNodeFunc(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
 	uniMgr *unicast.Manager,
-	peerManager *connection.PeerManager,
-) p2p.LibP2PNode {
+	peerManager *connection.PeerManager) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, uniMgr, peerManager)
 }
 
 // DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(
-	log zerolog.Logger,
+func DefaultNodeBuilder(log zerolog.Logger,
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
@@ -472,40 +412,27 @@ func DefaultNodeBuilder(
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
+	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	peerScoringEnabled bool,
 	connectionPruning bool,
-	updateInterval time.Duration,
-) NodeBuilder {
+	updateInterval time.Duration) NodeBuilder {
 	connManager := connection.NewConnManager(log, metrics)
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
 	peerFilter := notEjectedPeerFilter(idProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
-	connGater := connection.NewConnGater(
-		log,
+	connGater := connection.NewConnGater(log,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
-	)
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)))
 
 	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRoutingSystem(
-			func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return dht.NewDHT(
-					ctx,
-					host,
-					unicast.FlowDHTProtocolID(sporkId),
-					log,
-					metrics,
-					dht.AsServer(),
-				)
-			},
-		).
+		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, unicast.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
+		}).
 		SetPeerManagerOptions(connectionPruning, updateInterval).
 		SetCreateNode(DefaultCreateNodeFunc)
 

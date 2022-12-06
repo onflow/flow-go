@@ -142,8 +142,7 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(
-	log zerolog.Logger,
+func NewMiddleware(log zerolog.Logger,
 	libP2PNode p2p.LibP2PNode,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
@@ -153,8 +152,7 @@ func NewMiddleware(
 	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption,
-) *Middleware {
+	opts ...MiddlewareOption) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -182,31 +180,29 @@ func NewMiddleware(
 	}
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// TODO: refactor to avoid storing ctx altogether
-				mw.ctx = ctx
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// TODO: refactor to avoid storing ctx altogether
+			mw.ctx = ctx
 
-				if err := mw.start(ctx); err != nil {
-					ctx.Throw(err)
-				}
+			if err := mw.start(ctx); err != nil {
+				ctx.Throw(err)
+			}
 
-				ready()
+			ready()
 
-				<-ctx.Done()
-				mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
+			<-ctx.Done()
+			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
-				// wait for the readConnection and readSubscription routines to stop
-				mw.wg.Wait()
+			// wait for the readConnection and readSubscription routines to stop
+			mw.wg.Wait()
 
-				mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
 
-				// clean up rate limiter resources
-				mw.unicastRateLimiters.Stop()
-				mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+			// clean up rate limiter resources
+			mw.unicastRateLimiters.Stop()
+			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
 
-			},
-		).Build()
+		}).Build()
 
 	mw.Component = cm
 
@@ -230,20 +226,8 @@ func (m *Middleware) isProtocolParticipant() p2p.PeerFilter {
 	}
 }
 
-func (m *Middleware) NewBlobService(
-	channel channels.Channel,
-	ds datastore.Batching,
-	opts ...network.BlobServiceOption,
-) network.BlobService {
-	return blob.NewBlobService(
-		m.libP2PNode.Host(),
-		m.libP2PNode.Routing(),
-		channel.String(),
-		ds,
-		m.bitswapMetrics,
-		m.log,
-		opts...,
-	)
+func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
+	return blob.NewBlobService(m.libP2PNode.Host(), m.libP2PNode.Routing(), channel.String(), ds, m.bitswapMetrics, m.log, opts...)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {
@@ -320,11 +304,7 @@ func (m *Middleware) start(ctx context.Context) error {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
-	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
-		m.log,
-		m.slashingViolationsConsumer,
-		m.ov.Identity,
-	)
+	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
 
 	err := m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
 	if err != nil {
@@ -601,10 +581,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(
-			validators,
-			m.authorizedSenderValidator.PubSubMessageValidator(channel),
-		)
+		validators = append(validators, m.authorizedSenderValidator.PubSubMessageValidator(channel))
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
@@ -810,11 +787,7 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 	if msgSize > p2pnode.DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf(
-			"message size %d exceeds configured max message size %d",
-			msgSize,
-			p2pnode.DefaultMaxPubSubMsgSize,
-		)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
