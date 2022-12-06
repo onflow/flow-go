@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"testing"
 	"time"
 
@@ -50,6 +51,9 @@ func TestSpam(t *testing.T) {
 	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)
 
+	victimPeerInfo, err := utils.PeerAddressInfo(victimId)
+	require.NoError(t, err)
+
 	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -57,11 +61,25 @@ func TestSpam(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{spammerNode, victimNode}, 100*time.Second)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
+	// connect spammer and victim
+	err = spammerNode.AddPeer(ctx, victimPeerInfo)
+	require.NoError(t, err)
+
 	// create new spammer
 	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
+	require.NotNil(t, router)
 
 	// start spamming the first peer
-	spammer.SpamIHave(victimPeerId, 1, 1)
+	go func() {
+		spammer.SpamIHave(victimPeerId, 1, 1)
+	}()
 
-	time.Sleep(5 * time.Second)
+	inbounds := make([]chan string, 1)
+
+	select {
+	case rcv := <-inbounds[0]:
+		require.Equal(t, "foo", rcv)
+	case <-time.After(3 * time.Second):
+		require.Fail(t, "did not receive spam message")
+	}
 }
