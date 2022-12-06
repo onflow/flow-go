@@ -187,16 +187,16 @@ jobs:
       matrix:
         # modify which integration module to test by adding / removing the matrix targets
         make:
-#          - make -C integration access-tests
-#          - make -C integration bft-tests
-#          - make -C integration collection-tests
-#          - make -C integration consensus-tests
-          - make -C integration epochs-tests
-#          - make -C integration execution-tests
-#          - make -C integration ghost-tests
-#          - make -C integration mvp-tests
-#          - make -C integration network-tests
-#          - make -C integration verification-tests
+#          - make -C integration -e VERBOSE=1 access-tests
+#          - make -C integration -e VERBOSE=1 bft-tests
+#          - make -C integration -e VERBOSE=1 collection-tests
+#          - make -C integration -e VERBOSE=1 consensus-tests
+          - make -C integration -e VERBOSE=1 epochs-tests
+#          - make -C integration -e VERBOSE=1 execution-tests
+#          - make -C integration -e VERBOSE=1 ghost-tests
+#          - make -C integration -e VERBOSE=1 mvp-tests
+#          - make -C integration -e VERBOSE=1 network-tests
+#          - make -C integration -e VERBOSE=1 verification-tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

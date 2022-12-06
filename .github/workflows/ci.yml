@@ -143,17 +143,17 @@ jobs:
         include:
           - name: crypto
             make1: -C crypto setup
-            make2: unittest
+            make2: -e VERBOSE=1 unittest
             retries: 1
             race: 1
           - name: insecure
             make1: install-tools
-            make2: test
+            make2: -e VERBOSE=1 test
             retries: 3
             race: 1
           - name: integration
             make1: install-tools
-            make2: test
+            make2: -e VERBOSE=1 test
             retries: 3
             race: 0
     runs-on: ubuntu-latest
@@ -195,16 +195,16 @@ jobs:
       fail-fast: false
       matrix:
         make:
-          - make -C integration access-tests
-          - make -C integration bft-tests
-          - make -C integration collection-tests
-          - make -C integration consensus-tests
-          - make -C integration epochs-tests
-          - make -C integration execution-tests
-          - make -C integration ghost-tests
-          - make -C integration mvp-tests
-          - make -C integration network-tests
-          - make -C integration verification-tests
+          - make -C integration -e VERBOSE=1 access-tests
+          - make -C integration -e VERBOSE=1 bft-tests
+          - make -C integration -e VERBOSE=1 collection-tests
+          - make -C integration -e VERBOSE=1 consensus-tests
+          - make -C integration -e VERBOSE=1 epochs-tests
+          - make -C integration -e VERBOSE=1 execution-tests
+          - make -C integration -e VERBOSE=1 ghost-tests
+          - make -C integration -e VERBOSE=1 mvp-tests
+          - make -C integration -e VERBOSE=1 network-tests
+          - make -C integration -e VERBOSE=1 verification-tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
