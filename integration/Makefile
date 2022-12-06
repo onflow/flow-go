@@ -22,7 +22,7 @@ ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-t
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep $(if $(VERBOSE),-v,) -e integration/tests`
+	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
 .PHONY: access-tests
 access-tests:
