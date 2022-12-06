@@ -107,7 +107,11 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
-	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(),
+		m.size,
+		m.logger,
+		unittest.NetworkCodec(),
+		m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -152,10 +156,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newMw := mws[0]
 
 	overlay := m.createOverlay(providers[0])
-	overlay.On("Receive",
-		m.ids[0].NodeID,
-		mockery.AnythingOfType("*message.Message"),
-	).Return(nil)
+	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
@@ -212,7 +213,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		rateLimits.Inc()
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, onRateLimit, ratelimit.WithDisabledRateLimiting(false))
+	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter,
+		&ratelimit.NoopRateLimiter{},
+		onRateLimit,
+		ratelimit.WithDisabledRateLimiting(false))
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
@@ -229,8 +233,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// we expect 5 messages to be processed the rest will be rate limited
 	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
 
-	mws, providers := testutils.GenerateMiddlewares(
-		m.T(),
+	mws, providers := testutils.GenerateMiddlewares(m.T(),
 		m.logger,
 		ids,
 		libP2PNodes,
@@ -246,10 +249,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	newMw := mws[0]
 
 	overlay := m.createOverlay(providers[0])
-	overlay.On("Receive",
-		m.ids[0].NodeID,
-		mockery.AnythingOfType("*message.Message"),
-	).Return(nil)
+	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 
 	newMw.SetOverlay(overlay)
 
@@ -324,7 +324,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, onRateLimit, ratelimit.WithDisabledRateLimiting(false))
+	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{},
+		bandwidthRateLimiter,
+		onRateLimit,
+		ratelimit.WithDisabledRateLimiting(false))
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
@@ -339,10 +342,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	newMw := mws[0]
 
 	overlay := m.createOverlay(providers[0])
-	overlay.On("Receive",
-		m.ids[0].NodeID,
-		mockery.AnythingOfType("*message.Message"),
-	).Return(nil)
+	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 
 	newMw.SetOverlay(overlay)
 
@@ -505,7 +505,11 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 	for i := 0; i < count; i++ {
 		receiveWG.Add(1)
 		sendWG.Add(1)
-		msg, expectedMsg, expectedPayload := messageutils.CreateMessage(m.T(), m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, testChannel, fmt.Sprintf("hello from: %d", i))
+		msg, expectedMsg, expectedPayload := messageutils.CreateMessage(m.T(),
+			m.ids[firstNode].NodeID,
+			m.ids[lastNode].NodeID,
+			testChannel,
+			fmt.Sprintf("hello from: %d", i))
 
 		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, expectedMsg, expectedPayload).Return(nil).Once().
 			Run(func(args mockery.Arguments) {

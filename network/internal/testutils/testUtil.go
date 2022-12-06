@@ -104,12 +104,9 @@ func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityPro
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-func GenerateIDs(
-	t *testing.T,
-	logger zerolog.Logger,
-	n int,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsConfig)) (flow.IdentityList,
+	[]p2p.LibP2PNode,
+	[]observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
@@ -152,7 +149,13 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T,
+	logger zerolog.Logger,
+	identities flow.IdentityList,
+	libP2PNodes []p2p.LibP2PNode,
+	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
+	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 	bitswapmet := metrics.NewNoopCollector()
@@ -185,20 +188,17 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
-			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
-		)
+			middleware.WithUnicastRateLimiters(o.unicastRateLimiters))
 	}
 	return mws, idProviders
 }
 
 // GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(
-	t *testing.T,
+func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager,
-) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
@@ -210,9 +210,7 @@ func GenerateNetworks(
 		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
 		me.On("Address").Return(ids[i].Address)
 
-		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize,
-			log,
-			metrics.NewNoopCollector())
+		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
 
 		// create the network
 		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
@@ -240,8 +238,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	logger zerolog.Logger,
 	codec network.Codec,
 	consumer slashing.ViolationsConsumer,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
+	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
 	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
@@ -288,14 +285,12 @@ func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
 	}
 }
 
-func GenerateIDsMiddlewaresNetworks(
-	t *testing.T,
+func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	codec network.Codec,
 	consumer slashing.ViolationsConsumer,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
+	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, sms)
@@ -343,11 +338,7 @@ type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h,
-				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
-				zerolog.Nop(),
-				metrics.NewNoopCollector(),
-				dhtOpts...)
+			return p2pdht.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
 	}
 }
@@ -359,25 +350,18 @@ func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration
 }
 
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(
-	t *testing.T,
+func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	key crypto.PrivateKey,
 	idProvider module.IdentityProvider,
-	opts ...nodeBuilderOption,
-) (p2p.LibP2PNode, observable.Observable) {
+	opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(
-		logger,
-		metrics.NewNoopCollector(),
-		"0.0.0.0:0",
-		key,
-		sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 
@@ -494,8 +478,7 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
 func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(
-		unittest.Logger(),
+	return connection.NewConnGater(unittest.Logger(),
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
 }
