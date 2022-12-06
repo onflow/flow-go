@@ -28,7 +28,7 @@ type ProcedureExecutor interface {
 	Cleanup()
 }
 
-func run(executor ProcedureExecutor) error {
+func Run(executor ProcedureExecutor) error {
 	defer executor.Cleanup()
 
 	err := executor.Preprocess()
@@ -41,11 +41,11 @@ func run(executor ProcedureExecutor) error {
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(
+	NewExecutor(
 		ctx Context,
 		txnState *state.TransactionState,
 		derivedTxnData *derived.DerivedTransactionData,
-	) error
+	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
@@ -117,7 +117,7 @@ func (vm *VirtualMachine) Run(
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
-	err = proc.Run(ctx, txnState, derivedTxnData)
+	err = Run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 	if err != nil {
 		return err
 	}

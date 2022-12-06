@@ -26,8 +26,6 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
-
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
@@ -51,7 +49,7 @@ func TestSafetyCheck(t *testing.T) {
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
 		require.Nil(t, err)
 		require.Error(t, proc.Err)
 
@@ -64,7 +62,6 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
 
 		code := `transaction(arg: X) { }`
 
@@ -89,7 +86,7 @@ func TestSafetyCheck(t *testing.T) {
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
 		require.Nil(t, err)
 		require.Error(t, proc.Err)
 

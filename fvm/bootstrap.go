@@ -240,14 +240,6 @@ func (b *BootstrapProcedure) NewExecutor(
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
 
-func (b *BootstrapProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
-) error {
-	return run(b.NewExecutor(ctx, txnState, derivedTxnData))
-}
-
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
@@ -891,8 +883,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	errors.CodedError,
 	error,
 ) {
-	invoker := NewTransactionInvoker()
-
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,
 		WithAccountStorageLimit(false),
@@ -910,7 +900,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		return nil, err
 	}
 
-	err = invoker.Process(ctx, tx, b.txnState, prog)
+	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 
 	return txErr, fatalErr
