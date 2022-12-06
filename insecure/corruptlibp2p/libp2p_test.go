@@ -48,7 +48,7 @@ func TestSpam(t *testing.T) {
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the victim node
-				fmt.Println("victimNode>RPC inspector")
+				fmt.Println("victimNode>RPC inspector: ", rpc.Control.String())
 				close(received) // acknowledge victim received spammer's message
 				return nil
 			})),
@@ -77,8 +77,11 @@ func TestSpam(t *testing.T) {
 	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
 	require.NotNil(t, router)
 
+	// prepare to spam - generate control messages
+	controlMessages := spammer.GenerateCtlMessages(1, 5)
+
 	// start spamming the first peer
-	spammer.SpamIHave(victimPeerId, 1, 1)
+	spammer.SpamIHave(victimPeerId, controlMessages)
 
 	// check that victim received spammer's message
 	select {
