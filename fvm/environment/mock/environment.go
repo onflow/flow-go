@@ -12,6 +12,8 @@ import (
 
 	common "github.com/onflow/cadence/runtime/common"
 
+	derived "github.com/onflow/flow-go/fvm/derived"
+
 	flow "github.com/onflow/flow-go/model/flow"
 
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
@@ -21,8 +23,6 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
-
-	programs "github.com/onflow/flow-go/fvm/programs"
 
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
@@ -208,6 +208,29 @@ func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	return r0
 }
 
+// CheckPayerBalanceAndGetMaxTxFees provides a mock function with given fields: payer, inclusionEffort, executionEffort
+func (_m *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
+	ret := _m.Called(payer, inclusionEffort, executionEffort)
+
+	var r0 cadence.Value
+	if rf, ok := ret.Get(0).(func(flow.Address, uint64, uint64) cadence.Value); ok {
+		r0 = rf(payer, inclusionEffort, executionEffort)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Address, uint64, uint64) error); ok {
+		r1 = rf(payer, inclusionEffort, executionEffort)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ComputationIntensities provides a mock function with given fields:
 func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
 	ret := _m.Called()
@@ -338,15 +361,15 @@ func (_m *Environment) Events() []flow.Event {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() (programs.TransactionInvalidator, error) {
+func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, error) {
 	ret := _m.Called()
 
-	var r0 programs.TransactionInvalidator
-	if rf, ok := ret.Get(0).(func() programs.TransactionInvalidator); ok {
+	var r0 derived.TransactionInvalidator
+	if rf, ok := ret.Get(0).(func() derived.TransactionInvalidator); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(programs.TransactionInvalidator)
+			r0 = ret.Get(0).(derived.TransactionInvalidator)
 		}
 	}
 

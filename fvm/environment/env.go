@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -39,6 +39,14 @@ type Environment interface {
 
 	// SystemContracts
 	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
+	CheckPayerBalanceAndGetMaxTxFees(
+		payer flow.Address,
+		inclusionEffort uint64,
+		executionEffort uint64,
+	) (
+		cadence.Value,
+		error,
+	)
 	DeductTransactionFees(
 		payer flow.Address,
 		inclusionEffort uint64,
@@ -57,7 +65,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
 	FlushPendingUpdates() (
-		programs.TransactionInvalidator,
+		derived.TransactionInvalidator,
 		error,
 	)
 

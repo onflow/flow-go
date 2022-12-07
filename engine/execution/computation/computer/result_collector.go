@@ -130,43 +130,16 @@ func (collector *resultCollector) AddTransactionResult(
 	collector.result.AddTransactionResult(collectionIndex, txn)
 }
 
-type ExecutionStats struct {
-	ComputationUsed                 uint64
-	MemoryUsed                      uint64
-	EventCounts                     int
-	EventSize                       int
-	NumberOfRegistersTouched        int
-	NumberOfBytesWrittenToRegisters int
-	NumberOfTransactions            int
-}
-
 func (collector *resultCollector) CommitCollection(
 	collectionIndex int,
 	collection collectionItem,
 	collectionView state.View,
-) ExecutionStats {
-
+) module.ExecutionResultStats {
 	collector.viewChan <- collectionView
 	collector.eventsListChan <- collector.result.Events[collectionIndex]
 
-	viewSnapshot := collectionView.(*delta.View).Interactions()
-	collector.result.AddStateSnapshot(viewSnapshot)
-	collector.result.UpdateTransactionResultIndex(len(collection.Transactions))
-
-	compUsed, memUsed := collector.result.ChunkComputationAndMemoryUsed(
-		collectionIndex)
-	eventCounts, eventSize := collector.result.ChunkEventCountsAndSize(
-		collectionIndex)
-
-	return ExecutionStats{
-		ComputationUsed:                 compUsed,
-		MemoryUsed:                      memUsed,
-		EventCounts:                     eventCounts,
-		EventSize:                       eventSize,
-		NumberOfRegistersTouched:        viewSnapshot.NumberOfRegistersTouched,
-		NumberOfBytesWrittenToRegisters: viewSnapshot.NumberOfBytesWrittenToRegisters,
-		NumberOfTransactions:            len(collection.Transactions),
-	}
+	collector.result.AddCollection(collectionView.(*delta.View).Interactions())
+	return collector.result.CollectionStats(collectionIndex)
 }
 
 func (collector *resultCollector) Stop() {

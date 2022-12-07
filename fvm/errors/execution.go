@@ -3,6 +3,7 @@ package errors
 import (
 	"strings"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -44,6 +45,33 @@ func NewTransactionFeeDeductionFailedError(
 		err,
 		"failed to deduct %d transaction fees from %s",
 		txFees,
+		payer)
+}
+
+// NewInsufficientPayerBalanceError constructs a new CodedError which
+// indicates that the payer has insufficient balance to attempt transaction execution.
+func NewInsufficientPayerBalanceError(
+	payer flow.Address,
+	requiredBalance cadence.UFix64,
+) CodedError {
+	return NewCodedError(
+		ErrCodeInsufficientPayerBalance,
+		"payer %s has insufficient balance to attempt transaction execution (required balance: %s)",
+		payer,
+		requiredBalance,
+	)
+}
+
+// NewPayerBalanceCheckError constructs a new CodedError which
+// indicates that a there was an error checking the payers balance.
+func NewPayerBalanceCheckError(
+	payer flow.Address,
+	err error,
+) CodedError {
+	return WrapCodedError(
+		ErrCodePayerBalanceCheckError,
+		err,
+		"failed to check if the payer %s has sufficient balance",
 		payer)
 }
 
