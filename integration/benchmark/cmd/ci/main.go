@@ -196,11 +196,14 @@ func main() {
 		log,
 		lg,
 		workerStatsTracker,
-		adjustInterval,
-		uint(*initialTPSFlag),
-		uint(*minTPSFlag),
-		uint(*maxTPSFlag),
-		uint(maxInflight/2),
+
+		AdjusterParams{
+			Interval:    adjustInterval,
+			InitialTPS:  uint(*initialTPSFlag),
+			MinTPS:      uint(*minTPSFlag),
+			MaxTPS:      uint(*maxTPSFlag),
+			MaxInflight: uint(maxInflight / 2),
+		},
 	)
 	defer adjuster.Stop()
 

@@ -16,15 +16,18 @@ type adjuster struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 
-	initialTPS  uint
-	minTPS      uint
-	maxTPS      uint
-	maxInflight uint
-	interval    time.Duration
+	params AdjusterParams
 
 	lg                 *benchmark.ContLoadGenerator
 	workerStatsTracker *benchmark.WorkerStatsTracker
 	log                zerolog.Logger
+}
+type AdjusterParams struct {
+	Interval    time.Duration
+	InitialTPS  uint
+	MinTPS      uint
+	MaxTPS      uint
+	MaxInflight uint
 }
 
 func NewTPSAdjuster(
@@ -32,11 +35,7 @@ func NewTPSAdjuster(
 	log zerolog.Logger,
 	lg *benchmark.ContLoadGenerator,
 	workerStatsTracker *benchmark.WorkerStatsTracker,
-	interval time.Duration,
-	initialTPS uint,
-	minTPS uint,
-	maxTPS uint,
-	maxInflight uint,
+	params AdjusterParams,
 ) *adjuster {
 	ctx, cancel := context.WithCancel(ctx)
 	a := &adjuster{
@@ -44,11 +43,7 @@ func NewTPSAdjuster(
 		cancel: cancel,
 		done:   make(chan struct{}),
 
-		initialTPS:  initialTPS,
-		minTPS:      minTPS,
-		maxTPS:      maxTPS,
-		maxInflight: maxInflight,
-		interval:    interval,
+		params: params,
 
 		lg:                 lg,
 		workerStatsTracker: workerStatsTracker,
@@ -82,7 +77,7 @@ func (a *adjuster) Stop() {
 //
 // Target TPS is always bounded by [minTPS, maxTPS].
 func (a *adjuster) adjustTPSForever() error {
-	targetTPS := a.initialTPS
+	targetTPS := a.params.InitialTPS
 
 	// Stats for the last round
 	lastTs := time.Now()
@@ -95,7 +90,7 @@ func (a *adjuster) adjustTPSForever() error {
 		select {
 		// NOTE: not using a ticker here since adjusting worker count in SetTPS
 		// can take a while and lead to uneven feedback intervals.
-		case nowTs := <-time.After(a.interval):
+		case nowTs := <-time.After(a.params.Interval):
 			currentStats := a.workerStatsTracker.GetStats()
 
 			// number of timed out transactions in the last interval
@@ -112,7 +107,7 @@ func (a *adjuster) adjustTPSForever() error {
 				lastTPS,
 				targetTPS,
 				inflight,
-				a.maxInflight,
+				a.params.MaxInflight,
 				txsTimedout > 0,
 			)
 
@@ -131,7 +126,7 @@ func (a *adjuster) adjustTPSForever() error {
 				continue
 			}
 
-			boundedTPS := boundTPS(unboundedTPS, a.minTPS, a.maxTPS)
+			boundedTPS := boundTPS(unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
 			a.log.Info().
 				Uint("lastTargetTPS", targetTPS).
 				Float64("lastTPS", lastTPS).
