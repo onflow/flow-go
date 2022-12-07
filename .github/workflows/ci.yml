@@ -117,7 +117,7 @@ jobs:
         cache: true
     - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
-      run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -127,7 +127,7 @@ jobs:
       with:
         timeout_minutes: 25
         max_attempts: 3
-        command: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
       with:
