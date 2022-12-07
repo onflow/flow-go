@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,10 +29,10 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
-	var router *corrupt.GossipSubRouter
+	router := newAtomicRouter()
 	factory := corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 		require.NotNil(t, r)
-		router = r // save the router at the initialization time of the factory
+		router.setRouter(r)
 	})
 
 	spammerNode, _ := p2ptest.NodeFixture(
@@ -92,7 +93,7 @@ func TestSpam_IHave(t *testing.T) {
 	require.True(t, connected)
 
 	// create new spammer
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
 	require.NotNil(t, router)
 
 	// prepare to spam - generate IHAVE control messages
@@ -112,4 +113,35 @@ func TestSpam_IHave(t *testing.T) {
 	// check contents of received messages should match what spammer sent
 	require.Equal(t, len(iHaveSentCtlMsgs), len(iHaveReceivedCtlMsgs))
 	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentCtlMsgs)
+}
+
+// atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.
+// This is done to avoid race conditions when accessing the router from multiple goroutines.
+type atomicRouter struct {
+	mu     sync.Mutex
+	router *corrupt.GossipSubRouter
+}
+
+func newAtomicRouter() *atomicRouter {
+	return &atomicRouter{
+		mu: sync.Mutex{},
+	}
+}
+
+// SetRouter sets the router if it has never been set.
+func (a *atomicRouter) setRouter(router *corrupt.GossipSubRouter) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if router == nil {
+		a.router = router
+		return true
+	}
+	return false
+}
+
+// GetRouter returns the router.
+func (a *atomicRouter) getRouter() *corrupt.GossipSubRouter {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.router
 }
