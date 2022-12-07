@@ -82,14 +82,17 @@ init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
 .PHONY: start
-start:
+start: start-metrics start-flow
+
+# Starts metrics services
+.PHONY: start-metrics
+start-metrics:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
-	$(MAKE) start-flow-nodes
 
 # Starts a version of localnet with just flow nodes and without metrics services. This prevents port collision and consumption
 # when these services are not needed.
-.PHONY: start-flow-nodes
-start-flow-nodes:
+.PHONY: start-flow
+start-flow:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
 .PHONY: build
@@ -113,8 +116,7 @@ tps-ci-smoke:
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 2m
 
 .PHONY: tps-test-ci
-tps-test-ci: init-ci
-	$(MAKE) start-flow-nodes
+tps-test-ci: init-ci start-flow
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
 	$(MAKE) stop
 
