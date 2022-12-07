@@ -3,6 +3,7 @@ package corruptlibp2p_test
 import (
 	"context"
 	"fmt"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"testing"
 	"time"
@@ -42,7 +43,10 @@ func TestSpam(t *testing.T) {
 	)
 
 	received := make(chan struct{})
+
+	// keeps track of how many messages victim received from spammer - to know when to stop listening for more messages
 	receivedCounter := 0
+	var iHaveReceivedCtlMsgs []pb.ControlMessage
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -55,6 +59,7 @@ func TestSpam(t *testing.T) {
 					return nil
 				}
 				receivedCounter++
+				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
 
 				if receivedCounter == messagesToSpam {
 					close(received) // acknowledge victim received all of spammer's messages
@@ -94,13 +99,11 @@ func TestSpam(t *testing.T) {
 	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
 	require.NotNil(t, router)
 
-	// prepare to spam - generate control messages
-	controlMessages := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
+	// prepare to spam - generate IHAVE control messages
+	iHaveSentMessages := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
-	// prepare to receive spam messages
-
-	// start spamming the first peer
-	spammer.SpamIHave(victimPeerId, controlMessages)
+	// start spamming the victime peer
+	spammer.SpamIHave(victimPeerId, iHaveSentMessages)
 
 	// check that victim received spammer's message
 	select {
@@ -109,4 +112,8 @@ func TestSpam(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		require.Fail(t, "did not receive spam message")
 	}
+
+	// check contents of received messages - should match what spammer sent
+	require.Equal(t, len(iHaveSentMessages), len(iHaveReceivedCtlMsgs))
+	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentMessages)
 }
