@@ -2,7 +2,6 @@ package corruptlibp2p_test
 
 import (
 	"context"
-	"fmt"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"testing"
@@ -36,7 +35,6 @@ func TestSpam(t *testing.T) {
 		t.Name(),
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
-				fmt.Println("spammerNode>RPC inspector")
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
 			})),
@@ -63,14 +61,6 @@ func TestSpam(t *testing.T) {
 
 				if receivedCounter == messagesToSpam {
 					close(received) // acknowledge victim received all of spammer's messages
-					return nil
-				}
-
-				// here we can inspect the incoming RPC message to the victim node
-				fmt.Println("victimNode>RPC inspector: ", rpc.Control.String())
-
-				for i := 0; i < len(iHaves); i++ {
-					fmt.Println("Ihave loop: ", iHaves[i].String())
 				}
 				return nil
 			})),
@@ -85,6 +75,7 @@ func TestSpam(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
+
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{spammerNode, victimNode}, 100*time.Second)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
 
@@ -102,7 +93,7 @@ func TestSpam(t *testing.T) {
 	// prepare to spam - generate IHAVE control messages
 	iHaveSentMessages := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
-	// start spamming the victime peer
+	// start spamming the victim peer
 	spammer.SpamIHave(victimPeerId, iHaveSentMessages)
 
 	// check that victim received spammer's message
@@ -113,7 +104,7 @@ func TestSpam(t *testing.T) {
 		require.Fail(t, "did not receive spam message")
 	}
 
-	// check contents of received messages - should match what spammer sent
+	// check contents of received messages should match what spammer sent
 	require.Equal(t, len(iHaveSentMessages), len(iHaveReceivedCtlMsgs))
 	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentMessages)
 }
