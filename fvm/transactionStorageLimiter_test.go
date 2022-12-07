@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-func TestTransactionStorageLimiter_Process(t *testing.T) {
+func TestTransactionStorageLimiter(t *testing.T) {
 	owner := flow.HexToAddress("1")
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		chain := flow.Mainnet.Chain()
