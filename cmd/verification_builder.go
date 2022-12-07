@@ -91,12 +91,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *chainsync.Core       // used in follower engine
-		pendingBlocks           *buffer.PendingBlocks // used in follower engine
-		assignerEngine          *assigner.Engine      // the assigner engine
-		fetcherEngine           *fetcher.Engine       // the fetcher engine
-		requesterEngine         *requester.Engine     // the requester engine
-		verifierEng             *verifier.Engine      // the verifier engine
+		syncCore                *chainsync.Core           // used in follower engine
+		pendingBlocks           module.PendingBlockBuffer // used in follower engine
+		assignerEngine          *assigner.Engine          // the assigner engine
+		fetcherEngine           *fetcher.Engine           // the fetcher engine
+		requesterEngine         *requester.Engine         // the requester engine
+		verifierEng             *verifier.Engine          // the verifier engine
 		chunkConsumer           *chunkconsumer.ChunkConsumer
 		blockConsumer           *blockconsumer.BlockConsumer
 		finalizationDistributor *pubsub.FinalizationDistributor

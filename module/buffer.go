@@ -5,16 +5,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// PendingBlockBuffer defines an interface for a cache of pending blocks that
+// GenericPendingBlockBuffer defines an interface for a cache of pending blocks that
 // cannot yet be processed because they do not connect to the rest of the chain
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
-type PendingBlockBuffer interface {
-	Add(originID flow.Identifier, block flow.Slashable[flow.Block]) bool
+type GenericPendingBlockBuffer[P flow.GenericPayload] interface {
+	Add(originID flow.Identifier, block *flow.GenericBlock[P]) bool
 
-	ByID(blockID flow.Identifier) (*flow.Slashable[flow.Block], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[flow.GenericBlock[P]], bool)
 
-	ByParentID(parentID flow.Identifier) ([]*flow.Slashable[flow.Block], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[flow.GenericBlock[P]], bool)
 
 	DropForParent(parentID flow.Identifier)
 
@@ -24,19 +24,5 @@ type PendingBlockBuffer interface {
 	Size() uint
 }
 
-// PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
-// collection node cluster consensus.
-type PendingClusterBlockBuffer interface {
-	Add(originID flow.Identifier, block *cluster.Block) bool
-
-	ByID(blockID flow.Identifier) (*flow.Slashable[cluster.Block], bool)
-
-	ByParentID(parentID flow.Identifier) ([]*flow.Slashable[cluster.Block], bool)
-
-	DropForParent(parentID flow.Identifier)
-
-	// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
-	PruneByView(view uint64)
-
-	Size() uint
-}
+type PendingBlockBuffer = GenericPendingBlockBuffer[*flow.Payload]
+type PendingClusterBlockBuffer = GenericPendingBlockBuffer[*cluster.Payload]

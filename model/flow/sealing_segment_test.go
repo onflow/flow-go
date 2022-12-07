@@ -415,7 +415,7 @@ func TestAddBlock_StorageError(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, fmt.Errorf("not found") }
 		block1 := unittest.BlockFixture()
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(&flow.Payload{})
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
 
 		err := builder.AddBlock(&block1)

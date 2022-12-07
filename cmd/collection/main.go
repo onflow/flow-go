@@ -78,7 +78,7 @@ func main() {
 		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
+		followerBuffer          module.PendingBlockBuffer   // pending block cache for follower
 		finalizationDistributor *pubsub.FinalizationDistributor
 		finalizedHeader         *consync.FinalizedHeaderCache
 

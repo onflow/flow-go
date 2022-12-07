@@ -35,54 +35,46 @@ type UntrustedClusterBlockPayload struct {
 	ReferenceBlockID flow.Identifier
 }
 
+func (up UntrustedClusterBlockPayload) ToInternal() *cluster.Payload {
+	payload := &cluster.Payload{
+		ReferenceBlockID: up.ReferenceBlockID,
+	}
+	for _, tx := range up.Collection {
+		tx := tx
+		payload.Collection.Transactions = append(payload.Collection.Transactions, &tx)
+	}
+	return payload
+}
+
 // UntrustedClusterBlock is a duplicate of cluster.Block used within
 // untrusted messages. It exists only to provide a memory-safe structure for
 // decoding messages and should be replaced in the future by updating the core
 // cluster.Block type.
 // Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
 // then replace instances of this type with cluster.Block
-type UntrustedClusterBlock struct {
-	Header  flow.Header
-	Payload UntrustedClusterBlockPayload
-}
-
-// ToInternal returns the internal representation of the type.
-func (ub *UntrustedClusterBlock) ToInternal() *cluster.Block {
-	block := &cluster.Block{
-		Header: &ub.Header,
-		Payload: &cluster.Payload{
-			ReferenceBlockID: ub.Payload.ReferenceBlockID,
-		},
-	}
-	for _, tx := range ub.Payload.Collection {
-		tx := tx
-		block.Payload.Collection.Transactions = append(block.Payload.Collection.Transactions, &tx)
-	}
-	return block
-}
+type UntrustedClusterBlock = GenericUntrustedBlock[*cluster.Payload]
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
 // to the representation used in untrusted messages.
 func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClusterBlock {
-	block := UntrustedClusterBlock{
-		Header: *clusterBlock.Header,
-		Payload: UntrustedClusterBlockPayload{
-			ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
-			Collection:       make([]flow.TransactionBody, 0, clusterBlock.Payload.Collection.Len()),
-		},
+	payload := UntrustedClusterBlockPayload{
+		ReferenceBlockID: clusterBlock.Payload.ReferenceBlockID,
+		Collection:       make([]flow.TransactionBody, 0, clusterBlock.Payload.Collection.Len()),
 	}
 	for _, tx := range clusterBlock.Payload.Collection.Transactions {
-		block.Payload.Collection = append(block.Payload.Collection, *tx)
+		payload.Collection = append(payload.Collection, *tx)
 	}
-	return block
+
+	return UntrustedClusterBlock{
+		Header:  *clusterBlock.Header,
+		Payload: payload,
+	}
 }
 
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
-type ClusterBlockProposal struct {
-	Block UntrustedClusterBlock
-}
+type ClusterBlockProposal = GenericBlockProposal[*cluster.Payload]
 
 func NewClusterBlockProposal(internal *cluster.Block) *ClusterBlockProposal {
 	return &ClusterBlockProposal{

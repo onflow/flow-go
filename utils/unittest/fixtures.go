@@ -230,10 +230,10 @@ func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Se
 	return receipt, seal
 }
 
-func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
-	payload := flow.EmptyPayload()
+func PayloadFixture(options ...func(*flow.Payload)) *flow.Payload {
+	payload := &flow.Payload{}
 	for _, option := range options {
-		option(&payload)
+		option(payload)
 	}
 	return payload
 }
@@ -297,7 +297,7 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
 		Header:  header,
-		Payload: &payload,
+		Payload: payload,
 	}
 }
 
@@ -307,7 +307,7 @@ func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Bl
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
 		Header:  header,
-		Payload: &payload,
+		Payload: payload,
 	}
 
 }
@@ -333,7 +333,7 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 
 func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
 	block := BlockWithParentFixture(parent)
-	payload := flow.Payload{
+	payload := &flow.Payload{
 		Guarantees: nil,
 	}
 
@@ -356,7 +356,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
 		Header:  header,
-		Payload: &payload,
+		Payload: payload,
 	}
 
 	var stateInteractions []*delta.Snapshot

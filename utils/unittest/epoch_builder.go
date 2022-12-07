@@ -200,7 +200,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// build block B, sealing up to and including block A
 	B := BlockWithParentFixture(A)
-	B.SetPayload(flow.Payload{
+	B.SetPayload(&flow.Payload{
 		Receipts: prevReceipts,
 		Results:  prevResults,
 		Seals:    sealsForPrev,
@@ -222,7 +222,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 			Seal.Fixture(Seal.WithResult(&receiptA.ExecutionResult)),
 		}
 	}
-	C.SetPayload(flow.Payload{
+	C.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 		Seals:    sealsForA,
@@ -237,7 +237,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	sealForB := Seal.Fixture(
 		Seal.WithResult(&receiptB.ExecutionResult),
 	)
-	D.SetPayload(flow.Payload{
+	D.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptC.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
 		Seals:    []*flow.Seal{sealForB},
@@ -263,7 +263,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	sealForC := Seal.Fixture(
 		Seal.WithResult(&receiptC.ExecutionResult),
 	)
-	E.SetPayload(flow.Payload{
+	E.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptD.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
 		Seals:    []*flow.Seal{sealForC},
@@ -279,7 +279,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	sealForD := Seal.Fixture(
 		Seal.WithResult(&receiptD.ExecutionResult),
 	)
-	F.SetPayload(flow.Payload{
+	F.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptE.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
 		Seals:    []*flow.Seal{sealForD},
@@ -294,7 +294,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	sealForE := Seal.Fixture(
 		Seal.WithResult(&receiptE.ExecutionResult),
 	)
-	G.SetPayload(flow.Payload{
+	G.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptF.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptF.ExecutionResult},
 		Seals:    []*flow.Seal{sealForE},
@@ -338,7 +338,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	// first view is not necessarily exactly final view of previous epoch
 	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	finalReceipt := ReceiptForBlockFixture(finalBlock)
-	A.SetPayload(flow.Payload{
+	A.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{
 			finalReceipt.Meta(),
 		},

@@ -5,12 +5,11 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 )
 
-type SyncedBlock struct {
+// TODO: will be removed in favor of flow.Slashable
+type GenericSyncedBlock[UntrustedType any] struct {
 	OriginID flow.Identifier
-	Block    messages.UntrustedBlock
+	Block    UntrustedType
 }
 
-type SyncedClusterBlock struct {
-	OriginID flow.Identifier
-	Block    messages.UntrustedClusterBlock
-}
+type SyncedBlock = GenericSyncedBlock[messages.UntrustedBlock]
+type SyncedClusterBlock = GenericSyncedBlock[messages.UntrustedClusterBlock]

@@ -75,7 +75,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) *flow.Header {
 
 	block2 := BlockWithParentFixture(block.Header)
-	block2.SetPayload(flow.Payload{
+	block2.SetPayload(&flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
@@ -83,7 +83,7 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
-	block3.SetPayload(flow.Payload{
+	block3.SetPayload(&flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 	err = st.Extend(context.Background(), block3)

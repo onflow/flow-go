@@ -120,7 +120,7 @@ type ExecutionNode struct {
 	providerEngine          *exeprovider.Engine
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
-	pendingBlocks           *buffer.PendingBlocks // used in follower engine
+	pendingBlocks           module.PendingBlockBuffer // used in follower engine
 	deltas                  *ingestion.Deltas
 	syncEngine              *synchronization.Engine
 	followerEng             *followereng.Engine // to sync blocks from consensus nodes

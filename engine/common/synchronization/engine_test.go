@@ -445,7 +445,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
 		Nonce:  rand.Uint64(),
-		Blocks: []messages.UntrustedBlock{},
+		Blocks: []messages.GenericUntrustedBlock{},
 	}
 
 	// add one block that should be processed
