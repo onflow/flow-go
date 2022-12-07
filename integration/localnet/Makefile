@@ -113,7 +113,7 @@ tps-test:
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 2m
+	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 1m -bigquery-upload=false
 
 .PHONY: tps-ci
 tps-ci: bootstrap-ci build-flow start-flow

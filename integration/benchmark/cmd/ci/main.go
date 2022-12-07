@@ -59,6 +59,7 @@ func main() {
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
+	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
@@ -226,29 +227,32 @@ func main() {
 		recorder.SetStatus(StatusFailure)
 	}
 
-	log.Info().Msg("Initializing BigQuery")
-	db, err := NewDB(ctx, log, *bigQueryProjectFlag)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create bigquery client")
-	}
-	defer db.Close()
+	if *bigQueryUpload {
+		log.Info().Msg("Initializing BigQuery")
+		db, err := NewDB(ctx, log, *bigQueryProjectFlag)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create bigquery client")
+		}
+		defer db.Close()
 
-	err = db.createTable(ctx, *bigQueryDatasetFlag, *bigQueryRawTableFlag, RawRecord{})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create raw TPS table")
+		err = db.createTable(ctx, *bigQueryDatasetFlag, *bigQueryRawTableFlag, RawRecord{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create raw TPS table")
+		}
+
+		log.Info().Msg("Uploading data to BigQuery")
+		err = db.saveRawResults(
+			ctx,
+			*bigQueryDatasetFlag,
+			*bigQueryRawTableFlag,
+			recorder.BenchmarkResults,
+			*repoInfo,
+			BenchmarkInfo{BenchmarkType: loadType},
+			defaultEnvironment(),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to send data to bigquery")
+		}
 	}
 
-	log.Info().Msg("Uploading data to BigQuery")
-	err = db.saveRawResults(
-		ctx,
-		*bigQueryDatasetFlag,
-		*bigQueryRawTableFlag,
-		recorder.BenchmarkResults,
-		*repoInfo,
-		BenchmarkInfo{BenchmarkType: loadType},
-		defaultEnvironment(),
-	)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to send data to bigquery")
-	}
 }
