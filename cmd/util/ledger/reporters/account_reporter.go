@@ -15,8 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -133,7 +133,7 @@ type balanceProcessor struct {
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),

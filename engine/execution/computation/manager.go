@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -88,7 +88,7 @@ type Manager struct {
 	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
-	derivedChainData         *programs.DerivedChainData
+	derivedChainData         *derived.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
@@ -145,9 +145,9 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	derivedChainData, err := programs.NewDerivedChainData(params.DerivedDataCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(params.DerivedDataCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create programs cache: %w", err)
+		return nil, fmt.Errorf("cannot create derived data cache: %w", err)
 	}
 
 	e := Manager{
@@ -298,9 +298,9 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
-	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
-
-	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Msg("block result computed / derived data cache updated")
 
 	if uploadEnabled {
 		var group errgroup.Group

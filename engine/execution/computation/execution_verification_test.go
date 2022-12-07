@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -695,7 +695,11 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
-	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyDerivedBlockData())
+	computationResult, err := blockComputer.ExecuteBlock(
+		context.Background(),
+		executableBlock,
+		view,
+		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
 
 	prevResultId := unittest.IdentifierFixture()

@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -114,7 +114,7 @@ func Test_Programs(t *testing.T) {
 	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := programsStorage.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 	accounts := environment.NewAccounts(txnState)
 

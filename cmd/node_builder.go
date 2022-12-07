@@ -108,11 +108,6 @@ type NodeBuilder interface {
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
 
-	// MustNot asserts that the given error must not occur.
-	// If the error is nil, returns a nil log event (which acts as a no-op).
-	// If the error is not nil, returns a fatal log event containing the error.
-	MustNot(err error) *zerolog.Event
-
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() (Node, error)

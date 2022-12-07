@@ -142,8 +142,7 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(
-	log zerolog.Logger,
+func NewMiddleware(log zerolog.Logger,
 	libP2PNode p2p.LibP2PNode,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
@@ -153,8 +152,7 @@ func NewMiddleware(
 	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption,
-) *Middleware {
+	opts ...MiddlewareOption) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -523,7 +521,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
-			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+			violation := &slashing.Violation{
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast,
+			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
 			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
@@ -581,9 +581,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators,
-			m.authorizedSenderValidator.PubSubMessageValidator(channel),
-		)
+		validators = append(validators, m.authorizedSenderValidator.PubSubMessageValidator(channel))
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
@@ -634,13 +632,17 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
+		violation := &slashing.Violation{
+			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
 	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
+		violation := &slashing.Violation{
+			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
