@@ -23,7 +23,7 @@ type RawTPSRecord struct {
 type Status string
 
 const (
-	StatusUnknown Status = ""
+	StatusUnknown Status = "UNKNOWN"
 	StatusSuccess Status = "SUCCESS"
 	StatusFailure Status = "FAILURE"
 )
@@ -60,6 +60,7 @@ func NewTPSRecorder(
 
 	r := &tpsRecorder{
 		BenchmarkResults: BenchmarkResults{
+			Status:    StatusUnknown,
 			StartTime: time.Now(),
 		},
 		done:   make(chan struct{}),
