@@ -5,6 +5,7 @@ package signature
 
 import (
 	"crypto/rand"
+	"errors"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -234,10 +235,10 @@ func TestAggregatorSameMessage(t *testing.T) {
 		err = aggregator.TrustedAdd(1, sigs[1]) // stand-alone verification
 		require.NoError(t, err)
 
-		// Aggregation should validate its own aggregation result and error with sentinel InvalidAggregatedSignatureError
+		// Aggregation should validate its own aggregation result and error with sentinel ErrIdentitySignature
 		signers, agg, err := aggregator.Aggregate()
 		assert.Error(t, err)
-		assert.True(t, IsInvalidAggregatedSignatureError(err))
+		assert.True(t, errors.Is(err, ErrIdentitySignature))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})

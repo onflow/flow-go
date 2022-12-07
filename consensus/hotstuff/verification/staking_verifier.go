@@ -59,6 +59,7 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 // that all `voters` are authorized, without duplicates. Return values:
 //   - nil if `sigData` is cryptographically valid
 //   - model.InvalidFormatError if `sigData` has an incompatible format
+//   - model.InsufficientSignaturesError if `signers` is empty.
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
@@ -69,10 +70,10 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 
 	// verify the aggregated staking signature
 	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys())
 	if err != nil {
 		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-		//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
+		//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
 		//      This scenario _is expected_ during normal operations, because a byzantine
 		//      proposer might construct an (invalid) QC with an empty list of signers.
 		// (ii) In case some provided public keys type is not BLS.
@@ -80,15 +81,15 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 		//      guaranteed by the protocol to be BLS keys.
 		//
 		if crypto.IsBLSAggregateEmptyListError(err) {
-			return model.NewInvalidFormatErrorf("empty list of signers: %w", err)
+			return model.NewInsufficientSignaturesErrorf("empty list of signers: %w", err)
 		}
 		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}
+
 	stakingValid, err := aggregatedKey.Verify(sigData, msg, v.stakingHasher)
 	if err != nil {
 		return fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
-
 	if !stakingValid {
 		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 	}

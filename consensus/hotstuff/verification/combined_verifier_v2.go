@@ -52,7 +52,6 @@ func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
-
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
@@ -118,9 +117,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
-	if len(signers) == 0 {
-		return model.NewInsufficientSignaturesErrorf("empty list of signers")
-	}
+	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -133,8 +130,6 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		return fmt.Errorf("could not split signature: %w", err)
 	}
 
-	msg := MakeVoteMessage(block.View, block.BlockID)
-
 	// verify the beacon signature first since it is faster to verify (no public key aggregation needed)
 	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beaconHasher)
 	if err != nil {
@@ -146,19 +141,16 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 
 	// aggregate public staking keys of all signers (more costly)
 	// TODO: update to use module/signature.PublicKeyAggregator
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys())
 	if err != nil {
 		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-		//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
+		//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
 		//      This scenario _is expected_ during normal operations, because a byzantine
 		//      proposer might construct an (invalid) QC with an empty list of signers.
 		// (ii) In case some provided public keys type is not BLS.
 		//      This scenario is _not expected_ during normal operations, because all keys are
 		//      guaranteed by the protocol to be BLS keys.
 		// check case (i)
-		// TODO: this should not happen because the case `len(signers) == 0`
-		// is checked upfront and ruled out. This is because `Unpack` does not
-		// handle the empty list case properly.
 		if crypto.IsBLSAggregateEmptyListError(err) {
 			return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
 		}

@@ -158,22 +158,19 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 	return ok, nil
 }
 
-// Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
-//
-// Aggregate attempts to aggregate the internal signatures and returns the resulting signature.
-// The function errors if any signature fails the deserialization. It also performs a final
-// verification and errors if the aggregated signature is not valid.
-// It also errors if no signatures were added.
-// Post-check of aggregated signature is required for function safety, as `TrustedAdd` allows
-// adding invalid signatures. Aggregation may also output an invalid signature (identity)
-// even though all included signatures are valid (extremely unlikely case when all keys are sampled
-// uniformly)
+// Aggregate aggregates the stored BLS signatures and returns the resulting aggregated signature.
+// The method errors if no signatures were added or any of the added signature fails deserialization.
+// It also performs a final verification and errors if the aggregated signature is invalid. This
+// "post-check" of the aggregated signature is required for safety, as `TrustedAdd` allows
+// adding invalid signatures.
 // The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
-//   - InvalidAggregatedSignatureError if the aggregated signature is invalid. It's not clear whether included
-//     signatures via TrustedAdd are invalid. This case can happen even when all added signatures
-//     are individually valid.
+//   - ErrIdentitySignature if aggregation produced the identity signature, which is invalid
+//     by convention. This error can arise in two scenarios:
+//     1. Some signatures added via TrustedAdd were forged specifically with the goal to yield the
+//     identity signature. Here, these signatures would be invalid w.r.t to their respective public keys.
+//     2. The signatures are valid but the public keys were forged to sum up to an identity public key.
 //   - InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	// check if signature was already computed
@@ -209,7 +206,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	if !ok {
 		// check for identity signature (invalid aggregated signature)
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
-			return nil, nil, InvalidAggregatedSignatureError
+			return nil, nil, fmt.Errorf("invalid aggregated signature: %w", ErrIdentitySignature)
 		}
 		// this case can only happen if at least one added signature via TrustedAdd does not verify against
 		// the signer's corresponding public key
@@ -232,7 +229,6 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //   - InvalidSignerIdxError if some signer indices are out of bound
 //   - generic error in case of an unexpected runtime failure
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, error) {
-
 	keys := make([]crypto.PublicKey, 0, len(signers))
 	for _, signer := range signers {
 		if signer >= s.n || signer < 0 {
@@ -302,7 +298,7 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 // KeyAggregate returns the aggregated public key of the input signers.
 //
 // The aggregation errors if:
-//   - genric error if input signers is empty.
+//   - generic error if input signers is empty.
 //   - InvalidSignerIdxError if any signer is out of bound.
 //   - other generic errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {

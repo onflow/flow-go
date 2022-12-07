@@ -238,12 +238,33 @@ func IsInvalidSignatureIncludedError(err error) bool {
 // This can happen because:
 //   - one or many signatures added via TrustedAdd are invalid to their respective public keys.
 //   - OR the signatures are valid but the public keys were forged to sum up to an identity public key.
-var InvalidAggregatedSignatureError = errors.New("aggregated signature is invalid (identity signature)")
+type InvalidAggregatedSignatureError struct {
+	error
+}
+
+func NewInvalidAggregatedSignatureError(err error) error {
+	return InvalidAggregatedSignatureError{err}
+}
+
+func NewInvalidAggregatedSignatureErrorf(msg string, args ...interface{}) error {
+	return InvalidAggregatedSignatureError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidAggregatedSignatureError) Error() string { return e.error.Error() }
+func (e InvalidAggregatedSignatureError) Unwrap() error { return e.error }
 
 // IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
 func IsInvalidAggregatedSignatureError(err error) bool {
-	return errors.Is(err, InvalidAggregatedSignatureError)
+	var e InvalidAggregatedSignatureError
+	return errors.As(err, &e)
 }
+
+//var InvalidAggregatedSignatureError = errors.New("aggregated signature is invalid (identity signature)")
+//
+//// IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
+//func IsInvalidAggregatedSignatureError(err error) bool {
+//	return errors.Is(err, InvalidAggregatedSignatureError)
+//}
 
 // InsufficientSignaturesError indicates that not enough signatures have been stored to complete the operation.
 type InsufficientSignaturesError struct {

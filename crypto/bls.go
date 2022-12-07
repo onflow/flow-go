@@ -37,6 +37,7 @@ package crypto
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -73,6 +74,8 @@ const (
 	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
 	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
+
+	identityBLSSignatureHeader = byte(0xC0)
 )
 
 // blsBLS12381Algo, embeds SignAlgo
@@ -202,7 +205,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, err
 	}
 
-	// intialize BLS context
+	// initialize BLS context
 	blsInstance.reInit()
 
 	if len(s) != signatureLengthBLSBLS12381 {
@@ -232,7 +235,8 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
-const identityBLSSignatureHeader = byte(0xC0)
+// identityBLSSignature represents the identity signature
+var identityBLSSignature = append([]byte{identityBLSSignatureHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
 
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
@@ -243,18 +247,7 @@ const identityBLSSignatureHeader = byte(0xC0)
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	if len(s) != signatureLengthBLSBLS12381 {
-		return false
-	}
-	if s[0] != identityBLSSignatureHeader {
-		return false
-	}
-	for _, b := range s[1:] {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
+	return bytes.Compare(s, identityBLSSignature) == 0
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12-381 curve.
