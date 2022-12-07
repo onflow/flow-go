@@ -10,7 +10,7 @@ import (
 )
 
 func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
-	return MigrateByAccount(AccountUsageMigrator, payloads, pathFinderVersion)
+	return MigrateByAccount(AccountUsageMigrator{}, payloads, pathFinderVersion)
 }
 
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
@@ -26,9 +26,11 @@ func isAccountKey(key ledger.Key) bool {
 	return string(key.KeyParts[1].Value) == state.AccountStatusKey
 }
 
+type AccountUsageMigrator struct{}
+
 // AccountUsageMigrator iterate through each payload, and calculate the storage usage
 // and update the accoutns status with the updated storage usage
-func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error) {
+func (m AccountUsageMigrator) MigratePayloads(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error) {
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)

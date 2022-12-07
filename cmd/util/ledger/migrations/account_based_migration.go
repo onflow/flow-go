@@ -56,7 +56,9 @@ func PayloadGrouping(groups *PayloadGroup, payload ledger.Payload) (*PayloadGrou
 
 // AccountMigrator takes all the payloads that belong to the given account
 // and return the migrated payloads
-type AccountMigrator func(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error)
+type AccountMigrator interface {
+	MigratePayloads(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error)
+}
 
 // MigrateByAccount teaks a migrator function and all the payloads, and return the migrated payloads
 func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pathFinderVersion uint8) (
@@ -120,7 +122,7 @@ func MigrateGroupSequentially(
 	migrated := make([]ledger.Payload, 0)
 	migratedPaths := make([]ledger.Path, 0)
 	for address, payloads := range payloadsByAccount {
-		accountMigrated, err := migrator(address, payloads, pathFinderVersion)
+		accountMigrated, err := migrator.MigratePayloads(address, payloads, pathFinderVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
 		}
@@ -174,7 +176,7 @@ func MigrateGroupConcurrently(
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
 			for job := range jobs {
-				accountMigrated, err := migrator(job.Account, job.Payloads, pathFinderVersion)
+				accountMigrated, err := migrator.MigratePayloads(job.Account, job.Payloads, pathFinderVersion)
 				resultCh <- &resultMigrating{
 					Migrated: accountMigrated,
 					Err:      err,
