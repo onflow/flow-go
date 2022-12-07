@@ -108,25 +108,27 @@ func (r *tpsRecorder) SetStatus(status Status) {
 
 func (r *tpsRecorder) record(nowTs time.Time, stats benchmark.WorkerStats) {
 	if !r.lastTs.IsZero() {
-		timeDiff := nowTs.Sub(r.lastTs).Seconds()
-
-		r.RawTPS = append(
-			r.RawTPS,
-			RawTPSRecord{
-				Timestamp:     nowTs,
-				OffsetSeconds: nowTs.Sub(r.StartTime).Seconds(),
-
-				InputTPS:    float64(stats.TxsSent-r.lastStats.TxsSent) / timeDiff,
-				OutputTPS:   float64(stats.TxsExecuted-r.lastStats.TxsExecuted) / timeDiff,
-				TimedoutTPS: float64(stats.TxsTimedout-r.lastStats.TxsTimedout) / timeDiff,
-
-				// TODO(rbtz): add error stats.
-				ErrorTPS: 0,
-
-				InflightTxs: stats.TxsSent - stats.TxsExecuted,
-			})
+		r.RawTPS = append(r.RawTPS, r.statsToRawTPS(nowTs, stats))
 	}
 
 	r.lastStats = stats
 	r.lastTs = nowTs
+}
+
+func (r *tpsRecorder) statsToRawTPS(nowTs time.Time, stats benchmark.WorkerStats) RawTPSRecord {
+	timeDiff := nowTs.Sub(r.lastTs).Seconds()
+
+	return RawTPSRecord{
+		Timestamp:     nowTs,
+		OffsetSeconds: nowTs.Sub(r.StartTime).Seconds(),
+
+		InputTPS:    float64(stats.TxsSent-r.lastStats.TxsSent) / timeDiff,
+		OutputTPS:   float64(stats.TxsExecuted-r.lastStats.TxsExecuted) / timeDiff,
+		TimedoutTPS: float64(stats.TxsTimedout-r.lastStats.TxsTimedout) / timeDiff,
+
+		// TODO(rbtz): add error stats.
+		ErrorTPS: 0,
+
+		InflightTxs: stats.TxsSent - stats.TxsExecuted,
+	}
 }
