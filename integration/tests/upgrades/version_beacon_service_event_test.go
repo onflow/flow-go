@@ -1,13 +1,9 @@
 package execution
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -17,35 +13,35 @@ type TestServiceEventVersionControl struct {
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
 
-	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
+	//serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
+	//
+	//ctx := context.Background()
 
-	ctx := context.Background()
-
-	env := templates.Environment{
-		NodeVersionBeaconAddress: serviceAddress.String(),
-	}
-
-	versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
+	//env := templates.Environment{
+	//	NodeVersionBeaconAddress: serviceAddress.String(),
+	//}
+	//
+	//versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
 
 	//height := s.BlockState.HighestFinalizedHeight()
 
 	//Contract should be deployed at bootstrap, so we expect this script to succeed, but ignore the return value
-	_, err := s.AccessClient().ExecuteScriptBytes(context.Background(), versionBufferScript, nil)
-	s.Require().NoError(err)
+	//_, err := s.AccessClient().ExecuteScriptBytes(context.Background(), versionBufferScript, nil)
+	//s.Require().NoError(err)
+	//
+	//versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
 
-	versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
+	//latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
+	//s.Require().NoError(err)
+	//
+	//seq := s.AccessClient().GetSeqNumber()
 
-	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
-	s.Require().NoError(err)
-
-	seq := s.AccessClient().GetSeqNumber()
-
-	tx := sdk.NewTransaction().
-		SetScript(versionTableChangeScript).
-		SetReferenceBlockID(sdk.Identifier(latestBlockId)).
-		SetProposalKey(sdk.Address(serviceAddress), 0, seq).
-		SetPayer(sdk.Address(serviceAddress)).
-		AddAuthorizer(sdk.Address(serviceAddress))
+	//tx := sdk.NewTransaction().
+	//	SetScript(versionTableChangeScript).
+	//	SetReferenceBlockID(sdk.Identifier(latestBlockId)).
+	//	SetProposalKey(sdk.Address(serviceAddress), 0, seq).
+	//	SetPayer(sdk.Address(serviceAddress)).
+	//	AddAuthorizer(sdk.Address(serviceAddress))
 
 	//args
 	//  height: UInt64,
@@ -67,11 +63,23 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	//err = s.AccessClient().SignAndSendTransaction(ctx, tx)
 	//s.Require().NoError(err)
 
-	fmt.Println("WAITING NOW!!! txSigned " + tx.ID().String())
+	//fmt.Println("WAITING NOW!!! txSigned " + tx.ID().String())
 
 	//result, err := s.AccessClient().WaitForSealed(ctx, tx.ID())
 
-	reasult := s.BlockState.WaitForSealed(s.T(), 200)
+	//for i := 0; i < 120; i++ {
+	//	header, err := s.AccessClient().GetLatestSealedBlockHeader(context.Background())
+	//	s.Require().NoError(err)
+	//
+	//	fmt.Printf("SEALED %d\n", header.Height)
+	//
+	//	if header.Height > 100 {
+	//		break
+	//	}
+	//	time.Sleep(1 * time.Second)
+	//}
+
+	reasult := s.BlockState.WaitForSealed(s.T(), 100)
 	spew.Dump(reasult)
 
 	//
