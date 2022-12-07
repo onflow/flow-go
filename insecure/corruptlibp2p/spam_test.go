@@ -19,7 +19,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestSpam(t *testing.T) {
+// TestSpam_IHave sets up a 2 node test between a victim node and a spammer. The spammer sends a few IHAVE control messages
+// to the victim node without being subscribed to any of the same topics.
+// The test then checks that the victim node received all the messages from the spammer.
+func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
@@ -87,7 +90,7 @@ func TestSpam(t *testing.T) {
 	require.True(t, connected)
 
 	// create new spammer
-	spammer := corruptlibp2p.NewSpammerGossipSubRouter(router)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router)
 	require.NotNil(t, router)
 
 	// prepare to spam - generate IHAVE control messages

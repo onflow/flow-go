@@ -10,14 +10,14 @@ import (
 
 type ControlMessage int
 
-// SpammerGossipSub is a wrapper around the GossipSubRouter that allows us to
+// GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
-type SpammerGossipSub struct {
+type GossipSubRouterSpammer struct {
 	router *pubsub.GossipSubRouter
 }
 
-func NewSpammerGossipSubRouter(router *pubsub.GossipSubRouter) *SpammerGossipSub {
-	return &SpammerGossipSub{
+func NewGossipSubRouterSpammer(router *pubsub.GossipSubRouter) *GossipSubRouterSpammer {
+	return &GossipSubRouterSpammer{
 		router: router,
 	}
 }
@@ -25,7 +25,7 @@ func NewSpammerGossipSubRouter(router *pubsub.GossipSubRouter) *SpammerGossipSub
 // SpamIHave spams the victim with junk iHave messages.
 // msgCount is the number of iHave messages to send.
 // msgSize is the number of messageIDs to include in each iHave message.
-func (s *SpammerGossipSub) SpamIHave(victim peer.ID, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamIHave(victim peer.ID, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
 		s.router.SendControl(victim, &ctlMessage)
 	}
@@ -33,7 +33,7 @@ func (s *SpammerGossipSub) SpamIHave(victim peer.ID, ctlMessages []pb.ControlMes
 
 // GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
 // to receive them before they are sent by the spammer.
-func (s *SpammerGossipSub) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
+func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
 	//var ctlMessageMap = make(map[string]pb.ControlMessage)
 	var iHaveCtlMsgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
