@@ -312,7 +312,7 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
 	cs.head = &finalizedBlock
 
-	*cs.pending = module.PendingClusterBlockBuffer{}
+	*cs.pending = module.GenericPendingBlockBuffer[*cluster.Payload]{}
 	cs.pending.On("PruneByView", finalizedBlock.Header.View).Return(nil).Once()
 	cs.pending.On("Size").Return(uint(0)).Once()
 	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header, finalizedBlock.Header.View-1))

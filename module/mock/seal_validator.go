@@ -13,11 +13,11 @@ type SealValidator struct {
 }
 
 // Validate provides a mock function with given fields: candidate
-func (_m *SealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
+func (_m *SealValidator) Validate(candidate *flow.GenericBlock[*flow.Payload]) (*flow.Seal, error) {
 	ret := _m.Called(candidate)
 
 	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func(*flow.Block) *flow.Seal); ok {
+	if rf, ok := ret.Get(0).(func(*flow.GenericBlock[*flow.Payload]) *flow.Seal); ok {
 		r0 = rf(candidate)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +26,7 @@ func (_m *SealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*flow.Block) error); ok {
+	if rf, ok := ret.Get(1).(func(*flow.GenericBlock[*flow.Payload]) error); ok {
 		r1 = rf(candidate)
 	} else {
 		r1 = ret.Error(1)

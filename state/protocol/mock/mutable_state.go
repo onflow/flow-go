@@ -49,11 +49,11 @@ func (_m *MutableState) AtHeight(height uint64) protocol.Snapshot {
 }
 
 // Extend provides a mock function with given fields: ctx, candidate
-func (_m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
+func (_m *MutableState) Extend(ctx context.Context, candidate *flow.GenericBlock[*flow.Payload]) error {
 	ret := _m.Called(ctx, candidate)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.GenericBlock[*flow.Payload]) error); ok {
 		r0 = rf(ctx, candidate)
 	} else {
 		r0 = ret.Error(0)

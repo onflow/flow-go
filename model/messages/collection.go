@@ -52,7 +52,7 @@ func (up UntrustedClusterBlockPayload) ToInternal() *cluster.Payload {
 // cluster.Block type.
 // Deprecated: Please update cluster.Payload.Collection to use []flow.TransactionBody,
 // then replace instances of this type with cluster.Block
-type UntrustedClusterBlock = GenericUntrustedBlock[*cluster.Payload]
+type UntrustedClusterBlock = GenericUntrustedBlock[*cluster.Payload, UntrustedClusterBlockPayload]
 
 // UntrustedClusterBlockFromInternal converts the internal cluster.Block representation
 // to the representation used in untrusted messages.
@@ -74,7 +74,7 @@ func UntrustedClusterBlockFromInternal(clusterBlock *cluster.Block) UntrustedClu
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).
-type ClusterBlockProposal = GenericBlockProposal[*cluster.Payload]
+type ClusterBlockProposal = GenericBlockProposal[*cluster.Payload, UntrustedClusterBlockPayload]
 
 func NewClusterBlockProposal(internal *cluster.Block) *ClusterBlockProposal {
 	return &ClusterBlockProposal{

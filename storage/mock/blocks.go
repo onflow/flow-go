@@ -15,15 +15,15 @@ type Blocks struct {
 }
 
 // ByCollectionID provides a mock function with given fields: collID
-func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
+func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.GenericBlock[*flow.Payload], error) {
 	ret := _m.Called(collID)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -38,15 +38,15 @@ func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 }
 
 // ByHeight provides a mock function with given fields: height
-func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
+func (_m *Blocks) ByHeight(height uint64) (*flow.GenericBlock[*flow.Payload], error) {
 	ret := _m.Called(height)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(uint64) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(uint64) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -61,15 +61,15 @@ func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[*flow.Payload], error) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -133,11 +133,11 @@ func (_m *Blocks) InsertLastFullBlockHeightIfNotExists(height uint64) error {
 }
 
 // Store provides a mock function with given fields: block
-func (_m *Blocks) Store(block *flow.Block) error {
+func (_m *Blocks) Store(block *flow.GenericBlock[*flow.Payload]) error {
 	ret := _m.Called(block)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.GenericBlock[*flow.Payload]) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)
@@ -147,11 +147,11 @@ func (_m *Blocks) Store(block *flow.Block) error {
 }
 
 // StoreTx provides a mock function with given fields: block
-func (_m *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+func (_m *Blocks) StoreTx(block *flow.GenericBlock[*flow.Payload]) func(*transaction.Tx) error {
 	ret := _m.Called(block)
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(*flow.Block) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.GenericBlock[*flow.Payload]) func(*transaction.Tx) error); ok {
 		r0 = rf(block)
 	} else {
 		if ret.Get(0) != nil {

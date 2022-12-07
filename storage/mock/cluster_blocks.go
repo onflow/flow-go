@@ -15,15 +15,15 @@ type ClusterBlocks struct {
 }
 
 // ByHeight provides a mock function with given fields: height
-func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
+func (_m *ClusterBlocks) ByHeight(height uint64) (*flow.GenericBlock[*cluster.Payload], error) {
 	ret := _m.Called(height)
 
-	var r0 *cluster.Block
-	if rf, ok := ret.Get(0).(func(uint64) *cluster.Block); ok {
+	var r0 *flow.GenericBlock[*cluster.Payload]
+	if rf, ok := ret.Get(0).(func(uint64) *flow.GenericBlock[*cluster.Payload]); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*cluster.Payload])
 		}
 	}
 
@@ -38,15 +38,15 @@ func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
+func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[*cluster.Payload], error) {
 	ret := _m.Called(blockID)
 
-	var r0 *cluster.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *cluster.Block); ok {
+	var r0 *flow.GenericBlock[*cluster.Payload]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[*cluster.Payload]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*cluster.Payload])
 		}
 	}
 
@@ -61,11 +61,11 @@ func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 }
 
 // Store provides a mock function with given fields: block
-func (_m *ClusterBlocks) Store(block *cluster.Block) error {
+func (_m *ClusterBlocks) Store(block *flow.GenericBlock[*cluster.Payload]) error {
 	ret := _m.Called(block)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*cluster.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.GenericBlock[*cluster.Payload]) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)

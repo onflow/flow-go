@@ -93,20 +93,20 @@ type GenericToInternal[T flow.GenericPayload] interface {
 // flow.Block type.
 // Deprecated: Please update flow.Payload to use []flow.Guarantee etc., then
 // replace instances of this type with flow.Block
-type GenericUntrustedBlock[TrustedPayload flow.GenericPayload] struct {
+type GenericUntrustedBlock[TrustedPayload flow.GenericPayload, UntrustedPayload GenericToInternal[TrustedPayload]] struct {
 	Header  flow.Header
-	Payload GenericToInternal[TrustedPayload]
+	Payload UntrustedPayload
 }
 
 // ToInternal returns the internal representation of the type.
-func (ub *GenericUntrustedBlock[TrustedPayload]) ToInternal() *flow.GenericBlock[TrustedPayload] {
+func (ub *GenericUntrustedBlock[TrustedPayload, UntrustedPayload]) ToInternal() *flow.GenericBlock[TrustedPayload] {
 	return &flow.GenericBlock[TrustedPayload]{
 		Header:  &ub.Header,
 		Payload: ub.Payload.ToInternal(),
 	}
 }
 
-type UntrustedBlock = GenericUntrustedBlock[*flow.Payload]
+type UntrustedBlock = GenericUntrustedBlock[*flow.Payload, UntrustedBlockPayload]
 
 // UntrustedBlockFromInternal converts the internal flow.Block representation
 // to the representation used in untrusted messages.
@@ -131,19 +131,13 @@ func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 	}
 }
 
-type GenericBlockProposal[TrustedPayload flow.GenericPayload] struct {
-	Block GenericUntrustedBlock[TrustedPayload]
+type GenericBlockProposal[TrustedPayload flow.GenericPayload, UntrustedPayload GenericToInternal[TrustedPayload]] struct {
+	Block GenericUntrustedBlock[TrustedPayload, UntrustedPayload]
 }
 
 // BlockProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
-type BlockProposal = GenericBlockProposal[*flow.Payload]
-
-//func NewBlockProposal(internal *flow.GenericBlock[flow.GenericPayload]) *BlockProposal[flow.GenericPayload, GenericToInternal[flow.GenericPayload]] {
-//	return &BlockProposal[flow.GenericPayload, GenericToInternal[flow.GenericPayload]]{
-//		Block: internal,
-//	}
-//}
+type BlockProposal = GenericBlockProposal[*flow.Payload, UntrustedBlockPayload]
 
 func NewBlockProposal(internal *flow.Block) *BlockProposal {
 	return &BlockProposal{

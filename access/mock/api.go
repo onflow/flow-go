@@ -156,15 +156,15 @@ func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address
 }
 
 // GetBlockByHeight provides a mock function with given fields: ctx, height
-func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
+func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.GenericBlock[*flow.Payload], flow.BlockStatus, error) {
 	ret := _m.Called(ctx, height)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(ctx, height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -186,15 +186,15 @@ func (_m *API) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block
 }
 
 // GetBlockByID provides a mock function with given fields: ctx, id
-func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
+func (_m *API) GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.GenericBlock[*flow.Payload], flow.BlockStatus, error) {
 	ret := _m.Called(ctx, id)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -391,15 +391,15 @@ func (_m *API) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Id
 }
 
 // GetLatestBlock provides a mock function with given fields: ctx, isSealed
-func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
+func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.GenericBlock[*flow.Payload], flow.BlockStatus, error) {
 	ret := _m.Called(ctx, isSealed)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(context.Context, bool) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(ctx, isSealed)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 

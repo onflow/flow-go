@@ -15,12 +15,12 @@ type CollectionMetrics struct {
 }
 
 // ClusterBlockFinalized provides a mock function with given fields: block
-func (_m *CollectionMetrics) ClusterBlockFinalized(block *cluster.Block) {
+func (_m *CollectionMetrics) ClusterBlockFinalized(block *flow.GenericBlock[*cluster.Payload]) {
 	_m.Called(block)
 }
 
 // ClusterBlockProposed provides a mock function with given fields: block
-func (_m *CollectionMetrics) ClusterBlockProposed(block *cluster.Block) {
+func (_m *CollectionMetrics) ClusterBlockProposed(block *flow.GenericBlock[*cluster.Payload]) {
 	_m.Called(block)
 }
 

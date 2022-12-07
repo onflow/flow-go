@@ -14,11 +14,11 @@ type Blocks struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *Blocks) Add(block *flow.Block) bool {
+func (_m *Blocks) Add(block *flow.GenericBlock[*flow.Payload]) bool {
 	ret := _m.Called(block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Block) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.GenericBlock[*flow.Payload]) bool); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -28,15 +28,15 @@ func (_m *Blocks) Add(block *flow.Block) bool {
 }
 
 // All provides a mock function with given fields:
-func (_m *Blocks) All() []*flow.Block {
+func (_m *Blocks) All() []*flow.GenericBlock[*flow.Payload] {
 	ret := _m.Called()
 
-	var r0 []*flow.Block
-	if rf, ok := ret.Get(0).(func() []*flow.Block); ok {
+	var r0 []*flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func() []*flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Block)
+			r0 = ret.Get(0).([]*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
@@ -44,15 +44,15 @@ func (_m *Blocks) All() []*flow.Block {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
+func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.GenericBlock[*flow.Payload], bool) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	var r0 *flow.GenericBlock[*flow.Payload]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.GenericBlock[*flow.Payload]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.GenericBlock[*flow.Payload])
 		}
 	}
 
