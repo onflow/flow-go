@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/rs/zerolog/log"
 )
 
 func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
@@ -52,6 +53,11 @@ func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderV
 		totalSize += size
 	}
 
+	err := compareUsage(status, totalSize)
+	if err != nil {
+		log.Error().Msgf("%v", err)
+	}
+
 	if status == nil {
 		return nil, fmt.Errorf("could not find account status for account %v", account)
 	}
@@ -68,6 +74,14 @@ func AccountUsageMigrator(account string, payloads []ledger.Payload, pathFinderV
 	payloads[statusIndex] = newPayload
 
 	return payloads, nil
+}
+
+func compareUsage(status *environment.AccountStatus, totalSize uint64) error {
+	oldSize := status.StorageUsed()
+	if oldSize != totalSize {
+		return fmt.Errorf("old size: %v, new size: %v", oldSize, totalSize)
+	}
+	return nil
 }
 
 // newPayloadWithValue returns a new payload with the key from the given payload, and

@@ -78,7 +78,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 		logGrouping(i)
 	}
 
-	log.Info().Msgf("finish grouping for payloads, %v groups in total, %v NonAccountPayloads",
+	log.Info().Msgf("finish grouping for payloads by account: %v groups in total, %v NonAccountPayloads",
 		len(groups.Accounts), len(groups.NonAccountPayloads))
 
 	// migrate the payloads under accounts
