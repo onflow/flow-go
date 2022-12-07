@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 )
@@ -13,24 +12,13 @@ func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8) ([]
 	return MigrateByAccount(AccountUsageMigrator, payloads, pathFinderVersion)
 }
 
-func KeyToStorageInteractionKey(key ledger.Key) (meter.StorageInteractionKey, error) {
-	id, err := KeyToRegisterID(key)
-	if err != nil {
-		return meter.StorageInteractionKey{}, err
-	}
-	return meter.StorageInteractionKey{
-		Owner: id.Owner,
-		Key:   id.Key,
-	}, nil
-}
-
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
-	ik, err := KeyToStorageInteractionKey(key)
+	id, err := KeyToRegisterID(key)
 	if err != nil {
 		return 0, err
 	}
 
-	return meter.GetStorageKeyValueSizeForTesting(ik, payload.Value()), nil
+	return uint64(registerSize(id, payload)), nil
 }
 
 func isAccountKey(key ledger.Key) bool {
