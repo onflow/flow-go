@@ -21,24 +21,21 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/environment"
-
 	"github.com/onflow/flow-go/engine/execution"
-	state2 "github.com/onflow/flow-go/engine/execution/state"
-	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -47,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -191,12 +189,14 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	require.NoError(t, err)
 
 	fakeUploader := &FakeUploader{}
+	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
+	uploadMgr.AddUploader(fakeUploader)
 
 	manager := &Manager{
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploaders:        []uploader.Uploader{fakeUploader},
+		uploader:         uploadMgr,
 		tracer:           trace.NewNoopTracer(),
 	}
 

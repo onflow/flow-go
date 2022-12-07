@@ -69,7 +69,7 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
-	uploaders              []uploader.Uploader
+	uploader               *uploader.Manager
 	stopControl            *StopControl
 }
 
@@ -96,7 +96,7 @@ func New(
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
-	uploaders []uploader.Uploader,
+	uploader *uploader.Manager,
 	stopControl *StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
@@ -130,7 +130,7 @@ func New(
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		executionDataPruner:    pruner,
-		uploaders:              uploaders,
+		uploader:               uploader,
 		stopControl:            stopControl,
 	}
 
@@ -149,8 +149,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.stopControl.IsPaused() {
-		if computation.GetUploaderEnabled() {
-			if err := e.retryUpload(); err != nil {
+		if e.uploader.Enabled() {
+			if err := e.uploader.RetryUploads(); err != nil {
 				e.log.Warn().Msg("failed to re-upload all ComputationResults")
 			}
 		}
@@ -1257,16 +1257,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
-}
-
-func (e *Engine) retryUpload() (err error) {
-	for _, u := range e.uploaders {
-		switch retryableUploaderWraper := u.(type) {
-		case uploader.RetryableUploaderWrapper:
-			err = retryableUploaderWraper.RetryUpload()
-		}
-	}
-	return err
 }
 
 func GenerateExecutionReceipt(

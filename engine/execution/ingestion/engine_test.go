@@ -19,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -1726,36 +1725,4 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
-}
-
-func TestRetryableUploader(t *testing.T) {
-	testRetryableUploader := new(FakeRetryableUploader)
-
-	engine := &Engine{
-		uploaders: []uploader.Uploader{testRetryableUploader},
-	}
-
-	err := engine.retryUpload()
-	assert.Nil(t, err)
-
-	require.True(t, testRetryableUploader.RetryUploadCalled())
-}
-
-// FakeRetryableUploader is one RetryableUploader for testing purposes.
-type FakeRetryableUploader struct {
-	uploader.RetryableUploaderWrapper
-	retryUploadCalled bool
-}
-
-func (f *FakeRetryableUploader) Upload(_ *execution.ComputationResult) error {
-	return nil
-}
-
-func (f *FakeRetryableUploader) RetryUpload() error {
-	f.retryUploadCalled = true
-	return nil
-}
-
-func (f *FakeRetryableUploader) RetryUploadCalled() bool {
-	return f.retryUploadCalled
 }
