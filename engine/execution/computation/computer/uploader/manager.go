@@ -4,10 +4,11 @@ import (
 	"context"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
-	"golang.org/x/sync/errgroup"
 )
 
 // Manager encapsulates the logic for uploading computation results to cloud storage. It
