@@ -560,144 +560,42 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultAccessNodeConfig()
 
-		flags.UintVar(&builder.collectionGRPCPort,
-			"collection-ingress-port",
-			defaultConfig.collectionGRPCPort,
-			"the grpc ingress port for all collection nodes")
-		flags.UintVar(&builder.executionGRPCPort,
-			"execution-ingress-port",
-			defaultConfig.executionGRPCPort,
-			"the grpc ingress port for all execution nodes")
-		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr,
-			"rpc-addr",
-			"r",
-			defaultConfig.rpcConf.UnsecureGRPCListenAddr,
-			"the address the unsecured gRPC server listens on")
-		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr,
-			"secure-rpc-addr",
-			defaultConfig.rpcConf.SecureGRPCListenAddr,
-			"the address the secure gRPC server listens on")
-		flags.StringVarP(&builder.rpcConf.HTTPListenAddr,
-			"http-addr",
-			"h",
-			defaultConfig.rpcConf.HTTPListenAddr,
-			"the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RESTListenAddr,
-			"rest-addr",
-			defaultConfig.rpcConf.RESTListenAddr,
-			"the address the REST server listens on (if empty the REST server will not be started)")
-		flags.StringVarP(&builder.rpcConf.CollectionAddr,
-			"static-collection-ingress-addr",
-			"",
-			defaultConfig.rpcConf.CollectionAddr,
-			"the address (of the collection node) to send transactions to")
-		flags.StringVarP(&builder.ExecutionNodeAddress,
-			"script-addr",
-			"s",
-			defaultConfig.ExecutionNodeAddress,
-			"the address (of the execution node) forward the script to")
-		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs,
-			"historical-access-addr",
-			"",
-			defaultConfig.rpcConf.HistoricalAccessAddrs,
-			"comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout,
-			"collection-client-timeout",
-			defaultConfig.rpcConf.CollectionClientTimeout,
-			"grpc client timeout for a collection node")
-		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout,
-			"execution-client-timeout",
-			defaultConfig.rpcConf.ExecutionClientTimeout,
-			"grpc client timeout for an execution node")
-		flags.UintVar(&builder.rpcConf.ConnectionPoolSize,
-			"connection-pool-size",
-			defaultConfig.rpcConf.ConnectionPoolSize,
-			"maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
-		flags.UintVar(&builder.rpcConf.MaxHeightRange,
-			"rpc-max-height-range",
-			defaultConfig.rpcConf.MaxHeightRange,
-			"maximum size for height range requests")
-		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs,
-			"preferred-execution-node-ids",
-			defaultConfig.rpcConf.PreferredExecutionNodeIDs,
-			"comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs,
-			"fixed-execution-node-ids",
-			defaultConfig.rpcConf.FixedExecutionNodeIDs,
-			"comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&builder.logTxTimeToFinalized,
-			"log-tx-time-to-finalized",
-			defaultConfig.logTxTimeToFinalized,
-			"log transaction time to finalized")
+		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
+		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
+		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
+		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
+		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
+		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
+		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
+		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
+		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
+		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
+		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
-		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted,
-			"log-tx-time-to-finalized-executed",
-			defaultConfig.logTxTimeToFinalizedExecuted,
-			"log transaction time to finalized and executed")
-		flags.BoolVar(&builder.pingEnabled,
-			"ping-enabled",
-			defaultConfig.pingEnabled,
-			"whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-		flags.BoolVar(&builder.retryEnabled,
-			"retry-enabled",
-			defaultConfig.retryEnabled,
-			"whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
+		flags.BoolVar(&builder.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
-		flags.StringVarP(&builder.nodeInfoFile,
-			"node-info-file",
-			"",
-			defaultConfig.nodeInfoFile,
-			"full path to a json file which provides more details about nodes when reporting its reachability metrics")
-		flags.StringToIntVar(&builder.apiRatelimits,
-			"api-rate-limits",
-			defaultConfig.apiRatelimits,
-			"per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
-		flags.StringToIntVar(&builder.apiBurstlimits,
-			"api-burst-limits",
-			defaultConfig.apiBurstlimits,
-			"burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&builder.supportsObserver,
-			"supports-observer",
-			defaultConfig.supportsObserver,
-			"true if this staked access node supports observer or follower connections")
-		flags.StringVar(&builder.PublicNetworkConfig.BindAddress,
-			"public-network-address",
-			defaultConfig.PublicNetworkConfig.BindAddress,
-			"staked access node's public network bind address")
+		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
+		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 
 		// ExecutionDataRequester config
-		flags.BoolVar(&builder.executionDataSyncEnabled,
-			"execution-data-sync-enabled",
-			defaultConfig.executionDataSyncEnabled,
-			"whether to enable the execution data sync protocol")
-		flags.StringVar(&builder.executionDataDir,
-			"execution-data-dir",
-			defaultConfig.executionDataDir,
-			"directory to use for Execution Data database")
-		flags.Uint64Var(&builder.executionDataStartHeight,
-			"execution-data-start-height",
-			defaultConfig.executionDataStartHeight,
-			"height of first block to sync execution data from when starting with an empty Execution Data database")
-		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead,
-			"execution-data-max-search-ahead",
-			defaultConfig.executionDataConfig.MaxSearchAhead,
-			"max number of heights to search ahead of the lowest outstanding execution data height")
-		flags.DurationVar(&builder.executionDataConfig.FetchTimeout,
-			"execution-data-fetch-timeout",
-			defaultConfig.executionDataConfig.FetchTimeout,
-			"initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
-		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout,
-			"execution-data-max-fetch-timeout",
-			defaultConfig.executionDataConfig.MaxFetchTimeout,
-			"maximum timeout to use when fetching execution data from the network e.g. 300s")
-		flags.DurationVar(&builder.executionDataConfig.RetryDelay,
-			"execution-data-retry-delay",
-			defaultConfig.executionDataConfig.RetryDelay,
-			"initial delay for exponential backoff when fetching execution data fails e.g. 10s")
-		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay,
-			"execution-data-max-retry-delay",
-			defaultConfig.executionDataConfig.MaxRetryDelay,
-			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
+		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
+		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
+		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
+		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
