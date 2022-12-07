@@ -60,11 +60,8 @@ func (g *Git) GetRepoInfo() (*RepoInfo, error) {
 		return nil, fmt.Errorf("failed to get commit object for: %s: %w", ref.Hash().String(), err)
 	}
 
-	var subject string
-	lines := strings.SplitN(commit.Message, "\n", 2)
-	if len(lines) > 0 {
-		subject = strings.TrimSpace(lines[0])
-	}
+	subject, _, _ := strings.Cut(commit.Message, "\n")
+	subject = strings.TrimSpace(subject)
 
 	iter, err := g.repo.Tags()
 	if err != nil {
