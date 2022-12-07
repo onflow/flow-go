@@ -71,6 +71,11 @@ endif
 init-light:
 	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
+# CI tests have a larger number of nodes
+.PHONY: init-ci
+init-ci:
+	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 init
+
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs
 init-short-epochs:
@@ -79,18 +84,17 @@ init-short-epochs:
 .PHONY: start
 start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
-	$(MAKE) start-thin
+	$(MAKE) start-flow-nodes
 
+# Starts a version of localnet with just flow nodes and without metrics services. This prevents port collision and consumption
+# when these services are not needed.
+.PHONY: start-flow-nodes
+start-flow-nodes:
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
 .PHONY: build
 build:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
-
-# Starts a version of localnet without metrics services. This prevents port collision and consumption
-# when these services are not needed.
-.PHONY: start-thin
-start-thin:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
 .PHONY: stop
 stop:
@@ -109,9 +113,8 @@ tps-ci-smoke:
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 2m
 
 .PHONY: tps-test-ci
-tps-test-ci:
-	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 init
-	$(MAKE) start-thin
+tps-test-ci: init-ci
+	$(MAKE) start-flow-nodes
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
 	$(MAKE) stop
 
