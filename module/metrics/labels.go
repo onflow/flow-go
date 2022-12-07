@@ -128,3 +128,5 @@ const (
 )
 
 const ExecutionDataRequestRetryable = "retryable"
+
+const LabelViolationReason = "reason"
