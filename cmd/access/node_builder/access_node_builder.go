@@ -409,7 +409,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
-	var execDataStore execution_data.ExecutionDataStore
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -542,11 +541,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				RpcMetricsEnabled:       builder.rpcMetricsEnabled,
 			}
 
-			blobStore := blobs.NewBlobstore(ds)
-			execDataStore = execution_data.NewExecutionDataStore(blobStore, execution_data.DefaultSerializer)
 			builder.StateStreamEng = state_stream.NewEng(
 				conf,
-				execDataStore,
+				builder.ExecutionDataStore,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
