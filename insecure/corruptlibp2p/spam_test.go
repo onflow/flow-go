@@ -2,10 +2,12 @@ package corruptlibp2p_test
 
 import (
 	"context"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/onflow/flow-go/network/p2p/utils"
 	"testing"
 	"time"
+
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+
+	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"

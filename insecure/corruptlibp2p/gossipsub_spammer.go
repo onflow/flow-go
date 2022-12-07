@@ -1,11 +1,12 @@
 package corruptlibp2p
 
 import (
+	"testing"
+
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
-	"testing"
 )
 
 type ControlMessage int
