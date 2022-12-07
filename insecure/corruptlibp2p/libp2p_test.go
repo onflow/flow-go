@@ -99,8 +99,8 @@ func TestSpam(t *testing.T) {
 	// check that victim received spammer's message
 	select {
 	case <-received:
-		return
-	case <-time.After(2 * time.Second):
+		break
+	case <-time.After(1 * time.Second):
 		require.Fail(t, "did not receive spam message")
 	}
 
