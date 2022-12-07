@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
@@ -599,6 +600,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
 
+	// disabled by default
+	uploader := uploader.NewManager(node.Tracer)
+
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
@@ -615,7 +619,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		vmCtx,
 		committer,
-		nil,
+		uploader,
 		prov,
 		computation.ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -664,7 +668,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		nil,
-		nil,
+		uploader,
 		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
 	)
 	require.NoError(t, err)

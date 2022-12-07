@@ -142,6 +142,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
+		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 		tracer:           trace.NewNoopTracer(),
 	}
 
@@ -728,6 +729,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
+		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 		tracer:           trace.NewNoopTracer(),
 	}
 
