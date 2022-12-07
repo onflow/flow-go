@@ -77,9 +77,9 @@ func NewTPSRecorder(
 		defer close(r.done)
 
 		for {
+			r.record(time.Now(), workerStatsTracker.GetStats())
 			select {
-			case nowTs := <-t.C:
-				r.record(nowTs, workerStatsTracker.GetStats())
+			case <-t.C:
 			case <-ctx.Done():
 				return
 			}
