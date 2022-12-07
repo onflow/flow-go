@@ -126,6 +126,8 @@ func (s *Suite) SetupTest() {
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag(blockRateFlag),
+			testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+			testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}

@@ -249,7 +249,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 			defer bs.RUnlock()
 
 			if bs.highestSealed != nil {
-				t.Logf("%v waiting for sealed height (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, height, bs.highestFinalized)
+				fmt.Printf("%v waiting for sealed height (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, height, bs.highestFinalized)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
