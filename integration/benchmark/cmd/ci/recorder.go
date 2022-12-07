@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/integration/benchmark"
@@ -47,6 +48,8 @@ type tpsRecorder struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	stopOnce *sync.Once
 }
 
 func NewTPSRecorder(
@@ -62,6 +65,8 @@ func NewTPSRecorder(
 		done:   make(chan struct{}),
 		ctx:    ctx,
 		cancel: cancel,
+
+		stopOnce: &sync.Once{},
 	}
 
 	go func() {
@@ -84,13 +89,16 @@ func NewTPSRecorder(
 }
 
 func (r *tpsRecorder) Stop() {
-	r.cancel()
-	<-r.done
-	r.StopTime = time.Now()
-	r.DurationSeconds = r.StopTime.Sub(r.StartTime).Seconds()
-	if r.Status == StatusUnknown {
-		r.Status = StatusSuccess
-	}
+	r.stopOnce.Do(func() {
+		r.cancel()
+		<-r.done
+
+		r.StopTime = time.Now()
+		r.DurationSeconds = r.StopTime.Sub(r.StartTime).Seconds()
+		if r.Status == StatusUnknown {
+			r.Status = StatusSuccess
+		}
+	})
 }
 
 func (r *tpsRecorder) SetStatus(status Status) {
