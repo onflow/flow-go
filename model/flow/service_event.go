@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	ServiceEventSetup  = "setup"
-	ServiceEventCommit = "commit"
+	ServiceEventSetup          = "setup"
+	ServiceEventCommit         = "commit"
+	ServiceEventVersionControl = "version-control"
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -87,6 +88,13 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionControl:
+		version := new(VersionTable)
+		err = json.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -137,6 +145,13 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionControl:
+		version := new(VersionTable)
+		err = msgpack.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -186,6 +201,13 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionControl:
+		version := new(VersionTable)
+		err = cbor.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -223,6 +245,18 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", other.Event)
 		}
 		return commit.EqualTo(otherCommit), nil
+
+	case ServiceEventVersionControl:
+		version, ok := se.Event.(*VersionTable)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventVersionControl: %T", se.Event)
+		}
+		otherVersion, ok := other.Event.(*VersionTable)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventVersionControl: %T", other.Event)
+		}
+		return version.EqualTo(otherVersion), nil
+
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)
 	}

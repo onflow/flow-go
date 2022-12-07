@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-semver/semver"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -768,11 +769,14 @@ func ServiceEventsFixture(n int) flow.ServiceEventList {
 	sel := make(flow.ServiceEventList, n)
 
 	for ; n > 0; n-- {
-		switch rand.Intn(2) {
+		// make this fixture predictable
+		switch n % 3 {
 		case 0:
 			sel[n-1] = EpochCommitFixture().ServiceEvent()
 		case 1:
 			sel[n-1] = EpochSetupFixture().ServiceEvent()
+		case 2:
+			sel[n-1] = VersionTableFixture(3).ServiceEvent()
 		}
 	}
 
@@ -1872,6 +1876,41 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 		apply(commit)
 	}
 	return commit
+}
+
+func VersionTableFixture(size uint, opts ...func(flow.VersionTable)) *flow.VersionTable {
+
+	if size == 0 {
+		return &flow.VersionTable{
+			Sequence: uint64(0),
+		}
+	}
+
+	versionTable := flow.VersionTable{
+		RequiredVersions: []flow.VersionControlRequirement{{Height: 23, Version: "0.21.37"}},
+		Sequence:         uint64(5),
+	}
+
+	for i := 1; i < int(size); i++ {
+		versionTable.RequiredVersions = append(versionTable.RequiredVersions, VersionControlRequirementFixture(versionTable.RequiredVersions[i-1]))
+	}
+
+	for _, apply := range opts {
+		apply(versionTable)
+	}
+	return &versionTable
+}
+
+func VersionControlRequirementFixture(lower flow.VersionControlRequirement) flow.VersionControlRequirement {
+	nextHeight := lower.Height + (rand.Uint64() % 10000)
+
+	nextVersion := semver.New(lower.Version)
+	nextVersion.BumpPatch()
+
+	return flow.VersionControlRequirement{
+		Height:  nextHeight,
+		Version: nextVersion.String(),
+	}
 }
 
 // BootstrapFixture generates all the artifacts necessary to bootstrap the

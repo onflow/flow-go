@@ -12,8 +12,9 @@ import (
 
 // prefixes used to distinguish service events
 const (
-	ServiceEventPrefixSetup  = byte(1)
-	ServiceEventPrefixCommit = byte(2)
+	ServiceEventPrefixSetup          = byte(1)
+	ServiceEventPrefixCommit         = byte(2)
+	ServiceEventPrefixVersionControl = byte(3)
 )
 
 // serviceEventTypeToPrefix returns byte prefix for given service event type
@@ -23,6 +24,8 @@ func serviceEventTypeToPrefix(eventType string) (byte, error) {
 		return ServiceEventPrefixSetup, nil
 	case flow.ServiceEventCommit:
 		return ServiceEventPrefixCommit, nil
+	case flow.ServiceEventVersionControl:
+		return ServiceEventPrefixVersionControl, nil
 
 	// service events are special and the list is strictly controlled
 	// any unknown type must error out

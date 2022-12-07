@@ -3,11 +3,11 @@ package convert_test
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/convert"
-	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,7 +17,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup", func(t *testing.T) {
 
-		fixture, expected := fixtures.EpochSetupFixtureByChainID(chainID)
+		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -34,7 +34,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch commit", func(t *testing.T) {
 
-		fixture, expected := fixtures.EpochCommitFixtureByChainID(chainID)
+		fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -43,6 +43,22 @@ func TestEventConversion(t *testing.T) {
 
 		// cast event type to epoch commit
 		actual, ok := event.Event.(*flow.EpochCommit)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	})
+
+	t.Run("version beacon", func(t *testing.T) {
+
+		fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch commit
+		actual, ok := event.Event.(*flow.VersionTable)
 		require.True(t, ok)
 
 		assert.Equal(t, expected, actual)

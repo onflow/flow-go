@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/convert"
-	convertfixtures "github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -48,8 +47,8 @@ var eventsList = flow.EventsList{
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
-var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
+var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 

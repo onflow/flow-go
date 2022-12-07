@@ -39,6 +39,8 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		height1 := uint64(21)
 		height2 := uint64(37)
 		height3 := uint64(55)
+		// make sure we don't accidentally clash heights
+		heightForTypesTest := uint64(122)
 		eventType := flow.ServiceEventCommit
 
 		// inserting 3 results at different height each has a ServiceEventCommit
@@ -100,6 +102,58 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height1-1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
+		})
+
+		t.Run("all service events types can be indexed", func(t *testing.T) {
+			// badger supports concurrency and tests are self-contained, so we can run them in parallel
+			t.Run("EpochSetup", func(t *testing.T) {
+
+				t.Parallel()
+
+				resultID := unittest.IdentifierFixture()
+
+				err := db.Update(IndexExecutionResultByServiceEventTypeAndHeight(resultID, flow.ServiceEventSetup, heightForTypesTest))
+				require.NoError(t, err)
+
+				var gotResult flow.Identifier
+
+				err = db.View(LookupLastExecutionResultForServiceEventType(heightForTypesTest, flow.ServiceEventSetup, &gotResult))
+				require.NoError(t, err)
+				require.Equal(t, resultID, gotResult)
+			})
+
+			t.Run("EpochCommit", func(t *testing.T) {
+
+				t.Parallel()
+
+				resultID := unittest.IdentifierFixture()
+
+				err := db.Update(IndexExecutionResultByServiceEventTypeAndHeight(resultID, flow.ServiceEventCommit, heightForTypesTest))
+				require.NoError(t, err)
+
+				var gotResult flow.Identifier
+
+				err = db.View(LookupLastExecutionResultForServiceEventType(heightForTypesTest, flow.ServiceEventCommit, &gotResult))
+				require.NoError(t, err)
+				require.Equal(t, resultID, gotResult)
+			})
+
+			t.Run("VersionTable", func(t *testing.T) {
+
+				t.Parallel()
+
+				resultID := unittest.IdentifierFixture()
+
+				err := db.Update(IndexExecutionResultByServiceEventTypeAndHeight(resultID, flow.ServiceEventVersionControl, heightForTypesTest))
+				require.NoError(t, err)
+
+				var gotResult flow.Identifier
+
+				err = db.View(LookupLastExecutionResultForServiceEventType(heightForTypesTest, flow.ServiceEventVersionControl, &gotResult))
+				require.NoError(t, err)
+				require.Equal(t, resultID, gotResult)
+			})
+
 		})
 
 	})

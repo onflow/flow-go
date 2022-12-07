@@ -39,6 +39,7 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 	proofs := make([][]byte, n)
 	events := make([]flow.EventsList, n)
 	eventHashes := make([]flow.Identifier, n)
+
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
@@ -46,6 +47,13 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 		events[i] = make(flow.EventsList, 0)
 		eventHashes[i] = unittest.IdentifierFixture()
 	}
+
+	serviceEventEpochCommit, _ := unittest.EpochCommitFixtureByChainID(flow.Localnet)
+	serviceEventEpochSetup, _ := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	serviceEventVersionBeacon, _ := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+
+	serviceEvents := []flow.Event{serviceEventEpochCommit, serviceEventEpochSetup, serviceEventVersionBeacon}
+
 	return &execution.ComputationResult{
 		ExecutableBlock:  completeBlock,
 		StateSnapshots:   stateViews,
@@ -53,5 +61,6 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 		Proofs:           proofs,
 		Events:           events,
 		EventsHashes:     eventHashes,
+		ServiceEvents:    serviceEvents,
 	}
 }

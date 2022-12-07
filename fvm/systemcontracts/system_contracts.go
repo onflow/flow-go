@@ -30,11 +30,13 @@ const (
 	ContractNameFlowFees     = "FlowFees"
 	ContractStorageFees      = "FlowStorageFees"
 	ContractDeploymentAudits = "FlowContractAudits"
+	ContractNameVersion      = "NodeVersionBeacon"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
-	EventNameEpochSetup  = "EpochSetup"
-	EventNameEpochCommit = "EpochCommit"
+	EventNameEpochSetup   = "EpochSetup"
+	EventNameEpochCommit  = "EpochCommit"
+	EventNameVersionTable = "VersionTable"
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
@@ -81,8 +83,9 @@ type SystemContracts struct {
 
 // ServiceEvents is a container for all service events on a particular chain.
 type ServiceEvents struct {
-	EpochSetup  ServiceEvent
-	EpochCommit ServiceEvent
+	EpochSetup   ServiceEvent
+	EpochCommit  ServiceEvent
+	VersionTable ServiceEvent
 }
 
 // All returns all service events as a slice.
@@ -90,6 +93,7 @@ func (se ServiceEvents) All() []ServiceEvent {
 	return []ServiceEvent{
 		se.EpochSetup,
 		se.EpochCommit,
+		se.VersionTable,
 	}
 }
 
@@ -136,6 +140,11 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 			ContractName: ContractNameEpoch,
 			Name:         EventNameEpochCommit,
 		},
+		VersionTable: ServiceEvent{
+			Address:      addresses[ContractNameVersion],
+			ContractName: ContractNameVersion,
+			Name:         EventNameVersionTable,
+		},
 	}
 
 	return events, nil
@@ -155,6 +164,10 @@ var (
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
 	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
+
+	// TBD
+	versionContractAddressMainnet = flow.EmptyAddress
+	versionContractAddressTestnet = flow.EmptyAddress
 )
 
 func init() {
@@ -166,6 +179,7 @@ func init() {
 		ContractNameEpoch:     stakingContractAddressMainnet,
 		ContractNameClusterQC: stakingContractAddressMainnet,
 		ContractNameDKG:       stakingContractAddressMainnet,
+		ContractNameVersion:   versionContractAddressMainnet,
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
@@ -175,6 +189,7 @@ func init() {
 		ContractNameEpoch:     stakingContractAddressTestnet,
 		ContractNameClusterQC: stakingContractAddressTestnet,
 		ContractNameDKG:       stakingContractAddressTestnet,
+		ContractNameVersion:   stakingContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
@@ -184,6 +199,7 @@ func init() {
 		ContractNameEpoch:     flow.Sandboxnet.Chain().ServiceAddress(),
 		ContractNameClusterQC: flow.Sandboxnet.Chain().ServiceAddress(),
 		ContractNameDKG:       flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameVersion:   flow.Sandboxnet.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 
@@ -193,6 +209,7 @@ func init() {
 		ContractNameEpoch:     flow.Emulator.Chain().ServiceAddress(),
 		ContractNameClusterQC: flow.Emulator.Chain().ServiceAddress(),
 		ContractNameDKG:       flow.Emulator.Chain().ServiceAddress(),
+		ContractNameVersion:   flow.Emulator.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient

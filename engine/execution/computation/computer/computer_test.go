@@ -398,6 +398,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
 		}
+		serviceEventC := cadence.Event{
+			EventType: &cadence.EventType{
+				Location: common.AddressLocation{
+					Address: common.Address(serviceEvents.VersionTable.Address),
+				},
+				QualifiedIdentifier: serviceEvents.VersionTable.QualifiedIdentifier(),
+			},
+		}
 
 		// events to emit for each iteration/transaction
 		events := make([][]cadence.Event, totalTransactionCount)
@@ -405,7 +413,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
 		events[2] = []cadence.Event{ordinaryEvent}
 		events[3] = nil
-		events[4] = []cadence.Event{serviceEventB}
+		events[4] = []cadence.Event{serviceEventB, serviceEventC}
 
 		emittingRuntime := &testRuntime{
 			executeTransaction: func(script runtime.Script, context runtime.Context) error {
@@ -464,11 +472,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		// all events should have been collected
-		require.Len(t, result.ServiceEvents, 2)
+		require.Len(t, result.ServiceEvents, 3)
 
 		// events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+		require.Equal(t, serviceEventC.EventType.ID(), string(result.ServiceEvents[2].Type))
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 	})

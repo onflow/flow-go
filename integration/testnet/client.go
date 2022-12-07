@@ -193,16 +193,17 @@ func (c *Client) Account() *sdk.Account {
 	return c.account
 }
 
-func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
+func (c *Client) WaitForSealed(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
 
-	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
+	fmt.Printf("Waiting for transaction %s to be sealed...\n", txID)
 	errCount := 0
 	var result *sdk.TransactionResult
 	var err error
 	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
 		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-		result, err = c.client.GetTransactionResult(childCtx, id)
+		result, err = c.client.GetTransactionResult(childCtx, txID)
 		cancel()
+		fmt.Printf("Results for %s = %d, err = %s, \n", txID, result.Status, err)
 		if err != nil {
 			fmt.Print("x")
 			errCount++
@@ -218,7 +219,35 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	}
 
 	fmt.Println()
-	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
+	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", txID)
+
+	return result, err
+}
+
+func (c *Client) WaitForAtLeastStatus(ctx context.Context, txID sdk.Identifier, status sdk.TransactionStatus) (*sdk.TransactionResult, error) {
+
+	fmt.Printf("Waiting for transaction %s to be sealed...\n", txID)
+	errCount := 0
+	var result *sdk.TransactionResult
+	var err error
+	for result == nil || (result.Status < status) {
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		result, err = c.client.GetTransactionResult(childCtx, txID)
+		cancel()
+		fmt.Printf("Results for %s = %d, err = %s, \n", txID, result.Status, err)
+		if err != nil {
+			fmt.Print("x")
+			errCount++
+			if errCount >= 10 {
+				return &sdk.TransactionResult{
+					Error: err,
+				}, err
+			}
+		} else {
+			fmt.Print(".")
+		}
+		time.Sleep(time.Second)
+	}
 
 	return result, err
 }

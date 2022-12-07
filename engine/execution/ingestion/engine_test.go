@@ -320,6 +320,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 				assert.True(ctx.t, valid)
 			}
 
+			assert.Equal(ctx.t, len(computationResult.ServiceEvents), len(receipt.ExecutionResult.ServiceEvents))
+
 			ctx.mu.Lock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
 			ctx.mu.Unlock()

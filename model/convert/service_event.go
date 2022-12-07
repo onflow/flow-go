@@ -30,6 +30,8 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 		return convertServiceEventEpochSetup(event)
 	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
+	case events.VersionTable.EventType():
+		return convertServiceEventVersionTable(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
@@ -171,6 +173,36 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	}
 
 	return serviceEvent, nil
+}
+
+func convertServiceEventVersionTable(event flow.Event) (*flow.ServiceEvent, error) {
+
+	versionTable := new(flow.VersionTable)
+
+	payload, err := json.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	for _, cadenceVal := range payload.(cadence.Event).Fields[0].(cadence.Array).Values {
+		height := cadenceVal.(cadence.Struct).Fields[0].(cadence.UInt64).ToGoValue().(uint64)
+		version := cadenceVal.(cadence.Struct).Fields[1].(cadence.String).ToGoValue().(string)
+
+		versionTable.RequiredVersions = append(versionTable.RequiredVersions, flow.VersionControlRequirement{Height: height, Version: version})
+	}
+
+	seq := payload.(cadence.Event).Fields[1].(cadence.UInt64).ToGoValue().(uint64)
+
+	versionTable.Sequence = seq
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventVersionControl,
+		Event: versionTable,
+	}
+
+	return serviceEvent, nil
+
 }
 
 // convertClusterAssignments converts the Cadence representation of cluster

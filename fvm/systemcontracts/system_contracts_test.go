@@ -94,10 +94,13 @@ func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
 	require.True(t, ok, "missing chain %w", chainID.String())
 
 	epochContractAddr := addresses[ContractNameEpoch]
+	versionContractAddr := addresses[ContractNameVersion]
 	// entries may not be empty
 	assert.NotEqual(t, flow.EmptyAddress, epochContractAddr)
+	assert.NotEqual(t, flow.EmptyAddress, versionContractAddr)
 
 	// entries must match internal mapping
 	assert.Equal(t, epochContractAddr, events.EpochSetup.Address)
 	assert.Equal(t, epochContractAddr, events.EpochCommit.Address)
+	assert.Equal(t, epochContractAddr, events.VersionTable.Address)
 }
