@@ -3,7 +3,9 @@ package corruptlibp2p
 import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	"testing"
 )
 
 type ControlMessage int
@@ -29,15 +31,19 @@ func (s *SpammerGossipSub) SpamIHave(victim peer.ID, ctlMessages []pb.ControlMes
 	}
 }
 
-// GenerateCtlMessages generates control messages before they are sent so the test can prepare
+// GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
 // to receive them before they are sent by the spammer.
-func (s *SpammerGossipSub) GenerateCtlMessages(msgCount, msgSize int) []pb.ControlMessage {
-	var ctlMessages []pb.ControlMessage
+func (s *SpammerGossipSub) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
+	//var ctlMessageMap = make(map[string]pb.ControlMessage)
+	var iHaveCtlMsgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
-		ctlIHave := GossipSubCtrlFixture(WithIHave(msgCount, msgSize))
-		ctlMessages = append(ctlMessages, *ctlIHave)
+		iHaveCtlMsg := GossipSubCtrlFixture(WithIHave(msgCount, msgSize))
+
+		iHaves := iHaveCtlMsg.GetIhave()
+		require.Equal(t, msgCount, len(iHaves))
+		iHaveCtlMsgs = append(iHaveCtlMsgs, *iHaveCtlMsg)
 	}
-	return ctlMessages
+	return iHaveCtlMsgs
 }
 
 // TODO: SpamIWant, SpamGraft, SpamPrune.

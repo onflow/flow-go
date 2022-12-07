@@ -20,6 +20,7 @@ import (
 )
 
 func TestSpam(t *testing.T) {
+	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
 	var router *corrupt.GossipSubRouter
@@ -41,15 +42,31 @@ func TestSpam(t *testing.T) {
 	)
 
 	received := make(chan struct{})
+	receivedCounter := 0
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				iHaves := rpc.GetControl().GetIhave()
+				if len(iHaves) == 0 {
+					// don't inspect control messages with no IHAVE messages
+					return nil
+				}
+				receivedCounter++
+
+				if receivedCounter == messagesToSpam {
+					close(received) // acknowledge victim received all of spammer's messages
+					return nil
+				}
+
 				// here we can inspect the incoming RPC message to the victim node
 				fmt.Println("victimNode>RPC inspector: ", rpc.Control.String())
-				close(received) // acknowledge victim received spammer's message
+
+				for i := 0; i < len(iHaves); i++ {
+					fmt.Println("Ihave loop: ", iHaves[i].String())
+				}
 				return nil
 			})),
 	)
@@ -78,7 +95,9 @@ func TestSpam(t *testing.T) {
 	require.NotNil(t, router)
 
 	// prepare to spam - generate control messages
-	controlMessages := spammer.GenerateCtlMessages(1, 5)
+	controlMessages := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
+
+	// prepare to receive spam messages
 
 	// start spamming the first peer
 	spammer.SpamIHave(victimPeerId, controlMessages)
@@ -87,7 +106,7 @@ func TestSpam(t *testing.T) {
 	select {
 	case <-received:
 		return
-	case <-time.After(1 * time.Second):
+	case <-time.After(2 * time.Second):
 		require.Fail(t, "did not receive spam message")
 	}
 }
