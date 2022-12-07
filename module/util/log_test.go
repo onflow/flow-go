@@ -7,8 +7,8 @@ import (
 )
 
 func TestLogProgress(t *testing.T) {
-	logger := LogProgress("test", 41, &log.Logger)
-	for i := 0; i < 41; i++ {
+	logger := LogProgress("test", 40, &log.Logger)
+	for i := 0; i < 50; i++ {
 		logger(i)
 	}
 }
