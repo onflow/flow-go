@@ -91,10 +91,10 @@ func TestSpam(t *testing.T) {
 	require.NotNil(t, router)
 
 	// prepare to spam - generate IHAVE control messages
-	iHaveSentMessages := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
+	iHaveSentCtlMsgs := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	spammer.SpamIHave(victimPeerId, iHaveSentMessages)
+	spammer.SpamIHave(victimPeerId, iHaveSentCtlMsgs)
 
 	// check that victim received spammer's message
 	select {
@@ -105,6 +105,6 @@ func TestSpam(t *testing.T) {
 	}
 
 	// check contents of received messages should match what spammer sent
-	require.Equal(t, len(iHaveSentMessages), len(iHaveReceivedCtlMsgs))
-	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentMessages)
+	require.Equal(t, len(iHaveSentCtlMsgs), len(iHaveReceivedCtlMsgs))
+	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentCtlMsgs)
 }
