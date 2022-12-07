@@ -87,7 +87,7 @@ start: start-metrics start-flow
 # Starts metrics services
 .PHONY: start-metrics
 start-metrics:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d
 
 # Starts a version of localnet with just flow nodes and without metrics services. This prevents port collision and consumption
 # when these services are not needed.
