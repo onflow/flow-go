@@ -583,10 +583,7 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 
 	// Drop all log events that exceed this rate limit
-	throttledSampler := &zerolog.BurstSampler{
-		Burst:  fnb.BaseConfig.debugLogLimit,
-		Period: time.Second,
-	}
+	throttledSampler := logging.BurstSampler(fnb.BaseConfig.debugLogLimit, time.Second)
 
 	log := fnb.Logger.With().
 		Timestamp().
