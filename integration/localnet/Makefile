@@ -25,17 +25,17 @@ VERSION=localnetbuild
 
 CURRENT_DIRECTORY=$(shell pwd)
 
-# These vars set the default TPS values for tps-test-ci
-# These can be overwritten at the time make is called on tps-test-ci
+# These vars set the default TPS values for tps-ci
+# These can be overwritten at the time make is called on tps-ci
 # by setting these as arguments at the time the make target is called
-# e.g. "make tps-test-ci TPS_INIT=5 TPS_MIN=1 TPS_MAX=30"
+# e.g. "make tps-ci TPS_INIT=5 TPS_MIN=1 TPS_MAX=30"
 TPS_INIT=1000
 TPS_MIN=100
 TPS_MAX=1000
 DURATION=30m
 
-.PHONY: init
-init:
+.PHONY: bootstrap
+bootstrap:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
@@ -67,19 +67,19 @@ endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
 # (Except for consensus and execution nodes, which are set to 2)
-.PHONY: init-light
-init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+.PHONY: bootstrap-light
+bootstrap-light:
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 bootstrap
 
 # CI tests have a larger number of nodes
-.PHONY: init-ci
-init-ci:
-	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 init
+.PHONY: bootstrap-ci
+bootstrap-ci:
+	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 bootstrap
 
 # Creates a version of localnet configured with short epochs
-.PHONY: init-short-epochs
-init-short-epochs:
-	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
+.PHONY: bootstrap-short-epochs
+bootstrap-short-epochs:
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 bootstrap
 
 .PHONY: start
 start: start-metrics start-flow
@@ -95,8 +95,8 @@ start-metrics:
 start-flow:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
-.PHONY: build
-build:
+.PHONY: build-flow
+build-flow:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 
 .PHONY: stop
@@ -115,10 +115,9 @@ tps-test:
 tps-ci-smoke:
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 2m
 
-.PHONY: tps-test-ci
-tps-test-ci: init-ci start-flow
+.PHONY: tps-ci
+tps-ci: bootstrap-ci build-flow start-flow
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
-	$(MAKE) stop
 
 .PHONY: clean-data
 clean-data:
