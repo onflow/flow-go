@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
@@ -327,10 +326,10 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
-	n.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
+func (n *Network) Receive(scope *network.MessageScope) error {
+	n.metrics.NetworkMessageReceived(scope.Msg.Size(), scope.Msg.ChannelID, scope.Type.String())
 
-	err := n.processNetworkMessage(nodeID, msg, decodedMsgPayload)
+	err := n.processNetworkMessage(scope.OriginId, scope.Msg, scope.DecodedPayload)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
@@ -417,7 +416,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	n.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), network.MessageTypeUnicast.String(), MessageType(message))
 
 	return nil
 }

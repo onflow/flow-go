@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
@@ -591,7 +590,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(s, m.processAuthenticatedMessage, m.log)
+	rs := newReadSubscription(s, m.processPubSubMessages, m.log)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -604,6 +603,11 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	m.libP2PNode.RequestPeerUpdate()
 
 	return nil
+}
+
+// processPubSubMessages processes messages received from the pubsub subscription.
+func (m *Middleware) processPubSubMessages(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, peerID, network.MessageTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -691,16 +695,14 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		}
 	}
 
-	// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
-	m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.MessageTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID, messageType network.MessageType) {
 	flowID, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
@@ -730,24 +732,28 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 	msg.EventID = eventID
 	msg.Type = p2p.MessageType(decodedMsgPayload)
 
-	m.processMessage(msg, decodedMsgPayload)
+	m.processMessage(&network.MessageScope{
+		OriginId:       flowID,
+		Msg:            msg,
+		DecodedPayload: decodedMsgPayload,
+		Type:           messageType,
+	})
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
-	originID := flow.HashToID(msg.OriginID)
+func (m *Middleware) processMessage(scope *network.MessageScope) {
 
 	logger := m.log.With().
-		Str("channel", msg.ChannelID).
-		Str("type", msg.Type).
-		Int("msg_size", msg.Size()).
-		Str("origin_id", originID.String()).
+		Str("channel", scope.Msg.ChannelID).
+		Str("type", scope.Type.String()).
+		Int("msg_size", scope.Msg.Size()).
+		Str("origin_id", scope.OriginId.String()).
 		Logger()
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
-		if !v.Validate(*msg) {
+		if !v.Validate(*scope.Msg) {
 			logger.Debug().Msg("new message filtered by message validators")
 			return
 		}
@@ -756,7 +762,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 	logger.Debug().Msg("processing new message")
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg, decodedMsgPayload)
+	err := m.ov.Receive(scope)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
