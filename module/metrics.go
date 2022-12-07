@@ -3,6 +3,8 @@ package module
 import (
 	"time"
 
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,9 +40,14 @@ type NetworkSecurityMetrics interface {
 	OnRateLimitedUnicastMessage(role, msgType, topic string)
 }
 
-type NetworkMetrics interface {
+type LibP2PMetrics interface {
 	ResolverMetrics
 	DHTMetrics
+	rcmgr.MetricsReporter
+}
+
+type NetworkMetrics interface {
+	LibP2PMetrics
 	NetworkSecurityMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
