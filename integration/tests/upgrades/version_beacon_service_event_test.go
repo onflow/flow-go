@@ -1,9 +1,14 @@
 package execution
 
 import (
+	"context"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/onflow/cadence"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -13,59 +18,61 @@ type TestServiceEventVersionControl struct {
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
 
-	//serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
+	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
 	//
-	//ctx := context.Background()
+	ctx := context.Background()
 
-	//env := templates.Environment{
-	//	NodeVersionBeaconAddress: serviceAddress.String(),
-	//}
+	env := templates.Environment{
+		NodeVersionBeaconAddress: serviceAddress.String(),
+	}
 	//
-	//versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
+	versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
 
 	//height := s.BlockState.HighestFinalizedHeight()
 
 	//Contract should be deployed at bootstrap, so we expect this script to succeed, but ignore the return value
-	//_, err := s.AccessClient().ExecuteScriptBytes(context.Background(), versionBufferScript, nil)
-	//s.Require().NoError(err)
-	//
-	//versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
+	_, err := s.AccessClient().ExecuteScriptBytes(context.Background(), versionBufferScript, nil)
+	s.Require().NoError(err)
 
-	//latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
-	//s.Require().NoError(err)
-	//
-	//seq := s.AccessClient().GetSeqNumber()
+	versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
 
-	//tx := sdk.NewTransaction().
-	//	SetScript(versionTableChangeScript).
-	//	SetReferenceBlockID(sdk.Identifier(latestBlockId)).
-	//	SetProposalKey(sdk.Address(serviceAddress), 0, seq).
-	//	SetPayer(sdk.Address(serviceAddress)).
-	//	AddAuthorizer(sdk.Address(serviceAddress))
+	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
+	s.Require().NoError(err)
+	//
+	seq := s.AccessClient().GetSeqNumber()
+
+	tx := sdk.NewTransaction().
+		SetScript(versionTableChangeScript).
+		SetReferenceBlockID(sdk.Identifier(latestBlockId)).
+		SetProposalKey(sdk.Address(serviceAddress), 0, seq).
+		SetPayer(sdk.Address(serviceAddress)).
+		AddAuthorizer(sdk.Address(serviceAddress))
 
 	//args
 	//  height: UInt64,
 	//  newMajor: UInt8,
 	//  newMinor: UInt8,
 	//  newPatch: UInt8,
-	//err = tx.AddArgument(cadence.NewUInt64(uint64(21)))
-	//s.Require().NoError(err)
-	//
-	//err = tx.AddArgument(cadence.NewUInt8(uint8(0)))
-	//s.Require().NoError(err)
-	//
-	//err = tx.AddArgument(cadence.NewUInt8(uint8(3)))
-	//s.Require().NoError(err)
-	//
-	//err = tx.AddArgument(cadence.NewUInt8(uint8(7)))
-	//s.Require().NoError(err)
+	err = tx.AddArgument(cadence.NewUInt64(uint64(21)))
+	s.Require().NoError(err)
 
-	//err = s.AccessClient().SignAndSendTransaction(ctx, tx)
-	//s.Require().NoError(err)
+	err = tx.AddArgument(cadence.NewUInt8(uint8(0)))
+	s.Require().NoError(err)
+
+	err = tx.AddArgument(cadence.NewUInt8(uint8(3)))
+	s.Require().NoError(err)
+
+	err = tx.AddArgument(cadence.NewUInt8(uint8(7)))
+	s.Require().NoError(err)
+
+	err = s.AccessClient().SignAndSendTransaction(ctx, tx)
+	s.Require().NoError(err)
 
 	//fmt.Println("WAITING NOW!!! txSigned " + tx.ID().String())
 
-	//result, err := s.AccessClient().WaitForSealed(ctx, tx.ID())
+	txResult, err := s.AccessClient().WaitForSealed(ctx, tx.ID())
+	s.Require().NoError(err)
+	spew.Dump(txResult)
 
 	//for i := 0; i < 120; i++ {
 	//	header, err := s.AccessClient().GetLatestSealedBlockHeader(context.Background())
@@ -79,8 +86,8 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	//	time.Sleep(1 * time.Second)
 	//}
 
-	reasult := s.BlockState.WaitForSealed(s.T(), 100)
-	spew.Dump(reasult)
+	sealed := s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
+	spew.Dump(sealed)
 
 	//
 

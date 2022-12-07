@@ -5,5 +5,9 @@ transaction {
 	let heartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
       ?? panic("Could not borrow heartbeat from storage path")
     heartbeat.advanceBlock()
+
+    let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.Admin)(from: NodeVersionAdmin.NodeVersionAdminStoragePath) ?? panic("Could not borrow version admin from storage path")
+
+    //versionBeacon.
   }
 }
