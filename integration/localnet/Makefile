@@ -29,9 +29,9 @@ CURRENT_DIRECTORY=$(shell pwd)
 # These can be overwritten at the time make is called on tps-ci
 # by setting these as arguments at the time the make target is called
 # e.g. "make tps-ci TPS_INIT=5 TPS_MIN=1 TPS_MAX=30"
-TPS_INIT=1000
 TPS_MIN=100
 TPS_MAX=1000
+TPS_INIT=$(shell echo $$(( $(TPS_MAX) * 9 / 10 )) )
 DURATION=30m
 
 .PHONY: bootstrap
