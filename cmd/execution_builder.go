@@ -482,7 +482,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.State,
 		vmCtx,
 		ledgerViewCommitter,
-		exeNode.blockDataUploader,
 		executionDataProvider,
 		exeNode.exeConf.computationConfig,
 	)

@@ -600,11 +600,12 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
-
-	e.log.Info().
+	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
-		Msg("executing block")
+		Logger()
+
+	lg.Info().Msg("executing block")
 
 	startedAt := time.Now()
 
@@ -617,28 +618,32 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
 	if err != nil {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
-			Msg("error while computing block")
+		lg.Err(err).Msg("error while computing block")
 		return
+	}
+
+	if e.uploader.Enabled() {
+		err := e.uploader.Upload(ctx, computationResult)
+		if err != nil {
+			lg.Err(err).Msg("error while uploading block")
+			// continue processing. uploads should not block execution
+		}
 	}
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
 	if errors.Is(err, storage.ErrDataMismatch) {
-		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
+		lg.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
 	}
 
 	if err != nil {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
-			Msg("error while handing computation results")
+		lg.Err(err).Msg("error while handing computation results")
 		return
 	}
 
 	// if the receipt is for a sealed block, then no need to broadcast it.
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
+		lg.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
 	}
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
@@ -647,22 +652,20 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if !isExecutedBlockSealed {
 		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("could not check staking status")
+			lg.Fatal().Err(err).Msg("could not check staking status")
 		}
 		if authorizedAtBlock {
 			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 			if err != nil {
-				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+				lg.Err(err).Msg("critical: failed to broadcast the receipt")
 			} else {
 				broadcasted = true
 			}
 		}
 	}
 
-	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock)).
+	lg.Info().
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
-		Uint64("block_height", executableBlock.Block.Header.Height).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
 		Hex("start_state", executableBlock.StartState[:]).
 		Hex("final_state", finalState[:]).
@@ -684,7 +687,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
-		e.log.Err(err).Msg("failed in process block's children")
+		lg.Err(err).Msg("failed in process block's children")
 	}
 
 	if e.executionDataPruner != nil {

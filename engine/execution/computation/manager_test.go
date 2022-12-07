@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
@@ -142,7 +141,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 		tracer:           trace.NewNoopTracer(),
 	}
 
@@ -189,15 +187,10 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
 
-	fakeUploader := &FakeUploader{}
-	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
-	uploadMgr.AddUploader(fakeUploader)
-
 	manager := &Manager{
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploader:         uploadMgr,
 		tracer:           trace.NewNoopTracer(),
 	}
 
@@ -206,11 +199,6 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
 	require.NoError(t, err)
-
-	retrievedResult, has := fakeUploader.data[computationResult.ExecutableBlock.ID()]
-	require.True(t, has)
-
-	assert.Equal(t, computationResult, retrievedResult)
 }
 
 func TestExecuteScript(t *testing.T) {
@@ -260,7 +248,6 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		execCtx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -322,7 +309,6 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		execCtx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -367,7 +353,6 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -417,7 +402,6 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -467,7 +451,6 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -523,18 +506,6 @@ func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBloc
 	return f.computationResult, nil
 }
 
-type FakeUploader struct {
-	data map[flow.Identifier]*execution.ComputationResult
-}
-
-func (f *FakeUploader) Upload(computationResult *execution.ComputationResult) error {
-	if f.data == nil {
-		f.data = make(map[flow.Identifier]*execution.ComputationResult)
-	}
-	f.data[computationResult.ExecutableBlock.ID()] = computationResult
-	return nil
-}
-
 func noopView() *delta.View {
 	return delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
 		return nil, nil
@@ -552,7 +523,6 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		nil,
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
-		nil,
 		nil,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -592,7 +562,6 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		nil,
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
-		nil,
 		nil,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -729,7 +698,6 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 		tracer:           trace.NewNoopTracer(),
 	}
 
@@ -788,7 +756,6 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		nil,
 		ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,

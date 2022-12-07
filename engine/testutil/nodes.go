@@ -600,9 +600,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
 
-	// disabled by default
-	uploader := uploader.NewManager(node.Tracer)
-
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
@@ -619,7 +616,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		vmCtx,
 		committer,
-		uploader,
 		prov,
 		computation.ComputationConfig{
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
@@ -643,6 +639,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
+
+	// disabled by default
+	uploader := uploader.NewManager(node.Tracer)
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(

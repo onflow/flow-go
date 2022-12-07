@@ -19,6 +19,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	uploadermock "github.com/onflow/flow-go/engine/execution/computation/computer/uploader/mock"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -74,6 +76,7 @@ type testingContext struct {
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
 	stopControl         *StopControl
+	uploadMgr           *uploader.Manager
 
 	mu *sync.Mutex
 }
@@ -159,6 +162,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	stopControl := NewStopControl(zerolog.Nop(), false, 0)
 
+	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
+
 	engine, err = New(
 		log,
 		net,
@@ -182,7 +187,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		checkAuthorizedAtBlock,
 		nil,
-		nil,
+		uploadMgr,
 		stopControl,
 	)
 	require.NoError(t, err)
@@ -203,6 +208,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		identity:            myIdentity,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
 		identities:          identityList,
+		uploadMgr:           uploadMgr,
 		stopControl:         stopControl,
 
 		mu: &sync.Mutex{},
@@ -1724,5 +1730,104 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			// it won't included
 			blockH.ID()},
 			pending)
+	})
+}
+
+// TestExecutedBlockIsUploaded tests that the engine uploads the execution result
+func TestExecutedBlockIsUploaded(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		// A <- B
+		blockA := unittest.BlockHeaderFixture()
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
+		blockB.StartState = unittest.StateCommitmentPointerFixture()
+
+		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
+		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
+		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
+
+		computationResultB := executionUnittest.ComputationResultForBlockFixture(blockB)
+
+		// configure upload manager with a single uploader
+		uploader1 := uploadermock.NewUploader(ctx.t)
+		uploader1.On("Upload", computationResultB).Return(nil).Once()
+		ctx.uploadMgr.AddUploader(uploader1)
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockB.Block.Header.ParentID] = *blockB.StartState
+		wg := sync.WaitGroup{}
+		ctx.mockStateCommitsWithMap(commits)
+
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blockA, nil)
+
+		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, computationResultB)
+
+		wg.Add(1) // wait for block B to be executed
+		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		require.False(t, more)
+
+		_, ok := commits[blockB.ID()]
+		require.True(t, ok)
+
+	})
+}
+
+// TestExecutedBlockUploadedFailureDoesntBlock tests that block processing continues even the
+// uploader fails with an error
+func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		// A <- B
+		blockA := unittest.BlockHeaderFixture()
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
+		blockB.StartState = unittest.StateCommitmentPointerFixture()
+
+		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
+		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
+		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
+
+		computationResultB := executionUnittest.ComputationResultForBlockFixture(blockB)
+
+		// configure upload manager with a single uploader that returns an error
+		uploader1 := uploadermock.NewUploader(ctx.t)
+		uploader1.On("Upload", computationResultB).Return(fmt.Errorf("error uploading")).Once()
+		ctx.uploadMgr.AddUploader(uploader1)
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockB.Block.Header.ParentID] = *blockB.StartState
+		wg := sync.WaitGroup{}
+		ctx.mockStateCommitsWithMap(commits)
+
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blockA, nil)
+
+		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, computationResultB)
+
+		wg.Add(1) // wait for block B to be executed
+		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		require.False(t, more)
+
+		_, ok := commits[blockB.ID()]
+		require.True(t, ok)
+
 	})
 }

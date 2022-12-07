@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -141,7 +140,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -246,7 +244,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploader:         uploader.NewManager(trace.NewNoopTracer()),
 	}
 
 	view := delta.NewView(ledger.Get)

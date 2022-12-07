@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -76,7 +75,6 @@ type Manager struct {
 	derivedChainData         *derived.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
-	uploader                 *uploader.Manager
 	rngLock                  *sync.Mutex
 	rng                      *rand.Rand
 }
@@ -89,7 +87,6 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	uploader *uploader.Manager,
 	executionDataProvider *provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
@@ -147,7 +144,6 @@ func New(
 		derivedChainData:         derivedChainData,
 		scriptLogThreshold:       params.ScriptLogThreshold,
 		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
-		uploader:                 uploader,
 		rngLock:                  &sync.Mutex{},
 		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -281,17 +277,6 @@ func (e *Manager) ComputeBlock(
 			Msg("failed to compute block result")
 
 		return nil, fmt.Errorf("failed to execute block: %w", err)
-	}
-
-	e.log.Debug().
-		Hex("block_id", logging.Entity(block.Block)).
-		Msg("block result computed / derived data cache updated")
-
-	if e.uploader.Enabled() {
-		err := e.uploader.Upload(ctx, result)
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload block result: %w", err)
-		}
 	}
 
 	e.log.Debug().
