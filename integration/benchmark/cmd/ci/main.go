@@ -226,18 +226,13 @@ func main() {
 	lg.Stop()
 
 	log.Info().Msg("Validating data")
-	validData := false
 	if len(recorder.BenchmarkResults.RawTPS) == 0 {
 		recorder.SetStatus(StatusFailure)
-		validData = true
-	}
-	if validData == false {
-		log.Warn().Msg("invalid TPS data generated, returning")
-		return
+		log.Fatal().Msg("invalid TPS data generated")
 	}
 
 	// only upload valid data
-	if *bigQueryUpload == true {
+	if *bigQueryUpload {
 		log.Info().Msg("Initializing BigQuery")
 		db, err := NewDB(ctx, log, *bigQueryProjectFlag)
 		if err != nil {
@@ -275,7 +270,8 @@ func main() {
 				Float64("outputTPS", tpsRecord.OutputTPS).
 				Float64("timeoutTPS", tpsRecord.TimedoutTPS).
 				Float64("errorTPS", tpsRecord.ErrorTPS).
-				Int("inflight_txs", tpsRecord.InflightTxs)
+				Int("inflight_txs", tpsRecord.InflightTxs).
+				Msg("tps_record")
 		}
 	}
 }
