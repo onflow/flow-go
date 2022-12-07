@@ -45,7 +45,7 @@ func TestSpam_IHave(t *testing.T) {
 			})),
 	)
 
-	received := make(chan struct{})
+	receivedAllMsgs := make(chan struct{})
 
 	// keeps track of how many messages victim received from spammer - to know when to stop listening for more messages
 	receivedCounter := 0
@@ -65,7 +65,7 @@ func TestSpam_IHave(t *testing.T) {
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
 
 				if receivedCounter == messagesToSpam {
-					close(received) // acknowledge victim received all of spammer's messages
+					close(receivedAllMsgs) // acknowledge victim received all of spammer's messages
 				}
 				return nil
 			})),
@@ -101,12 +101,12 @@ func TestSpam_IHave(t *testing.T) {
 	// start spamming the victim peer
 	spammer.SpamIHave(victimPeerId, iHaveSentCtlMsgs)
 
-	// check that victim received spammer's message
+	// check that victim received all spam messages
 	select {
-	case <-received:
+	case <-receivedAllMsgs:
 		break
 	case <-time.After(1 * time.Second):
-		require.Fail(t, "did not receive spam message")
+		require.Fail(t, "did not receive spam messages")
 	}
 
 	// check contents of received messages should match what spammer sent
