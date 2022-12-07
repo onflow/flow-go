@@ -310,7 +310,7 @@ docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
-# build corrupted access node for BFT testing
+# build corrupt access node for BFT testing
 .PHONY: docker-build-access-corrupt
 docker-build-access-corrupt:
 	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there

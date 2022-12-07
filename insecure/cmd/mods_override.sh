@@ -6,7 +6,7 @@ cp ./go.mod ./go2.mod
 cp ./go.sum ./go2.sum
 
 # inject forked libp2p-pubsub into main module to allow building corrupt Docker images
-echo "require github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5" >> ./go.mod
+echo "require github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221205183923-5b979fd7d80b" >> ./go.mod
 
 # update go.sum since added new dependency
 go mod tidy
