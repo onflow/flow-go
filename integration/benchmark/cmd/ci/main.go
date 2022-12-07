@@ -262,16 +262,7 @@ func main() {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
 		for i, tpsRecord := range recorder.BenchmarkResults.RawTPS {
-			log.Info().
-				Int("tps_record_index", i).
-				Time("time", tpsRecord.Timestamp).
-				Float64("offsetSeconds", tpsRecord.OffsetSeconds).
-				Float64("inputTPS", tpsRecord.InputTPS).
-				Float64("outputTPS", tpsRecord.OutputTPS).
-				Float64("timeoutTPS", tpsRecord.TimedoutTPS).
-				Float64("errorTPS", tpsRecord.ErrorTPS).
-				Int("inflight_txs", tpsRecord.InflightTxs).
-				Msg("tps_record")
+			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
 }
