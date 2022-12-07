@@ -38,7 +38,7 @@ func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 		)
 	})
 	if err != nil {
-		return 0, errors.NewPayerBalanceCheckError(proc.Transaction.Payer, err)
+		return 0, errors.NewPayerBalanceCheckFailure(proc.Transaction.Payer, err)
 	}
 
 	// parse expected result from the Cadence runtime
@@ -57,5 +57,5 @@ func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 		}
 	}
 
-	return 0, errors.NewPayerBalanceCheckError(proc.Transaction.Payer, fmt.Errorf("invalid result type"))
+	return 0, errors.NewPayerBalanceCheckFailure(proc.Transaction.Payer, fmt.Errorf("invalid result type"))
 }
