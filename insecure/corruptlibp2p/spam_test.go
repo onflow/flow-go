@@ -29,7 +29,7 @@ func TestSpam_IHave(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
 	var router *corrupt.GossipSubRouter
-	factory := corruptlibp2p.CorruptibleGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+	factory := corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 		require.NotNil(t, r)
 		router = r // save the router at the initialization time of the factory
 	})
@@ -39,7 +39,7 @@ func TestSpam_IHave(t *testing.T) {
 		sporkId,
 		t.Name(),
 		internal.WithCorruptGossipSub(factory,
-			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
 			})),
@@ -55,7 +55,7 @@ func TestSpam_IHave(t *testing.T) {
 		sporkId,
 		t.Name(),
 		internal.WithCorruptGossipSub(factory,
-			corruptlibp2p.CorruptibleGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				iHaves := rpc.GetControl().GetIhave()
 				if len(iHaves) == 0 {
 					// don't inspect control messages with no IHAVE messages
