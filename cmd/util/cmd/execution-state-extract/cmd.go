@@ -24,6 +24,8 @@ var (
 	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
+	flagNWorker           int
+	flagVersion           int
 )
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -68,6 +70,10 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
+
+	Cmd.Flags().IntVar(&flagVersion, "version", 6, "checkpoint version")
 }
 
 func run(*cobra.Command, []string) {
@@ -145,6 +151,7 @@ func run(*cobra.Command, []string) {
 		chain,
 		!flagNoMigration,
 		!flagNoReport,
+		flagNWorker,
 	)
 
 	if err != nil {

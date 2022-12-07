@@ -61,7 +61,7 @@ type AccountMigrator interface {
 }
 
 // MigrateByAccount teaks a migrator function and all the payloads, and return the migrated payloads
-func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pathFinderVersion uint8) (
+func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pathFinderVersion uint8, nWorker int) (
 	[]ledger.Payload, []ledger.Path, error) {
 	groups := &PayloadGroup{
 		NonAccountPayloads: make([]ledger.Payload, 0),
@@ -85,7 +85,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 
 	// migrate the payloads under accounts
 	// migrated, paths, err := MigrateGroupSequentially(migrator, groups.Accounts, pathFinderVersion)
-	migrated, paths, err := MigrateGroupConcurrently(migrator, groups.Accounts, pathFinderVersion)
+	migrated, paths, err := MigrateGroupConcurrently(migrator, groups.Accounts, pathFinderVersion, nWorker)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not migrate group: %w", err)
@@ -157,9 +157,9 @@ func MigrateGroupConcurrently(
 	migrator AccountMigrator,
 	payloadsByAccount map[string][]ledger.Payload,
 	pathFinderVersion uint8,
+	nWorker int,
 ) (
 	[]ledger.Payload, []ledger.Path, error) {
-	nWorker := 10
 
 	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
 	go func() {

@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
-	return MigrateByAccount(AccountUsageMigrator{}, payloads, pathFinderVersion)
+func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8, nWorker int) ([]ledger.Payload, []ledger.Path, error) {
+	return MigrateByAccount(AccountUsageMigrator{}, payloads, pathFinderVersion, nWorker)
 }
 
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
