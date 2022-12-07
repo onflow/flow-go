@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 )
 
 var _ commands.AdminCommand = (*ToggleUploaderCommand)(nil)

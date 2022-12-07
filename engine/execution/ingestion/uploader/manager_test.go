@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"

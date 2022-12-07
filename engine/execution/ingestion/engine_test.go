@@ -19,9 +19,9 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-	uploadermock "github.com/onflow/flow-go/engine/execution/computation/computer/uploader/mock"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
+	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
