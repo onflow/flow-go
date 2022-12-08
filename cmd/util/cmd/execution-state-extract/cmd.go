@@ -24,7 +24,6 @@ var (
 	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
-	flagVersion           int
 )
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -69,8 +68,6 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
-
-	Cmd.Flags().IntVar(&flagVersion, "version", 6, "checkpoint version")
 }
 
 func run(*cobra.Command, []string) {
@@ -122,7 +119,8 @@ func run(*cobra.Command, []string) {
 	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
 		flagExecutionStateDir,
 		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
-		flagVersion)
+		6,
+	)
 
 	log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
 		hex.EncodeToString(stateCommitment[:]),
@@ -145,7 +143,6 @@ func run(*cobra.Command, []string) {
 		flagOutputDir,
 		log.Logger,
 		chain,
-		flagVersion,
 		!flagNoMigration,
 		!flagNoReport,
 	)
