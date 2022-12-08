@@ -241,36 +241,40 @@ func main() {
 
 	// only upload valid data
 	if *bigQueryUpload {
-		log.Info().Msg("Initializing BigQuery")
-		db, err := NewDB(ctx, log, *bigQueryProjectFlag)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create bigquery client")
-		}
-		defer db.Close()
-
-		err = db.createTable(ctx, *bigQueryDatasetFlag, *bigQueryRawTableFlag, RawRecord{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create raw TPS table")
-		}
-
-		log.Info().Msg("Uploading data to BigQuery")
-		err = db.saveRawResults(
-			ctx,
-			*bigQueryDatasetFlag,
-			*bigQueryRawTableFlag,
-			recorder.BenchmarkResults,
-			*repoInfo,
-			BenchmarkInfo{BenchmarkType: loadType},
-			defaultEnvironment(),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("unable to send data to bigquery")
-		}
+		uploadData(log, ctx, recorder, bigQueryProjectFlag, bigQueryDatasetFlag, bigQueryRawTableFlag, repoInfo)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
 		for i, tpsRecord := range recorder.BenchmarkResults.RawTPS {
 			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
+	}
+}
+
+func uploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecorder, bigQueryProjectFlag *string, bigQueryDatasetFlag *string, bigQueryRawTableFlag *string, repoInfo *RepoInfo) {
+	log.Info().Msg("Initializing BigQuery")
+	db, err := NewDB(ctx, log, *bigQueryProjectFlag)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create bigquery client")
+	}
+	defer db.Close()
+
+	err = db.createTable(ctx, *bigQueryDatasetFlag, *bigQueryRawTableFlag, RawRecord{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create raw TPS table")
+	}
+
+	log.Info().Msg("Uploading data to BigQuery")
+	err = db.saveRawResults(
+		ctx,
+		*bigQueryDatasetFlag,
+		*bigQueryRawTableFlag,
+		recorder.BenchmarkResults,
+		*repoInfo,
+		BenchmarkInfo{BenchmarkType: loadType},
+		defaultEnvironment(),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to send data to bigquery")
 	}
 }
