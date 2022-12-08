@@ -55,6 +55,7 @@ type tpsRecorder struct {
 func NewTPSRecorder(
 	ctx context.Context,
 	workerStatsTracker *benchmark.WorkerStatsTracker,
+	statInterval time.Duration,
 ) *tpsRecorder {
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -71,7 +72,7 @@ func NewTPSRecorder(
 	}
 
 	go func() {
-		t := time.NewTicker(adjustInterval)
+		t := time.NewTicker(statInterval)
 		defer t.Stop()
 
 		defer close(r.done)

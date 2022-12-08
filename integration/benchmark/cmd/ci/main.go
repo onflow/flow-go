@@ -41,7 +41,7 @@ const (
 	// Auto TPS scaling constants
 	additiveIncrease       = 100
 	multiplicativeDecrease = 0.9
-	adjustInterval         = 20 * time.Second
+	defaultAdjustInterval  = 20 * time.Second
 
 	// gRPC constants
 	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
@@ -56,6 +56,8 @@ func main() {
 	initialTPSFlag := flag.Int("tps-initial", 10, "starting transactions per second")
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
+	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
+	statIntervalFlag := flag.Duration("stat-interval", *adjustIntervalFlag, "")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
@@ -198,7 +200,7 @@ func main() {
 		workerStatsTracker,
 
 		AdjusterParams{
-			Interval:    adjustInterval,
+			Interval:    *adjustIntervalFlag,
 			InitialTPS:  uint(*initialTPSFlag),
 			MinTPS:      uint(*minTPSFlag),
 			MaxTPS:      uint(*maxTPSFlag),
@@ -207,7 +209,7 @@ func main() {
 	)
 	defer adjuster.Stop()
 
-	recorder := NewTPSRecorder(bCtx, workerStatsTracker)
+	recorder := NewTPSRecorder(bCtx, workerStatsTracker, *statIntervalFlag)
 	defer recorder.Stop()
 
 	log.Info().Msg("Waiting for load to finish")
