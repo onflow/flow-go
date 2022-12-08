@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"os"
 	"path/filepath"
 	"time"
@@ -554,6 +555,7 @@ func main() {
 				node.RootChainID,
 			)
 
+			notifier.AddConsumer(notifications.NewLogConsumer(node.Logger))
 			notifier.AddConsumer(finalizationDistributor)
 
 			// initialize the persister
