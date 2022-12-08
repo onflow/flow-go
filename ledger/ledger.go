@@ -388,7 +388,7 @@ func (v *Value) UnmarshalJSON(b []byte) error {
 
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads
 // and returns the paths of the payload
-type Migration func(payloads []Payload, pathFinderVersion uint8) ([]Payload, []Path, error)
+type Migration func(payloads []Payload) ([]Payload, error)
 
 // Reporter reports on data from the state
 type Reporter interface {

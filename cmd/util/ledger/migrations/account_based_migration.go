@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/util"
 )
@@ -57,12 +56,12 @@ func PayloadGrouping(groups *PayloadGroup, payload ledger.Payload) (*PayloadGrou
 // AccountMigrator takes all the payloads that belong to the given account
 // and return the migrated payloads
 type AccountMigrator interface {
-	MigratePayloads(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error)
+	MigratePayloads(account string, payloads []ledger.Payload) ([]ledger.Payload, error)
 }
 
 // MigrateByAccount teaks a migrator function and all the payloads, and return the migrated payloads
-func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pathFinderVersion uint8, nWorker int) (
-	[]ledger.Payload, []ledger.Path, error) {
+func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, nWorker int) (
+	[]ledger.Payload, error) {
 	groups := &PayloadGroup{
 		NonAccountPayloads: make([]ledger.Payload, 0),
 		Accounts:           make(map[string][]ledger.Payload),
@@ -75,7 +74,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 	for i, payload := range allPayloads {
 		groups, err = PayloadGrouping(groups, payload)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		logGrouping(i)
 	}
@@ -84,27 +83,20 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 		len(groups.Accounts), len(groups.NonAccountPayloads))
 
 	// migrate the payloads under accounts
-	// migrated, paths, err := MigrateGroupSequentially(migrator, groups.Accounts, pathFinderVersion)
-	migrated, paths, err := MigrateGroupConcurrently(migrator, groups.Accounts, pathFinderVersion, nWorker)
+	migrated, err := MigrateGroupConcurrently(migrator, groups.Accounts, nWorker)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not migrate group: %w", err)
+		return nil, fmt.Errorf("could not migrate group: %w", err)
 	}
 
 	log.Info().Msgf("finished migrating payloads for %v account", len(groups.Accounts))
 
-	nonAccountPaths, err := pathfinder.PathsFromPayloads(groups.NonAccountPayloads, pathFinderVersion)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not find paths for non account payloads: %w", err)
-	}
-
 	// add the non accounts which don't need to be migrated
 	migrated = append(migrated, groups.NonAccountPayloads...)
-	paths = append(paths, nonAccountPaths...)
 
 	log.Info().Msgf("finished migrating all account based payloads, total migrated payloads: %v", len(migrated))
 
-	return migrated, paths, nil
+	return migrated, nil
 }
 
 // MigrateGroupSequentially migrate the payloads in the given payloadsByAccount map which
@@ -112,32 +104,25 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, pa
 func MigrateGroupSequentially(
 	migrator AccountMigrator,
 	payloadsByAccount map[string][]ledger.Payload,
-	pathFinderVersion uint8,
 ) (
-	[]ledger.Payload, []ledger.Path, error) {
+	[]ledger.Payload, error) {
 
 	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
 
 	i := 0
 	migrated := make([]ledger.Payload, 0)
-	migratedPaths := make([]ledger.Path, 0)
 	for address, payloads := range payloadsByAccount {
-		accountMigrated, err := migrator.MigratePayloads(address, payloads, pathFinderVersion)
+		accountMigrated, err := migrator.MigratePayloads(address, payloads)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
+			return nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
 		}
 
 		migrated = append(migrated, accountMigrated...)
-		paths, err := pathfinder.PathsFromPayloads(accountMigrated, pathFinderVersion)
-		if err != nil {
-			return nil, nil, fmt.Errorf("can not find paths for migrated payload: %w", err)
-		}
-		migratedPaths = append(migratedPaths, paths...)
 		logAccount(i)
 		i++
 	}
 
-	return migrated, migratedPaths, nil
+	return migrated, nil
 }
 
 type jobMigrateAccountGroup struct {
@@ -145,7 +130,7 @@ type jobMigrateAccountGroup struct {
 	Payloads []ledger.Payload
 }
 
-type resultMigrating struct {
+type migrationResult struct {
 	Migrated []ledger.Payload
 	Err      error
 }
@@ -156,10 +141,9 @@ type resultMigrating struct {
 func MigrateGroupConcurrently(
 	migrator AccountMigrator,
 	payloadsByAccount map[string][]ledger.Payload,
-	pathFinderVersion uint8,
 	nWorker int,
 ) (
-	[]ledger.Payload, []ledger.Path, error) {
+	[]ledger.Payload, error) {
 
 	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
 	go func() {
@@ -172,12 +156,12 @@ func MigrateGroupConcurrently(
 		close(jobs)
 	}()
 
-	resultCh := make(chan *resultMigrating)
+	resultCh := make(chan *migrationResult)
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
 			for job := range jobs {
-				accountMigrated, err := migrator.MigratePayloads(job.Account, job.Payloads, pathFinderVersion)
-				resultCh <- &resultMigrating{
+				accountMigrated, err := migrator.MigratePayloads(job.Account, job.Payloads)
+				resultCh <- &migrationResult{
 					Migrated: accountMigrated,
 					Err:      err,
 				}
@@ -189,24 +173,17 @@ func MigrateGroupConcurrently(
 	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
 
 	migrated := make([]ledger.Payload, 0)
-	migratedPaths := make([]ledger.Path, 0)
 
 	for i := 0; i < len(payloadsByAccount); i++ {
 		result := <-resultCh
 		if result.Err != nil {
-			return nil, nil, fmt.Errorf("fail to migrate payload: %w", result.Err)
+			return nil, fmt.Errorf("fail to migrate payload: %w", result.Err)
 		}
 
 		accountMigrated := result.Migrated
 		migrated = append(migrated, accountMigrated...)
-		var err error
-		paths, err := pathfinder.PathsFromPayloads(accountMigrated, pathFinderVersion)
-		if err != nil {
-			return nil, nil, fmt.Errorf("can not find paths for migrated payload: %w", err)
-		}
-		migratedPaths = append(migratedPaths, paths...)
 		logAccount(i)
 	}
 
-	return migrated, migratedPaths, nil
+	return migrated, nil
 }

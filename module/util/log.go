@@ -5,7 +5,7 @@ import (
 )
 
 func LogProgress(msg string, total int, logger *zerolog.Logger) func(currentIndex int) {
-	logThreshold := float64(0)
+	logThreshold := float64(10)
 	return func(currentIndex int) {
 		percentage := float64(100)
 		if total > 0 {
@@ -13,7 +13,7 @@ func LogProgress(msg string, total int, logger *zerolog.Logger) func(currentInde
 		}
 
 		// report every 10 percent
-		if percentage >= logThreshold+10 {
+		if percentage >= logThreshold {
 			logger.Info().Msgf("%s completion percentage: %v percent", msg, int(percentage))
 			logThreshold += 10
 		}

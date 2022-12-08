@@ -943,19 +943,17 @@ func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
 	return true
 }
 
-func noOpMigration(p []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
-	paths, err := pathfinder.PathsFromPayloads(p, pathFinderVersion)
-
-	return p, paths, err
+func noOpMigration(p []ledger.Payload) ([]ledger.Payload, error) {
+	return p, nil
 }
 
-func migrationByValue(p []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
+func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
 		if p.Value().Equals([]byte{'A'}) {
 			k, err := p.Key()
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			pp := *ledger.NewPayload(k, ledger.Value([]byte{'C'}))
 			ret = append(ret, pp)
@@ -963,8 +961,7 @@ func migrationByValue(p []ledger.Payload, pathFinderVersion uint8) ([]ledger.Pay
 			ret = append(ret, p)
 		}
 	}
-	paths, err := pathfinder.PathsFromPayloads(p, pathFinderVersion)
-	return ret, paths, err
+	return ret, nil
 }
 
 type CustomUpdateWAL struct {
@@ -976,12 +973,12 @@ func (w *CustomUpdateWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, er
 	return w.updateFn(update)
 }
 
-func migrationByKey(p []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, []ledger.Path, error) {
+func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
 		k, err := p.Key()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if k.String() == "/1/1/22/2" {
 			pp := *ledger.NewPayload(k, ledger.Value([]byte{'D'}))
@@ -991,6 +988,5 @@ func migrationByKey(p []ledger.Payload, pathFinderVersion uint8) ([]ledger.Paylo
 		}
 	}
 
-	paths, err := pathfinder.PathsFromPayloads(p, pathFinderVersion)
-	return ret, paths, err
+	return ret, nil
 }

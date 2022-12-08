@@ -3,14 +3,15 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/rs/zerolog/log"
 )
 
-func MigrateAccountUsage(payloads []ledger.Payload, pathFinderVersion uint8, nWorker int) ([]ledger.Payload, []ledger.Path, error) {
-	return MigrateByAccount(AccountUsageMigrator{}, payloads, pathFinderVersion, nWorker)
+func MigrateAccountUsage(payloads []ledger.Payload, nWorker int) ([]ledger.Payload, error) {
+	return MigrateByAccount(AccountUsageMigrator{}, payloads, nWorker)
 }
 
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
@@ -30,7 +31,7 @@ type AccountUsageMigrator struct{}
 
 // AccountUsageMigrator iterate through each payload, and calculate the storage usage
 // and update the accoutns status with the updated storage usage
-func (m AccountUsageMigrator) MigratePayloads(account string, payloads []ledger.Payload, pathFinderVersion uint8) ([]ledger.Payload, error) {
+func (m AccountUsageMigrator) MigratePayloads(account string, payloads []ledger.Payload) ([]ledger.Payload, error) {
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)
