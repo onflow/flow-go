@@ -59,11 +59,14 @@ jobs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
     - name: Run tests
-      continue-on-error: true
-      run: ./tools/test_monitor/run-tests.sh
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 60
+        max_attempts: 5
+        command: ./tools/test_monitor/run-tests.sh
       env:
-        TEST_FLAKY: true
         JSON_OUTPUT: true
+        TEST_FLAKY: true
         RACE_DETECTOR: 1
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
