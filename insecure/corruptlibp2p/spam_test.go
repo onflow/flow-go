@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"sync"
@@ -66,9 +67,10 @@ func TestSpam_IHave(t *testing.T) {
 					// don't inspect control messages with no IHAVE messages
 					return nil
 				}
+				fmt.Println("received control message from", id)
 				receivedCounter++
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
-				if receivedCounter == 1 {
+				if receivedCounter >= messagesToSpam {
 					close(receivedAllMsgs) // acknowledge victim received all of spammer's messages
 				}
 				return nil
@@ -123,7 +125,7 @@ func TestSpam_IHave(t *testing.T) {
 	select {
 	case <-receivedAllMsgs:
 		break
-	case <-time.After(2000 * time.Second):
+	case <-time.After(1 * time.Second):
 		require.Fail(t, "did not receive spam messages")
 	}
 
