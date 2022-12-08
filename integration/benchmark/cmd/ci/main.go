@@ -67,13 +67,6 @@ func main() {
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
 	flag.Parse()
 
-	if *gitRepoPathFlag == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	chainID := flowsdk.Emulator
-
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
@@ -81,6 +74,13 @@ func main() {
 		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
 	}
 	log = log.Level(lvl)
+
+	if *gitRepoPathFlag == "" {
+		flag.PrintDefaults()
+		log.Fatal().Msg("git repo path is required")
+	}
+
+	chainID := flowsdk.Emulator
 
 	git, err := NewGit(log, *gitRepoPathFlag, *gitRepoURLFlag)
 	if err != nil {
