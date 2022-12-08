@@ -80,8 +80,6 @@ func main() {
 		log.Fatal().Msg("git repo path is required")
 	}
 
-	chainID := flowsdk.Emulator
-
 	git, err := NewGit(log, *gitRepoPathFlag, *gitRepoURLFlag)
 	if err != nil {
 		log.Fatal().Err(err).Str("path", *gitRepoPathFlag).Msg("failed to clone/open git repo")
@@ -122,7 +120,7 @@ func main() {
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
 
-	addressGen := flowsdk.NewAddressGenerator(chainID)
+	addressGen := flowsdk.NewAddressGenerator(flowsdk.Emulator)
 	serviceAccountAddress := addressGen.NextAddress()
 	fungibleTokenAddress := addressGen.NextAddress()
 	flowTokenAddress := addressGen.NextAddress()
@@ -228,18 +226,17 @@ func main() {
 	lg.Stop()
 
 	log.Info().Msg("Validating data")
-	totalTPS := 0.
+	var totalTPS float64
 	for _, record := range recorder.BenchmarkResults.RawTPS {
-		totalTPS += record.InputTPS
+		totalTPS += record.OutputTPS
 	}
-
 	resultLen := len(recorder.BenchmarkResults.RawTPS)
 	if resultLen == 0 || totalTPS == 0 {
 		recorder.SetStatus(StatusFailure)
 		log.Fatal().
 			Int("resultsLen", resultLen).
 			Float64("totalTPS", totalTPS).
-			Msg("invalid TPS data generated")
+			Msg("no TPS data generated")
 	}
 
 	// only upload valid data
