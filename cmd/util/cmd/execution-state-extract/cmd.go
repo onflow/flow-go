@@ -134,9 +134,10 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: 6",
+	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
 		flagExecutionStateDir,
 		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
+		6,
 	)
 
 	log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
