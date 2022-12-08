@@ -92,7 +92,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0}, channel)
+	data1 := p2ptest.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0}, channel)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -157,10 +157,10 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	defer cancel1s()
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
@@ -208,7 +208,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.Channel("invalid-channel"))
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channels.Channel("invalid-channel"))
 
 	err = sn2.Publish(timedCtx, topic, data1)
 
@@ -261,7 +261,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 
 	err = sn2.Publish(timedCtx, topic, data1)
 
@@ -336,7 +336,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -344,17 +344,17 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
 	timedCtx, cancel2s := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel2s()
-	data2 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data2 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
@@ -362,7 +362,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// an1 receives its own message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data2, sub3)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data2, sub3)
 
 	var wg sync.WaitGroup
 
@@ -439,7 +439,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// sn2 publishes the block proposal on the sync committee channel
 	err = sn2.Publish(timedCtx, topic, data1)
@@ -517,7 +517,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data1 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -525,17 +525,17 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data1, sub3)
 
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
-	data3 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+	data3 := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 	timedCtx, cancel2s := context.WithTimeout(ctx, time.Second)
 	defer cancel2s()
 	err = sn2.Publish(timedCtx, topic, data3)
@@ -609,18 +609,18 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our LN node
-	data := p2pfixtures.MustEncodeEvent(t, &messages.RangeRequest{}, channel)
+	data := p2ptest.MustEncodeEvent(t, &messages.RangeRequest{}, channel)
 
 	// ln2 publishes the sync request on the cluster channel
 	err = ln2.Publish(timedCtx, topic, data)
 	require.NoError(t, err)
 
 	// ln1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub1)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data, sub1)
 
 	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub2)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data, sub2)
 
 	// ln3 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub3)
+	p2ptest.SubMustReceiveMessage(t, timedCtx, data, sub3)
 }

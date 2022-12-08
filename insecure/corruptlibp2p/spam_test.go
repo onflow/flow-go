@@ -2,6 +2,8 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 	"sync"
 	"testing"
 	"time"
@@ -35,10 +37,11 @@ func TestSpam_IHave(t *testing.T) {
 		router.setRouter(r)
 	})
 
-	spammerNode, _ := p2ptest.NodeFixture(
+	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
@@ -55,6 +58,7 @@ func TestSpam_IHave(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
 		internal.WithCorruptGossipSub(factory,
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				iHaves := rpc.GetControl().GetIhave()
@@ -64,8 +68,7 @@ func TestSpam_IHave(t *testing.T) {
 				}
 				receivedCounter++
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
-
-				if receivedCounter == messagesToSpam {
+				if receivedCounter == 1 {
 					close(receivedAllMsgs) // acknowledge victim received all of spammer's messages
 				}
 				return nil
@@ -82,8 +85,9 @@ func TestSpam_IHave(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 
-	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{spammerNode, victimNode}, 100*time.Second)
-	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{spammerNode, victimNode}, cancel, 100*time.Second)
+	nodes := []p2p.LibP2PNode{spammerNode, victimNode}
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Second)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Second)
 
 	// connect spammer and victim
 	err = spammerNode.AddPeer(ctx, victimPeerInfo)
@@ -92,6 +96,19 @@ func TestSpam_IHave(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, connected)
 
+	require.Eventuallyf(t, func() bool {
+		// ensuring the spammer router has been initialized.
+		// this is needed because the router is initialized asynchronously.
+		return router.getRouter() != nil
+	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
+	p2ptest.EnsureConnected(t, ctx, nodes)
+	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
 	// create new spammer
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
 	require.NotNil(t, router)
@@ -106,7 +123,7 @@ func TestSpam_IHave(t *testing.T) {
 	select {
 	case <-receivedAllMsgs:
 		break
-	case <-time.After(1 * time.Second):
+	case <-time.After(2000 * time.Second):
 		require.Fail(t, "did not receive spam messages")
 	}
 
@@ -132,7 +149,7 @@ func newAtomicRouter() *atomicRouter {
 func (a *atomicRouter) setRouter(router *corrupt.GossipSubRouter) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if router == nil {
+	if a.router == nil {
 		a.router = router
 		return true
 	}

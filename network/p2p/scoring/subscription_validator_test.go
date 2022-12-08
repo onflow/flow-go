@@ -236,14 +236,14 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// let the subscriptions be established
 	time.Sleep(2 * time.Second)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
+	proposalMsg := p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// consensus node publishes a proposal
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
 	// checks that the message is received by all nodes.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []p2p.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
+	p2ptest.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []p2p.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
@@ -256,7 +256,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// consensus node publishes another proposal, but this time, it should not reach verification node.
 	// since upon an unauthorized subscription, verification node should have slashed consensus node on
 	// the GossipSub scoring protocol.
-	proposalMsg = p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
+	proposalMsg = p2ptest.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	// publishes a message to the topic.
 	require.NoError(t, conNode.Publish(ctx, blockTopic, proposalMsg))
 
@@ -266,7 +266,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
-	chunkDataPackRequestMsg := p2pfixtures.MustEncodeEvent(t, &messages.ChunkDataRequest{
+	chunkDataPackRequestMsg := p2ptest.MustEncodeEvent(t, &messages.ChunkDataRequest{
 		ChunkID: unittest.IdentifierFixture(),
 		Nonce:   rand.Uint64(),
 	}, channels.RequestChunks)
@@ -274,7 +274,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{ver1SubChunks, ver2SubChunks})
+	p2ptest.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{ver1SubChunks, ver2SubChunks})
 
 	ctx5s, cancel5s = context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
