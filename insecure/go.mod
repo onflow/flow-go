@@ -14,7 +14,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208204955-09668489428c
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208234712-b44d9133e4ee
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
