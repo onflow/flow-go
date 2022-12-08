@@ -225,19 +225,7 @@ func main() {
 	log.Info().Msg("Stopping load generator")
 	lg.Stop()
 
-	log.Info().Msg("Validating data")
-	var totalTPS float64
-	for _, record := range recorder.BenchmarkResults.RawTPS {
-		totalTPS += record.OutputTPS
-	}
-	resultLen := len(recorder.BenchmarkResults.RawTPS)
-	if resultLen == 0 || totalTPS == 0 {
-		recorder.SetStatus(StatusFailure)
-		log.Fatal().
-			Int("resultsLen", resultLen).
-			Float64("totalTPS", totalTPS).
-			Msg("no TPS data generated")
-	}
+	validateData(log, recorder)
 
 	// only upload valid data
 	if *bigQueryUpload {
@@ -276,5 +264,21 @@ func uploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecorder, 
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to send data to bigquery")
+	}
+}
+
+func validateData(log zerolog.Logger, recorder *tpsRecorder) {
+	log.Info().Msg("Validating data")
+	var totalTPS float64
+	for _, record := range recorder.BenchmarkResults.RawTPS {
+		totalTPS += record.OutputTPS
+	}
+	resultLen := len(recorder.BenchmarkResults.RawTPS)
+	if resultLen == 0 || totalTPS == 0 {
+		recorder.SetStatus(StatusFailure)
+		log.Fatal().
+			Int("resultsLen", resultLen).
+			Float64("totalTPS", totalTPS).
+			Msg("no TPS data generated")
 	}
 }
