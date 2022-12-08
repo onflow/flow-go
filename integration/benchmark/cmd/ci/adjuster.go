@@ -76,15 +76,6 @@ func (a *adjuster) Stop() {
 	<-a.done
 }
 
-// adjustTPSForever tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
-// The algorithm starts with minTPS as a target.  Each time it is able to reach the target TPS, it
-// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
-// the target by `multiplicativeDecrease` factor.
-//
-// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
-// compared to the last round.
-//
-// Target TPS is always bounded by [minTPS, maxTPS].
 func (a *adjuster) adjustTPSForever() (err error) {
 	initialStats := a.workerStatsTracker.GetStats()
 	lastState := adjusterState{
@@ -110,6 +101,15 @@ func (a *adjuster) adjustTPSForever() (err error) {
 	}
 }
 
+// adjustOnce tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
+// The algorithm starts with minTPS as a target.  Each time it is able to reach the target TPS, it
+// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
+// the target by `multiplicativeDecrease` factor.
+//
+// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
+// compared to the last round.
+//
+// Target TPS is always bounded by [minTPS, maxTPS].
 func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjusterState, error) {
 	currentStats := a.workerStatsTracker.GetStats()
 
