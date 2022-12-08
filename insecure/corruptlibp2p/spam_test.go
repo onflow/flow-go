@@ -2,8 +2,6 @@ package corruptlibp2p_test
 
 import (
 	"context"
-	"fmt"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"sync"
@@ -32,24 +30,23 @@ func TestSpam_IHave(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
 	router := newAtomicRouter()
-	spammerFactory := corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter, ps *corrupt.PubSub) {
-		require.NotNil(t, r)
-		router.set(r, ps)
-	})
-
 	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
-		internal.WithCorruptGossipSub(spammerFactory,
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter, ps *corrupt.PubSub) {
+			require.NotNil(t, r)
+			router.set(r, ps)
+		}),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
 			})),
 	)
 
-	receivedAllMsgs := make(chan struct{})
+	allSpamIHavesReceived := sync.WaitGroup{}
+	allSpamIHavesReceived.Add(messagesToSpam)
 
 	// keeps track of how many messages victim received from spammer - to know when to stop listening for more messages
 	receivedCounter := 0
@@ -61,18 +58,14 @@ func TestSpam_IHave(t *testing.T) {
 		p2ptest.WithRole(flow.RoleConsensus),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
-				fmt.Println(len(rpc.Publish))
 				iHaves := rpc.GetControl().GetIhave()
 				if len(iHaves) == 0 {
 					// don't inspect control messages with no IHAVE messages
 					return nil
 				}
-				fmt.Println("received control message from", id)
 				receivedCounter++
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
-				if receivedCounter >= messagesToSpam {
-					close(receivedAllMsgs) // acknowledge victim received all of spammer's messages
-				}
+				allSpamIHavesReceived.Done() // acknowledge that victim received a message.
 				return nil
 			})),
 	)
@@ -88,24 +81,17 @@ func TestSpam_IHave(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
-
 	nodes := []p2p.LibP2PNode{spammerNode, victimNode}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Second)
-
-	//// connect spammer and victim
-	//err = spammerNode.AddPeer(ctx, victimPeerInfo)
-	//require.NoError(t, err)
-	//connected, err := spammerNode.IsConnected(victimPeerInfo.ID)
-	//require.NoError(t, err)
-	//require.True(t, connected)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
+	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.
 		return router.getRouter() != nil
-	}, 1000*time.Second, 100*time.Millisecond, "spammer router not set")
+	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
 
+	// prior to the test we ensure that
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.EnsureConnected(t, ctx, nodes)
@@ -115,15 +101,6 @@ func TestSpam_IHave(t *testing.T) {
 		return unittest.ProposalFixture(), blockTopic
 	})
 
-	fmt.Println("ensures pending peers processed")
-	fmt.Println(victimPeerId.String())
-	require.Equal(t, spammerNode.Host().Network().Connectedness(victimPeerId), network.Connected)
-	updated := router.getPubSub().ForceUpdatePendingPeers([]peer.ID{victimPeerId})
-	fmt.Println("updated", len(updated))
-	for _, u := range updated {
-		fmt.Println("updated", u.String())
-	}
-	fmt.Println("ensured pending peers processed")
 	// create new spammer
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
 	require.NotNil(t, router)
@@ -135,12 +112,7 @@ func TestSpam_IHave(t *testing.T) {
 	spammer.SpamIHave(t, victimPeerId, iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
-	select {
-	case <-receivedAllMsgs:
-		break
-	case <-time.After(2000 * time.Second):
-		require.Fail(t, "did not receive spam messages")
-	}
+	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")
 
 	// check contents of received messages should match what spammer sent
 	require.Equal(t, len(iHaveSentCtlMsgs), len(iHaveReceivedCtlMsgs))
