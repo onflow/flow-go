@@ -76,9 +76,10 @@ func (se ServiceEvent) EventType() flow.EventType {
 
 // SystemContracts is a container for all system contracts on a particular chain.
 type SystemContracts struct {
-	Epoch     SystemContract
-	ClusterQC SystemContract
-	DKG       SystemContract
+	Epoch         SystemContract
+	ClusterQC     SystemContract
+	DKG           SystemContract
+	VersionBeacon SystemContract
 }
 
 // ServiceEvents is a container for all service events on a particular chain.
@@ -116,6 +117,10 @@ func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
 		DKG: SystemContract{
 			Address: addresses[ContractNameDKG],
 			Name:    ContractNameDKG,
+		},
+		VersionBeacon: SystemContract{
+			Address: addresses[ContractNameVersion],
+			Name:    ContractNameVersion,
 		},
 	}
 

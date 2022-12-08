@@ -138,7 +138,7 @@ func (s *Suite) SetupTest2() {
 		testnet.WithLogLevel(zerolog.DebugLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
-	vn1Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
+	vn1Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.DebugLevel))
 	vn2Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	vn3Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 

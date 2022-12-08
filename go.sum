@@ -1236,10 +1236,10 @@ github.com/onflow/cadence v0.28.0 h1:18A1V9xqGewibEhuzqBNEoNvqG6OwVqHg7gKu3UliaM
 github.com/onflow/cadence v0.28.0/go.mod h1:h+SbY8RNl6Q6sT6l/2cvpUZUJNCbzJya+3Bkwe/0YwY=
 github.com/onflow/flow v0.3.2 h1:z3IuKOjM9Tvf0pXfloTbrLxM5nTunI47cklsDd+wxBE=
 github.com/onflow/flow v0.3.2/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221202040447-569c956bf736 h1:nMwezazjM0ihWWJZRyszgyh2Ou5MuEmW8jj3xddnF+Y=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221202040447-569c956bf736/go.mod h1:9nrgjIF/noY2jJ7LP8bKLHTpcdHOa2yO0ryCKTQpxvs=
-github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221202040447-569c956bf736 h1:hB1VoepRGxcfBfNYb7kzFwHPNYW32okp5zJnsHFDwos=
-github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221202040447-569c956bf736/go.mod h1:WMmeggH/H9Xb/SsT+4QFMtGYf+p1S2LXzbZAIaQQWAk=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221208041754-bc6461588466 h1:duk4RxKTNTa/bHnMU18rRYVlJz+/TXrq4vCMZck+dow=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221208041754-bc6461588466/go.mod h1:9nrgjIF/noY2jJ7LP8bKLHTpcdHOa2yO0ryCKTQpxvs=
+github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221208041754-bc6461588466 h1:yg9BVH3RjraTJwAHaAsCl/NmBI0C0L9zg7EdGmJPHcU=
+github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221208041754-bc6461588466/go.mod h1:WMmeggH/H9Xb/SsT+4QFMtGYf+p1S2LXzbZAIaQQWAk=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0 h1:Cg4gHGVblxcejfNNG5Mfj98Wf4zbY76O0Y28QB0766A=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWKerUyf0gciw+e6tAEt0Ks3JE=
 github.com/onflow/flow-go-sdk v0.29.0 h1:dTQvTZkHsHMU3eEnHaE8JE2SOPeAIYx5CgTul5MgDYE=
@@ -1560,6 +1560,8 @@ github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415/go.mod h1:
 github.com/xeipuuv/gojsonschema v0.0.0-20180618132009-1d523034197f/go.mod h1:5yf86TLmAcydyeJq5YvxkGPE2fm/u4myDekKRoLuqhs=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11 h1:WYWfp6ydU0v6ev+amaIRIfxJEoEnf9HP0o523qlg/1o=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11/go.mod h1:GwZ5VBU63KlM8wZsnVvSGDIMeGMOO9Cb3uLXDP8WFYM=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

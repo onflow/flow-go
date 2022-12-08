@@ -606,6 +606,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 					return fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
+			case *flow.VersionTable:
+
+				// TODO here we want to notify about this event, but that's for another PR
+				continue
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -898,7 +902,9 @@ SealLoop:
 
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
-
+			case *flow.VersionTable:
+				// just skip
+				continue
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
 			}

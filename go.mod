@@ -33,7 +33,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
-	github.com/ipfs/go-bitswap v0.9.0
+	github.com/ipfs/go-bitswap v0.9.0 // indirect
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.3.2
@@ -59,8 +59,8 @@ require (
 	github.com/onflow/atree v0.4.0
 	github.com/onflow/cadence v0.28.0
 	github.com/onflow/flow v0.3.2
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221202040447-569c956bf736
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221202040447-569c956bf736
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221208041754-bc6461588466
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221208041754-bc6461588466
 	github.com/onflow/flow-go-sdk v0.29.0
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221116225618-de1bb3dad013
@@ -106,6 +106,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pkg/profile v1.7.0
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11
 	golang.org/x/mod v0.6.0-dev.0.20220818022119-ed83ed61efb9
 )
 
@@ -203,7 +204,6 @@ require (
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
-	github.com/libp2p/go-libp2p-loggables v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-msgio v0.2.0 // indirect
 	github.com/libp2p/go-nat v0.1.0 // indirect

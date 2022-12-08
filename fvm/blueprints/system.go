@@ -29,7 +29,8 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(templates.ReplaceAddresses(systemChunkTransactionTemplate,
 			templates.Environment{
-				EpochAddress: contracts.Epoch.Address.Hex(),
+				EpochAddress:             contracts.Epoch.Address.Hex(),
+				NodeVersionBeaconAddress: contracts.VersionBeacon.Address.Hex(),
 			})),
 		).
 		AddAuthorizer(contracts.Epoch.Address).

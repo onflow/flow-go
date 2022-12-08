@@ -1,4 +1,5 @@
 import FlowEpoch from 0xEPOCHADDRESS
+import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
 
 transaction {
   prepare(serviceAccount: AuthAccount) {
@@ -6,8 +7,8 @@ transaction {
       ?? panic("Could not borrow heartbeat from storage path")
     heartbeat.advanceBlock()
 
-    let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.Admin)(from: NodeVersionAdmin.NodeVersionAdminStoragePath) ?? panic("Could not borrow version admin from storage path")
+    let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.NodeVersionAdmin>(from: NodeVersionBeacon.NodeVersionAdminStoragePath) ?? panic("Could not borrow version admin from storage path")
 
-    //versionBeacon.
+    versionBeacon.checkVersionTableChanges()
   }
 }
