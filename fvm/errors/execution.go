@@ -62,14 +62,16 @@ func NewInsufficientPayerBalanceError(
 	)
 }
 
-// NewPayerBalanceCheckError constructs a new CodedError which
+// NewPayerBalanceCheckFailure constructs a new CodedError which
 // indicates that a there was an error checking the payers balance.
-func NewPayerBalanceCheckError(
+// This is an implementation error most likely between the smart contract and FVM interaction
+// and should not happen in regular execution.
+func NewPayerBalanceCheckFailure(
 	payer flow.Address,
 	err error,
 ) CodedError {
 	return WrapCodedError(
-		ErrCodePayerBalanceCheckError,
+		FailureCodePayerBalanceCheckFailure,
 		err,
 		"failed to check if the payer %s has sufficient balance",
 		payer)
