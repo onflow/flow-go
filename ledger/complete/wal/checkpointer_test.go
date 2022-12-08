@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/module/metrics"
@@ -345,14 +344,6 @@ func Test_Checkpointing(t *testing.T) {
 				require.Equal(t, values2[i], values[i])
 				require.Equal(t, values2[i], values5[i])
 			}
-		})
-
-		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
-			logger := unittest.Logger()
-			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
-			require.NoError(t, err)
-			require.Equal(t, 1, len(evictedFileNames))
-			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
 		})
 
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {

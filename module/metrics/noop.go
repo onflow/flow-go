@@ -3,6 +3,10 @@ package metrics
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -101,33 +105,33 @@ func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()            
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
 func (nc *NoopCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
 }
-func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                      {}
-func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                          {}
-func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                  {}
-func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                    {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                {}
-func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                 {}
-func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                           {}
-func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                     {}
-func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                        {}
-func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                     {}
-func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()               {}
-func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {}
-func (nc *NoopCollector) ConnectionFromPoolReused()                                            {}
-func (nc *NoopCollector) ConnectionAddedToPool()                                               {}
-func (nc *NoopCollector) NewConnectionEstablished()                                            {}
-func (nc *NoopCollector) ConnectionFromPoolInvalidated()                                       {}
-func (nc *NoopCollector) ConnectionFromPoolUpdated()                                           {}
-func (nc *NoopCollector) ConnectionFromPoolEvicted()                                           {}
-func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
-func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
-func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
-func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}
-func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                       {}
-func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _ uint64, _, _, _, _ int)  {}
-func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _ uint64, _, _, _, _, _ int) {
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                       {}
+func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                           {}
+func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                   {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                     {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                 {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                  {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                            {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                      {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                         {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                      {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                         {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                         {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()                {}
+func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)  {}
+func (nc *NoopCollector) ConnectionFromPoolReused()                                             {}
+func (nc *NoopCollector) ConnectionAddedToPool()                                                {}
+func (nc *NoopCollector) NewConnectionEstablished()                                             {}
+func (nc *NoopCollector) ConnectionFromPoolInvalidated()                                        {}
+func (nc *NoopCollector) ConnectionFromPoolUpdated()                                            {}
+func (nc *NoopCollector) ConnectionFromPoolEvicted()                                            {}
+func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                  {}
+func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                 {}
+func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                   {}
+func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                           {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                        {}
+func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.ExecutionResultStats) {}
+func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
@@ -214,6 +218,20 @@ func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                           
 func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                          {}
 func (nc *NoopCollector) OnIncomingRpcRejected()                                                {}
 func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                           {}
+func (nc *NoopCollector) AllowConn(dir network.Direction, usefd bool)                           {}
+func (nc *NoopCollector) BlockConn(dir network.Direction, usefd bool)                           {}
+func (nc *NoopCollector) AllowStream(p peer.ID, dir network.Direction)                          {}
+func (nc *NoopCollector) BlockStream(p peer.ID, dir network.Direction)                          {}
+func (nc *NoopCollector) AllowPeer(p peer.ID)                                                   {}
+func (nc *NoopCollector) BlockPeer(p peer.ID)                                                   {}
+func (nc *NoopCollector) AllowProtocol(proto protocol.ID)                                       {}
+func (nc *NoopCollector) BlockProtocol(proto protocol.ID)                                       {}
+func (nc *NoopCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID)                        {}
+func (nc *NoopCollector) AllowService(svc string)                                               {}
+func (nc *NoopCollector) BlockService(svc string)                                               {}
+func (nc *NoopCollector) BlockServicePeer(svc string, p peer.ID)                                {}
+func (nc *NoopCollector) AllowMemory(size int)                                                  {}
+func (nc *NoopCollector) BlockMemory(size int)                                                  {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

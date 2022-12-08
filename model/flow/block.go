@@ -57,15 +57,6 @@ func (b Block) Checksum() Identifier {
 	return b.Header.Checksum()
 }
 
-// PendingBlock is a wrapper type representing a block that cannot yet be
-// processed. The block header, payload, and sender ID are stored together
-// while waiting for the block to become processable.
-type PendingBlock struct {
-	OriginID Identifier
-	Header   *Header
-	Payload  *Payload
-}
-
 // BlockStatus represents the status of a block.
 type BlockStatus int
 

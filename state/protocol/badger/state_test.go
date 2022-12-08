@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/stretchr/testify/assert"
+	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	mock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -50,6 +52,8 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
 		require.NoError(t, err)
@@ -124,6 +128,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
 		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
 		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
