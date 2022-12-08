@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -89,7 +88,7 @@ func (suite *AccessSuite) SetupTest() {
 
 func (suite *AccessSuite) TestAPIsAvailable() {
 	suite.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
-		httpProxyAddress := fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
+		httpProxyAddress := net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
 
 		conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
 		require.NoError(suite.T(), err, "http proxy port not open on the access node")
@@ -98,7 +97,7 @@ func (suite *AccessSuite) TestAPIsAvailable() {
 	})
 
 	suite.T().Run("TestAccessConnection", func(t *testing.T) {
-		grpcAddress := fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
+		grpcAddress := net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
 
 		ctx, cancel := context.WithTimeout(suite.ctx, 1*time.Second)
 		defer cancel()
