@@ -228,9 +228,18 @@ func main() {
 	lg.Stop()
 
 	log.Info().Msg("Validating data")
-	if len(recorder.BenchmarkResults.RawTPS) == 0 {
+	totalTPS := 0.
+	for _, record := range recorder.BenchmarkResults.RawTPS {
+		totalTPS += record.InputTPS
+	}
+
+	resultLen := len(recorder.BenchmarkResults.RawTPS)
+	if resultLen == 0 || totalTPS == 0 {
 		recorder.SetStatus(StatusFailure)
-		log.Fatal().Msg("invalid TPS data generated")
+		log.Fatal().
+			Int("resultsLen", resultLen).
+			Float64("totalTPS", totalTPS).
+			Msg("invalid TPS data generated")
 	}
 
 	// only upload valid data
