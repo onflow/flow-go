@@ -45,6 +45,8 @@ type facadeEnvironment struct {
 	ContractUpdater
 	*Programs
 
+	*InterpreterSharedStateCache
+
 	accounts Accounts
 	txnState *state.TransactionState
 }
@@ -130,6 +132,8 @@ func newFacadeEnvironment(
 			txnState,
 			accounts,
 			derivedTxnData),
+
+		InterpreterSharedStateCache: NewInterpreterSharedStateCache(),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -282,6 +286,7 @@ func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.AccountFreezer.Reset()
+	env.InterpreterSharedStateCache.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.

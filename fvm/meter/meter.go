@@ -48,7 +48,6 @@ var (
 
 		// Values
 
-		common.MemoryKindBoolValue:      8,
 		common.MemoryKindAddressValue:   32,
 		common.MemoryKindStringValue:    138,
 		common.MemoryKindCharacterValue: 24,
@@ -61,12 +60,8 @@ var (
 		common.MemoryKindSimpleCompositeValue:     73,
 		common.MemoryKindSimpleCompositeValueBase: 89,
 		common.MemoryKindOptionalValue:            41,
-		common.MemoryKindNilValue:                 1,
-		common.MemoryKindVoidValue:                1,
 		common.MemoryKindTypeValue:                17,
 		common.MemoryKindPathValue:                24,
-		common.MemoryKindCapabilityValue:          1,
-		common.MemoryKindLinkValue:                1,
 		common.MemoryKindStorageReferenceValue:    41,
 		common.MemoryKindEphemeralReferenceValue:  41,
 		common.MemoryKindInterpretedFunctionValue: 128,
@@ -123,10 +118,8 @@ var (
 		common.MemoryKindCadenceContractValueSize: 16,
 		common.MemoryKindCadenceEnumValueBase:     33,
 		common.MemoryKindCadenceEnumValueSize:     16,
-		common.MemoryKindCadenceLinkValue:         1,
 		common.MemoryKindCadencePathValue:         33,
 		common.MemoryKindCadenceTypeValue:         17,
-		common.MemoryKindCadenceCapabilityValue:   1,
 
 		// Cadence Types
 

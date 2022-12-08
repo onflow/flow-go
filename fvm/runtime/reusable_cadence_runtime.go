@@ -20,7 +20,7 @@ type Environment interface {
 }
 
 var setAccountFrozenFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
+	Parameters: []sema.Parameter{
 		{
 			Label:          sema.ArgumentLabelNotRequired,
 			Identifier:     "account",
@@ -32,7 +32,7 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
 		},
 	},
-	ReturnTypeAnnotation: &sema.TypeAnnotation{
+	ReturnTypeAnnotation: sema.TypeAnnotation{
 		Type: sema.VoidType,
 	},
 }
