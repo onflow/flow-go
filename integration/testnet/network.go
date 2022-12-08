@@ -727,7 +727,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
-	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
+	bindAddr := fmt.Sprintf("localhost:%s", bindPort)
 	opts := append(
 		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),

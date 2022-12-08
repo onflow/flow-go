@@ -55,7 +55,7 @@ func TestCommandRunner(t *testing.T) {
 }
 
 func (suite *CommandRunnerSuite) SetupTest() {
-	suite.httpAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
+	suite.httpAddress = unittest.IPPort(testingdock.RandomPort(suite.T()))
 	suite.bootstrapper = NewCommandRunnerBootstrapper()
 }
 
