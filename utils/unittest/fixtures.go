@@ -42,7 +42,12 @@ import (
 
 const (
 	DefaultSeedFixtureLength = 64
+	DefaultAddress           = "localhost:0"
 )
+
+func IPPort(port string) string {
+	return fmt.Sprintf("localhost:%s", port)
+}
 
 func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()
