@@ -85,7 +85,7 @@ func (a *adjuster) Stop() {
 // compared to the last round.
 //
 // Target TPS is always bounded by [minTPS, maxTPS].
-func (a *adjuster) adjustTPSForever() error {
+func (a *adjuster) adjustTPSForever() (err error) {
 	initialStats := a.workerStatsTracker.GetStats()
 	lastState := adjusterState{
 		timestamp: time.Now(),
@@ -97,73 +97,80 @@ func (a *adjuster) adjustTPSForever() error {
 
 	for {
 		select {
-		// NOTE: not using a ticker here since adjusting worker count in SetTPS
+		// NOTE: not using a ticker here since adjustOnce
 		// can take a while and lead to uneven feedback intervals.
 		case nowTs := <-time.After(a.params.Interval):
-			currentStats := a.workerStatsTracker.GetStats()
-
-			// number of timed out transactions in the last interval
-			txsTimedout := currentStats.TxsTimedout - int(lastState.timedout)
-
-			inflight := currentStats.TxsSent - currentStats.TxsExecuted
-			inflightPerWorker := inflight / int(lastState.targetTPS)
-
-			skip, currentTPS, unboundedTPS := computeTPS(
-				lastState.executed,
-				uint(currentStats.TxsExecuted),
-				lastState.timestamp,
-				nowTs,
-				lastState.tps,
-				lastState.targetTPS,
-				inflight,
-				a.params.MaxInflight,
-				txsTimedout > 0,
-			)
-
-			if skip {
-				a.log.Info().
-					Float64("lastTPS", lastState.tps).
-					Float64("currentTPS", currentTPS).
-					Int("inflight", inflight).
-					Int("inflightPerWorker", inflightPerWorker).
-					Msg("skipped adjusting TPS")
-
-				lastState.executed = uint(currentStats.TxsExecuted)
-				lastState.tps = currentTPS
-				lastState.timestamp = nowTs
-
-				continue
-			}
-
-			boundedTPS := boundTPS(unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
-			a.log.Info().
-				Uint("lastTargetTPS", lastState.targetTPS).
-				Float64("lastTPS", lastState.tps).
-				Float64("currentTPS", currentTPS).
-				Uint("unboundedTPS", unboundedTPS).
-				Uint("targetTPS", boundedTPS).
-				Int("inflight", inflight).
-				Int("inflightPerWorker", inflightPerWorker).
-				Int("txsTimedout", txsTimedout).
-				Msg("adjusting TPS")
-
-			err := a.lg.SetTPS(boundedTPS)
+			lastState, err = a.adjustOnce(nowTs, lastState)
 			if err != nil {
-				return fmt.Errorf("unable to set tps: %w", err)
-			}
-
-			lastState = adjusterState{
-				timestamp: nowTs,
-				tps:       currentTPS,
-				targetTPS: boundedTPS,
-
-				timedout: uint(currentStats.TxsTimedout),
-				executed: uint(currentStats.TxsExecuted),
+				return fmt.Errorf("adjusting TPS: %w", err)
 			}
 		case <-a.ctx.Done():
 			return a.ctx.Err()
 		}
 	}
+}
+
+func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjusterState, error) {
+	currentStats := a.workerStatsTracker.GetStats()
+
+	// number of timed out transactions in the last interval
+	txsTimedout := currentStats.TxsTimedout - int(lastState.timedout)
+
+	inflight := currentStats.TxsSent - currentStats.TxsExecuted
+	inflightPerWorker := inflight / int(lastState.targetTPS)
+
+	skip, currentTPS, unboundedTPS := computeTPS(
+		lastState.executed,
+		uint(currentStats.TxsExecuted),
+		lastState.timestamp,
+		nowTs,
+		lastState.tps,
+		lastState.targetTPS,
+		inflight,
+		a.params.MaxInflight,
+		txsTimedout > 0,
+	)
+
+	if skip {
+		a.log.Info().
+			Float64("lastTPS", lastState.tps).
+			Float64("currentTPS", currentTPS).
+			Int("inflight", inflight).
+			Int("inflightPerWorker", inflightPerWorker).
+			Msg("skipped adjusting TPS")
+
+		lastState.executed = uint(currentStats.TxsExecuted)
+		lastState.tps = currentTPS
+		lastState.timestamp = nowTs
+
+		return lastState, nil
+	}
+
+	boundedTPS := boundTPS(unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
+	a.log.Info().
+		Uint("lastTargetTPS", lastState.targetTPS).
+		Float64("lastTPS", lastState.tps).
+		Float64("currentTPS", currentTPS).
+		Uint("unboundedTPS", unboundedTPS).
+		Uint("targetTPS", boundedTPS).
+		Int("inflight", inflight).
+		Int("inflightPerWorker", inflightPerWorker).
+		Int("txsTimedout", txsTimedout).
+		Msg("adjusting TPS")
+
+	err := a.lg.SetTPS(boundedTPS)
+	if err != nil {
+		return lastState, fmt.Errorf("unable to set tps: %w", err)
+	}
+
+	return adjusterState{
+		timestamp: nowTs,
+		tps:       currentTPS,
+		targetTPS: boundedTPS,
+
+		timedout: uint(currentStats.TxsTimedout),
+		executed: uint(currentStats.TxsExecuted),
+	}, nil
 }
 
 func computeTPS(
