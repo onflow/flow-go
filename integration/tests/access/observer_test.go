@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -185,11 +186,11 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 }
 
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("localhost:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("localhost:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {

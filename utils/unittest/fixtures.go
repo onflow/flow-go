@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"net"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ const (
 )
 
 func IPPort(port string) string {
-	return fmt.Sprintf("localhost:%s", port)
+	return net.JoinHostPort("localhost", port)
 }
 
 func AddressFixture() flow.Address {
