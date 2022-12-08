@@ -76,33 +76,14 @@ func MetricsMiddleware(logger zerolog.Logger) mux.MiddlewareFunc {
 							requestDuration,
 							http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 								logger.Info().Msg("Metrics for " + requestName + " stored successfully")
-								inner.ServeHTTP(writer, r)
 							}),
 						),
 					),
 				),
 			)
 
-			logger.Info().Msg("Returning HTTP at end of middleware")
-			// modify the writer
-			respWriter := newResponseWriter(w)
-			// continue to the next handler
-			inner.ServeHTTP(respWriter, req)
+			logger.Info().Msg("Metrics middleware, continue to serve request")
+			inner.ServeHTTP(w, req)
 		})
 	}
-}
-
-// responseWriter is a wrapper around http.ResponseWriter and helps capture the response code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
-
-func newResponseWriter(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{w, http.StatusOK}
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
 }
