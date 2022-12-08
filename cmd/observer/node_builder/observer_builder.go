@@ -114,13 +114,6 @@ type ObserverServiceConfig struct {
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
 	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
-	PublicNetworkConfig       PublicNetworkConfig
-}
-
-type PublicNetworkConfig struct {
-	BindAddress string
-	Network     network.Network
-	Metrics     module.NetworkMetrics
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -140,13 +133,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		rpcMetricsEnabled: false,
-		apiRatelimits:     nil,
-		apiBurstlimits:    nil,
-		PublicNetworkConfig: PublicNetworkConfig{
-			BindAddress: cmd.NotSet,
-			Metrics:     metrics.NewNoopCollector(),
-		},
+		rpcMetricsEnabled:         false,
+		apiRatelimits:             nil,
+		apiBurstlimits:            nil,
 		bootstrapNodeAddresses:    []string{},
 		bootstrapNodePublicKeys:   []string{},
 		observerNetworkingKeyPath: cmd.NotSet,
@@ -934,7 +923,6 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(builder.Logger, metrics.WithNetworkPrefix("public"))
 			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if builder.HeroCacheMetricsEnable {
 				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
@@ -948,12 +936,12 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, node.NodeID)
+			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
 			builder.initMiddleware(node.NodeID, node.Metrics.Network, libp2pNode, msgValidators...)
 
 			// topology is nil since it is automatically managed by libp2p
-			net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, builder.Middleware, nil, receiveCache)
+			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
 			if err != nil {
 				return nil, err
 			}

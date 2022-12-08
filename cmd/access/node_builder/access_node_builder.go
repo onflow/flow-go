@@ -165,7 +165,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiBurstlimits:               nil,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
-			Metrics:     metrics.NewNoopCollector(),
+			Metrics:     metrics.NewNetworkCollector(zerolog.Logger{}),
 		},
 		executionDataSyncEnabled: false,
 		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
