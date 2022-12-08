@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -172,7 +171,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010489")
+		minimumStorage, err := cadence.NewUFix64("0.00008312")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -191,7 +190,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// ensure fee deduction events are emitted even though tx fails
 		require.Len(t, cr.Events[1], 3)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -261,8 +260,8 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 10, transactionEvents)
 
-		// insufficient account balance error as account is at minimum account balance and inclusion fee is non-zero
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		// minimum account balance error as account is put below minimum account balance due to fee deduction
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
@@ -477,7 +476,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1103")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event

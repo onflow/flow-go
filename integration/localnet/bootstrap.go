@@ -457,7 +457,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
 	}
 
 	return service

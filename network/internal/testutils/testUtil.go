@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -138,7 +139,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
 
-		identities[i].Address = unittest.IPPort(port)
+		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
 
@@ -358,7 +359,7 @@ func generateLibP2PNode(t *testing.T,
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), unittest.DefaultAddress, key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 

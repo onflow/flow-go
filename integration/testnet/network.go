@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"math/rand"
-	gonet "net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -728,7 +727,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
-	bindAddr := gonet.JoinHostPort("localhost", bindPort)
+	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
 	opts := append(
 		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),

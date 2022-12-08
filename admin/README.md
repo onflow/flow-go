@@ -51,11 +51,6 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-transactions", "data": { "start-height": 340, "end-height": 343 }}'
 ```
 
-### To get execution data for a block by execution_data_id (only available execution nodes and access nodes with execution sync enabled)
-```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "read-execution-data", "data": { "execution_data_id": "2fff2b05e7226c58e3c14b3549ab44a354754761c5baa721ea0d1ea26d069dc4" }}'
-```
-
 #### To get a list of all updatable configs
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "list-configs"}'

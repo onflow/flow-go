@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -142,7 +141,7 @@ func (r *FungibleTokenTracker) worker(
 	wg *sync.WaitGroup) {
 	for j := range jobs {
 
-		view := utils.NewSimpleViewFromPayloads(j.payloads)
+		view := migrations.NewView(j.payloads)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 		accounts := environment.NewAccounts(txnState)
 		storage := cadenceRuntime.NewStorage(

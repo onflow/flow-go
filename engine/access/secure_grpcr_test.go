@@ -86,9 +86,9 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := rpc.Config{
-		UnsecureGRPCListenAddr: unittest.DefaultAddress,
-		SecureGRPCListenAddr:   unittest.DefaultAddress,
-		HTTPListenAddr:         unittest.DefaultAddress,
+		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
+		SecureGRPCListenAddr:   ":0",
+		HTTPListenAddr:         ":0",
 	}
 
 	// generate a server certificate that will be served by the GRPC server

@@ -3,13 +3,11 @@ package access
 import (
 	"context"
 	"fmt"
-	"net"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -35,9 +33,7 @@ type ObserverSuite struct {
 }
 
 func (suite *ObserverSuite) TearDownTest() {
-	if suite.teardown != nil {
-		suite.teardown()
-	}
+	suite.teardown()
 }
 
 func (suite *ObserverSuite) SetupTest() {
@@ -91,7 +87,13 @@ func (suite *ObserverSuite) SetupTest() {
 		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
 		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
 	})
-	require.NoError(suite.T(), err)
+
+	if err != nil {
+		// this can happen occaisionally...
+		// usually it's because docker didn't remove the observer container during the previous test.
+		// the observer container is removed by an "AutoRemove" flag in AddObserver.
+		panic(err)
+	}
 
 	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
 
@@ -186,11 +188,11 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 }
 
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(net.JoinHostPort("localhost", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {

@@ -146,11 +146,6 @@ func (s *State) InteractionUsed() uint64 {
 	return s.meter.TotalBytesOfStorageInteractions()
 }
 
-// RegisterUpdates returns the lists of register id / value that were updated.
-func (s *State) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return s.view.RegisterUpdates()
-}
-
 // Get returns a register value given owner and key
 func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
 	if s.committed {
@@ -358,20 +353,10 @@ func IsFVMStateKey(owner string, key string) bool {
 		key == AccountStatusKey
 }
 
-// This returns true if the key is a slab index for an account's ordered fields
-// map.
-//
-// In general, each account's regular fields are stored in ordered map known
-// only to cadence.  Cadence encodes this map into bytes and split the bytes
-// into slab chunks before storing the slabs into the ledger.
-func IsSlabIndex(key string) bool {
-	return len(key) == 9 && key[0] == '$'
-}
-
 // PrintableKey formats slabs properly and avoids invalid utf8s
 func PrintableKey(key string) string {
 	// slab
-	if IsSlabIndex(key) {
+	if key[0] == '$' && len(key) == 9 {
 		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
 		return fmt.Sprintf("$%d", i)
 	}

@@ -32,7 +32,6 @@ import (
 
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -55,7 +54,7 @@ func TestCommandRunner(t *testing.T) {
 }
 
 func (suite *CommandRunnerSuite) SetupTest() {
-	suite.httpAddress = unittest.IPPort(testingdock.RandomPort(suite.T()))
+	suite.httpAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
 	suite.bootstrapper = NewCommandRunnerBootstrapper()
 }
 
@@ -79,7 +78,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
-	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock), WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
+	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)

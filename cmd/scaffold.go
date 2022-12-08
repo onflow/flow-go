@@ -139,7 +139,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -165,7 +164,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminCert, "admin-cert", defaultConfig.AdminCert, "admin cert file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
-	fnb.flags.UintVar(&fnb.BaseConfig.AdminMaxMsgSize, "admin-max-response-size", defaultConfig.AdminMaxMsgSize, "admin server max response size in bytes")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
@@ -490,9 +488,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 		}
 
-		opts := []admin.CommandRunnerOption{
-			admin.WithMaxMsgSize(int(fnb.AdminMaxMsgSize)),
-		}
+		var opts []admin.CommandRunnerOption
 
 		if node.AdminCert != NotSet {
 			serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
@@ -515,9 +511,9 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 			opts = append(opts, admin.WithTLS(config))
 		}
 
-		runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
+		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
 
-		return runner, nil
+		return command_runner, nil
 	})
 
 	return nil
@@ -584,19 +580,11 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-
-	// Drop all log events that exceed this rate limit
-	throttledSampler := logging.BurstSampler(fnb.BaseConfig.debugLogLimit, time.Second)
-
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
 		Str("node_id", fnb.NodeID.String()).
-		Logger().
-		Sample(zerolog.LevelSampler{
-			TraceSampler: throttledSampler,
-			DebugSampler: throttledSampler,
-		})
+		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
 
@@ -606,9 +594,9 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 		return fmt.Errorf("invalid log level: %w", err)
 	}
 
-	// Minimum log level is set to trace, then overridden by SetGlobalLevel.
-	// this allows admin commands to modify the level to any value during runtime
-	log = log.Level(zerolog.TraceLevel)
+	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
+	// modify the level during runtime
+	log = log.Level(zerolog.DebugLevel)
 	zerolog.SetGlobalLevel(lvl)
 
 	fnb.Logger = log

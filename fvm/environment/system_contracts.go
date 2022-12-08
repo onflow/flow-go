@@ -92,38 +92,6 @@ func ServiceAddress(chain flow.Chain) flow.Address {
 	return chain.ServiceAddress()
 }
 
-var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
-	AddressFromChain: FlowFeesAddress,
-	LocationName:     systemcontracts.ContractNameFlowFees,
-	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
-	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
-		sema.UInt64Type,
-		sema.UInt64Type,
-	},
-}
-
-// CheckPayerBalanceAndGetMaxTxFees executes the verifyPayersBalanceForTransactionExecution
-// on the FlowFees account.
-// It checks whether the given payer has enough balance to cover inclusion fee and max execution
-// fee.
-// It returns (maxTransactionFee, ErrCodeInsufficientPayerBalance) if the payer doesn't have enough balance
-// It returns (maxTransactionFee, nil) if the payer has enough balance
-func (sys *SystemContracts) CheckPayerBalanceAndGetMaxTxFees(
-	payer flow.Address,
-	inclusionEffort uint64,
-	maxExecutionEffort uint64,
-) (cadence.Value, error) {
-	return sys.Invoke(
-		verifyPayersBalanceForTransactionExecutionSpec,
-		[]cadence.Value{
-			cadence.BytesToAddress(payer.Bytes()),
-			cadence.UFix64(inclusionEffort),
-			cadence.UFix64(maxExecutionEffort),
-		},
-	)
-}
-
 var deductTransactionFeeSpec = ContractFunctionSpec{
 	AddressFromChain: FlowFeesAddress,
 	LocationName:     systemcontracts.ContractNameFlowFees,
@@ -135,8 +103,8 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	},
 }
 
-// DeductTransactionFees executes the fee deduction function
-// on the FlowFees account.
+// DeductTransactionFees executes the fee deduction contract on the service
+// account.
 func (sys *SystemContracts) DeductTransactionFees(
 	payer flow.Address,
 	inclusionEffort uint64,

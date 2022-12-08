@@ -13,11 +13,11 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -64,7 +64,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwc.Close()
 	defer rwm.Close()
 
-	l := utils.NewSimpleViewFromPayloads(payload)
+	l := migrations.NewView(payload)
 	txnState := state.NewTransactionState(l, state.DefaultParameters())
 	gen := environment.NewAddressGenerator(txnState, r.Chain)
 

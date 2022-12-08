@@ -270,12 +270,11 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 	derived.TransactionInvalidator,
 	error,
 ) {
-	contractKeys, err := env.ContractUpdater.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDerivedDataInvalidator(contractKeys, env), nil
+	keys, err := env.ContractUpdater.Commit()
+	return DerivedDataInvalidator{
+		ContractUpdateKeys: keys,
+		FrozenAccounts:     env.FrozenAccounts(),
+	}, err
 }
 
 func (env *facadeEnvironment) Reset() {

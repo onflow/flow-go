@@ -70,10 +70,6 @@ const (
 	// We set it to the MaxAppSpecificReward + 1 so that we only opportunistically graft peers that are not access nodes (i.e., with MinAppSpecificPenalty),
 	// or penalized peers (i.e., with MaxAppSpecificPenalty).
 	DefaultOpportunisticGraftThreshold = MaxAppSpecificReward + 1
-
-	// MaxDebugLogs sets the max number of debug/trace log events per second. Logs emitted above
-	// this threshold are dropped.
-	MaxDebugLogs = 50
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -95,17 +91,9 @@ func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64
 }
 
 func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...PeerScoreParamsOption) *ScoreOption {
-	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger = logger.With().
-		Str("module", "pubsub_score_option").
-		Logger().
-		Sample(zerolog.LevelSampler{
-			TraceSampler: throttledSampler,
-			DebugSampler: throttledSampler,
-		})
 	validator := NewSubscriptionValidator()
 	s := &ScoreOption{
-		logger:                   logger,
+		logger:                   logger.With().Str("module", "pubsub_score_option").Logger(),
 		validator:                validator,
 		idProvider:               idProvider,
 		appSpecificScoreFunction: defaultAppSpecificScoreFunction(logger, idProvider, validator),

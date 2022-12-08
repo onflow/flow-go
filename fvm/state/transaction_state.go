@@ -404,13 +404,6 @@ func (s *TransactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
 }
 
-func (s *TransactionState) RegisterUpdates() (
-	[]flow.RegisterID,
-	[]flow.RegisterValue,
-) {
-	return s.currentState().RegisterUpdates()
-}
-
 // EnableAllLimitEnforcements enables all the limits
 func (s *TransactionState) EnableAllLimitEnforcements() {
 	s.enforceLimits = true

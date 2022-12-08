@@ -1,10 +1,8 @@
 package computer
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -39,16 +37,13 @@ type resultCollector struct {
 	metrics module.ExecutionMetrics
 
 	closeOnce sync.Once
+	wg        sync.WaitGroup
 
-	committer          ViewCommitter
-	state              flow.StateCommitment
-	committerInputChan chan state.View
-	committerDoneChan  chan struct{}
-	committerError     error
+	committer ViewCommitter
+	state     flow.StateCommitment
+	viewChan  chan state.View
 
-	hasherInputChan chan flow.EventsList
-	hasherDoneChan  chan struct{}
-	hasherError     error
+	eventsListChan chan flow.EventsList
 
 	result *execution.ComputationResult
 }
@@ -59,31 +54,30 @@ func newResultCollector(
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
 	block *entity.ExecutableBlock,
-	numCollections int,
+	numChunks int,
 ) *resultCollector {
 	collector := &resultCollector{
-		tracer:             tracer,
-		blockSpan:          blockSpan,
-		metrics:            metrics,
-		committer:          committer,
-		state:              *block.StartState,
-		committerInputChan: make(chan state.View, numCollections),
-		committerDoneChan:  make(chan struct{}),
-		hasherInputChan:    make(chan flow.EventsList, numCollections),
-		hasherDoneChan:     make(chan struct{}),
-		result:             execution.NewEmptyComputationResult(block),
+		tracer:         tracer,
+		blockSpan:      blockSpan,
+		metrics:        metrics,
+		committer:      committer,
+		state:          *block.StartState,
+		viewChan:       make(chan state.View, numChunks),
+		eventsListChan: make(chan flow.EventsList, numChunks),
+		result:         execution.NewEmptyComputationResult(block),
 	}
 
-	go collector.runCollectionCommitter()
-	go collector.runCollectionHasher()
+	collector.wg.Add(2)
+	go collector.runChunkCommitter()
+	go collector.runChunkHasher()
 
 	return collector
 }
 
-func (collector *resultCollector) runCollectionCommitter() {
-	defer close(collector.committerDoneChan)
+func (collector *resultCollector) runChunkCommitter() {
+	defer collector.wg.Done()
 
-	for view := range collector.committerInputChan {
+	for view := range collector.viewChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXECommitDelta)
@@ -92,8 +86,7 @@ func (collector *resultCollector) runCollectionCommitter() {
 			view,
 			collector.state)
 		if err != nil {
-			collector.committerError = fmt.Errorf("committer failed: %w", err)
-			return
+			panic(err)
 		}
 
 		collector.result.StateCommitments = append(
@@ -109,18 +102,17 @@ func (collector *resultCollector) runCollectionCommitter() {
 	}
 }
 
-func (collector *resultCollector) runCollectionHasher() {
-	defer close(collector.hasherDoneChan)
+func (collector *resultCollector) runChunkHasher() {
+	defer collector.wg.Done()
 
-	for data := range collector.hasherInputChan {
+	for data := range collector.eventsListChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXEHashEvents)
 
 		rootHash, err := flow.EventsMerkleRootHash(data)
 		if err != nil {
-			collector.hasherError = fmt.Errorf("hasher failed: %w", err)
-			return
+			panic(err)
 		}
 
 		collector.result.EventsHashes = append(
@@ -143,20 +135,8 @@ func (collector *resultCollector) CommitCollection(
 	collection collectionItem,
 	collectionView state.View,
 ) module.ExecutionResultStats {
-
-	select {
-	case collector.committerInputChan <- collectionView:
-		// Do nothing
-	case <-collector.committerDoneChan:
-		// Committer exited (probably due to an error)
-	}
-
-	select {
-	case collector.hasherInputChan <- collector.result.Events[collectionIndex]:
-		// Do nothing
-	case <-collector.hasherDoneChan:
-		// Hasher exited (probably due to an error)
-	}
+	collector.viewChan <- collectionView
+	collector.eventsListChan <- collector.result.Events[collectionIndex]
 
 	collector.result.AddCollection(collectionView.(*delta.View).Interactions())
 	return collector.result.CollectionStats(collectionIndex)
@@ -164,32 +144,13 @@ func (collector *resultCollector) CommitCollection(
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
-		close(collector.committerInputChan)
-		close(collector.hasherInputChan)
+		close(collector.viewChan)
+		close(collector.eventsListChan)
 	})
 }
 
-func (collector *resultCollector) Finalize() (
-	*execution.ComputationResult,
-	error,
-) {
+func (collector *resultCollector) Finalize() *execution.ComputationResult {
 	collector.Stop()
-
-	<-collector.committerDoneChan
-	<-collector.hasherDoneChan
-
-	var err error
-	if collector.committerError != nil {
-		err = multierror.Append(err, collector.committerError)
-	}
-
-	if collector.hasherError != nil {
-		err = multierror.Append(err, collector.hasherError)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return collector.result, nil
+	collector.wg.Wait()
+	return collector.result
 }

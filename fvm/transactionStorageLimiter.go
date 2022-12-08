@@ -14,7 +14,11 @@ import (
 
 type TransactionStorageLimiter struct{}
 
-func (_ TransactionStorageLimiter) CheckStorageLimits(
+func NewTransactionStorageLimiter() TransactionStorageLimiter {
+	return TransactionStorageLimiter{}
+}
+
+func (d TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
 	addresses []flow.Address,
 ) error {

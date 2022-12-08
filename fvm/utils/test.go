@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SimpleView provides a simple view for testing and migration purposes.
+// SimpleView provides a simple view for testing purposes.
 type SimpleView struct {
 	Parent *SimpleView
 	Ledger *MapLedger
@@ -17,12 +16,6 @@ type SimpleView struct {
 func NewSimpleView() *SimpleView {
 	return &SimpleView{
 		Ledger: NewMapLedger(),
-	}
-}
-
-func NewSimpleViewFromPayloads(payloads []ledger.Payload) *SimpleView {
-	return &SimpleView{
-		Ledger: NewMapLedgerFromPayloads(payloads),
 	}
 }
 
@@ -103,48 +96,22 @@ func (v *SimpleView) Delete(owner, key string) error {
 	return v.Ledger.Delete(owner, key)
 }
 
-func (v *SimpleView) Payloads() []ledger.Payload {
-	return v.Ledger.Payloads()
-}
-
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
 //
-// This implementation is designed for testing and migration purposes.
+// This implementation is designed for testing purposes.
 type MapLedger struct {
 	Registers       map[flow.RegisterID]flow.RegisterValue
 	RegisterTouches map[flow.RegisterID]struct{}
 	RegisterUpdated map[flow.RegisterID]struct{}
 }
 
-// NewMapLedger returns an instance of map ledger (should only be used for
-// testing and migration)
+// NewMapLedger returns an instance of map ledger (should only be used for testing)
 func NewMapLedger() *MapLedger {
 	return &MapLedger{
 		Registers:       make(map[flow.RegisterID]flow.RegisterValue),
 		RegisterTouches: make(map[flow.RegisterID]struct{}),
 		RegisterUpdated: make(map[flow.RegisterID]struct{}),
 	}
-}
-
-// NewMapLedger returns an instance of map ledger with entries loaded from
-// payloads (should only be used for testing and migration)
-func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
-	ledger := NewMapLedger()
-	for _, entry := range payloads {
-		key, err := entry.Key()
-		if err != nil {
-			panic(err)
-		}
-
-		id := flow.RegisterID{
-			Owner: string(key.KeyParts[0].Value),
-			Key:   string(key.KeyParts[1].Value),
-		}
-
-		ledger.Registers[id] = entry.Value()
-	}
-
-	return ledger
 }
 
 func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
@@ -169,23 +136,4 @@ func (m *MapLedger) Touch(owner, key string) error {
 func (m *MapLedger) Delete(owner, key string) error {
 	delete(m.RegisterTouches, flow.RegisterID{Owner: owner, Key: key})
 	return nil
-}
-
-func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
-	keyParts := []ledger.KeyPart{
-		ledger.NewKeyPart(0, []byte(id.Owner)),
-		ledger.NewKeyPart(2, []byte(id.Key)),
-	}
-
-	return ledger.NewKey(keyParts)
-}
-
-func (m *MapLedger) Payloads() []ledger.Payload {
-	ret := make([]ledger.Payload, 0, len(m.Registers))
-	for id, val := range m.Registers {
-		key := registerIdToLedgerKey(id)
-		ret = append(ret, *ledger.NewPayload(key, ledger.Value(val)))
-	}
-
-	return ret
 }
