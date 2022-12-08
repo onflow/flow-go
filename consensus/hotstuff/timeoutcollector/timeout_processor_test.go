@@ -3,6 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"math/rand"
 	"sync"
 	"testing"
@@ -446,9 +447,9 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	})
 
 	// utility function which generates a valid timeout for every signer
-	createTimeouts := func(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {
-		timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
-		for _, signer := range stakingSigners {
+	createTimeouts := func(participants flow.IdentityList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {
+		timeouts := make([]*model.TimeoutObject, 0, len(participants))
+		for _, signer := range participants {
 			timeout, err := signers[signer.NodeID].CreateTimeout(view, newestQC, lastViewTC)
 			require.NoError(t, err)
 			timeouts = append(timeouts, timeout)
@@ -468,26 +469,16 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)
 
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
-	require.NoError(t, err)
+	// create first QC for view N-1, this will be our olderQC
+	olderQC := createRealQC(t, committee, stakingSigners, signers, block)
+	// now create a second QC for view N, this will be our newest QC
+	nextBlock := helper.MakeBlock(
+		helper.WithBlockView(view),
+		helper.WithBlockProposer(leader.NodeID),
+		helper.WithBlockQC(olderQC))
+	newestQC := createRealQC(t, committee, stakingSigners, signers, nextBlock)
 
-	var newestQC *flow.QuorumCertificate
-	onQCCreated := func(qc *flow.QuorumCertificate) {
-		newestQC = qc
-	}
-
-	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
-	require.NoError(t, err)
-
-	for _, signer := range stakingSigners[1:] {
-		vote, err := signers[signer.NodeID].CreateVote(block)
-		require.NoError(t, err)
-		err = voteProcessor.Process(vote)
-		require.NoError(t, err)
-	}
-
-	require.NotNil(t, newestQC, "vote processor must create a valid QC at this point")
+	// at this point we have created two QCs for round N-1 and N, create a TC for view N
 
 	// create verifier that will do crypto checks of created TC
 	verifier := verification.NewStakingVerifier()
@@ -507,35 +498,72 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	require.NoError(t, err)
 
 	notifier := mocks.NewTimeoutCollectorConsumer(t)
-	notifier.On("OnPartialTcCreated", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
+	notifier.On("OnPartialTcCreated", view, olderQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
 	processor, err := NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view was successful, no lastViewTC in this case
-	timeouts := createTimeouts(view, newestQC, nil)
+	timeouts := createTimeouts(stakingSigners, view, olderQC, nil)
 	for _, timeout := range timeouts {
 		err := processor.Process(timeout)
 		require.NoError(t, err)
 	}
 
 	notifier.AssertExpectations(t)
+
+	// at this point we have created QCs for view N-1 and N additionally a TC for view N, we can create TC for view N+1
+	// with timeout objects containing both QC and TC for view N
 
 	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, msig.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
-	notifier.On("OnPartialTcCreated", view+1, newestQC, lastViewTC).Return().Once()
+	notifier.On("OnPartialTcCreated", view+1, newestQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
 	processor, err = NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
-	// last view ended with TC, need to include lastViewTC
-	timeouts = createTimeouts(view+1, newestQC, lastViewTC)
+	// part of committee will use QC, another part TC, this will result in aggregated signature consisting
+	// of two types of messages with views N-1 and N representing the newest QC known to replicas.
+	timeoutsWithQC := createTimeouts(stakingSigners[:len(stakingSigners)/2], view+1, newestQC, nil)
+	timeoutsWithTC := createTimeouts(stakingSigners[len(stakingSigners)/2:], view+1, olderQC, lastViewTC)
+	timeouts = append(timeoutsWithQC, timeoutsWithTC...)
 	for _, timeout := range timeouts {
 		err := processor.Process(timeout)
 		require.NoError(t, err)
 	}
 
 	notifier.AssertExpectations(t)
+}
+
+func createRealQC(
+	t *testing.T,
+	committee hotstuff.DynamicCommittee,
+	signers flow.IdentityList,
+	signerObjects map[flow.Identifier]*verification.StakingSigner,
+	block *model.Block,
+) *flow.QuorumCertificate {
+	leader := signers[0]
+	proposal, err := signerObjects[leader.NodeID].CreateProposal(block)
+	require.NoError(t, err)
+
+	var createdQC *flow.QuorumCertificate
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		createdQC = qc
+	}
+
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, onQCCreated)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	require.NoError(t, err)
+
+	for _, signer := range signers[1:] {
+		vote, err := signerObjects[signer.NodeID].CreateVote(block)
+		require.NoError(t, err)
+		err = voteProcessor.Process(vote)
+		require.NoError(t, err)
+	}
+
+	require.NotNil(t, createdQC, "vote processor must create a valid QC at this point")
+	return createdQC
 }
