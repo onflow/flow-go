@@ -117,7 +117,12 @@ jobs:
         cache: true
     - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 3
+        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
