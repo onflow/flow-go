@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"net"
 	"testing"
 	"time"
 
@@ -42,7 +43,12 @@ import (
 
 const (
 	DefaultSeedFixtureLength = 64
+	DefaultAddress           = "localhost:0"
 )
+
+func IPPort(port string) string {
+	return net.JoinHostPort("localhost", port)
+}
 
 func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()

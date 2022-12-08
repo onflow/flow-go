@@ -51,7 +51,7 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 func SilentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 	key := NetworkingKeyFixtures(t)
 
-	lst, err := net.Listen("tcp4", ":0")
+	lst, err := net.Listen("tcp4", unittest.DefaultAddress)
 	require.NoError(t, err)
 
 	addr, err := manet.FromNetAddr(lst.Addr())
@@ -98,7 +98,7 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
-		"0.0.0.0:0",
+		unittest.DefaultAddress,
 		networkKey,
 		sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {

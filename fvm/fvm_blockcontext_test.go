@@ -1088,13 +1088,36 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
 				require.NoError(t, err)
 
-				txBody := testutil.CreateContractDeploymentTransaction(
+				n := 0
+				seqNum := func() uint64 {
+					sn := n
+					n++
+					return uint64(sn)
+				}
+				// fund account so the payer can pay for the next transaction.
+				txBody := transferTokensTx(chain).
+					SetProposalKey(chain.ServiceAddress(), 0, seqNum()).
+					AddAuthorizer(chain.ServiceAddress()).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0]))).
+					SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+				tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+				err = vm.Run(ctx, tx, view)
+				require.NoError(t, err)
+				assert.NoError(t, tx.Err)
+
+				ctx.MaxStateInteractionSize = 500_000
+
+				txBody = testutil.CreateContractDeploymentTransaction(
 					"Container",
 					script,
 					accounts[0],
 					chain)
 
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, seqNum())
 				txBody.SetPayer(accounts[0])
 
 				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
@@ -1103,7 +1126,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+				tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 				err = vm.Run(ctx, tx, view)
 				require.NoError(t, err)

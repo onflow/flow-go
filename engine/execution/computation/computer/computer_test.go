@@ -933,7 +933,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		module.ExecutionResultStats{
 			EventCounts:                     expectedNumberOfEvents,
 			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        49,
+			NumberOfRegistersTouched:        50,
 			NumberOfBytesWrittenToRegisters: 3404,
 			NumberOfCollections:             1,
 			NumberOfTransactions:            1,
