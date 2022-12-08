@@ -123,4 +123,19 @@ tps-ci: bootstrap-ci build-flow start-flow
 clean-data:
 	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
 	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
+
+	# deletes all generated files and folders from bootstrap and test running
 	rm -rf ./data
+	rm -rf ./bootstrap
+	rm -rf ./trie
+	rm -rf ./profiler
+	rm -f ./targets.nodes.json
+	rm -f ./docker-compose.nodes.yml
+
+# deletes the stopped environment-clean container(s) - running this command inside another target doesn't delete the containers so it's isolated to run in a separate target
+# Note: running this target shows an error on the command line "make: *** [clean-data2] Error 1" but the container is still deletes
+.PHONY: clean-data2
+clean-data2:
+	docker rm $(shell docker ps -aq --filter ancestor=environment-clean)
+	#$(shell docker rm $$(docker ps -aq --filter ancestor=environment-clean))
+
