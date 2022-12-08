@@ -3,7 +3,6 @@ package corruptlibp2p_test
 import (
 	"context"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
 	"sync"
 	"testing"
 	"time"
@@ -69,13 +68,6 @@ func TestSpam_IHave(t *testing.T) {
 				return nil
 			})),
 	)
-	victimPeerId := victimNode.Host().ID()
-	v, err := unittest.PeerIDFromFlowID(&victimId)
-	require.NoError(t, err)
-	require.Equal(t, victimPeerId, v)
-
-	//victimPeerInfo, err := utils.PeerAddressInfo(victimId)
-	//require.NoError(t, err)
 
 	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,10 +88,10 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
-	})
+	//p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+	//	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	//	return unittest.ProposalFixture(), blockTopic
+	//})
 
 	// create new spammer
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
@@ -109,7 +101,7 @@ func TestSpam_IHave(t *testing.T) {
 	iHaveSentCtlMsgs := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	spammer.SpamIHave(t, victimPeerId, iHaveSentCtlMsgs)
+	spammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
 	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")
