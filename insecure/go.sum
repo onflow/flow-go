@@ -1478,6 +1478,12 @@ github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221205183923-5b979fd7d80b h1:9qSLOxaiPv3HR5THaAcUuXRi4OFIexDseSp8ZBKOMsk=
 github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221205183923-5b979fd7d80b/go.mod h1:Tylw4k1H86gbJx84i3r7qahN/mBaeMpUBvHY0Igshfw=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208175358-bf05f82c565e h1:+7MOzfuoHgh6Rpy7BJBEPcMgDvC/cTaFv7QlWXjT8+M=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208175358-bf05f82c565e/go.mod h1:Tylw4k1H86gbJx84i3r7qahN/mBaeMpUBvHY0Igshfw=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208185058-df6c36a76983 h1:AzbDxc7heoGrroxZwRg+LBbneh15o0UvvxfUzmzg6aY=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208185058-df6c36a76983/go.mod h1:Tylw4k1H86gbJx84i3r7qahN/mBaeMpUBvHY0Igshfw=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208204955-09668489428c h1:WbA09PVlZtZu9QztQDCw4ZYHvptFkRvJtFLal3a3O58=
+github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208204955-09668489428c/go.mod h1:Tylw4k1H86gbJx84i3r7qahN/mBaeMpUBvHY0Igshfw=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

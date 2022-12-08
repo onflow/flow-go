@@ -393,6 +393,7 @@ func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) 
 				continue
 			}
 			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
 		}
 	}
 }

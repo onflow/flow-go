@@ -3,6 +3,7 @@ package corruptlibp2p_test
 import (
 	"context"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"sync"
@@ -10,8 +11,6 @@ import (
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-
-	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -33,9 +32,9 @@ func TestSpam_IHave(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
 	router := newAtomicRouter()
-	factory := corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+	spammerFactory := corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter, ps *corrupt.PubSub) {
 		require.NotNil(t, r)
-		router.setRouter(r)
+		router.set(r, ps)
 	})
 
 	spammerNode, spammerId := p2ptest.NodeFixture(
@@ -43,7 +42,7 @@ func TestSpam_IHave(t *testing.T) {
 		sporkId,
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
-		internal.WithCorruptGossipSub(factory,
+		internal.WithCorruptGossipSub(spammerFactory,
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
@@ -60,8 +59,9 @@ func TestSpam_IHave(t *testing.T) {
 		sporkId,
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
-		internal.WithCorruptGossipSub(factory,
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				fmt.Println(len(rpc.Publish))
 				iHaves := rpc.GetControl().GetIhave()
 				if len(iHaves) == 0 {
 					// don't inspect control messages with no IHAVE messages
@@ -76,11 +76,13 @@ func TestSpam_IHave(t *testing.T) {
 				return nil
 			})),
 	)
-	victimPeerId, err := unittest.PeerIDFromFlowID(&victimId)
+	victimPeerId := victimNode.Host().ID()
+	v, err := unittest.PeerIDFromFlowID(&victimId)
 	require.NoError(t, err)
+	require.Equal(t, victimPeerId, v)
 
-	victimPeerInfo, err := utils.PeerAddressInfo(victimId)
-	require.NoError(t, err)
+	//victimPeerInfo, err := utils.PeerAddressInfo(victimId)
+	//require.NoError(t, err)
 
 	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
@@ -91,19 +93,20 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Second)
 
-	// connect spammer and victim
-	err = spammerNode.AddPeer(ctx, victimPeerInfo)
-	require.NoError(t, err)
-	connected, err := spammerNode.IsConnected(victimPeerInfo.ID)
-	require.NoError(t, err)
-	require.True(t, connected)
+	//// connect spammer and victim
+	//err = spammerNode.AddPeer(ctx, victimPeerInfo)
+	//require.NoError(t, err)
+	//connected, err := spammerNode.IsConnected(victimPeerInfo.ID)
+	//require.NoError(t, err)
+	//require.True(t, connected)
 
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.
 		return router.getRouter() != nil
-	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
+	}, 1000*time.Second, 100*time.Millisecond, "spammer router not set")
 
+	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
@@ -111,6 +114,16 @@ func TestSpam_IHave(t *testing.T) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
+
+	fmt.Println("ensures pending peers processed")
+	fmt.Println(victimPeerId.String())
+	require.Equal(t, spammerNode.Host().Network().Connectedness(victimPeerId), network.Connected)
+	updated := router.getPubSub().ForceUpdatePendingPeers([]peer.ID{victimPeerId})
+	fmt.Println("updated", len(updated))
+	for _, u := range updated {
+		fmt.Println("updated", u.String())
+	}
+	fmt.Println("ensured pending peers processed")
 	// create new spammer
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
 	require.NotNil(t, router)
@@ -119,13 +132,13 @@ func TestSpam_IHave(t *testing.T) {
 	iHaveSentCtlMsgs := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	spammer.SpamIHave(victimPeerId, iHaveSentCtlMsgs)
+	spammer.SpamIHave(t, victimPeerId, iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
 	select {
 	case <-receivedAllMsgs:
 		break
-	case <-time.After(1 * time.Second):
+	case <-time.After(2000 * time.Second):
 		require.Fail(t, "did not receive spam messages")
 	}
 
@@ -139,6 +152,7 @@ func TestSpam_IHave(t *testing.T) {
 type atomicRouter struct {
 	mu     sync.Mutex
 	router *corrupt.GossipSubRouter
+	ps     *corrupt.PubSub
 }
 
 func newAtomicRouter() *atomicRouter {
@@ -148,11 +162,12 @@ func newAtomicRouter() *atomicRouter {
 }
 
 // SetRouter sets the router if it has never been set.
-func (a *atomicRouter) setRouter(router *corrupt.GossipSubRouter) bool {
+func (a *atomicRouter) set(router *corrupt.GossipSubRouter, ps *corrupt.PubSub) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.router == nil {
+	if a.router == nil && a.ps == nil {
 		a.router = router
+		a.ps = ps
 		return true
 	}
 	return false
@@ -163,4 +178,10 @@ func (a *atomicRouter) getRouter() *corrupt.GossipSubRouter {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.router
+}
+
+func (a *atomicRouter) getPubSub() *corrupt.PubSub {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ps
 }
