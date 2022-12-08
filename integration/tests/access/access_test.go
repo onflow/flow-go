@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -110,5 +111,11 @@ func (suite *AccessSuite) TestAPIsAvailable() {
 
 		_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
 		assert.NoError(t, err, "failed to ping access node")
+	})
+
+	suite.T().Run("TestAccessMetrics", func(t *testing.T) {
+		metricsAddress := net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
+		_, err := http.Get("http://" + metricsAddress + "/metrics")
+		require.NoError(suite.T(), err, "metrics port not open on the access node")
 	})
 }
