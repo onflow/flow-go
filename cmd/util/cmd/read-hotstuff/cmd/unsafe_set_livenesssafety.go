@@ -85,6 +85,14 @@ func runSetUnsafe(*cobra.Command, []string) {
 		Uint64("liveness.NewestQC.View", modifiedLivenessData.NewestQC.View).
 		Msg("setting new hotstuff data")
 
+	// perform safety checks
+	if modifiedLivenessData.CurrentView != modifiedLivenessData.NewestQC.View+1 {
+		log.Fatal().Msgf("invalid newest qc view (%d) compared to cur view (%d)", modifiedLivenessData.NewestQC.View, modifiedLivenessData.CurrentView)
+	}
+	if modifiedSafetyData.HighestAcknowledgedView > modifiedLivenessData.CurrentView {
+		log.Fatal().Msgf("invalid HighestAcknowledgedView (%d) compared to cur view (%d)", modifiedSafetyData.HighestAcknowledgedView, modifiedLivenessData.CurrentView)
+	}
+
 	err = pers.PutSafetyData(modifiedSafetyData)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not set hotstuff safety data")
