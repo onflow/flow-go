@@ -334,8 +334,8 @@ func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.Lib
 // duration.
 func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration time.Duration) {
 	comps := make([]module.ReadyDoneAware, 0, len(rda))
-	for _, net := range comps {
-		comps = append(comps, net)
+	for _, c := range rda {
+		comps = append(comps, c)
 	}
 
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
