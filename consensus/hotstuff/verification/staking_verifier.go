@@ -142,6 +142,7 @@ func verifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCView
 		return fmt.Errorf("signature verification failed: %w", err)
 	}
 	if !valid {
+		fmt.Printf("**** verifying BLS sig: %v\n", messages)
 		return fmt.Errorf("invalid aggregated TC signature for view %d: %w", view, model.ErrInvalidSignature)
 	}
 	return nil
