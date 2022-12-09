@@ -88,10 +88,6 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
-	//p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-	//	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	//	return unittest.ProposalFixture(), blockTopic
-	//})
 
 	// create new spammer
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
