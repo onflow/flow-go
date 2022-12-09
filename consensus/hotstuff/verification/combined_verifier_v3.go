@@ -122,9 +122,6 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
-	if len(signers) == 0 {
-		return model.NewInsufficientSignaturesErrorf("empty list of signers")
-	}
 
 	signerIdentities := signers.Lookup()
 	dkg, err := c.committee.DKG(block.BlockID)
@@ -157,7 +154,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 		if err != nil {
 			// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-			//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
+			//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
 			//      This scenario _is expected_ during normal operations, because a byzantine
 			//      proposer might construct an (invalid) QC with an empty list of signers.
 			// (ii) In case some provided public keys type is not BLS.
@@ -165,9 +162,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 			//      guaranteed by the protocol to be BLS keys.
 
 			// check case (i)
-			// TODO: this should not happen because the case `len(signers) == 0`
-			// is checked upfront and ruled out. This is because `Unpack` does not
-			// handle the empty list case properly.
 			if crypto.IsBLSAggregateEmptyListError(err) {
 				return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
 			}
