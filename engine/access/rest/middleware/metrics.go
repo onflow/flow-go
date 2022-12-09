@@ -1,89 +1,166 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/slok/go-http-metrics/metrics"
+	"github.com/slok/go-http-metrics/middleware"
+	"github.com/slok/go-http-metrics/middleware/std"
+
+	"github.com/gorilla/mux"
 )
 
-// MetricsMiddleware creates a middleware which adds a metrics interceptor to each request to track the
-// number of requests,
-func MetricsMiddleware(logger zerolog.Logger) mux.MiddlewareFunc {
-	return func(inner http.Handler) http.Handler {
+// Example recorder taken from:
+// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+
+// Config has the dependencies and values of the recorder.
+type Config struct {
+	// Prefix is the prefix that will be set on the metrics, by default it will be empty.
+	Prefix string
+	// DurationBuckets are the buckets used by Prometheus for the HTTP request duration metrics,
+	// by default uses Prometheus default buckets (from 5ms to 10s).
+	DurationBuckets []float64
+	// SizeBuckets are the buckets used by Prometheus for the HTTP response size metrics,
+	// by default uses a exponential buckets from 100B to 1GB.
+	SizeBuckets []float64
+	// Registry is the registry that will be used by the recorder to store the metrics,
+	// if the default registry is not used then it will use the default one.
+	Registry prometheus.Registerer
+	// HandlerIDLabel is the name that will be set to the handler ID label, by default is `handler`.
+	HandlerIDLabel string
+	// StatusCodeLabel is the name that will be set to the status code label, by default is `code`.
+	StatusCodeLabel string
+	// MethodLabel is the name that will be set to the method label, by default is `method`.
+	MethodLabel string
+	// ServiceLabel is the name that will be set to the service label, by default is `service`.
+	ServiceLabel string
+}
+
+func (c *Config) defaults() {
+	if len(c.DurationBuckets) == 0 {
+		c.DurationBuckets = prometheus.DefBuckets
+	}
+
+	if len(c.SizeBuckets) == 0 {
+		c.SizeBuckets = prometheus.ExponentialBuckets(100, 10, 8)
+	}
+
+	if c.Registry == nil {
+		c.Registry = prometheus.DefaultRegisterer
+	}
+
+	if c.HandlerIDLabel == "" {
+		c.HandlerIDLabel = "handler"
+	}
+
+	if c.StatusCodeLabel == "" {
+		c.StatusCodeLabel = "code"
+	}
+
+	if c.MethodLabel == "" {
+		c.MethodLabel = "method"
+	}
+
+	if c.ServiceLabel == "" {
+		c.ServiceLabel = "service"
+	}
+}
+
+type CustomRecorder interface {
+	metrics.Recorder
+	AddTotalRequests(ctx context.Context, service string, id string)
+}
+
+type recorder struct {
+	httpRequestDurHistogram   *prometheus.HistogramVec
+	httpResponseSizeHistogram *prometheus.HistogramVec
+	httpRequestsInflight      *prometheus.GaugeVec
+	httpRequestsTotal         *prometheus.GaugeVec
+}
+
+// NewRecorder returns a new metrics recorder that implements the recorder
+// using Prometheus as the backend.
+func NewRecorder(cfg Config) CustomRecorder {
+	cfg.defaults()
+
+	r := &recorder{
+		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: cfg.Prefix,
+			Subsystem: "http",
+			Name:      "request_duration_seconds",
+			Help:      "The latency of the HTTP requests.",
+			Buckets:   cfg.DurationBuckets,
+		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
+
+		httpResponseSizeHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: cfg.Prefix,
+			Subsystem: "http",
+			Name:      "response_size_bytes",
+			Help:      "The size of the HTTP responses.",
+			Buckets:   cfg.SizeBuckets,
+		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
+
+		httpRequestsInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: cfg.Prefix,
+			Subsystem: "http",
+			Name:      "requests_inflight",
+			Help:      "The number of inflight requests being handled at the same time.",
+		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
+
+		httpRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: cfg.Prefix,
+			Subsystem: "http",
+			Name:      "requests_total",
+			Help:      "The number of requests handled over time.",
+		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
+	}
+
+	cfg.Registry.MustRegister(
+		r.httpRequestDurHistogram,
+		r.httpResponseSizeHistogram,
+		r.httpRequestsInflight,
+		r.httpRequestsTotal,
+	)
+
+	return r
+}
+
+func MetricsMiddleware() mux.MiddlewareFunc {
+	r := NewRecorder(Config{Prefix: "access_rest_api"})
+	metricsMiddleware := middleware.New(middleware.Config{Recorder: r})
+
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// // record star time
-			// start := time.Now()
-			// // modify the writer
-			// respWriter := newResponseWriter(w)
-			// // continue to the next handler
-			// inner.ServeHTTP(respWriter, req)
-			// log := logger.Info()
-			// if respWriter.statusCode != http.StatusOK {
-			// 	log = logger.Error()
-			// }
-			// log.Str("method", req.Method).
-			// 	Str("uri", req.RequestURI).
-			// 	Str("client_ip", req.RemoteAddr).
-			// 	Str("user_agent", req.UserAgent()).
-			// 	Dur("duration", time.Since(start)).
-			// 	Int("response_code", respWriter.statusCode).
-			// 	Msg("api")
+			// This is a custom metric being called on every http request
+			r.AddTotalRequests(req.Context(), req.Method, req.URL.Path)
 
-			requestName := req.Method + " " + req.URL.String()
-			reg := prometheus.NewRegistry()
-			wrappedReg := prometheus.WrapRegistererWith(prometheus.Labels{"request": requestName}, reg)
+			// Modify the writer
+			respWriter := &responseWriter{w, http.StatusOK}
 
-			requestsTotal := promauto.With(wrappedReg).NewCounterVec(
-				prometheus.CounterOpts{
-					Name: "http_requests_total",
-					Help: "Tracks the number of HTTP requests.",
-				}, []string{"method", "code"},
-			)
-			requestDuration := promauto.With(wrappedReg).NewHistogramVec(
-				prometheus.HistogramOpts{
-					Name: "http_request_duration_seconds",
-					Help: "Tracks the latencies for HTTP requests.",
-				},
-				[]string{"method", "code"},
-			)
-			requestSize := promauto.With(wrappedReg).NewSummaryVec(
-				prometheus.SummaryOpts{
-					Name: "http_request_size_bytes",
-					Help: "Tracks the size of HTTP requests.",
-				},
-				[]string{"method", "code"},
-			)
-			responseSize := promauto.With(wrappedReg).NewSummaryVec(
-				prometheus.SummaryOpts{
-					Name: "http_response_size_bytes",
-					Help: "Tracks the size of HTTP responses.",
-				},
-				[]string{"method", "code"},
-			)
-
-			promhttp.InstrumentHandlerRequestSize(
-				requestSize,
-				promhttp.InstrumentHandlerCounter(
-					requestsTotal,
-					promhttp.InstrumentHandlerResponseSize(
-						responseSize,
-						promhttp.InstrumentHandlerDuration(
-							requestDuration,
-							http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
-								logger.Info().Msg("Metrics for " + requestName + " stored successfully")
-							}),
-						),
-					),
-				),
-			)
-
-			logger.Info().Msg("Metrics middleware, continue to serve request")
-			inner.ServeHTTP(w, req)
+			// Record go-http-metrics/middleware metrics and continue to the next handler
+			std.Handler("", metricsMiddleware, next).ServeHTTP(respWriter, req)
 		})
 	}
+}
+
+// These methods are called automatically by go-http-metrics/middleware
+func (r recorder) ObserveHTTPRequestDuration(_ context.Context, p metrics.HTTPReqProperties, duration time.Duration) {
+	r.httpRequestDurHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(duration.Seconds())
+}
+
+func (r recorder) ObserveHTTPResponseSize(_ context.Context, p metrics.HTTPReqProperties, sizeBytes int64) {
+	r.httpResponseSizeHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(float64(sizeBytes))
+}
+
+func (r recorder) AddInflightRequests(_ context.Context, p metrics.HTTPProperties, quantity int) {
+	r.httpRequestsInflight.WithLabelValues(p.Service, p.ID).Add(float64(quantity))
+}
+
+// New custom method to track all requests made for every REST API request
+func (r recorder) AddTotalRequests(_ context.Context, method string, id string) {
+	r.httpRequestsTotal.WithLabelValues(method, id).Inc()
 }
