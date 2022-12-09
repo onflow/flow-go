@@ -51,39 +51,39 @@ func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *mess
 	}, nil
 }
 
-func (m *IncomingMessageScope) OriginId() flow.Identifier {
+func (m IncomingMessageScope) OriginId() flow.Identifier {
 	return m.originId
 }
 
-func (m *IncomingMessageScope) Message() *message.Message {
+func (m IncomingMessageScope) Message() *message.Message {
 	return m.msg
 }
 
-func (m *IncomingMessageScope) DecodedPayload() interface{} {
-	return m.DecodedPayload
+func (m IncomingMessageScope) DecodedPayload() interface{} {
+	return m.decodedPayload
 }
 
-func (m *IncomingMessageScope) Protocol() ProtocolType {
+func (m IncomingMessageScope) Protocol() ProtocolType {
 	return m.protocol
 }
 
-func (m *IncomingMessageScope) Channel() string {
+func (m IncomingMessageScope) Channel() string {
 	return m.msg.ChannelID
 }
 
-func (m *IncomingMessageScope) Size() int {
+func (m IncomingMessageScope) Size() int {
 	return m.msg.Size()
 }
 
-func (m *IncomingMessageScope) TargetIDs() [][]byte {
+func (m IncomingMessageScope) TargetIDs() [][]byte {
 	return m.msg.TargetIDs
 }
 
-func (m *IncomingMessageScope) EventID() []byte {
+func (m IncomingMessageScope) EventID() []byte {
 	return m.eventId[:]
 }
 
-func (m *IncomingMessageScope) PayloadType() string {
+func (m IncomingMessageScope) PayloadType() string {
 	return MessageType(m.msg.Payload)
 }
 
