@@ -47,8 +47,6 @@ func TestSpam_IHave(t *testing.T) {
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
 
-	// keeps track of how many messages victim received from spammer - to know when to stop listening for more messages
-	receivedCounter := 0
 	var iHaveReceivedCtlMsgs []pb.ControlMessage
 	victimNode, victimId := p2ptest.NodeFixture(
 		t,
@@ -62,7 +60,7 @@ func TestSpam_IHave(t *testing.T) {
 					// don't inspect control messages with no iHAVE messages
 					return nil
 				}
-				receivedCounter++
+
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
 				allSpamIHavesReceived.Done() // acknowledge that victim received a message.
 				return nil
