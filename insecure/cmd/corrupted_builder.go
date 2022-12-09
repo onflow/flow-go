@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"net"
 	"strconv"
 
@@ -71,12 +70,6 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		// explicitly set additional pubsub options
-		psOpts := []pubsub.Option{
-			pubsub.WithMessageSigning(cnb.WithPubSubMessageSigning),
-			pubsub.WithStrictSignatureVerification(cnb.WithPubSubStrictSignatureVerification),
-		}
-
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
@@ -95,7 +88,8 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.NetworkConnectionPruning,
 			cnb.PeerUpdateInterval,
 			cnb.TopicValidatorDisabled,
-			psOpts,
+			cnb.WithPubSubMessageSigning,
+			cnb.WithPubSubStrictSignatureVerification,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()

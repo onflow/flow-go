@@ -26,9 +26,9 @@ type CorruptPubSubAdapterConfig struct {
 
 var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 
-func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, withMessageSigning, withStrictSignatureVerification bool) *CorruptPubSubAdapterConfig {
 	return &CorruptPubSubAdapterConfig{
-		options: defaultCorruptPubsubOptions(base),
+		options: defaultCorruptPubsubOptions(base, withMessageSigning, withStrictSignatureVerification),
 	}
 }
 
@@ -58,10 +58,10 @@ func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }
 
-func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig) []corrupt.Option {
+func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig, withMessageSigning, withStrictSignatureVerification bool) []corrupt.Option {
 	return []corrupt.Option{
-		corrupt.WithMessageSigning(true),
-		corrupt.WithStrictSignatureVerification(true),
+		corrupt.WithMessageSigning(withMessageSigning),
+		corrupt.WithStrictSignatureVerification(withStrictSignatureVerification),
 		corrupt.WithMaxMessageSize(base.MaxMessageSize),
 	}
 }
