@@ -115,8 +115,8 @@ func TestStakingSigner_VerifyQC(t *testing.T) {
 
 	verifier := NewStakingVerifier()
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	require.True(t, model.IsInvalidFormatError(err))
+	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block)
-	require.True(t, model.IsInvalidFormatError(err))
+	require.True(t, model.IsInsufficientSignaturesError(err))
 }
