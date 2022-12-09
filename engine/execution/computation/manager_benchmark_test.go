@@ -131,6 +131,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
@@ -147,7 +149,15 @@ func BenchmarkComputeBlock(b *testing.B) {
 	)
 
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		tracer,
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
