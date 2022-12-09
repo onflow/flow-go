@@ -38,6 +38,9 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 // because having service_event_type key first allows us to scan through the index and
 // filter by service event type first, and then find the result for highest height,
 // see LookupLastExecutionResultForServiceEventType
+//
+// Input eventType strings must be valid service event types, and be known to serviceEventTypeToPrefix.
+// No errors are expected during normal operation.
 func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, eventType string, blockHeight uint64) func(*badger.Txn) error {
 	typeByte, err := serviceEventTypeToPrefix(eventType)
 	if err != nil {
