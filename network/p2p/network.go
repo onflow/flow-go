@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/utils/logging"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -33,8 +30,6 @@ const (
 	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
 	// for sake of deduplication.
 	DefaultReceiveCacheSize = 10e4
-	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
-	eventIDPackingPrefix = "libp2ppacking"
 )
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
@@ -417,7 +412,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), network.MessageType(message))
 
 	return nil
 }
@@ -489,7 +484,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.NetworkMessageSent(msg.Size(), string(channel), MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), string(channel), network.MessageType(message))
 
 	return nil
 }
@@ -531,24 +526,4 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 func (n *Network) Topology() flow.IdentityList {
 	return n.topology.Fanout(n.Identities())
-}
-
-func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
-	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
-	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	return h.SumHash(), nil
-}
-
-func MessageType(decodedPayload interface{}) string {
-	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }

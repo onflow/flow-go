@@ -6,7 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p"
+	"strings"
+)
+
+const (
+	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
+	eventIDPackingPrefix = "libp2ppacking"
 )
 
 type ProtocolType string
@@ -33,7 +38,7 @@ type IncomingMessageScope struct {
 }
 
 func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
-	eventId, err := p2p.EventId(channels.Channel(msg.ChannelID), msg.Payload)
+	eventId, err := EventId(channels.Channel(msg.ChannelID), msg.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute event id: %w", err)
 	}
@@ -79,5 +84,25 @@ func (m *IncomingMessageScope) EventID() []byte {
 }
 
 func (m *IncomingMessageScope) PayloadType() string {
-	return p2p.MessageType(m.msg.Payload)
+	return MessageType(m.msg.Payload)
+}
+
+func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
+	// use a hash with an engine-specific salt to get the payload hash
+	h := hash.NewSHA3_384()
+	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
+	if err != nil {
+		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
+	}
+
+	_, err = h.Write(payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash event: %w", err)
+	}
+
+	return h.SumHash(), nil
+}
+
+func MessageType(decodedPayload interface{}) string {
+	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }

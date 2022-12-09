@@ -1,6 +1,7 @@
 package messageutils
 
 import (
+	"github.com/onflow/flow-go/network"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,7 +10,6 @@ import (
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,7 +32,7 @@ func CreateMessageWithPayload(t *testing.T, originID flow.Identifier, targetID f
 		Payload:   b,
 	}
 
-	eventID, err := p2p.EventId(channel, m.Payload)
+	eventID, err := network.EventId(channel, m.Payload)
 	require.NoError(t, err)
 
 	// this is the message after all network processing. i.e. what is passed to network.Receive
@@ -42,7 +42,7 @@ func CreateMessageWithPayload(t *testing.T, originID flow.Identifier, targetID f
 		Payload:   m.Payload,
 		EventID:   eventID,
 		OriginID:  originID[:],
-		Type:      p2p.MessageType(payload),
+		Type:      network.MessageType(payload),
 	}
 
 	return m, outputMsg, payload

@@ -663,7 +663,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		return
 	}
 
-	msg.Type = p2p.MessageType(decodedMsgPayload)
+	msg.Type = network.MessageType(decodedMsgPayload)
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
