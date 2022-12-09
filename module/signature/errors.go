@@ -19,6 +19,16 @@ var (
 
 	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
 	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
+
+	// ErrIdentitySignature indicates that the aggregated signature failed the module safety final
+	// verification because the aggregated signature is the 'identity signature'.
+	// Context: If private keys are sampled uniformly at random, there is vanishing
+	// probability of generating the aggregated identity signature.
+	// However, (colluding) byzantine signers could force the generation of private keys that
+	// result in the identity aggregated signature.
+	// The Identity aggregated signature can also result from invalid signatures included
+	// using "Trusted Add" that add up to identity.
+	ErrIdentitySignature = errors.New("aggregated signature is invalid because it is identity")
 )
 
 /* ********************* InvalidSignatureIncludedError ********************* */
@@ -41,20 +51,6 @@ func (e InvalidSignatureIncludedError) Unwrap() error { return e.err }
 func IsInvalidSignatureIncludedError(err error) bool {
 	var e InvalidSignatureIncludedError
 	return errors.As(err, &e)
-}
-
-/* ********************* InvalidAggregatedSignatureError ********************* */
-
-// InvalidAggregatedSignatureError indicates that the aggregated signature is invalid.
-// (because it is equal to an identity signature).
-// This can happen because:
-//   - one or many signatures added via TrustedAdd are invalid to their respective public keys.
-//   - OR the signatures are valid but the public keys were forged to sum up to an identity public key.
-var InvalidAggregatedSignatureError = errors.New("aggregated signature is invalid (identity signature)")
-
-// IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
-func IsInvalidAggregatedSignatureError(err error) bool {
-	return errors.Is(err, InvalidAggregatedSignatureError)
 }
 
 /* ************************* InvalidSignerIdxError ************************* */

@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -168,7 +169,7 @@ func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, 
 		if signature.IsInsufficientSignaturesError(err) {
 			return nil, nil, model.NewInsufficientSignaturesError(err)
 		}
-		if signature.IsInvalidAggregatedSignatureError(err) {
+		if errors.Is(err, signature.ErrIdentitySignature) {
 			return nil, nil, model.InvalidAggregatedSignatureError
 		}
 		if signature.IsInvalidSignatureIncludedError(err) {

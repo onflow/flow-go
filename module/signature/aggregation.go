@@ -171,9 +171,11 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
-//   - InvalidAggregatedSignatureError if the aggregated signature is invalid. It's not clear whether included
-//     signatures via TrustedAdd are invalid. This case can happen even when all added signatures
-//     are individually valid.
+//   - ErrIdentitySignature if the aggregated signature is identity, which is invalid.
+//     This error can arise in two scenarios:
+//     1. Some signatures added via TrustedAdd were forged specifically with the goal to yield the
+//     identity signature. Here, these signatures would be invalid w.r.t to their respective public keys.
+//     2. The signatures are valid but the public keys were forged to sum up to an identity public key.
 //   - InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	// check if signature was already computed
@@ -209,7 +211,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	if !ok {
 		// check for identity signature (invalid aggregated signature)
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
-			return nil, nil, InvalidAggregatedSignatureError
+			return nil, nil, ErrIdentitySignature
 		}
 		// this case can only happen if at least one added signature via TrustedAdd does not verify against
 		// the signer's corresponding public key
@@ -302,7 +304,7 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 // KeyAggregate returns the aggregated public key of the input signers.
 //
 // The aggregation errors if:
-//   - genric error if input signers is empty.
+//   - generic error if input signers is empty.
 //   - InvalidSignerIdxError if any signer is out of bound.
 //   - other generic errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
