@@ -378,7 +378,6 @@ func (l *Ledger) ExportCheckpointAt(
 		payloads = t.AllPayloads()
 		payloadSize := len(payloads)
 
-		var err error
 		// migrate payloads
 		for i, migrate := range migrations {
 			l.logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
