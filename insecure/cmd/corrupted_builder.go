@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"net"
 	"strconv"
 
@@ -22,13 +23,17 @@ const CorruptNetworkPort = 4300
 // CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
-	TopicValidatorDisabled bool
+	TopicValidatorDisabled                bool
+	WithPubSubMessageSigning              bool
+	WithPubSubStrictSignatureVerification bool
 }
 
 func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
 	return &CorruptedNodeBuilder{
-		FlowNodeBuilder:        cmd.FlowNode(role),
-		TopicValidatorDisabled: true,
+		FlowNodeBuilder:                       cmd.FlowNode(role),
+		TopicValidatorDisabled:                true,
+		WithPubSubMessageSigning:              true,
+		WithPubSubStrictSignatureVerification: true,
 	}
 }
 
@@ -36,6 +41,8 @@ func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
 func (cnb *CorruptedNodeBuilder) LoadCorruptFlags() {
 	cnb.FlowNodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
 		flags.BoolVar(&cnb.TopicValidatorDisabled, "topic-validator-disabled", true, "enable the libp2p topic validator for corrupt nodes")
+		flags.BoolVar(&cnb.WithPubSubMessageSigning, "pubsub-message-signing", true, "enable pubsub message signing for corrupt nodes")
+		flags.BoolVar(&cnb.WithPubSubStrictSignatureVerification, "pubsub-strict-sig-verification", true, "enable pubsub strict signature verification for corrupt nodes")
 	})
 }
 
@@ -63,6 +70,12 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
+		// explicitly set additional pubsub options
+		psOpts := []pubsub.Option{
+			pubsub.WithMessageSigning(cnb.WithPubSubMessageSigning),
+			pubsub.WithStrictSignatureVerification(cnb.WithPubSubStrictSignatureVerification),
+		}
+
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptnet.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
@@ -81,6 +94,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.NetworkConnectionPruning,
 			cnb.PeerUpdateInterval,
 			cnb.TopicValidatorDisabled,
+			psOpts,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()

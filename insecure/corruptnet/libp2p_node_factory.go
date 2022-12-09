@@ -1,6 +1,7 @@
 package corruptnet
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"time"
 
 	"github.com/onflow/flow-go/network/p2p"
@@ -31,6 +32,7 @@ func NewCorruptLibP2PNodeFactory(
 	connectionPruning bool,
 	updateInterval time.Duration,
 	topicValidatorDisabled bool,
+	psOpts []pubsub.Option,
 ) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		if chainID != flow.BftTestnet {
@@ -38,6 +40,8 @@ func NewCorruptLibP2PNodeFactory(
 		}
 
 		builder := p2pbuilder.DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
+
+		builder.SetPubSubOptions(psOpts)
 
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)

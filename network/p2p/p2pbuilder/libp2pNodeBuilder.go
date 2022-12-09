@@ -87,6 +87,7 @@ type NodeBuilder interface {
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
+	SetPubSubOptions([]pubsub.Option) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -108,6 +109,7 @@ type LibP2PNodeBuilder struct {
 	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
+	pubsubOptions               []pubsub.Option
 }
 
 func NewNodeBuilder(
@@ -180,6 +182,12 @@ func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, 
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	builder.createNode = f
+	return builder
+}
+
+// SetPubSubOptions sets pubsub options that will be added with the default pubsub options.
+func (builder *LibP2PNodeBuilder) SetPubSubOptions(opts []pubsub.Option) NodeBuilder {
+	builder.pubsubOptions = opts
 	return builder
 }
 
@@ -256,6 +264,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				pubsub.WithDiscovery(discoveryRouting.NewRoutingDiscovery(rsys)),
 				pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 			)
+
+			if len(builder.pubsubOptions) > 0 {
+				psOpts = append(psOpts, builder.pubsubOptions...)
+			}
 
 			if builder.subscriptionFilter != nil {
 				psOpts = append(psOpts, pubsub.WithSubscriptionFilter(builder.subscriptionFilter))
@@ -353,10 +365,6 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 
 func DefaultPubsubOptions(maxPubSubMsgSize int) []pubsub.Option {
 	return []pubsub.Option{
-		// enforce message signing
-		pubsub.WithMessageSigning(true),
-		// enforce message signature verification
-		pubsub.WithStrictSignatureVerification(true),
 		// set max message size limit for 1-k PubSub messaging
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
 		// no discovery
