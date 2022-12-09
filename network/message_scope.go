@@ -87,6 +87,70 @@ func (m IncomingMessageScope) PayloadType() string {
 	return MessageType(m.msg.Payload)
 }
 
+type OutgoingMessageScope struct {
+	targetId  flow.Identifier                   // the target node IDs.
+	channelId string                            // the channel ID.
+	payload   interface{}                       // the payload to be sent.
+	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
+	msg       *message.Message                  // proto message sent on wire.
+	protocol  ProtocolType                      // the type of protocol used to send the message.
+}
+
+func NewOutgoingScope(targetId flow.Identifier, channelId string, payload interface{}, encoder func(interface{}) ([]byte, error)) (*OutgoingMessageScope, error) {
+	scope := &OutgoingMessageScope{
+		targetId:  targetId,
+		channelId: channelId,
+		payload:   payload,
+		encoder:   encoder,
+		protocol:  ProtocolTypeUnicast,
+	}
+	msg, err := scope.buildMessage()
+	if err != nil {
+		return nil, fmt.Errorf("could not build message: %v", err)
+	}
+	scope.msg = msg
+	return scope, nil
+}
+
+func (o OutgoingMessageScope) TargetId() flow.Identifier {
+	return o.targetId
+}
+
+func (o OutgoingMessageScope) Size() int {
+	return o.msg.Size()
+}
+
+func (o OutgoingMessageScope) MessageType() string {
+	return MessageType(o.payload)
+}
+
+func (o OutgoingMessageScope) Channel() string {
+	return o.channelId
+}
+
+func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
+	payload, err := o.encoder(o.payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode payload: %w", err)
+	}
+
+	//var emTargets [][]byte = [][]byte{o.targetId[:]}
+	//for _, targetId := range o.targetIds {
+	//	tempID := targetId // avoid capturing loop variable
+	//	emTargets = append(emTargets, tempID[:])
+	//}
+
+	return &message.Message{
+		TargetIDs: [][]byte{o.targetId[:]},
+		ChannelID: o.channelId,
+		Payload:   payload,
+	}, nil
+}
+
+func (o OutgoingMessageScope) Proto() *message.Message {
+	return o.msg
+}
+
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()

@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -364,55 +363,27 @@ func (n *Network) processNetworkMessage(scope *network.IncomingMessageScope) err
 	return nil
 }
 
-// genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
-	// encode the payload using the configured codec
-	payload, err := n.codec.Encode(event)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode event: %w", err)
-	}
-
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
-	//defer binstat.Leave(bs)
-
-	var emTargets [][]byte
-	for _, targetID := range targetIDs {
-		tempID := targetID // avoid capturing loop variable
-		emTargets = append(emTargets, tempID[:])
-	}
-
-	// cast event to a libp2p.Message
-	msg := &message.Message{
-		ChannelID: channel.String(),
-		TargetIDs: emTargets,
-		Payload:   payload,
-	}
-
-	return msg, nil
-}
-
 // UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
 	}
 
-	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetID)
+	msg, err := network.NewOutgoingScope(targetID, channel.String(), payload, n.codec.Encode, network.ProtocolTypeUnicast)
 	if err != nil {
 		return fmt.Errorf("unicast could not generate network message: %w", err)
 	}
 
-	err = n.mw.SendDirect(msg, targetID)
+	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), network.MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), network.MessageType(payload))
 
 	return nil
 }

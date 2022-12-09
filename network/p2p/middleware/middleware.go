@@ -359,14 +359,14 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 // - failed to send message to peer.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
+func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 	// translates identifier to peer id
-	peerID, err := m.idTranslator.GetPeerID(targetID)
+	peerID, err := m.idTranslator.GetPeerID(msg.TargetId())
 	if err != nil {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	maxMsgSize := unicastMaxMsgSize(msg)
+	maxMsgSize := unicastMaxMsgSize(msg.MessageType())
 	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
@@ -374,10 +374,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
-	maxTimeout := m.unicastMaxMsgDuration(msg)
+	maxTimeout := m.unicastMaxMsgDuration(msg.MessageType())
 
-	m.metrics.DirectMessageStarted(msg.ChannelID)
-	defer m.metrics.DirectMessageFinished(msg.ChannelID)
+	m.metrics.DirectMessageStarted(msg.Channel())
+	defer m.metrics.DirectMessageFinished(msg.Channel())
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
@@ -385,7 +385,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
+	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.MessageType())
 	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
@@ -395,7 +395,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s: %w", msg.TargetId(), err)
 	}
 
 	success := false
@@ -405,7 +405,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 			// close the stream immediately
 			err = stream.Close()
 			if err != nil {
-				err = fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
+				err = fmt.Errorf("failed to close the stream for %s: %w", msg.TargetId(), err)
 			}
 		} else {
 			resetErr := stream.Reset()
@@ -425,15 +425,15 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	bufw := bufio.NewWriter(stream)
 	writer := ggio.NewDelimitedWriter(bufw)
 
-	err = writer.WriteMsg(msg)
+	err = writer.WriteMsg(msg.Proto())
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
+		return fmt.Errorf("failed to send message to %s: %w", msg.TargetId(), err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to flush stream for %s: %w", msg.TargetId(), err)
 	}
 
 	success = true
@@ -663,11 +663,11 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		return
 	}
 
-	msg.Type = network.MessageType(decodedMsgPayload)
+	messageType := network.MessageType(decodedMsgPayload)
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize := unicastMaxMsgSize(msg)
+	maxSize := unicastMaxMsgSize(messageType)
 	if msg.Size() > maxSize {
 		// message size exceeded
 		m.log.Error().
@@ -688,7 +688,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 				Error().
 				Err(err).
 				Str("peer_id", remotePeer.String()).
-				Str("type", msg.Type).
+				Str("type", messageType).
 				Str("channel", msg.ChannelID).
 				Msg("unicast authorized sender validation failed")
 			return
@@ -805,8 +805,8 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message
-func unicastMaxMsgSize(msg *message.Message) int {
-	switch msg.Type {
+func unicastMaxMsgSize(messageType string) int {
+	switch messageType {
 	case "messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
@@ -815,8 +815,8 @@ func unicastMaxMsgSize(msg *message.Message) int {
 }
 
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
-	switch msg.Type {
+func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
+	switch messageType {
 	case "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
 			return LargeMsgUnicastTimeout
