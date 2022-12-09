@@ -189,7 +189,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
 		Logger()
 
-	lg.Debug().
+	lg.Info().
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
@@ -263,7 +263,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
-	lg.Debug().Msg("entity response sent")
+	lg.Info().Msg("entity response sent")
 
 	return nil
 }
