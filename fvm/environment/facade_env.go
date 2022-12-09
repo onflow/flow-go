@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -267,14 +267,15 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	programs.ModifiedSetsInvalidator,
+	derived.TransactionInvalidator,
 	error,
 ) {
-	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSetsInvalidator{
-		ContractUpdateKeys: keys,
-		FrozenAccounts:     env.FrozenAccounts(),
-	}, err
+	contractKeys, err := env.ContractUpdater.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDerivedDataInvalidator(contractKeys, env), nil
 }
 
 func (env *facadeEnvironment) Reset() {
