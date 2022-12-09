@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -34,6 +33,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -2149,4 +2150,13 @@ func EngineMessageFixtures(count int) []*engine.Message {
 		messages = append(messages, EngineMessageFixture())
 	}
 	return messages
+}
+
+// GetFlowProtocolEventID returns the event ID for the event provided.
+func GetFlowProtocolEventID(t *testing.T, channel channels.Channel, event interface{}) flow.Identifier {
+	payload, err := NetworkCodec().Encode(event)
+	require.NoError(t, err)
+	eventIDHash, err := p2p.EventId(channel, payload)
+	require.NoError(t, err)
+	return flow.HashToID(eventIDHash)
 }
