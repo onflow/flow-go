@@ -69,9 +69,9 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 //   - (nil, model.InvalidFormatError) if failed to unpack the signature data
 func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
-	data, err := p.Decode(sigData)
+	data, err := p.Decode(sigData) // all potential error are of type `model.InvalidFormatError`
 	if err != nil {
-		return nil, model.NewInvalidFormatErrorf("could not decode sig data %s", err)
+		return nil, fmt.Errorf("could not decode sig data %w", err)
 	}
 
 	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
