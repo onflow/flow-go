@@ -176,10 +176,8 @@ func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt
 }
 
 func (lc *LogConsumer) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
-	lc.log.Warn().
-		Uint64("timeout_view", timeout.View).
-		Hex("signer_id", timeout.SignerID[:]).
-		Msg("invalid timeout detected")
+	log := timeout.LogContext(lc.log).Logger()
+	log.Warn().Msg("invalid timeout detected")
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
@@ -227,7 +225,7 @@ func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 }
 
 func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
-	lc.log.Info().
+	lc.log.Debug().
 		Hex("block_id", blockID[:]).
 		Uint64("block_view", view).
 		Hex("recipient_id", recipientID[:]).
@@ -236,11 +234,11 @@ func (lc *LogConsumer) OnOwnVote(blockID flow.Identifier, view uint64, sigData [
 
 func (lc *LogConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	log := timeout.LogContext(lc.log).Logger()
-	log.Info().Msg("publishing HotStuff timeout object")
+	log.Debug().Msg("publishing HotStuff timeout object")
 }
 
 func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime time.Time) {
-	lc.log.Info().
+	lc.log.Debug().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
