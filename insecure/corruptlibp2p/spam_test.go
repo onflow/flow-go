@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestSpam_IHave sets up a 2 node test between a victim node and a spammer. The spammer sends a few IHAVE control messages
+// TestSpam_IHave sets up a 2 node test between a victim node and a spammer. The spammer sends a few iHAVE control messages
 // to the victim node without being subscribed to any of the same topics.
 // The test then checks that the victim node received all the messages from the spammer.
 func TestSpam_IHave(t *testing.T) {
@@ -59,7 +59,7 @@ func TestSpam_IHave(t *testing.T) {
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				iHaves := rpc.GetControl().GetIhave()
 				if len(iHaves) == 0 {
-					// don't inspect control messages with no IHAVE messages
+					// don't inspect control messages with no iHAVE messages
 					return nil
 				}
 				receivedCounter++
@@ -84,7 +84,7 @@ func TestSpam_IHave(t *testing.T) {
 	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
 
 	// prior to the test we should ensure that spammer and victim connect and discover each other.
-	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send IHAVE messages directly to the victim.
+	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a priory connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
@@ -94,7 +94,7 @@ func TestSpam_IHave(t *testing.T) {
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.get())
 	require.NotNil(t, router)
 
-	// prepare to spam - generate IHAVE control messages
+	// prepare to spam - generate iHAVE control messages
 	iHaveSentCtlMsgs := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
