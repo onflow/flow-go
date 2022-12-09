@@ -3,7 +3,6 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"math/rand"
 	"sync"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -445,6 +446,8 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
 	})
+	// identities must be in canonical order
+	stakingSigners = stakingSigners.Sort(order.Canonical)
 
 	// utility function which generates a valid timeout for every signer
 	createTimeouts := func(participants flow.IdentityList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {

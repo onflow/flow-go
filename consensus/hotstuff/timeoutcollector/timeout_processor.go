@@ -3,7 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow/order"
+
 	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 )
 
