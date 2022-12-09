@@ -152,7 +152,7 @@ func (s *SignatureValidationAttackOrchestrator) getReqChunksEvent(originID, targ
 		ChunkID: unittest.IdentifierFixture(),
 		Nonce:   rand.Uint64(),
 	}
-	eventID := unittest.GetFlowProtocolEventID(s.t, channel, chunkDataReq)
+	eventID := insecure.GetFlowProtocolEventID(s.t, channel, chunkDataReq)
 	return &insecure.EgressEvent{
 		CorruptOriginId:     originID,
 		Channel:             channel,
