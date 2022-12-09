@@ -220,7 +220,7 @@ func main() {
 	// only upload valid data
 	if *bigQueryUpload {
 		repoInfo := mustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
-		mustUploadData(ctx, log, recorder, bigQueryProjectFlag, bigQueryDatasetFlag, bigQueryRawTableFlag, repoInfo)
+		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
@@ -243,15 +243,23 @@ func mustGetRepoInfo(log zerolog.Logger, gitRepoURL string, gitRepoPath string) 
 	return repoInfo
 }
 
-func mustUploadData(ctx context.Context, log zerolog.Logger, recorder *tpsRecorder, bigQueryProjectFlag *string, bigQueryDatasetFlag *string, bigQueryRawTableFlag *string, repoInfo *RepoInfo) {
+func mustUploadData(
+	ctx context.Context,
+	log zerolog.Logger,
+	recorder *tpsRecorder,
+	repoInfo *RepoInfo,
+	bigQueryProject string,
+	bigQueryDataset string,
+	bigQueryRawTable string,
+) {
 	log.Info().Msg("Initializing BigQuery")
-	db, err := NewDB(ctx, log, *bigQueryProjectFlag)
+	db, err := NewDB(ctx, log, bigQueryProject)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bigquery client")
 	}
 	defer db.Close()
 
-	err = db.createTable(ctx, *bigQueryDatasetFlag, *bigQueryRawTableFlag, RawRecord{})
+	err = db.createTable(ctx, bigQueryDataset, bigQueryRawTable, RawRecord{})
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create raw TPS table")
 	}
@@ -259,8 +267,8 @@ func mustUploadData(ctx context.Context, log zerolog.Logger, recorder *tpsRecord
 	log.Info().Msg("Uploading data to BigQuery")
 	err = db.saveRawResults(
 		ctx,
-		*bigQueryDatasetFlag,
-		*bigQueryRawTableFlag,
+		bigQueryDataset,
+		bigQueryRawTable,
 		recorder.BenchmarkResults,
 		*repoInfo,
 		BenchmarkInfo{BenchmarkType: loadType},
