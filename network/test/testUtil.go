@@ -352,7 +352,7 @@ func generateLibP2PNode(
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 

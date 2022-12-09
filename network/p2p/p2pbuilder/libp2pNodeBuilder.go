@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"net"
 	"time"
 
@@ -68,7 +69,7 @@ func DefaultLibP2PNodeFactory(
 			connection.WithOnInterceptSecuredFilters([]p2p.PeerFilter{peerFilter}),
 		)
 
-		builder := NewNodeBuilder(log, address, flowKey, sporkId).
+		builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 			SetBasicResolver(resolver).
 			SetConnectionManager(connManager).
 			SetConnectionGater(connGater).
@@ -121,6 +122,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
+	metrics                     module.NetworkMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -136,12 +138,14 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:     logger,
+		metrics:    metrics,
 		sporkID:    sporkID,
 		addr:       addr,
 		networkKey: networkKey,
@@ -217,6 +221,18 @@ func (builder *LibP2PNodeBuilder) Build() (*p2pnode.Node, error) {
 
 	if builder.resourceManager != nil {
 		opts = append(opts, libp2p.ResourceManager(builder.resourceManager))
+		builder.logger.Warn().
+			Msg("libp2p resource manager is overridden by the node builder, metrics may not be available")
+	} else {
+		// setting up default resource manager, by hooking in the resource manager metrics reporter.
+		limits := rcmgr.DefaultLimits
+		libp2p.SetDefaultServiceLimits(&limits)
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.AutoScale()), rcmgr.WithMetrics(builder.metrics))
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
+		}
+		opts = append(opts, libp2p.ResourceManager(mgr))
+		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
 	}
 
 	if builder.connManager != nil {
