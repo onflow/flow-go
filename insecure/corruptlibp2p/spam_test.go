@@ -34,9 +34,9 @@ func TestSpam_IHave(t *testing.T) {
 		sporkId,
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
-		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter, ps *corrupt.PubSub) {
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 			require.NotNil(t, r)
-			router.set(r, ps)
+			router.set(r)
 		}),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
@@ -80,17 +80,18 @@ func TestSpam_IHave(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.
-		return router.getRouter() != nil
+		return router.get() != nil
 	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
 
-	// prior to the test we ensure that
+	// prior to the test we should ensure that spammer and victim connect and discover each other.
+	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send IHAVE messages directly to the victim.
+	// without a priory connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
-	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
 
 	// create new spammer
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.getRouter())
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.get())
 	require.NotNil(t, router)
 
 	// prepare to spam - generate IHAVE control messages
@@ -112,7 +113,6 @@ func TestSpam_IHave(t *testing.T) {
 type atomicRouter struct {
 	mu     sync.Mutex
 	router *corrupt.GossipSubRouter
-	ps     *corrupt.PubSub
 }
 
 func newAtomicRouter() *atomicRouter {
@@ -122,26 +122,19 @@ func newAtomicRouter() *atomicRouter {
 }
 
 // SetRouter sets the router if it has never been set.
-func (a *atomicRouter) set(router *corrupt.GossipSubRouter, ps *corrupt.PubSub) bool {
+func (a *atomicRouter) set(router *corrupt.GossipSubRouter) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.router == nil && a.ps == nil {
+	if a.router == nil {
 		a.router = router
-		a.ps = ps
 		return true
 	}
 	return false
 }
 
 // GetRouter returns the router.
-func (a *atomicRouter) getRouter() *corrupt.GossipSubRouter {
+func (a *atomicRouter) get() *corrupt.GossipSubRouter {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.router
-}
-
-func (a *atomicRouter) getPubSub() *corrupt.PubSub {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.ps
 }

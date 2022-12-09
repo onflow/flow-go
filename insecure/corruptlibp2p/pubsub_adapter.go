@@ -101,10 +101,10 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.gossipSub.ListPeers(topic)
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, *corrupt.PubSub, error) {
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
+		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
 	// initializes a default gossipsub router and wraps it with the corrupt router.
@@ -113,7 +113,7 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 	// injects the corrupt router into the gossipsub constructor
 	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
+		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
 	adapter := &CorruptGossipSubAdapter{
@@ -122,5 +122,5 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		logger:    logger,
 	}
 
-	return adapter, router, gossipSub, nil
+	return adapter, router, nil
 }
