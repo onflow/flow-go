@@ -80,16 +80,6 @@ func main() {
 		log.Fatal().Msg("git repo path is required")
 	}
 
-	git, err := NewGit(log, *gitRepoPathFlag, *gitRepoURLFlag)
-	if err != nil {
-		log.Fatal().Err(err).Str("path", *gitRepoPathFlag).Msg("failed to clone/open git repo")
-	}
-	repoInfo, err := git.GetRepoInfo()
-	if err != nil {
-		log.Fatal().Err(err).Str("path", *gitRepoPathFlag).Msg("failed to get repo info")
-	}
-	log.Info().Interface("repoInfo", repoInfo).Msg("parsed repo info")
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -229,6 +219,7 @@ func main() {
 
 	// only upload valid data
 	if *bigQueryUpload {
+		repoInfo := mustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
 		uploadData(log, ctx, recorder, bigQueryProjectFlag, bigQueryDatasetFlag, bigQueryRawTableFlag, repoInfo)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
@@ -237,6 +228,19 @@ func main() {
 			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
+}
+
+func mustGetRepoInfo(log zerolog.Logger, gitRepoURL string, gitRepoPath string) *RepoInfo {
+	git, err := NewGit(log, gitRepoPath, gitRepoURL)
+	if err != nil {
+		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to clone/open git repo")
+	}
+	repoInfo, err := git.GetRepoInfo()
+	if err != nil {
+		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to get repo info")
+	}
+	log.Info().Interface("repoInfo", repoInfo).Msg("parsed repo info")
+	return repoInfo
 }
 
 func uploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecorder, bigQueryProjectFlag *string, bigQueryDatasetFlag *string, bigQueryRawTableFlag *string, repoInfo *RepoInfo) {
