@@ -427,12 +427,19 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 
 // TestTimeoutProcessor_BuildVerifyTC tests a complete path from creating timeouts to collecting timeouts and then
 // building & verifying TC.
-// We start with building valid newest QC that will be included in every TimeoutObject. We need to have a valid QC
-// since TimeoutProcessor performs complete validation of TimeoutObject. Then we create a valid cryptographically signed
-// timeout for each signer. Created timeouts are feed to TimeoutProcessor which eventually creates a TC after seeing processing
-// enough objects. After we verify if TC was correctly constructed and if it doesn't violate protocol rules.
-// After obtaining valid TC we will repeat this test case to make sure that TimeoutObject(and TC eventually) with LastViewTC is
-// correctly built
+// This test emulates the most complex scenario where TC consists of TimeoutObjects that are structurally different.
+// Let's consider a case where at some view N consensus committee generated both QC and TC, resulting in nodes differently entering view N+1.
+// When constructing TC for view N+1 some replicas will contribute with TO{View:N+1, NewestQC.View: N, LastViewTC: nil}
+// while others with TO{View:N+1, NewestQC.View: N-1, LastViewTC: TC{View: N, NewestQC.View: N-1}}.
+// This results in multi-message BLS signature with messages picked from set M={N-1,N}.
+// We have to be able to construct a valid TC for view N+1 and successfully validate it.
+// We start by building a valid QC for view N-1, that will be included in every TimeoutObject at view N.
+// Right after we create a valid QC for view N. We need to have valid QCs since TimeoutProcessor performs complete validation of TimeoutObject.
+// Then we create a valid cryptographically signed timeout for each signer. Created timeouts are feed to TimeoutProcessor
+// which eventually creates a TC after seeing processing enough objects. After we verify if TC was correctly constructed
+// and if it doesn't violate protocol rules. At this point we have QC for view N-1, both QC and TC for view N.
+// After constructing valid objects we will repeat TC creation process and create a TC for view N+1 where replicas contribute
+// with structurally different TimeoutObjects to make sure that TC is correctly built and can be successfully validated.
 func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)
@@ -481,7 +488,8 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		helper.WithBlockQC(olderQC))
 	newestQC := createRealQC(t, committee, stakingSigners, signers, nextBlock)
 
-	// at this point we have created two QCs for round N-1 and N, create a TC for view N
+	// At this point we have created two QCs for round N-1 and N.
+	// Next step is create a TC for view N.
 
 	// create verifier that will do crypto checks of created TC
 	verifier := verification.NewStakingVerifier()
@@ -540,6 +548,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	notifier.AssertExpectations(t)
 }
 
+// createRealQC is a helper function which generates a properly signed QC with real signatures for given block.
 func createRealQC(
 	t *testing.T,
 	committee hotstuff.DynamicCommittee,

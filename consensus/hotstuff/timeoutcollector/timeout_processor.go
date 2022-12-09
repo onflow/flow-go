@@ -250,10 +250,18 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
 	}
 
+	// IMPORTANT: To properly verify an aggregated signature included in TC we need to provide list of signers with corresponding
+	// messages(`TimeoutCertificate.NewestQCViews`) for each signer, this relation should be very strict.
+	// Aggregate returns an unordered set of signers together with additional data.
+	// Due to implementation specifics of signer indices decoding step results in canonically ordered
+	// signer ids which means we need to canonically order messages, so we can properly map signer to message after decoding.
+
+	// sort data in canonical order
 	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) bool {
 		return order.IdentifierCanonical(lhs.Signer, rhs.Signer)
 	})
 
+	// extract signers and data separately
 	signers := make([]flow.Identifier, 0, len(signersData))
 	newestQCViews := make([]uint64, 0, len(signersData))
 	for _, data := range signersData {
