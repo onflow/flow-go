@@ -170,7 +170,7 @@ func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, 
 			return nil, nil, model.NewInsufficientSignaturesError(err)
 		}
 		if errors.Is(err, signature.ErrIdentitySignature) {
-			return nil, nil, model.InvalidAggregatedSignatureError
+			return nil, nil, model.NewInvalidAggregatedSignatureError(err)
 		}
 		if signature.IsInvalidSignatureIncludedError(err) {
 			return nil, nil, model.NewInvalidSignatureIncludedError(err)
