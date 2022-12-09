@@ -56,6 +56,7 @@ type transactionExecutor struct {
 	TransactionVerifier
 	TransactionSequenceNumberChecker
 	TransactionStorageLimiter
+	TransactionPayerBalanceChecker
 
 	ctx            Context
 	proc           *TransactionProcedure
@@ -254,6 +255,15 @@ func (executor *transactionExecutor) normalExecution() (
 	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
+	// TODO:  max transaction fees returned from this function should be used in the storage check
+	_, err = executor.CheckPayerBalanceAndReturnMaxFees(
+		executor.proc,
+		executor.txnState,
+		executor.env)
+	if err != nil {
+		return
+	}
+
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,

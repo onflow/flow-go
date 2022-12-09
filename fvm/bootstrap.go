@@ -310,8 +310,8 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
-	b.deployStorageFees(service, fungibleToken, flowToken)
+	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
+	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
@@ -415,7 +415,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 	return flowToken
 }
 
-func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken, storageFees flow.Address) flow.Address {
 	flowFees := b.createAccount(b.accountKeys.FlowFeesAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
@@ -425,6 +425,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 				service,
 				fungibleToken,
 				flowToken,
+				storageFees,
 				flowFees,
 			),
 			0),
@@ -433,7 +434,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 	return flowFees
 }
 
-func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) {
+func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) flow.Address {
 	contract := contracts.FlowStorageFees(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
@@ -449,6 +450,7 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+	return service
 }
 
 // deployContractAuditVouchers deploys audit vouchers contract to the service account

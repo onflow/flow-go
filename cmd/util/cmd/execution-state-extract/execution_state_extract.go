@@ -28,7 +28,6 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
-	version int, // to be removed after next spork
 	migrate bool,
 	report bool,
 ) error {
@@ -125,7 +124,6 @@ func extractExecutionState(
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
-		version,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)

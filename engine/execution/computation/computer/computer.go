@@ -244,7 +244,10 @@ func (e *blockComputer) executeBlock(
 		}
 	}
 
-	res := collector.Finalize()
+	res, err := collector.Finalize()
+	if err != nil {
+		return nil, fmt.Errorf("cannot finalize computation result: %w", err)
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).

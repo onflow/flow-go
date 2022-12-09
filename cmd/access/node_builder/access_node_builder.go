@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
+	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -208,6 +209,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+	ExecutionDataStore         execution_data.ExecutionDataStore
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -407,9 +409,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
-	var execDataStore execution_data.ExecutionDataStore
 
 	builder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -444,6 +448,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
 			bsDependable = module.NewProxiedReadyDoneAware()
 			builder.PeerManagerDependencies.Add(bsDependable)
+			return nil
+		}).
+		Module("execution datastore", func(node *cmd.NodeConfig) error {
+			blobstore := blobs.NewBlobstore(ds)
+			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -532,11 +541,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				RpcMetricsEnabled:       builder.rpcMetricsEnabled,
 			}
 
-			blobStore := blobs.NewBlobstore(ds)
-			execDataStore = execution_data.NewExecutionDataStore(blobStore, execution_data.DefaultSerializer)
 			builder.StateStreamEng = state_stream.NewEng(
 				conf,
-				execDataStore,
+				builder.ExecutionDataStore,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
