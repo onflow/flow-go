@@ -220,7 +220,7 @@ func main() {
 	// only upload valid data
 	if *bigQueryUpload {
 		repoInfo := mustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
-		uploadData(log, ctx, recorder, bigQueryProjectFlag, bigQueryDatasetFlag, bigQueryRawTableFlag, repoInfo)
+		mustUploadData(log, ctx, recorder, bigQueryProjectFlag, bigQueryDatasetFlag, bigQueryRawTableFlag, repoInfo)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
@@ -243,7 +243,7 @@ func mustGetRepoInfo(log zerolog.Logger, gitRepoURL string, gitRepoPath string) 
 	return repoInfo
 }
 
-func uploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecorder, bigQueryProjectFlag *string, bigQueryDatasetFlag *string, bigQueryRawTableFlag *string, repoInfo *RepoInfo) {
+func mustUploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecorder, bigQueryProjectFlag *string, bigQueryDatasetFlag *string, bigQueryRawTableFlag *string, repoInfo *RepoInfo) {
 	log.Info().Msg("Initializing BigQuery")
 	db, err := NewDB(ctx, log, *bigQueryProjectFlag)
 	if err != nil {
