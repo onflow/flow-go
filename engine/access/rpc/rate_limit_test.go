@@ -90,9 +90,9 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := Config{
-		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
-		SecureGRPCListenAddr:   ":0",
-		HTTPListenAddr:         ":0",
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
 	}
 
 	// set the rate limit to test with

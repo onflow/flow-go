@@ -415,7 +415,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
-		return true, fmt.Errorf("could not send request: %w", err)
+		return true, fmt.Errorf("could not send request for entities %v: %w", logging.IDs(entityIDs), err)
 	}
 	e.requests[req.Nonce] = req
 
