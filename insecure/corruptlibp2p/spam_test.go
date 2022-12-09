@@ -102,7 +102,6 @@ func TestSpam_IHave(t *testing.T) {
 	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")
 
 	// check contents of received messages should match what spammer sent
-	require.Equal(t, len(iHaveSentCtlMsgs), len(iHaveReceivedCtlMsgs))
 	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentCtlMsgs)
 }
 

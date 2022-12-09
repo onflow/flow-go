@@ -1,20 +1,14 @@
 package corruptlibp2p
 
 import (
-	"testing"
-	"time"
-
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	"testing"
 )
 
 type ControlMessage int
-
-const (
-	spammerRetryCount = 3
-)
 
 // GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
@@ -32,21 +26,9 @@ func NewGossipSubRouterSpammer(router *pubsub.GossipSubRouter) *GossipSubRouterS
 // msgCount is the number of iHave messages to send.
 // msgSize is the number of messageIDs to include in each iHave message.
 func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim peer.ID, ctlMessages []pb.ControlMessage) {
-	success := false
-
 	for _, ctlMessage := range ctlMessages {
-		for i := 0; i < spammerRetryCount; i++ {
-			ok := s.router.SendControl(victim, &ctlMessage)
-			if ok {
-				success = true
-				break
-			}
-			// sleep for a bit to give the victim time to process the message
-			time.Sleep(1 * time.Second)
-		}
+		require.True(t, s.router.SendControl(victim, &ctlMessage))
 	}
-
-	require.True(t, success, "failed to send control message")
 }
 
 // GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
