@@ -193,6 +193,7 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	committee := &mocks.Committee{}
 	dkg := &mocks.DKG{}
 	pk := &modulemock.PublicKey{}
+	pk.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	dkg.On("GroupKey").Return(pk)
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
@@ -201,9 +202,19 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 	block := model.BlockFromFlow(header, header.View-1)
-	sigData := unittest.QCSigDataFixture()
 
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	// sigData with empty signers
+	emptySignersInput := model.SignatureData{
+		SigType:                      []byte{},
+		AggregatedStakingSig:         unittest.SignatureFixture(),
+		AggregatedRandomBeaconSig:    unittest.SignatureFixture(),
+		ReconstructedRandomBeaconSig: unittest.SignatureFixture(),
+	}
+	encoder := new(model.SigDataPacker)
+	sigData, err := encoder.Encode(&emptySignersInput)
+	require.NoError(t, err)
+
+	err = verifier.VerifyQC([]*flow.Identity{}, sigData, block)
 	fmt.Println(err.Error())
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
