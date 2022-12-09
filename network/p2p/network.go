@@ -3,6 +3,7 @@ package p2p
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/utils/logging"
 	"strings"
 	"sync"
 	"time"
@@ -326,37 +327,37 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(scope *network.MessageScope) error {
-	n.metrics.NetworkMessageReceived(scope.Msg.Size(), scope.Msg.ChannelID, scope.Type.String())
+func (n *Network) Receive(scope *network.IncomingMessageScope) error {
+	n.metrics.NetworkMessageReceived(scope.Size(), scope.Channel(), scope.Protocol().String())
 
-	err := n.processNetworkMessage(scope.OriginId, scope.Msg, scope.DecodedPayload)
+	err := n.processNetworkMessage(scope)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
+func (n *Network) processNetworkMessage(scope *network.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if !n.receiveCache.Add(message.EventID) {
+	if !n.receiveCache.Add(scope.EventID()) {
 		// drops duplicate message
 		n.logger.Debug().
-			Hex("sender_id", senderID[:]).
-			Hex("event_id", message.EventID).
-			Str("channel", message.ChannelID).
+			Hex("sender_id", logging.ID(scope.OriginId())).
+			Hex("event_id", scope.EventID()).
+			Str("channel", scope.Channel()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
+		n.metrics.NetworkDuplicateMessagesDropped(scope.Channel(), scope.Protocol().String())
 
 		return nil
 	}
 
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMsgPayload,
-		Size:     message.Size(),
-		Target:   channels.Channel(message.ChannelID),
-		SenderID: senderID,
+		Payload:  scope.DecodedPayload(),
+		Size:     scope.Size(),
+		Target:   channels.Channel(scope.Channel()),
+		SenderID: scope.OriginId(),
 	}
 
 	// insert the message in the queue
@@ -416,7 +417,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	n.metrics.NetworkMessageSent(msg.Size(), network.MessageTypeUnicast.String(), MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), MessageType(message))
 
 	return nil
 }

@@ -70,28 +70,7 @@ type Overlay interface {
 	// Identity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(*MessageScope) error
-}
-
-type MessageType string
-
-func (m MessageType) String() string {
-	return string(m)
-}
-
-const (
-	// MessageTypeUnicast is the message type for unicast messages
-	MessageTypeUnicast MessageType = "unicast"
-
-	// MessageTypePubSub is the message type for broadcast messages
-	MessageTypePubSub MessageType = "pubsub"
-)
-
-type MessageScope struct {
-	OriginId       flow.Identifier  // the origin node ID
-	Msg            *message.Message // the message received
-	DecodedPayload interface{}      // decoded payload of the message
-	Type           MessageType      // the type of the message
+	Receive(*IncomingMessageScope) error
 }
 
 // Connection represents an interface to read from & write to a connection.

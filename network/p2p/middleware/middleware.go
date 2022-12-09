@@ -607,7 +607,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 // processPubSubMessages processes messages received from the pubsub subscription.
 func (m *Middleware) processPubSubMessages(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, peerID, network.MessageTypePubSub)
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, peerID, network.ProtocolTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -695,15 +695,15 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		}
 	}
 
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.MessageTypeUnicast)
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID, messageType network.MessageType) {
-	flowID, err := m.idTranslator.GetFlowID(peerID)
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID, protocol network.ProtocolType) {
+	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
 		// authenticated which means it must be known
@@ -715,45 +715,33 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 		return
 	}
 
-	channel := channels.Channel(msg.ChannelID)
-	eventID, err := p2p.EventId(channel, msg.GetPayload())
+	scope, err := network.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
 	if err != nil {
-		// this indicates there was an issue hashing, not necessarily an issue with the message itself
+		// this indicates there was an issue hashing, not necessarily an issue with the message itself.
 		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
-			Msgf("could not generate event ID for message")
+			Msg("could not create incoming message scope")
 		return
 	}
 
-	// Override values in message since they can't be trusted as-is
-	// TODO: remove these from the message struct entirely since they must be explicitly validated
-	msg.OriginID = flowID[:]
-	msg.EventID = eventID
-	msg.Type = p2p.MessageType(decodedMsgPayload)
-
-	m.processMessage(&network.MessageScope{
-		OriginId:       flowID,
-		Msg:            msg,
-		DecodedPayload: decodedMsgPayload,
-		Type:           messageType,
-	})
+	m.processMessage(scope)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(scope *network.MessageScope) {
+func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 
 	logger := m.log.With().
-		Str("channel", scope.Msg.ChannelID).
-		Str("type", scope.Type.String()).
-		Int("msg_size", scope.Msg.Size()).
-		Str("origin_id", scope.OriginId.String()).
+		Str("channel", scope.Channel()).
+		Str("type", scope.Protocol().String()).
+		Int("msg_size", scope.Size()).
+		Hex("origin_id", logging.ID(scope.OriginId())).
 		Logger()
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
-		if !v.Validate(*scope.Msg) {
+		if !v.Validate(*scope) {
 			logger.Debug().Msg("new message filtered by message validators")
 			return
 		}
