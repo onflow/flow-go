@@ -18,7 +18,7 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain) (*mu
 
 	// common middleware for all request
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
-	v1SubRouter.Use(middleware.MetricsMiddleware(logger))
+	v1SubRouter.Use(middleware.MetricsMiddleware())
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
 
