@@ -215,7 +215,7 @@ func main() {
 	log.Info().Msg("Stopping load generator")
 	lg.Stop()
 
-	validateData(log, recorder)
+	mustValidateData(log, recorder)
 
 	// only upload valid data
 	if *bigQueryUpload {
@@ -271,7 +271,7 @@ func mustUploadData(log zerolog.Logger, ctx context.Context, recorder *tpsRecord
 	}
 }
 
-func validateData(log zerolog.Logger, recorder *tpsRecorder) {
+func mustValidateData(log zerolog.Logger, recorder *tpsRecorder) {
 	log.Info().Msg("Validating data")
 	var totalTPS float64
 	for _, record := range recorder.BenchmarkResults.RawTPS {
