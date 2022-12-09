@@ -90,7 +90,8 @@ func (s *TransactionState) IsCurrent(id NestedTransactionId) bool {
 }
 
 // BeginNestedTransaction creates a unrestricted nested transaction within the
-// current unrestricted (nested) transaction.  This returns error if the current
+// current unrestricted (nested) transaction.  The meter parameters are
+// inherited from the current transaction.  This returns error if the current
 // nested transaction is program restricted.
 func (s *TransactionState) BeginNestedTransaction() (
 	NestedTransactionId,
@@ -111,8 +112,34 @@ func (s *TransactionState) BeginNestedTransaction() (
 	}, nil
 }
 
+// BeginNestedTransactionWithMeterParams creates a unrestricted nested
+// transaction within the current unrestricted (nested) transaction, using the
+// provided meter parameters. This returns error if the current nested
+// transaction is program restricted.
+func (s *TransactionState) BeginNestedTransactionWithMeterParams(
+	params meter.MeterParameters,
+) (
+	NestedTransactionId,
+	error,
+) {
+	if s.IsParseRestricted() {
+		return NestedTransactionId{}, fmt.Errorf(
+			"cannot begin a unrestricted nested transaction inside a " +
+				"program restricted nested transaction",
+		)
+	}
+
+	child := s.currentState().NewChildWithMeterParams(params)
+	s.push(child, nil)
+
+	return NestedTransactionId{
+		state: child,
+	}, nil
+}
+
 // BeginParseRestrictedNestedTransaction creates a restricted nested
-// transaction within the current (nested) transaction.
+// transaction within the current (nested) transaction.  The meter parameters
+// are inherited from the current transaction.
 func (s *TransactionState) BeginParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
@@ -231,14 +258,11 @@ func (s *TransactionState) CommitParseRestricted(
 // transaction may be resume via Resume.
 //
 // WARNING: Pause and Resume are intended for implementing continuation passing
-// style behavior for the transaction invoker, with the assumption that no
-// other transaction processor modify the state (other than the spock and
-// metering). The paused nested transaction should not be reused across
-// transactions.  IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE
-// THAT COULD LEAD TO PHANTOM READS.
-//
-// TODO(patrick): Sequence number is modified by the verify tx processor.  Make
-// sure it doesn't interfere with transaction invoker pause / resumption.
+// style behavior for the transaction executor, with the assumption that the
+// states accessed prior to pausing remain valid after resumption.  The paused
+// nested transaction should not be reused across transactions.  IT IS NOT
+// SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE THAT COULD LEAD TO
+// PHANTOM READS.
 func (s *TransactionState) Pause(
 	expectedId NestedTransactionId,
 ) (

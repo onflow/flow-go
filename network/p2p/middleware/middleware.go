@@ -5,6 +5,7 @@ package middleware
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -66,6 +67,11 @@ const (
 
 var (
 	_ network.Middleware = (*Middleware)(nil)
+
+	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
+	// the middleware receives a message via unicast but does not have a corresponding subscription for
+	// the channel in that message.
+	ErrUnicastMsgWithoutSub = errors.New("middleware does not have subscription for the channel ID indicated in the unicast message received")
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -512,6 +518,27 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+
+		// ignore messages if node does not have subscription to topic
+		if !m.libP2PNode.HasSubscription(topic) {
+			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+
+			// msg type is not guaranteed to be correct since it is set by the client
+			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			if err != nil {
+				violation.Err = err
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
+
+			violation.MsgType = what
+			violation.Err = ErrUnicastMsgWithoutSub
+			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
+			return
+		}
+
 		// check if unicast messages have reached rate limit before processing next message
 		if !m.unicastRateLimiters.MessageAllowed(remotePeer) {
 			return
@@ -607,13 +634,13 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
-	if codec.IsErrMsgUnmarshal(err) {
+	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
@@ -650,7 +677,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, true)
+		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, message.ProtocolUnicast)
 		if err != nil {
 			m.log.
 				Error().

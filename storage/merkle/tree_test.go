@@ -74,7 +74,8 @@ func TestEmptyTreeHash(t *testing.T) {
 		assert.NotEmpty(t, tree.Hash())
 
 		// remove key: hash should now be empty again
-		removed := tree.Del(key)
+		removed, err := tree.Del(key)
+		assert.NoError(t, err)
 		assert.True(t, removed)
 		assert.Equal(t, tree.Hash(), expectedEmptyHash)
 	}
@@ -259,7 +260,8 @@ func TestTreeSingle(t *testing.T) {
 		}
 
 		// delete the value again, check it was successful
-		deleted := tree.Del(key)
+		deleted, err := tree.Del(key)
+		assert.NoError(t, err)
 		assert.True(t, deleted)
 		_, retrieved = tree.Get(key)
 		assert.False(t, retrieved)
@@ -306,7 +308,8 @@ func TestTreeBatch(t *testing.T) {
 
 	// remove all key-value pairs, ensure it worked
 	for _, key := range keys {
-		deleted := tree.Del(key)
+		deleted, err := tree.Del(key)
+		assert.NoError(t, err)
 		assert.True(t, deleted)
 	}
 
@@ -358,7 +361,8 @@ func TestRandomOrder(t *testing.T) {
 
 	// remove the key-value pairs from the first tree in random order
 	for _, key := range keys {
-		deleted := tree1.Del(key)
+		deleted, err := tree1.Del(key)
+		assert.NoError(t, err)
 		require.True(t, deleted)
 	}
 
@@ -405,7 +409,7 @@ func treePut(n int) func(*testing.B) {
 			b.StartTimer()
 			_, _ = t.Put(key, val)
 			b.StopTimer()
-			_ = t.Del(key)
+			_, _ = t.Del(key)
 		}
 	}
 }
@@ -421,7 +425,7 @@ func treeGet(n int) func(*testing.B) {
 			b.StartTimer()
 			_, _ = t.Get(key)
 			b.StopTimer()
-			_ = t.Del(key)
+			_, _ = t.Del(key)
 		}
 	}
 }
@@ -435,7 +439,7 @@ func treeDel(n int) func(*testing.B) {
 			key, val := randomKeyValuePair(32, 128)
 			_, _ = t.Put(key, val)
 			b.StartTimer()
-			_ = t.Del(key)
+			_, _ = t.Del(key)
 			b.StopTimer()
 		}
 	}

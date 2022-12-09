@@ -9,6 +9,7 @@ import (
 
 type LoaderCollector struct {
 	transactionsSent prometheus.Counter
+	transactionsLost prometheus.Counter
 	tpsConfigured    prometheus.Gauge
 
 	transactionsExecuted prometheus.Counter
@@ -22,6 +23,11 @@ func NewLoaderCollector() *LoaderCollector {
 			Name:      "transactions_sent",
 			Namespace: namespaceLoader,
 			Help:      "transactions sent by the loader",
+		}),
+		transactionsLost: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "transactions_lost",
+			Namespace: namespaceLoader,
+			Help:      "transaction that took too long to return",
 		}),
 		tpsConfigured: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "transactions_per_second_configured",
@@ -46,6 +52,10 @@ func NewLoaderCollector() *LoaderCollector {
 
 func (cc *LoaderCollector) TransactionSent() {
 	cc.transactionsSent.Inc()
+}
+
+func (cc *LoaderCollector) TransactionLost() {
+	cc.transactionsLost.Inc()
 }
 
 func (cc *LoaderCollector) SetTPSConfigured(tps uint) {

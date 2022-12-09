@@ -91,6 +91,8 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 		lg := log.With().
 			Str("peer_id", from.String()).
 			Str("topic", rawMsg.GetTopic()).
+			Int("raw_msg_size", len(rawMsg.Data)).
+			Int("msg_size", msg.Size()).
 			Logger()
 
 		// verify sender is a known peer
@@ -132,7 +134,7 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 			// slash peer if message contains unknown message code byte
 			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, channel, err))
 			return pubsub.ValidationReject
-		case codec.IsErrMsgUnmarshal(err):
+		case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 			// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 			slashingViolationsConsumer.OnInvalidMsgError(violation(from, channel, err))
 			return pubsub.ValidationReject
@@ -168,9 +170,9 @@ func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsu
 
 func violation(pid peer.ID, channel channels.Channel, err error) *slashing.Violation {
 	return &slashing.Violation{
-		PeerID:    pid.String(),
-		Channel:   channel,
-		IsUnicast: false,
-		Err:       err,
+		PeerID:   pid.String(),
+		Channel:  channel,
+		Protocol: message.ProtocolPublish,
+		Err:      err,
 	}
 }

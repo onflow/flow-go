@@ -95,6 +95,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
+	metrics                     module.NetworkMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -111,12 +112,14 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	metrics module.NetworkMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:     logger,
+		metrics:    metrics,
 		sporkID:    sporkID,
 		addr:       addr,
 		networkKey: networkKey,
@@ -294,8 +297,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
-	error) {
+func DefaultLibP2PHost(address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 	defaultOptions, err := defaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
@@ -392,7 +394,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
 	)
 
-	builder := NewNodeBuilder(log, address, flowKey, sporkId).
+	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

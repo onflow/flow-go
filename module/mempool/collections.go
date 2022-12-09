@@ -31,7 +31,4 @@ type Collections interface {
 	// All will retrieve all collections that are currently in the memory pool
 	// as a slice.
 	All() []*flow.Collection
-
-	// Hash will return a hash of the contents of the memory pool.
-	Hash() flow.Identifier
 }

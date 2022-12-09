@@ -6,6 +6,7 @@
 
 #include "bls12381_utils.h"
 #include "bls_include.h"
+#include "assert.h"
 
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
@@ -84,7 +85,10 @@ prec_st* init_precomputed_data_BLS12_381() {
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* relic_init_BLS12_381() { 
     // check Relic was compiled with the right conf 
-    if (ALLOC != AUTO) return NULL;
+    assert(ALLOC == AUTO);
+
+    // sanity check of Relic constants the package is relying on
+    assert(RLC_OK == RLC_EQ);
 
     // initialize relic core with a new context
     ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));

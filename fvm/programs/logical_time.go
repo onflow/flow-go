@@ -4,17 +4,18 @@ import (
 	"math"
 )
 
-// We will use txIndex as logical time for the purpose of "caching" programs.
+// We will use txIndex as logical time for the purpose of "caching" derived
+// data.
 //
 // Execution time refers to the transaction's start time.  Snapshot time refers
 // to the time when the snapshot first becomes readable (i.e., the "snapshot
 // time - 1" transaction committed the snapshot view).  The snapshot is where
-// the program source code is read from if no cached program entry is available.
+// the derived value is computed from if no cached value is available.
 // Each transaction's snapshot time must be smaller than or equal to its
 // execution time.
 //
 // Normal transaction advances the time clock and must be committed to
-// BlockPrograms in monotonically increasing execution time order.
+// DerivedBlockData in monotonically increasing execution time order.
 //
 // Snapshot read transaction (aka script) does not advance the time clock.  Its
 // execution and snapshot time must be set to the latest snapshot time (or
