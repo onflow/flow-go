@@ -3,8 +3,9 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
-
+	"github.com/onflow/flow-go/model/flow/order"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -243,9 +244,20 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 // weight for building TC. This function is run only once by single worker.
 // Any error should be treated as exception.
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
-	signers, highQCViews, aggregatedSig, err := p.sigAggregator.Aggregate()
+	signersData, aggregatedSig, err := p.sigAggregator.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
+	}
+
+	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) bool {
+		return order.IdentifierCanonical(lhs.Signer, rhs.Signer)
+	})
+
+	signers := make([]flow.Identifier, 0, len(signersData))
+	newestQCViews := make([]uint64, 0, len(signersData))
+	for _, data := range signersData {
+		signers = append(signers, data.Signer)
+		newestQCViews = append(newestQCViews, data.NewestQCView)
 	}
 
 	signerIndices, err := p.signerIndicesFromIdentities(signers)
@@ -253,7 +265,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 		return nil, fmt.Errorf("could not encode signer indices: %w", err)
 	}
 
-	// Note that `newestQC` can have a larger view than any of the views included in `highQCViews`.
+	// Note that `newestQC` can have a larger view than any of the views included in `newestQCViews`.
 	// This is because for a TO currently being processes following two operations are executed in separate steps:
 	// * updating the `newestQCTracker` with the QC from the TO
 	// * adding the TO's signature to `sigAggregator`
@@ -263,7 +275,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 
 	return &flow.TimeoutCertificate{
 		View:          p.view,
-		NewestQCViews: highQCViews,
+		NewestQCViews: newestQCViews,
 		NewestQC:      newestQC,
 		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,

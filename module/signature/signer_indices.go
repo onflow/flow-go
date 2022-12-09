@@ -3,7 +3,6 @@ package signature
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/flow"
 )

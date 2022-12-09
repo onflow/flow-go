@@ -128,7 +128,14 @@ type TimeoutSignatureAggregator interface {
 	// Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	Aggregate() (signers []flow.Identifier, newestQCViews []uint64, aggregatedSig crypto.Signature, exception error)
+	Aggregate() (signersInfo []TimeoutSignerInfo, aggregatedSig crypto.Signature, exception error)
+}
+
+// TimeoutSignerInfo is a helper structure that stores what QC views each signer has contributed into TC's aggregated signature.
+// Used as result of TimeoutSignatureAggregator.Aggregate()
+type TimeoutSignerInfo struct {
+	NewestQCView uint64
+	Signer       flow.Identifier
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
