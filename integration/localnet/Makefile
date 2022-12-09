@@ -107,10 +107,6 @@ stop:
 load:
 	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
 
-.PHONY: tps-test
-tps-test:
-	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 10 -tps-durations 1m
-
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
 	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
