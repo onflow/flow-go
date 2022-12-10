@@ -459,7 +459,7 @@ func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 
 // NewResourceManager creates a new resource manager for testing with no limits.
 func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
-	return p2pNetwork.NullResourceManager
+	return &p2pNetwork.NullResourceManager{}
 }
 
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
