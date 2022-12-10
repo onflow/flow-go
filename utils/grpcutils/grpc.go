@@ -49,6 +49,9 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 // DefaultServerTLSConfig returns the default TLS server config with the given cert for a secure GRPC server
 func DefaultServerTLSConfig(cert *tls.Certificate) *tls.Config {
+
+	// TODO(rbtz): remove after we pick up https://github.com/securego/gosec/pull/903
+	// #nosec G402
 	tlsConfig := &tls.Config{
 		MinVersion:   tls.VersionTLS13,
 		Certificates: []tls.Certificate{*cert},
