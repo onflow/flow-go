@@ -185,17 +185,15 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
+	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
+
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
 	limit := rate.Limit(5)
 
 	// burst per interval
 	burst := 5
 
-	// create test time
-	testtime := unittest.NewTestTime()
-
-	// setup message rate limiter
-	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch. O
@@ -270,15 +268,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 6 messages. The 6th message will be
-	// rate limited.
-	start := testtime.Now()
-	end := start.Add(time.Second)
-	for testtime.Now().Before(end) {
-		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
-		testtime.Advance(168 * time.Millisecond)
-
-		msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%s", testtime.Now().String()))
+	// send 6 unicast messages, 5 should be allowed and the 6th should be rate limited
+	for i := 0; i < 6; i++ {
+		msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%d", i))
 		err := m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 	}
