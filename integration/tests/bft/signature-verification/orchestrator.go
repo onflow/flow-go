@@ -2,12 +2,12 @@ package signature_verification
 
 import (
 	"fmt"
-	"go.uber.org/atomic"
 	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/insecure"

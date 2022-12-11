@@ -117,7 +117,6 @@ type LibP2PNodeBuilder struct {
 	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
-	pubsubOptions               []pubsub.Option
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -203,12 +202,6 @@ func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, 
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	builder.createNode = f
-	return builder
-}
-
-// SetPubSubOptions sets pubsub options that will be added with the default pubsub options.
-func (builder *LibP2PNodeBuilder) SetPubSubOptions(opts []pubsub.Option) NodeBuilder {
-	builder.pubsubOptions = opts
 	return builder
 }
 
@@ -399,14 +392,6 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	}
 
 	return options, nil
-}
-
-func DefaultPubsubOptions(maxPubSubMsgSize int) []pubsub.Option {
-	return []pubsub.Option{
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
-		// no discovery
-	}
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
