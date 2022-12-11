@@ -67,6 +67,7 @@ func TestExtractExecutionState(t *testing.T) {
 				flow.Emulator.Chain(),
 				false,
 				false,
+				10,
 			)
 			require.Error(t, err)
 		})
