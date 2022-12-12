@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,8 +18,8 @@ import (
 // TODO(patrick): remove and switch to *programs.DerivedTransactionData once
 // https://github.com/onflow/flow-emulator/pull/229 is integrated.
 type DerivedTransactionData interface {
-	GetProgram(loc common.AddressLocation) (*interpreter.Program, *state.State, bool)
-	SetProgram(loc common.AddressLocation, prog *interpreter.Program, state *state.State)
+	GetProgram(loc common.AddressLocation) (*derived.Program, *state.State, bool)
+	SetProgram(loc common.AddressLocation, prog *derived.Program, state *state.State)
 }
 
 // Programs manages operations around cadence program parsing.
@@ -98,7 +99,9 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	programs.derivedTxnData.SetProgram(address, program, state)
+	programs.derivedTxnData.SetProgram(address, &derived.Program{
+		Program: program,
+	}, state)
 	return nil
 }
 
@@ -128,7 +131,7 @@ func (programs *Programs) get(
 				err))
 		}
 
-		return program, true
+		return program.Program, true
 	}
 
 	// Address location program is reusable across transactions.  Create
