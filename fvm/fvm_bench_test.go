@@ -146,11 +146,15 @@ type BasicBlockExecutor struct {
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
 	vm := fvm.NewVirtualMachine()
 
+	// a big interaction limit since that is not what's being tested.
+	interactionLimit := fvm.DefaultMaxInteractionSize * uint64(1000)
+
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
+		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
