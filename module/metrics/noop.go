@@ -134,52 +134,53 @@ func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.Execut
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _ uint64, _, _ int, _ bool) {
 }
-func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
-func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
-func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                              {}
-func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                {}
-func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                 {}
-func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                              {}
-func (nc *NoopCollector) LatestTrieRegSize(size uint64)                                    {}
-func (nc *NoopCollector) LatestTrieRegSizeDiff(size int64)                                 {}
-func (nc *NoopCollector) LatestTrieMaxDepthTouched(maxDepth uint16)                        {}
-func (nc *NoopCollector) UpdateCount()                                                     {}
-func (nc *NoopCollector) ProofSize(bytes uint32)                                           {}
-func (nc *NoopCollector) UpdateValuesNumber(number uint64)                                 {}
-func (nc *NoopCollector) UpdateValuesSize(byte uint64)                                     {}
-func (nc *NoopCollector) UpdateDuration(duration time.Duration)                            {}
-func (nc *NoopCollector) UpdateDurationPerItem(duration time.Duration)                     {}
-func (nc *NoopCollector) ReadValuesNumber(number uint64)                                   {}
-func (nc *NoopCollector) ReadValuesSize(byte uint64)                                       {}
-func (nc *NoopCollector) ReadDuration(duration time.Duration)                              {}
-func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                       {}
-func (nc *NoopCollector) ExecutionCollectionRequestSent()                                  {}
-func (nc *NoopCollector) ExecutionCollectionRequestRetried()                               {}
-func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                       {}
-func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                      {}
-func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                  {}
-func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                          {}
-func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
-func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
-func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
-func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
-func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)         {}
-func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
-func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
-func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
-func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
-func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
-func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
-func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)               {}
-func (nc *NoopCollector) ExecutionComputationResultUploaded()                              {}
-func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                         {}
-func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)        {}
-func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64)       {}
-func (nc *NoopCollector) AddBlobsFailed()                                                  {}
-func (nc *NoopCollector) FulfilledHeight(blockHeight uint64)                               {}
-func (nc *NoopCollector) ReceiptSkipped()                                                  {}
+func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int) {}
+func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryEstimate uint64) {
+}
+func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                        {}
+func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                          {}
+func (nc *NoopCollector) LatestTrieRegCount(number uint64)                           {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                        {}
+func (nc *NoopCollector) LatestTrieRegSize(size uint64)                              {}
+func (nc *NoopCollector) LatestTrieRegSizeDiff(size int64)                           {}
+func (nc *NoopCollector) LatestTrieMaxDepthTouched(maxDepth uint16)                  {}
+func (nc *NoopCollector) UpdateCount()                                               {}
+func (nc *NoopCollector) ProofSize(bytes uint32)                                     {}
+func (nc *NoopCollector) UpdateValuesNumber(number uint64)                           {}
+func (nc *NoopCollector) UpdateValuesSize(byte uint64)                               {}
+func (nc *NoopCollector) UpdateDuration(duration time.Duration)                      {}
+func (nc *NoopCollector) UpdateDurationPerItem(duration time.Duration)               {}
+func (nc *NoopCollector) ReadValuesNumber(number uint64)                             {}
+func (nc *NoopCollector) ReadValuesSize(byte uint64)                                 {}
+func (nc *NoopCollector) ReadDuration(duration time.Duration)                        {}
+func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                 {}
+func (nc *NoopCollector) ExecutionCollectionRequestSent()                            {}
+func (nc *NoopCollector) ExecutionCollectionRequestRetried()                         {}
+func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                 {}
+func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                {}
+func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)            {}
+func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                    {}
+func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                 {}
+func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)       {}
+func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)   {}
+func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)   {}
+func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                    {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                               {}
+func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)              {}
+func (nc *NoopCollector) ChunkDataPackRequestProcessed()                             {}
+func (nc *NoopCollector) ExecutionSync(syncing bool)                                 {}
+func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                           {}
+func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)         {}
+func (nc *NoopCollector) ExecutionComputationResultUploaded()                        {}
+func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                   {}
+func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)  {}
+func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64) {}
+func (nc *NoopCollector) AddBlobsFailed()                                            {}
+func (nc *NoopCollector) FulfilledHeight(blockHeight uint64)                         {}
+func (nc *NoopCollector) ReceiptSkipped()                                            {}
 func (nc *NoopCollector) RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int) {
 }
 func (nc *NoopCollector) RequestFailed(duration time.Duration, retryable bool)                  {}

@@ -524,7 +524,7 @@ type ExecutionMetrics interface {
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed, actualMemoryUsed uint64,
+		compUsed, memoryEstimate uint64,
 		eventCounts, eventSize int,
 		failed bool)
 
@@ -532,7 +532,7 @@ type ExecutionMetrics interface {
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
 
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
-	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
+	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryEstimate uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()

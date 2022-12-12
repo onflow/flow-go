@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -183,7 +182,6 @@ func (e *Manager) ExecuteScript(
 ) ([]byte, error) {
 
 	startedAt := time.Now()
-	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
@@ -269,8 +267,7 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	memAllocAfter := debug.GetHeapAllocsBytes()
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, script.MemoryEstimate)
 
 	return encodedValue, nil
 }

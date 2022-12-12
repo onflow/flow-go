@@ -59,17 +59,13 @@ type ExecutionCollector struct {
 	transactionCheckTime                   prometheus.Histogram
 	transactionInterpretTime               prometheus.Histogram
 	transactionExecutionTime               prometheus.Histogram
-	transactionMemoryUsage                 prometheus.Histogram
 	transactionMemoryEstimate              prometheus.Histogram
-	transactionMemoryDifference            prometheus.Histogram
 	transactionComputationUsed             prometheus.Histogram
 	transactionEmittedEvents               prometheus.Histogram
 	transactionEventSize                   prometheus.Histogram
 	scriptExecutionTime                    prometheus.Histogram
 	scriptComputationUsed                  prometheus.Histogram
-	scriptMemoryUsage                      prometheus.Histogram
 	scriptMemoryEstimate                   prometheus.Histogram
-	scriptMemoryDifference                 prometheus.Histogram
 	numberOfAccounts                       prometheus.Gauge
 	chunkDataPackRequestProcessedTotal     prometheus.Counter
 	chunkDataPackProofSize                 prometheus.Histogram
@@ -388,28 +384,12 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_usage",
-		Help:      "the total amount of memory allocated by a transaction",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
 	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_memory_estimate",
 		Help:      "the estimated memory used by a transaction",
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
-	})
-
-	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a transaction",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -444,28 +424,12 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	scriptMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "script_memory_usage",
-		Help:      "the total amount of memory allocated by a script",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
 	scriptMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "script_memory_estimate",
 		Help:      "the estimated memory used by a script",
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
-	})
-
-	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "script_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a script",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	chunkDataPackRequestProcessedTotal := promauto.NewCounter(prometheus.CounterOpts{
@@ -563,16 +527,12 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		transactionInterpretTime:               transactionInterpretTime,
 		transactionExecutionTime:               transactionExecutionTime,
 		transactionComputationUsed:             transactionComputationUsed,
-		transactionMemoryUsage:                 transactionMemoryUsage,
 		transactionMemoryEstimate:              transactionMemoryEstimate,
-		transactionMemoryDifference:            transactionMemoryDifference,
 		transactionEmittedEvents:               transactionEmittedEvents,
 		transactionEventSize:                   transactionEventSize,
 		scriptExecutionTime:                    scriptExecutionTime,
 		scriptComputationUsed:                  scriptComputationUsed,
-		scriptMemoryUsage:                      scriptMemoryUsage,
 		scriptMemoryEstimate:                   scriptMemoryEstimate,
-		scriptMemoryDifference:                 scriptMemoryDifference,
 		chunkDataPackRequestProcessedTotal:     chunkDataPackRequestProcessedTotal,
 		chunkDataPackProofSize:                 chunkDataPackProofSize,
 		chunkDataPackCollectionSize:            chunkDataPackCollectionSize,
@@ -709,16 +669,14 @@ func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compK
 // TransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
-	compUsed, memoryUsed, actualMemoryUsed uint64,
+	compUsed, memoryEstimate uint64,
 	eventCounts, eventSize int,
 	failed bool,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
-	ec.transactionMemoryUsage.Observe(float64(actualMemoryUsed))
-	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
-	ec.transactionMemoryDifference.Observe(float64(memoryUsed) - float64(actualMemoryUsed))
+	ec.transactionMemoryEstimate.Observe(float64(memoryEstimate))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	ec.transactionEventSize.Observe(float64(eventSize))
 	if failed {
@@ -733,13 +691,11 @@ func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(proofSize, numberO
 }
 
 // ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryEstimate uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.scriptComputationUsed.Observe(float64(compUsed))
-	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
-	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
-	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
+	ec.scriptMemoryEstimate.Observe(float64(memoryEstimate))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes

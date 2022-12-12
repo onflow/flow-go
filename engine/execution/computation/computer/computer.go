@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -370,7 +369,6 @@ func (e *blockComputer) executeTransaction(
 	isSystemTransaction bool,
 ) error {
 	startedAt := time.Now()
-	memAllocBefore := debug.GetHeapAllocsBytes()
 	txID := txBody.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
@@ -438,15 +436,12 @@ func (e *blockComputer) executeTransaction(
 
 	collector.AddTransactionResult(collectionIndex, tx)
 
-	memAllocAfter := debug.GetHeapAllocsBytes()
-
 	lg := e.log.With().
 		Str("tx_id", txID.String()).
 		Str("block_id", blockIdStr).
 		Str("traceID", traceID).
 		Uint64("computation_used", tx.ComputationUsed).
 		Uint64("memory_used", tx.MemoryEstimate).
-		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Logger()
 
@@ -479,7 +474,6 @@ func (e *blockComputer) executeTransaction(
 		time.Since(startedAt),
 		tx.ComputationUsed,
 		tx.MemoryEstimate,
-		memAllocAfter-memAllocBefore,
 		len(tx.Events),
 		flow.EventsList(tx.Events).ByteSize(),
 		tx.Err != nil,
