@@ -30,6 +30,7 @@ func extractExecutionState(
 	chain flow.Chain,
 	migrate bool,
 	report bool,
+	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -85,8 +86,11 @@ func extractExecutionState(
 	newState := ledger.State(targetHash)
 
 	if migrate {
-		migrations = []ledger.Migration{}
-
+		// add migration here
+		migrations = []ledger.Migration{
+			// the following migration calculate the storage usage and update the storage for each account
+			// mig.MigrateAccountUsage,
+		}
 	}
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.

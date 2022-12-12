@@ -698,9 +698,17 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
+		builder.IdentityProvider = blocklistWrapper
+
+		// register the blocklist for dynamic configuration via admin command
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
+			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+		if err != nil {
+			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
