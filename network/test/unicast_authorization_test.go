@@ -94,8 +94,6 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 100*time.Millisecond)
-
 	u.senderMW.SetOverlay(overlay)
 	u.senderMW.Start(sigCtx)
 
@@ -105,6 +103,8 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	unittest.RequireComponentsReadyBefore(u.T(), 100*time.Millisecond, u.senderMW, u.receiverMW)
 
 	u.cancel = cancel
+
+	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 100*time.Millisecond)
 }
 
 // stopMiddlewares will stop all middlewares.
