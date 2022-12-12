@@ -76,3 +76,20 @@ k8s-pod-health:
 k8s-test-network-accessibility:
 	flow blocks get latest --host localhost:9000
 	flow accounts create --network benchnet --key  e0ef5e52955e6542287db4528b3e8acc84a2c204eee9609f7c3120d1dac5a11b1bcb39677511db14354aa8c1a0ef62151220d97f015d49a8f0b78b653b570bfd --signer benchnet-account -f ~/flow.json
+
+
+bn2-prep:
+	# this cloned repo will be used for deploying but we need the latest version of the bn2 automation code
+	git clone https://github.com/onflow/flow-go.git
+
+	# switch to a published tag that will have the correct Docker images already built
+	cd flow-go && git checkout tags/v0.28.14
+
+	# moves the cloned flow-go repo up one level to flow-go/integration/flow-go so the latest benchnet2 code can be copied into it
+	mv flow-go ..
+
+	# remove the checked out version of benchnet2
+	rm -rf ../flow-go/integration/benchnet2
+
+	# copy the latest version of benchnet2 into the checkout version
+	cd .. && cp -r benchnet2 flow-go/integration
