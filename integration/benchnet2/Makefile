@@ -93,3 +93,6 @@ bn2-prep:
 
 	# copy the latest version of benchnet2 into the checkout version
 	cd .. && cp -r benchnet2 flow-go/integration
+
+bn2-clean:
+	rm -rf ../flow-go
