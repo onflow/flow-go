@@ -131,19 +131,14 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.End()
 
-		// no validation of transactions is necessary for empty collections
-		if payload.Collection.Len() == 0 {
-			return nil
-		}
-
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
 		// otherwise we would compromise liveness of the cluster.
 		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
-		}
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
+			}
 			return fmt.Errorf("could not check reference block: %w", err)
 		}
 
