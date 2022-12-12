@@ -4,8 +4,7 @@ package mock
 
 import (
 	common "github.com/onflow/cadence/runtime/common"
-
-	interpreter "github.com/onflow/cadence/runtime/interpreter"
+	derived "github.com/onflow/flow-go/fvm/derived"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -18,15 +17,15 @@ type DerivedTransactionData struct {
 }
 
 // GetProgram provides a mock function with given fields: loc
-func (_m *DerivedTransactionData) GetProgram(loc common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+func (_m *DerivedTransactionData) GetProgram(loc common.AddressLocation) (*derived.Program, *state.State, bool) {
 	ret := _m.Called(loc)
 
-	var r0 *interpreter.Program
-	if rf, ok := ret.Get(0).(func(common.AddressLocation) *interpreter.Program); ok {
+	var r0 *derived.Program
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) *derived.Program); ok {
 		r0 = rf(loc)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.Program)
+			r0 = ret.Get(0).(*derived.Program)
 		}
 	}
 
@@ -50,7 +49,7 @@ func (_m *DerivedTransactionData) GetProgram(loc common.AddressLocation) (*inter
 }
 
 // SetProgram provides a mock function with given fields: loc, prog, _a2
-func (_m *DerivedTransactionData) SetProgram(loc common.AddressLocation, prog *interpreter.Program, _a2 *state.State) {
+func (_m *DerivedTransactionData) SetProgram(loc common.AddressLocation, prog *derived.Program, _a2 *state.State) {
 	_m.Called(loc, prog, _a2)
 }
 
