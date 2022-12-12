@@ -135,12 +135,12 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get epoch status: %w", err)
 	}
 
 	setup, err := s.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get epoch setup: %w", err)
 	}
 
 	// sort the identities so the 'Exists' binary search works

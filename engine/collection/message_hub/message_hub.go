@@ -404,6 +404,10 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 		hotstuffProposal := model.ProposalFromFlow(proposal)
 		// notify vote aggregator that new block proposal is available, in case we are next leader
 		h.voteAggregator.AddBlock(hotstuffProposal) // non-blocking
+		h.log.Info().
+			Uint64("height", proposal.Height).
+			Str("block_id", hotstuffProposal.Block.BlockID.String()).
+			Msg("msghub: adding own proposal to VoteAggregator")
 
 		// TODO(active-pacemaker): replace with pub/sub?
 		// submit proposal to our own processing pipeline

@@ -90,7 +90,10 @@ func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList,
 
 	// otherwise use the snapshot given by the reference block
 	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(c.clusterMemberFilter)
-	return identities, err
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities at reference block (%x): %w", payload.ReferenceBlockID, err)
+	}
+	return identities, nil
 }
 
 func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {

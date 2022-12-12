@@ -344,6 +344,10 @@ func (c *Core) processBlockProposal(proposal *cluster.Block, parent *flow.Header
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
+	c.log.Info().
+		Uint64("height", proposal.Header.Height).
+		Str("block_id", hotstuffProposal.Block.BlockID.String()).
+		Msg("compcore: adding external proposal to VoteAggregator")
 	c.voteAggregator.AddBlock(hotstuffProposal)
 
 	// submit the model to hotstuff for processing
