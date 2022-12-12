@@ -2,7 +2,6 @@ package environment
 
 import (
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
@@ -91,7 +90,7 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	location common.AddressLocation,
-	program *interpreter.Program,
+	program *derived.Program,
 	state *state.State,
 ) bool {
 	// TODO(rbtz): switch to fine grain invalidation.
