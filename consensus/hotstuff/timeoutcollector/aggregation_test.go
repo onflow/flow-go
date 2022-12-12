@@ -84,7 +84,7 @@ func TestNewTimeoutSignatureAggregator(t *testing.T) {
 // Tests verification, adding and aggregation. Test is performed in concurrent environment
 func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 	signersNum := 20
-	aggregator, ids, pks, sigs, actualSignersInfo, msgs, hashers := createAggregationData(t, signersNum)
+	aggregator, ids, pks, sigs, signersData, msgs, hashers := createAggregationData(t, signersNum)
 
 	// only add a subset of the signatures
 	subSet := signersNum / 2
@@ -97,7 +97,7 @@ func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 			defer wg.Done()
 			index := i + subSet
 			// test VerifyAndAdd
-			_, err := aggregator.VerifyAndAdd(ids[index].NodeID, sig, actualSignersInfo[index].NewestQCView)
+			_, err := aggregator.VerifyAndAdd(ids[index].NodeID, sig, signersData[index].NewestQCView)
 			// ignore weight as comparing against expected weight is not thread safe
 			require.NoError(t, err)
 		}(i, sig)
@@ -105,42 +105,30 @@ func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 	}
 
 	wg.Wait()
-	signersData, aggSig, err := aggregator.Aggregate()
+	actualSignersInfo, aggSig, err := aggregator.Aggregate()
 	require.NoError(t, err)
 	require.ElementsMatch(t, signersData[subSet:], actualSignersInfo)
 
 	ok, err := crypto.VerifyBLSSignatureManyMessages(pks[subSet:], aggSig, msgs[subSet:], hashers[subSet:])
 	require.NoError(t, err)
 	require.True(t, ok)
-	// check signers
-	identifiers := make([]flow.Identifier, 0, signersNum-subSet)
-	for i := subSet; i < signersNum; i++ {
-		identifiers = append(identifiers, ids[i].NodeID)
-	}
-	require.ElementsMatch(t, signersData, identifiers)
 
 	// add remaining signatures in one thread in order to test the returned weight
 	for i, sig := range sigs[:subSet] {
-		weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, actualSignersInfo[i].NewestQCView)
+		weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, signersData[i].NewestQCView)
 		require.NoError(t, err)
 		expectedWeight += ids[i].Weight
 		require.Equal(t, expectedWeight, weight)
 		// test TotalWeight
 		require.Equal(t, expectedWeight, aggregator.TotalWeight())
 	}
-	signersData, aggSig, err = aggregator.Aggregate()
+	actualSignersInfo, aggSig, err = aggregator.Aggregate()
 	require.NoError(t, err)
 	require.ElementsMatch(t, signersData, actualSignersInfo)
 
 	ok, err = crypto.VerifyBLSSignatureManyMessages(pks, aggSig, msgs, hashers)
 	require.NoError(t, err)
 	require.True(t, ok)
-	// check signers
-	identifiers = make([]flow.Identifier, 0, signersNum)
-	for i := 0; i < signersNum; i++ {
-		identifiers = append(identifiers, ids[i].NodeID)
-	}
-	require.ElementsMatch(t, signersData, identifiers)
 }
 
 // TestTimeoutSignatureAggregator_VerifyAndAdd tests behavior of VerifyAndAdd under invalid input data.

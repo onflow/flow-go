@@ -251,8 +251,8 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	}
 
 	// IMPORTANT: To properly verify an aggregated signature included in TC we need to provide list of signers with corresponding
-	// messages(`TimeoutCertificate.NewestQCViews`) for each signer. If the one-to-once correspondence of view and signer is not
-	// maintained, the TC's aggregated signature will be invalid. 
+	// messages(`TimeoutCertificate.NewestQCViews`) for each signer. If the one-to-once correspondence of view and signer is not maintained,
+	// it won't be possible to verify the aggregated signature.
 	// Aggregate returns an unordered set of signers together with additional data.
 	// Due to implementation specifics of signer indices, the decoding step results in canonically ordered signer ids, which means
 	// we need to canonically order the respective `newestQCView`, so we can properly map signer to `newestQCView` after decoding.
