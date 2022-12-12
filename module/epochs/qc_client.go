@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -140,11 +141,19 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
+		// context expiring is not a critical failure, wrap as transient
+		if errors.Is(err, ctx.Err()) {
+			return network.NewTransientErrorf("failed to submit transaction: context done: %w", err)
+		}
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
 	err = c.WaitForSealed(ctx, txID, started)
 	if err != nil {
+		// context expiring is not a critical failure, wrap as transient
+		if errors.Is(err, ctx.Err()) {
+			return network.NewTransientErrorf("failed to submit transaction: context done: %w", err)
+		}
 		return fmt.Errorf("failed to wait for transaction seal: %w", err)
 	}
 
