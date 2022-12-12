@@ -93,8 +93,25 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	program *derived.Program,
 	state *state.State,
 ) bool {
-	// TODO(rbtz): switch to fine grain invalidation.
-	return invalidator.ShouldInvalidateEntries()
+	if invalidator.MeterParamOverridesUpdated {
+		return true
+	}
+
+	if len(invalidator.FrozenAccounts) > 0 {
+		// TODO: switch to fine grain invalidation.
+		return true
+	}
+
+	for _, key := range invalidator.ContractUpdateKeys {
+		_, ok := program.Dependencies[common.AddressLocation{
+			Address: common.MustBytesToAddress(key.Address.Bytes()),
+			Name:    key.Name,
+		}]
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 type MeterParamOverridesInvalidator struct {
