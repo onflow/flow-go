@@ -131,8 +131,8 @@ type TimeoutSignatureAggregator interface {
 	Aggregate() (signersInfo []TimeoutSignerInfo, aggregatedSig crypto.Signature, exception error)
 }
 
-// TimeoutSignerInfo is a helper structure that stores what QC views each signer has contributed into TC's aggregated signature.
-// Used as result of TimeoutSignatureAggregator.Aggregate()
+// TimeoutSignerInfo is a helper structure that stores the QC views that each signer
+// contributed to a TC. Used as result of TimeoutSignatureAggregator.Aggregate()
 type TimeoutSignerInfo struct {
 	NewestQCView uint64
 	Signer       flow.Identifier
