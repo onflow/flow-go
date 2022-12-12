@@ -55,7 +55,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
-	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
+	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight)).Sort(order.Canonical)
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = *atomic.NewUint64(0)
@@ -363,7 +363,14 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 		require.Equal(s.T(), expectedTC, tc)
 	}).Return(nil).Once()
 
-	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(signers.NodeIDs()), highQCViews, expectedSig, nil)
+	signersData := make([]hotstuff.TimeoutSignerInfo, 0)
+	for i, signer := range signers.NodeIDs() {
+		signersData = append(signersData, hotstuff.TimeoutSignerInfo{
+			NewestQCView: highQCViews[i],
+			Signer:       signer,
+		})
+	}
+	s.sigAggregator.On("Aggregate").Return(signersData, expectedSig, nil)
 	s.committee.On("IdentitiesByEpoch", s.view).Return(s.participants, nil)
 
 	for _, timeout := range timeouts {
@@ -394,8 +401,17 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
 	s.notifier.On("OnPartialTcCreated", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Return(nil).Once()
-	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
+
+	signersData := make([]hotstuff.TimeoutSignerInfo, 0, len(s.participants))
+	for _, signer := range s.participants.NodeIDs() {
+		signersData = append(signersData, hotstuff.TimeoutSignerInfo{
+			NewestQCView: 0,
+			Signer:       signer,
+		})
+	}
+	// don't care about actual data
+	s.sigAggregator.On("Aggregate").Return(signersData, crypto.Signature{}, nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
