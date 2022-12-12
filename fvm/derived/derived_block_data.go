@@ -11,7 +11,7 @@ import (
 
 type Program struct {
 	*interpreter.Program
-	dependencies map[common.AddressLocation]struct{}
+	Dependencies map[common.AddressLocation]struct{}
 }
 
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived

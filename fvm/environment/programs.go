@@ -40,6 +40,7 @@ type Programs struct {
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
 	nonAddressPrograms map[common.Location]*interpreter.Program
+	dependencies       map[common.AddressLocation]map[common.AddressLocation]struct{}
 }
 
 // NewPrograms construts a new ProgramHandler
@@ -57,6 +58,7 @@ func NewPrograms(
 		accounts:           accounts,
 		derivedTxnData:     derivedTxnData,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
+		dependencies:       make(map[common.AddressLocation]map[common.AddressLocation]struct{}),
 	}
 }
 
@@ -99,8 +101,17 @@ func (programs *Programs) set(
 		return nil
 	}
 
+	// stop tracking dependencies
+	dependencies, ok := programs.dependencies[address]
+	if !ok {
+		dependencies = make(map[common.AddressLocation]struct{})
+	} else {
+		delete(programs.dependencies, address)
+	}
+
 	programs.derivedTxnData.SetProgram(address, &derived.Program{
-		Program: program,
+		Program:      program,
+		Dependencies: dependencies,
 	}, state)
 	return nil
 }
@@ -124,6 +135,16 @@ func (programs *Programs) get(
 
 	program, state, has := programs.derivedTxnData.GetProgram(address)
 	if has {
+
+		// add the dependencies to the currents program being loaded
+		// if one is being loaded
+		for _, dependencies := range programs.dependencies {
+			dependencies[address] = struct{}{}
+			for newDep := range program.Dependencies {
+				dependencies[newDep] = struct{}{}
+			}
+		}
+
 		err := programs.txnState.AttachAndCommit(state)
 		if err != nil {
 			panic(fmt.Sprintf(
@@ -142,6 +163,14 @@ func (programs *Programs) get(
 	if err != nil {
 		panic(err)
 	}
+
+	// add the dependencies to the current programs being loaded
+	for _, dependencies := range programs.dependencies {
+		dependencies[address] = struct{}{}
+	}
+
+	// start tracking dependencies for this program
+	programs.dependencies[address] = make(map[common.AddressLocation]struct{})
 
 	return nil, false
 }
