@@ -45,10 +45,14 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 func (m *MutableState) Extend(block *cluster.Block) error {
 
 	blockID := block.ID()
+	log := func(msg string, args ...any) {
+		fmt.Printf("cluster.Mutator.Extend(block_id="+blockID.String()+"): "+msg+"\n", args...)
+	}
 
 	span, ctx, _ := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
 	defer span.End()
 
+	log("extending block")
 	err := m.State.db.View(func(tx *badger.Txn) error {
 
 		setupSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendSetup)
@@ -63,6 +67,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 		// check for a specified reference block
 		// we also implicitly check this later, but can fail fast here
+		log("reference block id: %x", payload.ReferenceBlockID)
 		if payload.ReferenceBlockID == flow.ZeroID {
 			return state.NewInvalidExtensionError("new block has empty reference block ID")
 		}
@@ -133,18 +138,24 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 		// no validation of transactions is necessary for empty collections
 		if payload.Collection.Len() == 0 {
-			return nil
+			log("empty payload! - usually we would short-circuit here")
 		}
 
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
 		// otherwise we would compromise liveness of the cluster.
 		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+		log("read ref block, err: %v")
 		if errors.Is(err, storage.ErrNotFound) {
 			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
 		}
 		if err != nil {
 			return fmt.Errorf("could not check reference block: %w", err)
+		}
+		if refBlock != nil {
+			log("read ref block, height: %d, view: %d", refBlock.Height, refBlock.View)
+		} else {
+			log("read ref block, but its nil!!!")
 		}
 
 		// no validation of transactions is necessary for empty collections

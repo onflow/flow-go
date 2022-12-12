@@ -17,7 +17,10 @@ import (
 // received but not finalized, and that share the latest finalized block as a common
 // ancestor.
 func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header, validator hotstuff.Validator, onProposal func(*model.Proposal) error) error {
-	log = log.With().Str("process", "hotstuff_recovery").Logger()
+	log = log.With().
+		Str("process", "hotstuff_recovery").
+		Str("chain_id", finalized.ChainID.String()).
+		Logger()
 	log.Info().Int("total", len(pending)).Msgf("recovery started")
 
 	// add all pending blocks to forks

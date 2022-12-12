@@ -324,6 +324,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block, parent *flow.Header
 	}
 
 	// see if the block is a valid extension of the protocol state
+	log.Info().Msg("about to Extend block")
 	err = c.state.Extend(proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
@@ -341,6 +342,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block, parent *flow.Header
 			return fmt.Errorf("unexpected exception while extending cluster state with block %x at height %d: %w", blockID, header.Height, err)
 		}
 	}
+	log.Info().Msgf("successfully called Extend (err=%v), going to pass to VA/HotStuff", err)
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
