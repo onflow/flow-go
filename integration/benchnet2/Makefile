@@ -1,4 +1,8 @@
-DOCKER_TAG := $(shell git rev-parse --short HEAD)
+# eventually, DOCKER_TAG will use the git commit hash
+# this isn't working fully yet so fow now we will specify the explicit Git tag to use as the Docker tag
+#DOCKER_TAG := $(shell git rev-parse --short HEAD)
+FLOW_GO_TAG = v0.28.15
+DOCKER_TAG := $(FLOW_GO_TAG)
 
 # default values that callers can override when calling target
 ACCESS = 1
@@ -21,7 +25,6 @@ else ifeq ($(strip $(VALID_COLLECTION)), 1)
 else ifeq ($(strip $(NAMESPACE)),)
 	$(error Namespace cannot be empty)
 endif
-
 
 gen-bootstrap:
 	go run -tags relic ../../cmd/bootstrap genconfig --address-format "%s%d.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 1000 -o ./ --config ./bootstrap/conf/node-config.json
@@ -77,13 +80,12 @@ k8s-test-network-accessibility:
 	flow blocks get latest --host localhost:9000
 	flow accounts create --network benchnet --key  e0ef5e52955e6542287db4528b3e8acc84a2c204eee9609f7c3120d1dac5a11b1bcb39677511db14354aa8c1a0ef62151220d97f015d49a8f0b78b653b570bfd --signer benchnet-account -f ~/flow.json
 
-
 bn2-prep:
 	# this cloned repo will be used for deploying but we need the latest version of the bn2 automation code
 	git clone https://github.com/onflow/flow-go.git
 
 	# switch to a published tag that will have the correct Docker images already built
-	cd flow-go && git checkout tags/v0.28.14
+	cd flow-go && git checkout tags/$(FLOW_GO_TAG)
 
 	# moves the cloned flow-go repo up one level to flow-go/integration/flow-go so the latest benchnet2 code can be copied into it
 	mv flow-go ..
