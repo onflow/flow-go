@@ -321,13 +321,17 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
 func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, duration time.Duration) {
 	for _, node := range nodes {
-		node.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, node)
-
-		pm := node.PeerManagerComponent()
-		pm.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, pm)
+		StartNode(ctx, t, node, duration)
 	}
+}
+
+// StartNode starts the provided node and their peer managers using the provided irrecoverable context
+func StartNode(ctx irrecoverable.SignalerContext, t *testing.T, node p2p.LibP2PNode, duration time.Duration) {
+	node.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, duration, node)
+	pm := node.PeerManagerComponent()
+	pm.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, duration, pm)
 }
 
 type nodeBuilderOption func(p2pbuilder.NodeBuilder)

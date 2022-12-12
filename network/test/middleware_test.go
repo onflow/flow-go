@@ -132,12 +132,11 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
-
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
 		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
+		testutils.StartNode(m.mwCtx, m.T(), m.nodes[i], 100*time.Millisecond)
 		require.NoError(m.T(), mw.Subscribe(testChannel))
 	}
 }
@@ -256,9 +255,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+	
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
@@ -349,9 +349,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 	newMw.Start(irrecoverableCtx)
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
