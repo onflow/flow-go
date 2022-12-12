@@ -5,11 +5,10 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type ContractUpdateKey struct {
-	Address flow.Address
+	Address common.Address
 	Name    string
 }
 
@@ -94,19 +93,23 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	state *state.State,
 ) bool {
 	if invalidator.MeterParamOverridesUpdated {
+		// if meter parameters changed we need to invalidate all programs
 		return true
 	}
 
-	if len(invalidator.FrozenAccounts) > 0 {
-		// TODO: switch to fine grain invalidation.
-		return true
+	// if an account was (un)frozen we need to invalidate all
+	// programs that depend on any contract on that address.
+	for _, frozenAccount := range invalidator.FrozenAccounts {
+		_, ok := program.Dependencies[frozenAccount]
+		if ok {
+			return true
+		}
 	}
 
+	// invalidate all programs depending on any of the contracts that were updated
+	// A program has itself listed as a dependency, so that this simpler.
 	for _, key := range invalidator.ContractUpdateKeys {
-		_, ok := program.Dependencies[common.AddressLocation{
-			Address: common.MustBytesToAddress(key.Address.Bytes()),
-			Name:    key.Name,
-		}]
+		_, ok := program.Dependencies[key.Address]
 		if ok {
 			return true
 		}

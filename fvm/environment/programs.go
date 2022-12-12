@@ -40,7 +40,9 @@ type Programs struct {
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
 	nonAddressPrograms map[common.Location]*interpreter.Program
-	dependencies       map[common.AddressLocation]map[common.AddressLocation]struct{}
+
+	// dependencyStack tracks programs currently being loaded and their dependencies.
+	dependencyStack *dependencyStack
 }
 
 // NewPrograms construts a new ProgramHandler
@@ -58,7 +60,7 @@ func NewPrograms(
 		accounts:           accounts,
 		derivedTxnData:     derivedTxnData,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
-		dependencies:       make(map[common.AddressLocation]map[common.AddressLocation]struct{}),
+		dependencyStack:    newDependencyStack(),
 	}
 }
 
@@ -85,12 +87,13 @@ func (programs *Programs) set(
 		return err
 	}
 
-	// stop tracking dependencies
-	dependencies, ok := programs.dependencies[address]
-	if !ok {
-		dependencies = make(map[common.AddressLocation]struct{})
-	} else {
-		delete(programs.dependencies, address)
+	location, dependencies, err := programs.dependencyStack.pop()
+	if err != nil {
+		return err
+	}
+	if location != address {
+		return fmt.Errorf("cannot set program. Popped dependencies are for an unexpeced address"+
+			" (expected %s, got %s)", address, location)
 	}
 
 	programs.derivedTxnData.SetProgram(address, &derived.Program{
@@ -119,16 +122,7 @@ func (programs *Programs) get(
 
 	program, state, has := programs.derivedTxnData.GetProgram(address)
 	if has {
-
-		// add the dependencies to the currents program being loaded
-		// if one is being loaded
-		for _, dependencies := range programs.dependencies {
-			dependencies[address] = struct{}{}
-			for newDep := range program.Dependencies {
-				dependencies[newDep] = struct{}{}
-			}
-		}
-
+		programs.dependencyStack.addDependencies(program.Dependencies)
 		err := programs.txnState.AttachAndCommit(state)
 		if err != nil {
 			panic(fmt.Sprintf(
@@ -139,6 +133,8 @@ func (programs *Programs) get(
 		return program.Program, true
 	}
 
+	programs.dependencyStack.push(address)
+
 	// Address location program is reusable across transactions.  Create
 	// a nested transaction here in order to capture the states read to
 	// parse the program.
@@ -147,14 +143,6 @@ func (programs *Programs) get(
 	if err != nil {
 		panic(err)
 	}
-
-	// add the dependencies to the current programs being loaded
-	for _, dependencies := range programs.dependencies {
-		dependencies[address] = struct{}{}
-	}
-
-	// start tracking dependencies for this program
-	programs.dependencies[address] = make(map[common.AddressLocation]struct{})
 
 	return nil, false
 }
@@ -227,4 +215,68 @@ func (programs *Programs) DecodeArgument(
 	}
 
 	return v, err
+}
+
+// dependencyTracker tracks dependencies for a location
+type dependencyTracker struct {
+	location     common.AddressLocation
+	dependencies derived.ProgramDependencies
+}
+
+// dependencyStack is a stack of dependencyTracker
+// It is used during loading a program to create a dependency list for each program
+type dependencyStack struct {
+	trackers []dependencyTracker
+}
+
+func newDependencyStack() *dependencyStack {
+	return &dependencyStack{
+		trackers: make([]dependencyTracker, 0),
+	}
+}
+
+// push a new location to track dependencies for.
+func (s *dependencyStack) push(loc common.AddressLocation) {
+	dependencies := make(derived.ProgramDependencies, 1)
+
+	// A program is listed as its own dependency.
+	dependencies.AddDependency(loc.Address)
+
+	s.trackers = append(s.trackers, dependencyTracker{
+		location:     loc,
+		dependencies: dependencies,
+	})
+}
+
+// addDependencies adds dependencies to the current dependency tracker
+func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependencies) {
+	l := len(s.trackers)
+	if l == 0 {
+		// stack is empty.
+		// This is expected if loading a program that is already cached.
+		return
+	}
+
+	s.trackers[l-1].dependencies.Merge(dependencies)
+}
+
+// pop the last dependencies on the stack and return them.
+func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependencies, error) {
+	if len(s.trackers) == 0 {
+		return common.AddressLocation{},
+			nil,
+			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
+	}
+
+	// pop the last tracker
+	tracker := s.trackers[len(s.trackers)-1]
+	s.trackers = s.trackers[:len(s.trackers)-1]
+
+	// there are more trackers in the stack.
+	// add the dependencies of the popped tracker to the parent tracker
+	if len(s.trackers) > 0 {
+		s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
+	}
+
+	return tracker.location, tracker.dependencies, nil
 }

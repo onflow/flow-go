@@ -9,9 +9,25 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
+// ProgramDependencies are the locations of the programs this program depends on.
+type ProgramDependencies map[common.Address]struct{}
+
+// AddDependency adds the address as a dependency.
+func (d ProgramDependencies) AddDependency(address common.Address) {
+	d[address] = struct{}{}
+}
+
+// Merge merges current dependencies with other dependencies.
+func (d ProgramDependencies) Merge(other ProgramDependencies) {
+	for address := range other {
+		d[address] = struct{}{}
+	}
+}
+
 type Program struct {
 	*interpreter.Program
-	Dependencies map[common.AddressLocation]struct{}
+
+	Dependencies ProgramDependencies
 }
 
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived
