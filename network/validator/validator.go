@@ -1,8 +1,9 @@
 package validator
 
 import (
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // MessageValidator validates the given message with original sender `from` and returns an error if validation fails
@@ -10,6 +11,6 @@ import (
 // Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
 type MessageValidator func(from peer.ID, msg interface{}) (string, error)
 
-// PubSubMessageValidator validates the given message with original sender `from` and returns pubsub.ValidationResult.
+// PubSubMessageValidator validates the given message with original sender `from` and returns p2p.ValidationResult.
 // Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
-type PubSubMessageValidator func(from peer.ID, msg interface{}) pubsub.ValidationResult
+type PubSubMessageValidator func(from peer.ID, msg interface{}) p2p.ValidationResult

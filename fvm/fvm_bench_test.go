@@ -34,7 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
@@ -135,7 +135,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	derivedChainData      *programs.DerivedChainData
+	derivedChainData      *derived.DerivedChainData
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
@@ -216,8 +216,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
-	derivedChainData, err := programs.NewDerivedChainData(
-		programs.DefaultDerivedDataCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
 	require.NoError(tb, err)
 
 	return &BasicBlockExecutor{

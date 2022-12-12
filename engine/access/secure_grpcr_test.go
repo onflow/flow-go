@@ -86,9 +86,9 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := rpc.Config{
-		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
-		SecureGRPCListenAddr:   ":0",
-		HTTPListenAddr:         ":0",
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -101,8 +101,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
+	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

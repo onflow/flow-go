@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -108,11 +109,6 @@ type NodeBuilder interface {
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
 
-	// MustNot asserts that the given error must not occur.
-	// If the error is nil, returns a nil log event (which acts as a no-op).
-	// If the error is not nil, returns a fatal log event containing the error.
-	MustNot(err error) *zerolog.Event
-
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() (Node, error)
@@ -144,6 +140,7 @@ type BaseConfig struct {
 	AdminCert                   string
 	AdminKey                    string
 	AdminClientCAs              string
+	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
 	DynamicStartupANAddress     string
@@ -156,6 +153,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
@@ -279,12 +277,14 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
+		debugLogLimit:    2000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,
@@ -313,6 +313,12 @@ func DefaultBaseConfig() *BaseConfig {
 // to define the list of depenencies that must be ready before starting the component.
 type DependencyList struct {
 	components []module.ReadyDoneAware
+}
+
+func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
+	return &DependencyList{
+		components: components,
+	}
 }
 
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.

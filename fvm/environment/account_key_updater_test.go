@@ -1,4 +1,4 @@
-package environment
+package environment_test
 
 import (
 	"fmt"
@@ -17,12 +17,18 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
-	akh := &accountKeyUpdater{accounts: FakeAccounts{}}
+	akh := environment.NewAccountKeyUpdater(
+		nil,
+		nil,
+		FakeAccounts{},
+		nil,
+		nil)
 
 	address := cadence.BytesToAddress([]byte{1, 2, 3, 4})
 
@@ -37,7 +43,9 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
 
-	err = akh.addEncodedAccountKey(runtime.Address(address), encodedPublicKey)
+	err = akh.InternalAddEncodedAccountKey(
+		runtime.Address(address),
+		encodedPublicKey)
 	require.Error(t, err)
 
 	require.True(t, errors.IsValueError(err))
@@ -65,7 +73,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 		SignAlgo:  invalidSignAlgo,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		sema.HashAlgorithmSHA2_384,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -95,7 +107,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 
 	invalidHashAlgo := sema.HashAlgorithm(112)
 
-	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
+	_, err := environment.NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -123,7 +135,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		runtime.HashAlgorithmSHA2_256,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -177,7 +193,7 @@ type FakeAccounts struct {
 	keyCount uint64
 }
 
-var _ Accounts = &FakeAccounts{}
+var _ environment.Accounts = &FakeAccounts{}
 
 func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
 func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }

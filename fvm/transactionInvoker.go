@@ -10,41 +10,20 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	programsCache "github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): rm.  call proc.Run directly.
+// TODO(patrick): rm once emulator is updated.
 type TransactionInvoker struct {
 }
 
 func NewTransactionInvoker() *TransactionInvoker {
 	return &TransactionInvoker{}
-}
-
-func (i TransactionInvoker) NewExecutor(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) *transactionExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (i TransactionInvoker) Process(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) error {
-	// TODO(patrick): switch to run(i.NewExecutor(...))
-	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
-	defer executor.Cleanup()
-	return executor.Execute()
 }
 
 type TransactionExecutorParams struct {
@@ -77,11 +56,12 @@ type transactionExecutor struct {
 	TransactionVerifier
 	TransactionSequenceNumberChecker
 	TransactionStorageLimiter
+	TransactionPayerBalanceChecker
 
 	ctx            Context
 	proc           *TransactionProcedure
 	txnState       *state.TransactionState
-	derivedTxnData *programsCache.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -98,7 +78,7 @@ func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
 	span := proc.StartSpanFromProcTraceSpan(
 		ctx.Tracer,
@@ -204,22 +184,22 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 		return beginErr
 	}
 
-	var modifiedSets programsCache.ModifiedSetsInvalidator
+	var invalidator derived.TransactionInvalidator
 	var txError error
-	modifiedSets, txError = executor.normalExecution()
+	invalidator, txError = executor.normalExecution()
 	if executor.errs.Collect(txError).CollectedFailure() {
 		return executor.errs.ErrorOrNil()
 	}
 
 	if executor.errs.CollectedError() {
-		modifiedSets = programsCache.ModifiedSetsInvalidator{}
+		invalidator = nil
 		executor.errorExecution()
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
 	}
 
-	executor.errs.Collect(executor.commit(modifiedSets))
+	executor.errs.Collect(executor.commit(invalidator))
 
 	return executor.errs.ErrorOrNil()
 }
@@ -272,9 +252,18 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 }
 
 func (executor *transactionExecutor) normalExecution() (
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
+	// TODO:  max transaction fees returned from this function should be used in the storage check
+	_, err = executor.CheckPayerBalanceAndReturnMaxFees(
+		executor.proc,
+		executor.txnState,
+		executor.env)
+	if err != nil {
+		return
+	}
+
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
@@ -300,7 +289,7 @@ func (executor *transactionExecutor) normalExecution() (
 
 	// Before checking storage limits, we must applying all pending changes
 	// that may modify storage usage.
-	modifiedSets, err = executor.env.FlushPendingUpdates()
+	invalidator, err = executor.env.FlushPendingUpdates()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -373,7 +362,7 @@ func (executor *transactionExecutor) errorExecution() {
 }
 
 func (executor *transactionExecutor) commit(
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 ) error {
 	if executor.txnState.NumNestedTransactions() > 1 {
 		// This is a fvm internal programming error.  We forgot to call Commit
@@ -400,7 +389,7 @@ func (executor *transactionExecutor) commit(
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
-	executor.derivedTxnData.AddInvalidator(modifiedSets)
+	executor.derivedTxnData.AddInvalidator(invalidator)
 
 	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
 	if commitErr != nil {
