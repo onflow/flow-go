@@ -6,6 +6,8 @@ import (
 	crypto "github.com/onflow/flow-go/crypto"
 	flow "github.com/onflow/flow-go/model/flow"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,44 +17,35 @@ type TimeoutSignatureAggregator struct {
 }
 
 // Aggregate provides a mock function with given fields:
-func (_m *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, crypto.Signature, error) {
+func (_m *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, crypto.Signature, error) {
 	ret := _m.Called()
 
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+	var r0 []hotstuff.TimeoutSignerInfo
+	if rf, ok := ret.Get(0).(func() []hotstuff.TimeoutSignerInfo); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).([]hotstuff.TimeoutSignerInfo)
 		}
 	}
 
-	var r1 []uint64
-	if rf, ok := ret.Get(1).(func() []uint64); ok {
+	var r1 crypto.Signature
+	if rf, ok := ret.Get(1).(func() crypto.Signature); ok {
 		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]uint64)
+			r1 = ret.Get(1).(crypto.Signature)
 		}
 	}
 
-	var r2 crypto.Signature
-	if rf, ok := ret.Get(2).(func() crypto.Signature); ok {
+	var r2 error
+	if rf, ok := ret.Get(2).(func() error); ok {
 		r2 = rf()
 	} else {
-		if ret.Get(2) != nil {
-			r2 = ret.Get(2).(crypto.Signature)
-		}
+		r2 = ret.Error(2)
 	}
 
-	var r3 error
-	if rf, ok := ret.Get(3).(func() error); ok {
-		r3 = rf()
-	} else {
-		r3 = ret.Error(3)
-	}
-
-	return r0, r1, r2, r3
+	return r0, r1, r2
 }
 
 // TotalWeight provides a mock function with given fields:

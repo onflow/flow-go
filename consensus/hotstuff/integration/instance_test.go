@@ -469,14 +469,16 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				}, nil,
 			).Maybe()
 			aggregator.On("Aggregate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-				[]flow.Identifier(in.participants.NodeIDs()),
-				func() []uint64 {
-					newestQCViews := make([]uint64, 0, len(in.participants))
+				func() []hotstuff.TimeoutSignerInfo {
+					signersData := make([]hotstuff.TimeoutSignerInfo, 0, len(in.participants))
 					newestQCView := newestView.Value()
-					for range in.participants {
-						newestQCViews = append(newestQCViews, newestQCView)
+					for _, signer := range in.participants.NodeIDs() {
+						signersData = append(signersData, hotstuff.TimeoutSignerInfo{
+							NewestQCView: newestQCView,
+							Signer:       signer,
+						})
 					}
-					return newestQCViews
+					return signersData
 				},
 				unittest.SignatureFixture(),
 				nil,
