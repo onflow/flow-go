@@ -35,7 +35,7 @@ This generates keys for each of the nodes and a genesis block to build on.
 Bootstrap a new network:
 
 ```sh
-make init
+make bootstrap
 ```
 
 ### Configuration
@@ -46,14 +46,14 @@ All configuration is optional.
 Specify the number of nodes for each role:
 
 ```sh
-make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
+make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 bootstrap
 ```
 *NOTE: number of execution\consensus nodes should be no less than 2. It is to avoid seals being created in case of execution forks.*
 
 Specify the number of collector clusters:
 
 ```sh
-make -e NCLUSTERS=3 init
+make -e NCLUSTERS=3 bootstrap
 ```
 
 ### Profiling
@@ -62,7 +62,7 @@ You can turn on automatic profiling for all nodes. Profiles are written every 2
 minutes to `./profiler`.
 
 ```sh
-make -e PROFILER=true init
+make -e PROFILER=true bootstrap
 ```
 
 ## Start the network
