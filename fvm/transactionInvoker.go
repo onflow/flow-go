@@ -97,14 +97,17 @@ func newTransactionExecutor(
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
-		ctx:                       ctx,
-		proc:                      proc,
-		txnState:                  txnState,
-		derivedTxnData:            derivedTxnData,
-		span:                      span,
-		env:                       env,
-		errs:                      errors.NewErrorsCollector(),
-		cadenceRuntime:            env.BorrowCadenceRuntime(),
+		TransactionVerifier: TransactionVerifier{
+			VerificationConcurrency: 4,
+		},
+		ctx:            ctx,
+		proc:           proc,
+		txnState:       txnState,
+		derivedTxnData: derivedTxnData,
+		span:           span,
+		env:            env,
+		errs:           errors.NewErrorsCollector(),
+		cadenceRuntime: env.BorrowCadenceRuntime(),
 	}
 }
 
