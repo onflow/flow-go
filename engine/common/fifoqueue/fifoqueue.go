@@ -8,6 +8,10 @@ import (
 	"github.com/ef-ds/deque"
 )
 
+// CapacityUnlimited specifies the largest possible capacity for a FifoQueue.
+// maximum value for platform-specific int: https://yourbasic.org/golang/max-min-int-uint/
+const CapacityUnlimited = 1<<(mathbits.UintSize-1) - 1
+
 // FifoQueue implements a FIFO queue with max capacity and length observer.
 // Elements that exceeds the queue's max capacity are silently dropped.
 // By default, the theoretical capacity equals to the largest `int` value
@@ -35,30 +39,15 @@ type ConstructorOption func(*FifoQueue) error
 // the `NewFifoQueue` constructor (via `WithLengthObserver` option).
 type QueueLengthObserver func(int)
 
-// WithCapacity is a constructor option for NewFifoQueue. It specifies the
-// max number of elements the queue can hold. By default, the theoretical
-// capacity equals to the largest `int` value (platform dependent).
-// The WithCapacity option overrides the previous value (default value or
-// value specified by previous option).
-func WithCapacity(capacity int) ConstructorOption {
-	return func(queue *FifoQueue) error {
-		if capacity < 1 {
-			return fmt.Errorf("capacity for Fifo queue must be positive")
-		}
-		queue.maxCapacity = capacity
-		return nil
-	}
-}
-
 // WithLengthObserver is a constructor option for NewFifoQueue. Each time the
 // queue's length changes, the queue calls the provided callback with the new
 // length. By default, the QueueLengthObserver is a NoOp.
 // CAUTION:
-//  * QueueLengthObserver implementations must be non-blocking
-//  * The values published to queue length observer might be in different order
-//    than the actual length values at the time of insertion. This is a
-//    performance optimization, which allows to reduce the duration during
-//    which the queue is internally locked when inserting elements.
+//   - QueueLengthObserver implementations must be non-blocking
+//   - The values published to queue length observer might be in different order
+//     than the actual length values at the time of insertion. This is a
+//     performance optimization, which allows to reduce the duration during
+//     which the queue is internally locked when inserting elements.
 func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if callback == nil {
@@ -70,12 +59,13 @@ func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 }
 
 // NewFifoQueue is the Constructor for FifoQueue
-func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
-	// maximum value for platform-specific int: https://yourbasic.org/golang/max-min-int-uint/
-	maxInt := 1<<(mathbits.UintSize-1) - 1
+func NewFifoQueue(maxCapacity int, options ...ConstructorOption) (*FifoQueue, error) {
+	if maxCapacity < 1 {
+		return nil, fmt.Errorf("capacity for Fifo queue must be positive")
+	}
 
 	queue := &FifoQueue{
-		maxCapacity:    maxInt,
+		maxCapacity:    maxCapacity,
 		lengthObserver: func(int) { /* noop */ },
 	}
 	for _, opt := range options {

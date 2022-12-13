@@ -31,7 +31,6 @@ type Stopper struct {
 // to catch up.
 // a better strategy is to wait until all nodes has entered a certain view,
 // then stop them all.
-//
 func NewStopper(finalizedCount uint, tolerate int) *Stopper {
 	return &Stopper{
 		running:        make(map[flow.Identifier]struct{}),
@@ -73,7 +72,7 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 func (s *Stopper) stopAll() {
 	// only allow one process to stop all nodes,
 	// and stop them exactly once
-	if !s.stopping.CAS(false, true) {
+	if !s.stopping.CompareAndSwap(false, true) {
 		return
 	}
 

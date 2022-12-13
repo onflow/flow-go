@@ -1,61 +1,37 @@
 package slashing
 
 import (
-	"fmt"
-
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/utils/logging"
-
 	"github.com/onflow/flow-go/model/flow"
+	network "github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 )
 
-const (
-	unAuthorizedSenderViolation = "unauthorized_sender"
-	unknownMsgTypeViolation     = "unknown_message_type"
-	senderEjectedViolation      = "sender_ejected"
-)
+type ViolationsConsumer interface {
+	// OnUnAuthorizedSenderError logs an error for unauthorized sender error
+	OnUnAuthorizedSenderError(violation *Violation)
 
-// SlashingViolationsConsumer is a struct that logs a message for any slashable offences.
-// This struct will be updated in the future when slashing is implemented.
-type SlashingViolationsConsumer struct {
-	log zerolog.Logger
+	// OnUnknownMsgTypeError logs an error for unknown message type error
+	OnUnknownMsgTypeError(violation *Violation)
+
+	// OnInvalidMsgError logs an error for messages that contained payloads that could not
+	// be unmarshalled into the message type denoted by message code byte.
+	OnInvalidMsgError(violation *Violation)
+
+	// OnSenderEjectedError logs an error for sender ejected error
+	OnSenderEjectedError(violation *Violation)
+
+	// OnUnauthorizedUnicastOnChannel logs an error for messages unauthorized to be sent via unicast
+	OnUnauthorizedUnicastOnChannel(violation *Violation)
+
+	// OnUnexpectedError logs an error for unknown errors
+	OnUnexpectedError(violation *Violation)
 }
 
-// NewSlashingViolationsConsumer returns a new SlashingViolationsConsumer
-func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsumer {
-	return &SlashingViolationsConsumer{log}
-}
-
-// OnUnAuthorizedSenderError logs a warning for unauthorized sender error
-func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", unAuthorizedSenderViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
-}
-
-// OnUnknownMsgTypeError logs a warning for unknown message type error
-func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", unknownMsgTypeViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
-}
-
-// OnSenderEjectedError logs a warning for sender ejected error
-func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", senderEjectedViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+type Violation struct {
+	Identity *flow.Identity
+	PeerID   string
+	MsgType  string
+	Channel  network.Channel
+	Protocol message.Protocol
+	Err      error
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
@@ -27,7 +28,7 @@ func main() {
 		}{
 			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
 			ExecutionCollector: metrics.NewExecutionCollector(tracer),
-			NetworkCollector:   metrics.NewNetworkCollector(),
+			NetworkCollector:   metrics.NewNetworkCollector(unittest.Logger()),
 		}
 		diskTotal := rand.Int63n(1024 * 1024 * 1024)
 		for i := 0; i < 1000; i++ {
@@ -38,8 +39,16 @@ func main() {
 			// adds a random delay for execution duration, between 0 and 2 seconds
 			time.Sleep(duration)
 
-			collector.ExecutionBlockExecuted(duration, uint64(rand.Int63n(1e6)), 1, 1)
-			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionBlockExecuted(
+				duration,
+				module.ExecutionResultStats{
+					ComputationUsed:      uint64(rand.Int63n(1e6)),
+					MemoryUsed:           uint64(rand.Int63n(1e6)),
+					EventCounts:          2,
+					EventSize:            100,
+					NumberOfCollections:  1,
+					NumberOfTransactions: 1,
+				})
 
 			diskIncrease := rand.Int63n(1024 * 1024)
 			diskTotal += diskIncrease

@@ -35,6 +35,11 @@ func AllDone(components ...module.ReadyDoneAware) <-chan struct{} {
 // AllClosed returns a channel that is closed when all input channels are closed.
 func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
+	if len(channels) == 0 {
+		close(done)
+		return done
+	}
+
 	var wg sync.WaitGroup
 
 	for _, ch := range channels {
@@ -144,4 +149,16 @@ func WaitError(errChan <-chan error, done <-chan struct{}) error {
 		}
 		return nil
 	}
+}
+
+// DetypeSlice converts a typed slice containing any kind of elements into an
+// untyped []any type, in effect removing the element type information from the slice.
+// It is useful for passing data into structpb.NewValue, which accepts []any but not
+// []T for any specific type T.
+func DetypeSlice[T any](typedSlice []T) []any {
+	untypedSlice := make([]any, len(typedSlice))
+	for i, t := range typedSlice {
+		untypedSlice[i] = t
+	}
+	return untypedSlice
 }

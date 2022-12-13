@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -51,6 +52,8 @@ type Suite struct {
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
+	seals        *storage.Seals
+	downloader   *downloadermock.Downloader
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -102,9 +105,10 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
-	rpcEngBuilder.WithLegacy()
-	rpcEng := rpcEngBuilder.Build()
+		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0,
+		0, false, false, nil, nil)
+	require.NoError(suite.T(), err)
+	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
@@ -112,12 +116,11 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	// stops requestMissingCollections from executing in processBackground worker
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-	eng.Start(irrecoverableCtx)
+	eng.ComponentManager.Start(irrecoverableCtx)
 	<-eng.Ready()
 
 	suite.eng = eng
@@ -126,6 +129,8 @@ func (suite *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
+	suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil).Once()
+
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
@@ -157,7 +162,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)

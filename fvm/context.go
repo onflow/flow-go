@@ -5,47 +5,43 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
+const (
+	AccountKeyWeightThreshold = 1000
+
+	DefaultComputationLimit   = 100_000 // 100K
+	DefaultMemoryLimit        = math.MaxUint64
+	DefaultMaxInteractionSize = 20_000_000 // ~20MB
+)
+
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain   flow.Chain
-	Blocks  Blocks
-	Metrics handler.MetricsReporter
-	Tracer  module.Tracer
-	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
-	AllowContextOverrideByExecutionState bool
-	ComputationLimit                     uint64
-	MemoryLimit                          uint64
-	MaxStateKeySize                      uint64
-	MaxStateValueSize                    uint64
-	MaxStateInteractionSize              uint64
-	EventCollectionByteSizeLimit         uint64
-	BlockHeader                          *flow.Header
-	// NOTE: The ServiceAccountEnabled option is used by the playground
-	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
-	ServiceAccountEnabled bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
-	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictContractDeployment    bool
-	RestrictContractRemoval       bool
-	LimitAccountStorage           bool
-	TransactionFeesEnabled        bool
-	CadenceLoggingEnabled         bool
-	ServiceEventCollectionEnabled bool
-	ExtensiveTracing              bool
-	TransactionProcessors         []TransactionProcessor
-	ScriptProcessors              []ScriptProcessor
-	Logger                        zerolog.Logger
+	// DisableMemoryAndInteractionLimits will override memory and interaction
+	// limits and set them to MaxUint64, effectively disabling these limits.
+	DisableMemoryAndInteractionLimits bool
+	ComputationLimit                  uint64
+	MemoryLimit                       uint64
+	MaxStateKeySize                   uint64
+	MaxStateValueSize                 uint64
+	MaxStateInteractionSize           uint64
+
+	TransactionExecutorParams
+
+	DerivedBlockData *derived.DerivedBlockData
+
+	environment.EnvironmentParams
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(logger zerolog.Logger, opts ...Option) Context {
-	return newContext(defaultContext(logger), opts...)
+func NewContext(opts ...Option) Context {
+	return newContext(defaultContext(), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -61,43 +57,16 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-const AccountKeyWeightThreshold = 1000
-
-const (
-	DefaultComputationLimit             = 100_000        // 100K
-	DefaultMemoryLimit                  = math.MaxUint64 //
-	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
-)
-
-func defaultContext(logger zerolog.Logger) Context {
+func defaultContext() Context {
 	return Context{
-		Chain:                                flow.Mainnet.Chain(),
-		Blocks:                               nil,
-		Metrics:                              &handler.NoopMetricsReporter{},
-		Tracer:                               nil,
-		AllowContextOverrideByExecutionState: true,
-		ComputationLimit:                     DefaultComputationLimit,
-		MemoryLimit:                          DefaultMemoryLimit,
-		MaxStateKeySize:                      state.DefaultMaxKeySize,
-		MaxStateValueSize:                    state.DefaultMaxValueSize,
-		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
-		BlockHeader:                          nil,
-		ServiceAccountEnabled:                true,
-		RestrictContractDeployment:           true,
-		RestrictContractRemoval:              true,
-		CadenceLoggingEnabled:                false,
-		ServiceEventCollectionEnabled:        false,
-		ExtensiveTracing:                     false,
-		TransactionProcessors: []TransactionProcessor{
-			NewTransactionVerifier(AccountKeyWeightThreshold),
-			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(logger),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
-		},
-		Logger: logger,
+		DisableMemoryAndInteractionLimits: false,
+		ComputationLimit:                  DefaultComputationLimit,
+		MemoryLimit:                       DefaultMemoryLimit,
+		MaxStateKeySize:                   state.DefaultMaxKeySize,
+		MaxStateValueSize:                 state.DefaultMaxValueSize,
+		MaxStateInteractionSize:           DefaultMaxInteractionSize,
+		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
+		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -121,10 +90,11 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
-// WithAllowContextOverrideByExecutionState sets if certain context parameters get loaded from the state or not
-func WithAllowContextOverrideByExecutionState(load bool) Option {
+// WithMemoryAndInteractionLimitsDisabled will override memory and interaction
+// limits and set them to MaxUint64, effectively disabling these limits.
+func WithMemoryAndInteractionLimitsDisabled() Option {
 	return func(ctx Context) Context {
-		ctx.AllowContextOverrideByExecutionState = load
+		ctx.DisableMemoryAndInteractionLimits = true
 		return ctx
 	}
 }
@@ -141,6 +111,14 @@ func WithComputationLimit(limit uint64) Option {
 func WithMemoryLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.MemoryLimit = limit
+		return ctx
+	}
+}
+
+// WithLogger sets the context logger
+func WithLogger(logger zerolog.Logger) Option {
+	return func(ctx Context) Context {
+		ctx.Logger = logger
 		return ctx
 	}
 }
@@ -209,7 +187,7 @@ func WithExtensiveTracing() Option {
 //
 // The VM uses the block storage provider to provide historical block information to
 // the Cadence runtime.
-func WithBlocks(blocks Blocks) Option {
+func WithBlocks(blocks environment.Blocks) Option {
 	return func(ctx Context) Context {
 		ctx.Blocks = blocks
 		return ctx
@@ -219,10 +197,10 @@ func WithBlocks(blocks Blocks) Option {
 // WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsReporter(mr handler.MetricsReporter) Option {
+func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
-			ctx.Metrics = mr
+			ctx.MetricsReporter = mr
 		}
 		return ctx
 	}
@@ -236,11 +214,26 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
+// TODO(patrick): remove after emulator has been updated.
+//
 // WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
-func WithTransactionProcessors(processors ...TransactionProcessor) Option {
+func WithTransactionProcessors(processors ...interface{}) Option {
 	return func(ctx Context) Context {
-		ctx.TransactionProcessors = processors
+		executeBody := false
+		for _, p := range processors {
+			switch p.(type) {
+			case *TransactionInvoker:
+				executeBody = true
+			default:
+				panic("Unexpected transaction processor")
+			}
+		}
+
+		ctx.AuthorizationChecksEnabled = false
+		ctx.SequenceNumberCheckAndIncrementEnabled = false
+		ctx.AccountKeyWeightThreshold = 0
+		ctx.TransactionBodyExecutionEnabled = executeBody
 		return ctx
 	}
 }
@@ -298,10 +291,79 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
+// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// authorization checks.
+func WithAuthorizationChecksEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AuthorizationChecksEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSequenceNumberCheckAndIncrementEnabled enables or disables pre-execution
+// sequence number check / increment.
+func WithSequenceNumberCheckAndIncrementEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.SequenceNumberCheckAndIncrementEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAccountKeyWeightThreshold sets the key weight threshold used for
+// authorization checks.  If the threshold is a negative number, signature
+// verification is skipped.
+//
+// Note: This is set only by tests
+func WithAccountKeyWeightThreshold(threshold int) Option {
+	return func(ctx Context) Context {
+		ctx.AccountKeyWeightThreshold = threshold
+		return ctx
+	}
+}
+
+// WithTransactionBodyExecutionEnabled enables or disables the transaction body
+// execution.
+//
+// Note: This is disabled only by tests
+func WithTransactionBodyExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionBodyExecutionEnabled = enabled
+		return ctx
+	}
+}
+
 // WithTransactionFeesEnabled enables or disables deduction of transaction fees
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// use for creating the cadence runtime.
+func WithReusableCadenceRuntimePool(
+	pool reusableRuntime.ReusableCadenceRuntimePool,
+) Option {
+	return func(ctx Context) Context {
+		ctx.ReusableCadenceRuntimePool = pool
+		return ctx
+	}
+}
+
+// WithDerivedBlockData sets the derived data cache storage to be used by the
+// transaction/script.
+func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
+	return func(ctx Context) Context {
+		ctx.DerivedBlockData = derivedBlockData
+		return ctx
+	}
+}
+
+// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
+func WithEventEncoder(encoder environment.EventEncoder) Option {
+	return func(ctx Context) Context {
+		ctx.EventEncoder = encoder
 		return ctx
 	}
 }

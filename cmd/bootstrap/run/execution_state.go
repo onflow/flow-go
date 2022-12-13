@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -56,7 +57,7 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

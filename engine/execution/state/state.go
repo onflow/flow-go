@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -44,7 +45,7 @@ type ReadOnlyExecutionState interface {
 	HasState(flow.StateCommitment) bool
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
+	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
@@ -311,7 +312,7 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
@@ -418,6 +419,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := s.blocks.ByID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve block: %w", err)
@@ -508,50 +510,18 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.End()
 	}
 
-	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
-		var blockID flow.Identifier
-		err := operation.RetrieveExecutedBlock(&blockID)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup executed block: %w", err)
-		}
-
-		var highest flow.Header
-		err = operation.RetrieveHeader(blockID, &highest)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve executed header: %w", err)
-		}
-
-		if header.Height <= highest.Height {
-			return nil
-		}
-		err = operation.UpdateExecutedBlock(header.ID())(txn)
-		if err != nil {
-			return fmt.Errorf("cannot update highest executed block: %w", err)
-		}
-
-		return nil
-	})
+	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
 	var blockID flow.Identifier
-	var highest flow.Header
-	err := s.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutedBlock(&blockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
-		}
-		err = operation.RetrieveHeader(blockID, &highest)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
-		}
-		return nil
-	})
+	var height uint64
+	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return highest.Height, blockID, nil
+	return height, blockID, nil
 }
 
 // IsBlockExecuted returns whether the block has been executed.

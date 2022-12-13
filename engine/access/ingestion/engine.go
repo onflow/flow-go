@@ -105,18 +105,14 @@ func New(
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
-	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultQueueCapacity),
-	)
+	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
 	}
 
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
 
-	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultQueueCapacity),
-	)
+	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
 	}
@@ -185,6 +181,43 @@ func New(
 	}
 
 	return e, nil
+}
+
+func (e *Engine) Start(parent irrecoverable.SignalerContext) {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
+	}
+
+	// if spork root snapshot
+	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
+
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
+	if err != nil {
+		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
+	}
+
+	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
+	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
+	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
+	// in blocks above that height.
+	if isSporkRootSnapshot {
+		// for snapshot with a single block in the sealing segment the first full block is the root block.
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	} else {
+		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
+		// requesting resources for blocks below the expiry.
+		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	}
+
+	e.ComponentManager.Start(parent)
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -350,6 +383,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 // processBlock handles an incoming finalized block.
 func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
@@ -377,6 +411,19 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		}
 	}
 
+	// skip requesting collections, if this block is below the last full block height
+	// this means that either we have already received these collections, or the block
+	// may contain unverifiable guarantees (in case this node has just joined the network)
+	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not get last full block height: %w", err)
+	}
+
+	if block.Header.Height <= lastFullBlockHeight {
+		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
+		return nil
+	}
+
 	// queue requesting each of the collections from the collection node
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
@@ -384,6 +431,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 }
 
 func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	// retrieve the block
 	block, err := e.blocks.ByID(hb.BlockID)
 	if err != nil {
@@ -435,6 +483,7 @@ func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	now := time.Now().UTC()
 
 	// retrieve the block
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
 
 	if errors.Is(err, storage.ErrNotFound) {

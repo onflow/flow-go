@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -44,6 +45,7 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultProfileUploader   = false
 	DefaultTracing           = true
 	DefaultCadenceTracing    = false
 	DefaultExtensiveTracing  = false
@@ -72,6 +74,7 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	profileUploader        bool
 	tracing                bool
 	cadenceTracing         bool
 	extesiveTracing        bool
@@ -91,6 +94,7 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
@@ -183,7 +187,7 @@ func displayPortAssignments() {
 
 func prepareCommonHostFolders() {
 	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
-		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		}
 
@@ -297,7 +301,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 	}
 
 	err := os.MkdirAll(dataDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -307,7 +311,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
 	}
 	err = os.MkdirAll(profilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -342,10 +346,10 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
-		fmt.Sprintf("--chunk-alpha=1"),
-		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--chunk-alpha=1",
+		"--emergency-sealing-active=false",
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -360,7 +364,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--chunk-alpha=1"),
+		"--chunk-alpha=1",
 	)
 
 	service.Ports = []string{
@@ -381,8 +385,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -398,7 +402,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
 	err := os.MkdirAll(trieDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -415,6 +419,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Volumes = append(
@@ -444,12 +449,15 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
+		"--execution-data-sync-enabled=true",
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
 	}
 
 	return service
@@ -466,7 +474,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-		fmt.Sprintf("--bind=0.0.0.0:0"),
+		"--bind=0.0.0.0:0",
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
@@ -495,9 +503,11 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
+			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
@@ -661,7 +671,7 @@ func writeObserverPrivateKey(observerName string) {
 
 	// write to file
 	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", BootstrapDir, observerName)
-	err = ioutil.WriteFile(outputFile, output, 0600)
+	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
 		panic(err)
 	}

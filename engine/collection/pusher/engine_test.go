@@ -1,7 +1,7 @@
 package pusher_test
 
 import (
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -64,7 +64,7 @@ func (suite *Suite) SetupTest() {
 	suite.transactions = new(storage.Transactions)
 
 	suite.engine, err = pusher.New(
-		zerolog.New(ioutil.Discard),
+		zerolog.New(io.Discard),
 		net,
 		suite.state,
 		metrics,

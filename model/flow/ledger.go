@@ -14,22 +14,11 @@ type RegisterID struct {
 	Key   string
 }
 
-// this function returns a string format of a RegisterID in the form '%x/%x'
-// it has been optimized to avoid the memory allocations inside Sprintf
+// String returns formatted string representation of the RegisterID.
+// TODO(rbtz): remove after the merge of https://github.com/onflow/flow-emulator/pull/235
+// Deprecated: used only by emultor.
 func (r *RegisterID) String() string {
-	ownerLen := len(r.Owner)
-
-	requiredLen := ((ownerLen + len(r.Key)) * 2) + 1
-
-	arr := make([]byte, requiredLen)
-
-	hex.Encode(arr, []byte(r.Owner))
-
-	arr[2*ownerLen] = byte('/')
-
-	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Key))
-
-	return string(arr)
+	return fmt.Sprintf("%x/%x", r.Owner, r.Key)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
@@ -54,7 +43,7 @@ type RegisterEntry struct {
 	Value RegisterValue
 }
 
-//handy container for sorting
+// handy container for sorting
 type RegisterEntries []RegisterEntry
 
 func (d RegisterEntries) Len() int {

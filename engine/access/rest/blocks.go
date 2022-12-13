@@ -66,7 +66,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 
 	// support providing end height as "sealed" or "final"
 	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
-		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
+		latest, _, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +194,7 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
 	if blkProvider.id != nil {
-		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
+		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
 			return nil, NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
@@ -204,7 +204,7 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 	}
 
 	if blkProvider.latest {
-		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
+		blk, _, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
 			// cannot be a 'not found' error since final and sealed block should always be found
 			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
@@ -212,7 +212,7 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 		return blk, nil
 	}
 
-	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
+	blk, _, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil { // unfortunately backend returns internal error status if not found
 		return nil, NewNotFoundError(
 			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,

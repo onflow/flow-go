@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	synccore "github.com/onflow/flow-go/module/chainsync"
-	identifier "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -45,7 +44,7 @@ type Engine struct {
 	pollInterval         time.Duration
 	scanInterval         time.Duration
 	core                 module.SyncCore
-	participantsProvider identifier.IdentifierProvider
+	participantsProvider module.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
 	requestHandler *RequestHandler // component responsible for handling requests
@@ -65,7 +64,7 @@ func New(
 	comp network.Engine,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
-	participantsProvider identifier.IdentifierProvider,
+	participantsProvider module.IdentifierProvider,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -113,8 +112,7 @@ func New(
 
 // setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
 func (e *Engine) setupResponseMessageHandler() error {
-	syncResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(defaultSyncResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for sync responses: %w", err)
 	}
@@ -123,8 +121,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(defaultBlockResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for block responses: %w", err)
 	}
@@ -228,8 +225,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // process processes events for the synchronization engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -303,7 +300,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
+		if !e.core.HandleBlock(&block.Header) {
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}

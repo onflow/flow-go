@@ -16,7 +16,6 @@ import (
 )
 
 type TestnetStateTracker struct {
-	ghostTracking bool
 	BlockState    *BlockState
 	ReceiptState  *ReceiptState
 	ApprovalState *ResultApprovalState
@@ -36,13 +35,14 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 	// subscribe to the ghost
 	timeout := time.After(20 * time.Second)
-	ticker := time.Tick(100 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 	for retry := true; retry; {
 		select {
 		case <-timeout:
 			require.FailNowf(t, "could not subscribe to ghost", "%v", timeout)
 			return
-		case <-ticker:
+		case <-ticker.C:
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {
@@ -88,9 +88,9 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
 					time.Now().UTC(),
 					sender,
-					m.Header.Height,
-					m.Header.View,
-					m.Header.ID())
+					m.Block.Header.Height,
+					m.Block.Header.View,
+					m.Block.Header.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
 				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
@@ -123,8 +123,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
 func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState,
-	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*messages.BlockProposal,
-	*flow.ExecutionReceipt) {
+	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*flow.Block, *flow.ExecutionReceipt) {
 
 	// get the state commitment for the highest finalized block
 	initialFinalizedSC := unittest.GenesisStateCommitment
@@ -140,7 +139,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	currentHeight := initFinalizedheight + 1
 
 	currentID := b1.Header.ID()
-	var b2 *messages.BlockProposal
+	var b2 *flow.Block
 	var r2 *flow.ExecutionReceipt
 	require.Eventually(t, func() bool {
 		var ok bool

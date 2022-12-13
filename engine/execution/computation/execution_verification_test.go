@@ -18,7 +18,9 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -170,7 +172,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00008312")
+		minimumStorage, err := cadence.NewUFix64("0.00010489")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -189,7 +191,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// ensure fee deduction events are emitted even though tx fails
 		require.Len(t, cr.Events[1], 3)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -259,8 +261,8 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 10, transactionEvents)
 
-		// minimum account balance error as account is put below minimum account balance due to fee deduction
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+		// insufficient account balance error as account is at minimum account balance and inclusion fee is non-zero
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
@@ -475,7 +477,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1103")
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -631,17 +633,16 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVirtualMachine()
 
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
-	opts = append(opts, fvm.WithBlocks(&fvm.NoopBlockFinder{}))
+	opts = append(opts, fvm.WithLogger(logger))
+	opts = append(opts, fvm.WithBlocks(&environment.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(
-			logger,
 			opts...,
 		)
 
@@ -695,12 +696,16 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
-	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+	computationResult, err := blockComputer.ExecuteBlock(
+		context.Background(),
+		executableBlock,
+		view,
+		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
 
 	prevResultId := unittest.IdentifierFixture()
 
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
+	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)

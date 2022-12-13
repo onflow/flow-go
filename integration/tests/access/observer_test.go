@@ -3,19 +3,24 @@ package access
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestObserver(t *testing.T) {
@@ -30,7 +35,9 @@ type ObserverSuite struct {
 }
 
 func (suite *ObserverSuite) TearDownTest() {
-	suite.teardown()
+	if suite.teardown != nil {
+		suite.teardown()
+	}
 }
 
 func (suite *ObserverSuite) SetupTest() {
@@ -42,9 +49,8 @@ func (suite *ObserverSuite) SetupTest() {
 		"GetLatestBlock":                 {},
 		"GetBlockByID":                   {},
 		"GetBlockByHeight":               {},
-		"GetCollectionByID":              {},
-		"GetNetworkParameters":           {},
 		"GetLatestProtocolStateSnapshot": {},
+		"GetNetworkParameters":           {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{
@@ -85,13 +91,7 @@ func (suite *ObserverSuite) SetupTest() {
 		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
 		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
 	})
-
-	if err != nil {
-		// this can happen occaisionally...
-		// usually it's because docker didn't remove the observer container during the previous test.
-		// the observer container is removed by an "AutoRemove" flag in AddObserver.
-		panic(err)
-	}
+	require.NoError(suite.T(), err)
 
 	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
 
@@ -153,7 +153,7 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 				if err == nil {
 					return
 				}
-				code := grpc.Code(err)
+				code := status.Code(err)
 				assert.Equal(t, codes.NotFound, code)
 			})
 		}
@@ -186,16 +186,16 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 }
 
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

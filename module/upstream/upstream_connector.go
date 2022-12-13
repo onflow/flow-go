@@ -5,13 +5,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p"
+
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/p2p/utils"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 // upstreamConnector tries to connect the unstaked AN with atleast one of the configured bootstrap access nodes
@@ -19,13 +22,13 @@ type upstreamConnector struct {
 	lm                  *lifecycle.LifecycleManager
 	bootstrapIdentities flow.IdentityList
 	logger              zerolog.Logger
-	unstakedNode        *p2p.Node
+	unstakedNode        p2p.LibP2PNode
 	cancel              context.CancelFunc
 	retryInitialTimeout time.Duration
 	maxRetries          uint64
 }
 
-func NewUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
+func NewUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode p2p.LibP2PNode, logger zerolog.Logger) *upstreamConnector {
 	return &upstreamConnector{
 		lm:                  lifecycle.NewLifecycleManager(),
 		bootstrapIdentities: bootstrapIdentities,
@@ -92,7 +95,7 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 	default:
 	}
 
-	peerAddrInfo, err := p2p.PeerAddressInfo(bootstrapPeer)
+	peerAddrInfo, err := utils.PeerAddressInfo(bootstrapPeer)
 
 	if err != nil {
 		return err

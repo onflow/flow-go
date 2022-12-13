@@ -84,6 +84,14 @@ func (tb TransactionBody) ByteSize() uint {
 	return uint(size)
 }
 
+// InclusionEffort returns the inclusion effort of the transaction
+func (tb TransactionBody) InclusionEffort() uint64 {
+	// Hardcoded inclusion effort (of 1.0 UFix).
+	// Eventually this will be dynamic and will depend on the transaction properties
+	inclusionEffort := uint64(100_000_000)
+	return inclusionEffort
+}
+
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
@@ -277,8 +285,8 @@ func (tb *TransactionBody) SignEnvelope(
 // and hasher.
 //
 // This function returns an error if:
-//  - crypto.InvalidInputsError if the private key cannot sign with the given hasher
-//  - other error if an unexpected error occurs
+//   - crypto.InvalidInputsError if the private key cannot sign with the given hasher
+//   - other error if an unexpected error occurs
 func (tb *TransactionBody) Sign(
 	message []byte,
 	privateKey crypto.PrivateKey,

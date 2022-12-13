@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,22 +16,18 @@ const nodeID string = "000000000000000000000000000000000000000000000000000000000
 func TestEndToEnd(t *testing.T) {
 
 	// Create a temp directory to work as "bootstrap"
-	bootdir, err := ioutil.TempDir("", "bootstrap.*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(bootdir)
+	bootdir := t.TempDir()
 
 	t.Logf("Created dir %s", bootdir)
 
 	// Create test files
 	//bootcmd.WriteText(filepath.Join(bootdir, bootstrap.PathNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
-	err = os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
+	err := os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
 	if err != nil {
 		t.Fatalf("Failed to write dir for random beacon file: %s", err)
 	}
-	err = ioutil.WriteFile(randomBeaconPath, []byte("test data"), 0644)
+	err = os.WriteFile(randomBeaconPath, []byte("test data"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write random beacon file: %s", err)
 	}
@@ -60,7 +55,7 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func TestSha256(t *testing.T) {
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "prefix-")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "prefix-")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 

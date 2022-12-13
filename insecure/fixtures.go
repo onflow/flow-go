@@ -11,13 +11,14 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const DefaultAddress = "localhost:0"
 
-// EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the attack network.
-// It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
+// EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the orchestrator network.
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the orchestrator network and the
 // orchestrator.
 func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *EgressEvent, *flow.Identity) {
 	// fixture for content of message
@@ -40,16 +41,19 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
+	eventIDHash, err := p2p.EventId(channel, payload)
+	require.NoError(t, err)
+
+	eventID := flow.HashToID(eventIDHash)
 
 	// creates egress message that goes over gRPC.
-
 	egressMsg := &EgressMessage{
-		ChannelID: channels.TestNetworkChannel.String(),
-		OriginID:  originId[:],
-		TargetNum: targetNum,
-		TargetIDs: flow.IdsToBytes(targetIds),
-		Payload:   payload,
-		Protocol:  protocol,
+		ChannelID:       channels.TestNetworkChannel.String(),
+		CorruptOriginID: originId[:],
+		TargetNum:       targetNum,
+		TargetIDs:       flow.IdsToBytes(targetIds),
+		Payload:         payload,
+		Protocol:        protocol,
 	}
 
 	m := &Message{
@@ -57,14 +61,15 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	}
 
 	// creates corresponding event of that message that
-	// is sent by attack network to orchestrator.
+	// is sent by orchestrator network to orchestrator.
 	e := &EgressEvent{
-		CorruptedNodeId:   originId,
-		Channel:           channel,
-		FlowProtocolEvent: content,
-		Protocol:          protocol,
-		TargetNum:         targetNum,
-		TargetIds:         targetIds,
+		CorruptOriginId:     originId,
+		Channel:             channel,
+		FlowProtocolEvent:   content,
+		FlowProtocolEventID: eventID,
+		Protocol:            protocol,
+		TargetNum:           targetNum,
+		TargetIds:           targetIds,
 	}
 
 	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DefaultAddress))
@@ -80,10 +85,10 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 
 	// creates ingress message that goes over gRPC.
 	ingressMsg := &IngressMessage{
-		ChannelID: channels.TestNetworkChannel.String(),
-		OriginID:  originId[:],
-		TargetID:  targetId[:],
-		Payload:   payload,
+		ChannelID:       channels.TestNetworkChannel.String(),
+		OriginID:        originId[:],
+		CorruptTargetID: targetId[:],
+		Payload:         payload,
 	}
 
 	return &Message{
@@ -92,7 +97,7 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 }
 
 // EgressMessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
-// The messages are sent between a corruptible conduit and the attack network.
+// The messages are sent between a corruptible conduit and the orchestrator network.
 // The events are the corresponding protocol-level representation of messages.
 func EgressMessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count int) ([]*Message, []*EgressEvent,
 	flow.IdentityList) {

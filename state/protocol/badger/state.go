@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
@@ -457,7 +458,19 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
+	head, err := finalSnapshot.Head()
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error to get finalized block: %w", err)
+	}
+	metrics.FinalizedHeight(head.Height)
+
+	sealed, err := state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block: %w", err)
+	}
+	metrics.SealedHeight(sealed.Height)
 
 	// update all epoch related metrics
 	err = state.updateEpochMetrics(finalSnapshot)
@@ -477,7 +490,8 @@ func (state *State) Sealed() protocol.Snapshot {
 	var sealed uint64
 	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
-		return invalid.NewSnapshot(fmt.Errorf("could not retrieve sealed height: %w", err))
+		// sealed height must always be set, all errors here are critical
+		return invalid.NewSnapshotf("could not retrieve sealed height: %w", err)
 	}
 	return state.AtHeight(sealed)
 }
@@ -487,6 +501,7 @@ func (state *State) Final() protocol.Snapshot {
 	var finalized uint64
 	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
+		// finalized height must always be set, so all errors here are critical
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
 	}
 	return state.AtHeight(finalized)
@@ -496,13 +511,18 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
-	if err != nil {
-		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
+	if errors.Is(err, storage.ErrNotFound) {
+		return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
 	}
-	return NewSnapshot(state, blockID)
+	if err != nil {
+		// critical storage error
+		return invalid.NewSnapshotf("could not look up block by height: %w", err)
+	}
+	return state.AtBlockID(blockID)
 }
 
 func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	// TODO should return invalid.NewSnapshot(ErrUnknownSnapshotReference) if block doesn't exist
 	return NewSnapshot(state, blockID)
 }
 

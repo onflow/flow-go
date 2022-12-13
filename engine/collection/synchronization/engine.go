@@ -119,8 +119,7 @@ func New(
 
 // setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
 func (e *Engine) setupResponseMessageHandler() error {
-	syncResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(defaultSyncResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for sync responses: %w", err)
 	}
@@ -129,8 +128,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(defaultBlockResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for block responses: %w", err)
 	}
@@ -231,8 +229,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // process processes events for the synchronization engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -300,7 +298,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
+		if !e.core.HandleBlock(&block.Header) {
 			continue
 		}
 		synced := &events.SyncedClusterBlock{

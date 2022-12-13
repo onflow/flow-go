@@ -32,3 +32,11 @@ func EntityListFixture(n uint) []*MockEntity {
 func MockEntityFixture() *MockEntity {
 	return &MockEntity{Identifier: IdentifierFixture()}
 }
+
+func MockEntityListFixture(count int) []*MockEntity {
+	entities := make([]*MockEntity, 0, count)
+	for i := 0; i < count; i++ {
+		entities = append(entities, MockEntityFixture())
+	}
+	return entities
+}

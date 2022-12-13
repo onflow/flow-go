@@ -3,7 +3,6 @@ package reporters
 import (
 	"context"
 	"fmt"
-	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -12,14 +11,13 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
-	metering "github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -66,11 +64,9 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwc.Close()
 	defer rwm.Close()
 
-	l := migrations.NewView(payload)
-	meter := metering.NewMeter(metering.DefaultParameters())
-	st := state.NewState(l, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
+	l := utils.NewSimpleViewFromPayloads(payload)
+	txnState := state.NewTransactionState(l, state.DefaultParameters())
+	gen := environment.NewAddressGenerator(txnState, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -122,13 +118,11 @@ type balanceProcessor struct {
 	vm            *fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
-	prog          *programs.Programs
-	intf          runtime.Interface
+	env           environment.Environment
 	balanceScript []byte
 	momentsScript []byte
 
-	accounts state.Accounts
-	st       *state.State
+	accounts environment.Accounts
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -138,29 +132,34 @@ type balanceProcessor struct {
 }
 
 func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
-	prog := programs.NewEmptyPrograms()
+	vm := fvm.NewVirtualMachine()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithMemoryAndInteractionLimitsDisabled(),
+		fvm.WithDerivedBlockData(derivedBlockData))
 
 	v := view.NewChild()
-	meter := metering.NewMeter(metering.DefaultParameters())
-	st := state.NewState(v, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
+	txnState := state.NewTransactionState(v, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
-	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
+
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.EnvironmentParams,
+		txnState,
+		derivedTxnData)
 
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
 		view:     v,
 		accounts: accounts,
-		st:       st,
-		prog:     prog,
-		intf:     env,
+		env:      env,
 	}
 }
 
@@ -318,7 +317,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, false, err
 	}
@@ -339,7 +338,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -356,7 +355,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view)
 	if err != nil {
 		return 0, err
 	}
@@ -394,12 +393,16 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	if err != nil {
 		return nil, err
 	}
-	receiver, err := c.vm.Runtime.ReadStored(addr,
+
+	rt := c.env.BorrowCadenceRuntime()
+	defer c.env.ReturnCadenceRuntime(rt)
+
+	receiver, err := rt.ReadStored(
+		addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
 			Identifier: id,
 		},
-		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// CustomIdentifierProvider implements an IdentifierProvider which provides results from the given function.
+// CustomIdentifierProvider implements `module.IdentifierProvider` which provides results from the given function.
 type CustomIdentifierProvider struct {
 	identifiers func() flow.IdentifierList
 }

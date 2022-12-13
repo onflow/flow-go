@@ -7,6 +7,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type Blobstore interface {
@@ -54,7 +55,7 @@ func (bs *blobstoreImpl) Has(ctx context.Context, c cid.Cid) (bool, error) {
 
 func (bs *blobstoreImpl) Get(ctx context.Context, c cid.Cid) (Blob, error) {
 	blob, err := bs.bs.Get(ctx, c)
-	if err == blockstore.ErrNotFound {
+	if ipld.IsNotFound(err) {
 		return nil, ErrNotFound
 	}
 

@@ -2,7 +2,7 @@
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 #ifndef _REL_MISC_INCLUDE_H
 #define _REL_MISC_INCLUDE_H
@@ -114,16 +114,20 @@ void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 
-int check_membership_G1(const ep_t p);
-int simple_subgroup_check_G1(const ep_t);
-int simple_subgroup_check_G2(const ep2_t);
-void ep_rand_G1(ep_t);
-void ep_rand_G1complement( ep_t);
+// membership checks
+int      check_membership_G1(const ep_t);
+int      check_membership_G2(const ep2_t);
+int      check_membership_Zr_star(const bn_t);
+
+int      simple_subgroup_check_G1(const ep_t);
+int      simple_subgroup_check_G2(const ep2_t);
+void     ep_rand_G1(ep_t);
+void     ep_rand_G1complement( ep_t);
+void     ep2_rand_G2(ep2_t);
+void     ep2_rand_G2complement( ep2_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-int bowe_subgroup_check_G1(const ep_t);
+int      bowe_subgroup_check_G1(const ep_t);
 #endif
-int subgroup_check_G1_test(int, int);
-int subgroup_check_G1_bench();
 
 // utility testing function
 void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);

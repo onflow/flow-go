@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-const SegmentSize = 32 * 1024 * 1024
+const SegmentSize = 32 * 1024 * 1024 // 32 MB
 
 type DiskWAL struct {
 	wal            *prometheusWAL.WAL
@@ -36,7 +36,7 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
-		log:            logger,
+		log:            logger.With().Str("ledger_mod", "diskwal").Logger(),
 		dir:            dir,
 	}, nil
 }
@@ -116,9 +116,13 @@ func (w *DiskWAL) Replay(
 ) error {
 	from, to, err := w.Segments()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not find segments: %w", err)
 	}
-	return w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
+	if err != nil {
+		return fmt.Errorf("could not replay segments [%v:%v]: %w", from, to, err)
+	}
+	return nil
 }
 
 func (w *DiskWAL) ReplayLogsOnly(
@@ -128,9 +132,13 @@ func (w *DiskWAL) ReplayLogsOnly(
 ) error {
 	from, to, err := w.Segments()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not find segments: %w", err)
 	}
-	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
+	if err != nil {
+		return fmt.Errorf("could not replay WAL only for segments [%v:%v]: %w", from, to, err)
+	}
+	return nil
 }
 
 func (w *DiskWAL) replay(
@@ -141,7 +149,7 @@ func (w *DiskWAL) replay(
 	useCheckpoints bool,
 ) error {
 
-	w.log.Debug().Msgf("replaying WAL from %d to %d", from, to)
+	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d", from, to)
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
@@ -149,6 +157,7 @@ func (w *DiskWAL) replay(
 
 	loadedCheckpoint := -1
 	startSegment := from
+	checkpointLoaded := false
 
 	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
@@ -192,6 +201,7 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
 			loadedCheckpoint = latestCheckpoint
+			checkpointLoaded = true
 			break
 		}
 
@@ -210,6 +220,8 @@ func (w *DiskWAL) replay(
 			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
 		}
 		if hasRootCheckpoint {
+			w.log.Info().Msgf("loading root checkpoint")
+
 			flattenedForest, err := checkpointer.LoadRootCheckpoint()
 			if err != nil {
 				return fmt.Errorf("cannot load root checkpoint: %w", err)
@@ -218,10 +230,16 @@ func (w *DiskWAL) replay(
 			if err != nil {
 				return fmt.Errorf("error while handling root checkpoint: %w", err)
 			}
+
+			w.log.Info().Msgf("root checkpoint loaded")
+			checkpointLoaded = true
 		}
 	}
 
-	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
+	w.log.Info().
+		Bool("checkpoint_loaded", checkpointLoaded).
+		Int("loaded_checkpoint", loadedCheckpoint).
+		Msgf("replaying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
@@ -262,7 +280,7 @@ func (w *DiskWAL) replay(
 		}
 	}
 
-	w.log.Info().Msgf("finished replaying WAL from %d to %d", from, to)
+	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
 
 	return nil
 }

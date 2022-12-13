@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -57,7 +57,7 @@ func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
 type Network struct {
 	sync.RWMutex
 	*component.ComponentManager
-	identityProvider            id.IdentityProvider
+	identityProvider            module.IdentityProvider
 	logger                      zerolog.Logger
 	codec                       network.Codec
 	me                          module.Local
@@ -108,7 +108,7 @@ type NetworkParameters struct {
 	Topology            network.Topology
 	SubscriptionManager network.SubscriptionManager
 	Metrics             module.NetworkMetrics
-	IdentityProvider    id.IdentityProvider
+	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
 	Options             []NetworkOptFunction
 }
@@ -337,13 +337,10 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedM
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(message.EventID) {
-		log := n.logger.With().
+		// drops duplicate message
+		n.logger.Debug().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
-			Logger()
-
-		// drops duplicate message
-		log.Debug().
 			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
 
@@ -380,32 +377,17 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
 	//defer binstat.Leave(bs)
 
-	eventId, err := EventId(channel, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate event id for message: %x", err)
-	}
-
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
 		tempID := targetID // avoid capturing loop variable
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID
-	selfID := n.me.NodeID()
-	originID := selfID[:]
-
-	// get message type from event type and remove the asterisk prefix if present
-	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
-
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
-		EventID:   eventId,
-		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
-		Type:      msgType,
 	}
 
 	return msg, nil
@@ -516,6 +498,9 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
+		// This means the message was received on a channel that the node has not registered an
+		// engine for. This may be because the message was received during startup and the node
+		// hasn't subscribed to the channel yet, or there is a bug.
 		logger.Err(err).Msg("failed to submit message")
 		return
 	}
@@ -554,4 +539,8 @@ func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	}
 
 	return h.SumHash(), nil
+}
+
+func MessageType(decodedPayload interface{}) string {
+	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }

@@ -8,9 +8,9 @@ import (
 )
 
 // Controller implements a timout with:
-// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
-//   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: decrease timeout by subtrahend `timeoutDecrease`
+//   - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//     this results in exponential growing timeout duration on multiple subsequent timeouts
+//   - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
 	cfg            Config
 	timer          *time.Timer
@@ -109,5 +109,5 @@ func (t *Controller) OnProgressBeforeTimeout() {
 
 // BlockRateDelay is a delay to broadcast the proposal in order to control block production rate
 func (t *Controller) BlockRateDelay() time.Duration {
-	return time.Duration(t.cfg.BlockRateDelayMS * float64(time.Millisecond))
+	return time.Duration(t.cfg.BlockRateDelayMS.Load() * float64(time.Millisecond))
 }

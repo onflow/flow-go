@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+
 	"math/rand"
 	"net/http"
 	"os"
@@ -91,18 +92,18 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	const anyPort = ":0" // :0 to let the OS pick a free port
 	config := rpc.Config{
-		UnsecureGRPCListenAddr: anyPort,
-		SecureGRPCListenAddr:   anyPort,
-		HTTPListenAddr:         anyPort,
-		RESTListenAddr:         anyPort,
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
+		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
-	rpcEngBuilder.WithLegacy()
-	suite.rpcEng = rpcEngBuilder.Build()
+		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
+		false, nil, nil)
+	assert.NoError(suite.T(), err)
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 

@@ -12,10 +12,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,17 +26,17 @@ func TestFungibleTokenTracker(t *testing.T) {
 	// bootstrap ledger
 	payloads := []ledger.Payload{}
 	chain := flow.Testnet.Chain()
-	view := migrations.NewView(payloads)
+	view := utils.NewSimpleViewFromPayloads(payloads)
 
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVirtualMachine()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithDerivedBlockData(derivedBlockData),
 	}
-	ctx := fvm.NewContext(zerolog.Nop(), opts...)
+	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -44,9 +44,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
-	programs := programs.NewEmptyPrograms()
 
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view, programs)
+	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -81,8 +80,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		SetScript(deployingTestContractScript).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, 0)
-	err = vm.Run(ctx, tx, view, programs)
+	tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -107,8 +106,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx = fvm.Transaction(txBody, 0)
-	err = vm.Run(ctx, tx, view, programs)
+	tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+	err = vm.Run(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 

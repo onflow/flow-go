@@ -6,6 +6,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -16,6 +19,8 @@ const (
 )
 
 type NetworkCollector struct {
+	*LibP2PResourceManagerMetrics
+	*GossipSubMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -33,8 +38,14 @@ type NetworkCollector struct {
 	dnsLookupRequestDroppedCount prometheus.Counter
 	routingTableSize             prometheus.Gauge
 
+	// authorization, rate limiting metrics
+	unAuthorizedMessagesCount       *prometheus.CounterVec
+	rateLimitedUnicastMessagesCount *prometheus.CounterVec
+
 	prefix string
 }
+
+var _ module.NetworkMetrics = (*NetworkCollector)(nil)
 
 type NetworkCollectorOpt func(*NetworkCollector)
 
@@ -46,12 +57,15 @@ func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	}
 }
 
-func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
 	nc := &NetworkCollector{}
 
 	for _, opt := range opts {
 		opt(nc)
 	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
+	nc.GossipSubMetrics = NewGossipSubMetrics(nc.prefix)
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -201,6 +215,24 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.unAuthorizedMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemAuth,
+			Name:      nc.prefix + "unauthorized_messages_count",
+			Help:      "number of messages that failed authorization validation",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
+	)
+
+	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemRateLimiting,
+			Name:      nc.prefix + "rate_limited_unicast_messages_count",
+			Help:      "number of messages sent via unicast that have been rate limited",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
+	)
+
 	return nc
 }
 
@@ -293,4 +325,14 @@ func (nc *NetworkCollector) OnDNSCacheHit() {
 // OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
 func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
 	nc.dnsLookupRequestDroppedCount.Inc()
+}
+
+// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense string) {
+	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
+}
+
+// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
+func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }

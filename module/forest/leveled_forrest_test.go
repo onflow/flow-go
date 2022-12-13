@@ -148,7 +148,7 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 
 // TestLevelledForest_HasVertex test that vertices as correctly reported as contained in Forest
 // NOTE: We consider a vertex added only if it has been directly added through the AddVertex method.
-//       Vertices that references bvy known vertices but have not themselves are considered to be not in the tree.
+// Vertices that references bvy known vertices but have not themselves are considered to be not in the tree.
 func TestLevelledForest_HasVertex(t *testing.T) {
 	F := populateNewForest(t)
 	assert.True(t, F.HasVertex(string2Identifyer("A")))

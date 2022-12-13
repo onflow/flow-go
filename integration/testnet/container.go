@@ -121,14 +121,14 @@ func (c *ContainerConfig) ImageName() string {
 	if c.Ghost {
 		return defaultRegistry + "/ghost:latest"
 	}
-	debugSuffix := ""
+	imageSuffix := ""
 	if c.Debug {
-		debugSuffix = "-debug"
+		imageSuffix = "-debug"
 	} else if c.Corrupted {
-		debugSuffix = "-corrupted"
+		imageSuffix = "-corrupted"
 	}
 
-	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
+	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), imageSuffix)
 }
 
 // Container represents a test Docker container for a generic Flow node.
@@ -317,6 +317,20 @@ func (c *Container) Disconnect() error {
 	err = c.waitForCondition(ctx, containerDisconnected)
 	if err != nil {
 		return fmt.Errorf("error waiting for container to disconnect: %w", err)
+	}
+
+	return nil
+}
+
+// WaitForContainerStopped waits until the container is stopped
+func (c *Container) WaitForContainerStopped(timeout time.Duration) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	err := c.waitForCondition(ctx, containerStopped)
+	if err != nil {
+		return fmt.Errorf("error waiting for container stopped: %w", err)
 	}
 
 	return nil

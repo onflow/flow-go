@@ -15,8 +15,17 @@ type IngressController struct {
 }
 
 // HandleIncomingEvent provides a mock function with given fields: _a0, _a1, _a2
-func (_m *IngressController) HandleIncomingEvent(_a0 channels.Channel, _a1 flow.Identifier, _a2 interface{}) {
-	_m.Called(_a0, _a1, _a2)
+func (_m *IngressController) HandleIncomingEvent(_a0 interface{}, _a1 channels.Channel, _a2 flow.Identifier) bool {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(interface{}, channels.Channel, flow.Identifier) bool); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewIngressController interface {

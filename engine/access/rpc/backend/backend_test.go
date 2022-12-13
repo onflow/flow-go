@@ -19,15 +19,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/util"
-
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -119,6 +118,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -142,13 +143,14 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	)
 
 	// query the handler for the latest finalized block
-	header, err := backend.GetLatestBlockHeader(context.Background(), false)
+	header, status, err := backend.GetLatestBlockHeader(context.Background(), false)
 	suite.checkResponse(header, err)
 
 	// make sure we got the latest block
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 
@@ -486,6 +488,9 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil).Once()
 
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Head").Return(block, nil).Once()
+
 	backend := New(
 		suite.state,
 		nil,
@@ -508,13 +513,14 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetLatestBlockHeader(context.Background(), true)
+	header, status, err := backend.GetLatestBlockHeader(context.Background(), true)
 	suite.checkResponse(header, err)
 
 	// make sure we got the latest sealed block
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 }
@@ -1151,13 +1157,19 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	suite.snapshot.
 		On("Head").
-		Return(header, nil).
+		Return(header, nil).Once()
+
+	headerClone := *header
+	headerClone.Height = 0
+
+	suite.snapshot.
+		On("Head").
+		Return(&headerClone, nil).
 		Once()
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&expected, nil).
-		Once()
+		Return(&expected, nil)
 
 	backend := New(
 		suite.state,
@@ -1181,11 +1193,12 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	)
 
 	// query the handler for the latest finalized header
-	actual, err := backend.GetLatestBlock(context.Background(), false)
+	actual, status, err := backend.GetLatestBlock(context.Background(), false)
 	suite.checkResponse(actual, err)
 
 	// make sure we got the latest header
 	suite.Require().Equal(expected, *actual)
+	suite.Assert().Equal(status, flow.BlockStatusFinalized)
 
 	suite.assertAllExpectations()
 }

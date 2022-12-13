@@ -90,9 +90,9 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := Config{
-		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
-		SecureGRPCListenAddr:   ":0",
-		HTTPListenAddr:         ":0",
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
 	}
 
 	// set the rate limit to test with
@@ -108,10 +108,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
-	rpcEngBuilder.WithLegacy()
-	suite.rpcEng = rpcEngBuilder.Build()
+	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
+	assert.NoError(suite.T(), err)
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 

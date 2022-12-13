@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
@@ -66,6 +67,7 @@ func TestExtractExecutionState(t *testing.T) {
 				flow.Emulator.Chain(),
 				false,
 				false,
+				10,
 			)
 			require.Error(t, err)
 		})
@@ -90,7 +92,7 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -166,7 +168,7 @@ func TestExtractExecutionState(t *testing.T) {
 						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 						checkpointsToKeep  = 1
 					)
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 					require.NoError(t, err)
 
 					<-compactor.Ready()

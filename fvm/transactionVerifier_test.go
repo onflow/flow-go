@@ -8,9 +8,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,12 +18,8 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(
-		ledger,
-		meter.NewMeter(meter.DefaultParameters()),
-		state.DefaultParameters(),
-	))
-	accounts := state.NewAccounts(sth)
+	txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
 
 	// create 2 accounts
 	address1 := flow.HexToAddress("1234")
@@ -57,10 +52,15 @@ func TestTransactionVerification(t *testing.T) {
 		tx.PayloadSignatures = []flow.TransactionSignature{sig, sig}
 		proc := fvm.Transaction(&tx, 0)
 
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
-		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(1000),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
+		err = fvm.Run(proc.NewExecutor(ctx, txnState, nil))
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
+		require.True(t, strings.Contains(proc.Err.Error(), "duplicate signatures are provided for the same key"))
 	})
 	t.Run("duplicated authorization and envelope signatures", func(t *testing.T) {
 
@@ -77,10 +77,15 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig}
 		proc := fvm.Transaction(&tx, 0)
 
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
-		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(1000),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
+		err = fvm.Run(proc.NewExecutor(ctx, txnState, nil))
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
+		require.True(t, strings.Contains(proc.Err.Error(), "duplicate signatures are provided for the same key"))
 	})
 
 	t.Run("invalid envelope signature", func(t *testing.T) {
@@ -111,12 +116,16 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(1000),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
+		err = fvm.Run(proc.NewExecutor(ctx, txnState, nil))
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
-		var envelopeError *errors.InvalidEnvelopeSignatureError
-		require.ErrorAs(t, err, &envelopeError)
+		require.True(t, errors.IsInvalidEnvelopeSignatureError(proc.Err))
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
@@ -147,12 +156,16 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(1000),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
+		err = fvm.Run(proc.NewExecutor(ctx, txnState, nil))
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
-		var payloadError *errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.True(t, errors.IsInvalidPayloadSignatureError(proc.Err))
 	})
 
 	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
@@ -180,22 +193,28 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		proc := fvm.Transaction(&tx, 0)
-		txVerifier := fvm.NewTransactionVerifier(1000)
-		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(1000),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
+		err = fvm.Run(proc.NewExecutor(ctx, txnState, nil))
+		require.Nil(t, err)
+		require.Error(t, proc.Err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
-		var payloadError *errors.InvalidPayloadSignatureError
-		require.ErrorAs(t, err, &payloadError)
+		require.True(t, errors.IsInvalidPayloadSignatureError(proc.Err))
 	})
 
 	t.Run("frozen account is rejected", func(t *testing.T) {
-
-		txChecker := fvm.NewTransactionVerifier(-1)
+		ctx := fvm.NewContext(
+			fvm.WithAuthorizationChecksEnabled(true),
+			fvm.WithAccountKeyWeightThreshold(-1),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionBodyExecutionEnabled(false))
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := state.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		accounts := environment.NewAccounts(st)
 
 		// freeze account
 		err := accounts.SetAccountFrozen(frozenAddress, true)
@@ -215,24 +234,28 @@ func TestTransactionVerification(t *testing.T) {
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
 		require.NoError(t, err)
+		require.NoError(t, tx.Err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
 		require.NoError(t, err)
+		require.NoError(t, tx.Err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{frozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
+		require.Nil(t, err)
+		require.Error(t, tx.Err)
 
 		// all addresses must not be frozen
 		tx = fvm.Transaction(&flow.TransactionBody{
@@ -240,8 +263,9 @@ func TestTransactionVerification(t *testing.T) {
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 			Authorizers: []flow.Address{frozenAddress, notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
+		require.Nil(t, err)
+		require.Error(t, tx.Err)
 
 		// Payer should be part of authorizers account, but lets check it separately for completeness
 
@@ -249,15 +273,17 @@ func TestTransactionVerification(t *testing.T) {
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
 		require.NoError(t, err)
+		require.NoError(t, tx.Err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       frozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
+		require.Nil(t, err)
+		require.Error(t, tx.Err)
 
 		// Proposal account
 
@@ -265,14 +291,16 @@ func TestTransactionVerification(t *testing.T) {
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: frozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
-		require.Error(t, err)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
+		require.Nil(t, err)
+		require.Error(t, tx.Err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{
 			Payer:       notFrozenAddress,
 			ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 		}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err = fvm.Run(tx.NewExecutor(ctx, st, nil))
 		require.NoError(t, err)
+		require.NoError(t, tx.Err)
 	})
 }

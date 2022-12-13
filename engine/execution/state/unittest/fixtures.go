@@ -13,33 +13,23 @@ func StateInteractionsFixture() *delta.SpockSnapshot {
 }
 
 func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
-	stateViews := make([]*delta.SpockSnapshot, len(collectionsSignerIDs)+1) //+1 for system chunk
-	stateCommitments := make([]flow.StateCommitment, len(collectionsSignerIDs)+1)
-	eventHashes := make([]flow.Identifier, len(collectionsSignerIDs)+1)
-	proofs := make([][]byte, len(collectionsSignerIDs)+1)
-	for i := 0; i < len(collectionsSignerIDs)+1; i++ {
-		stateViews[i] = StateInteractionsFixture()
-		stateCommitments[i] = unittest.StateCommitmentFixture()
-		eventHashes[i] = unittest.IdentifierFixture()
-		proofs[i] = unittest.RandomBytes(2)
-	}
-	return &execution.ComputationResult{
-		ExecutableBlock:  unittest.ExecutableBlockFixture(collectionsSignerIDs),
-		StateSnapshots:   stateViews,
-		StateCommitments: stateCommitments,
-		EventsHashes:     eventHashes,
-		Proofs:           proofs,
-	}
+	block := unittest.ExecutableBlockFixture(collectionsSignerIDs)
+	startState := unittest.StateCommitmentFixture()
+	block.StartState = &startState
+
+	return ComputationResultForBlockFixture(block)
 }
 
-func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections) + 1
-	stateViews := make([]*delta.SpockSnapshot, n)
-	stateCommitments := make([]flow.StateCommitment, n)
-	proofs := make([][]byte, n)
-	events := make([]flow.EventsList, n)
-	eventHashes := make([]flow.Identifier, n)
-	for i := 0; i < n; i++ {
+func ComputationResultForBlockFixture(
+	completeBlock *entity.ExecutableBlock,
+) *execution.ComputationResult {
+	numChunks := len(completeBlock.CompleteCollections) + 1
+	stateViews := make([]*delta.SpockSnapshot, numChunks)
+	stateCommitments := make([]flow.StateCommitment, numChunks)
+	proofs := make([][]byte, numChunks)
+	events := make([]flow.EventsList, numChunks)
+	eventHashes := make([]flow.Identifier, numChunks)
+	for i := 0; i < numChunks; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
 		proofs[i] = unittest.RandomBytes(6)
@@ -47,11 +37,12 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 		eventHashes[i] = unittest.IdentifierFixture()
 	}
 	return &execution.ComputationResult{
-		ExecutableBlock:  completeBlock,
-		StateSnapshots:   stateViews,
-		StateCommitments: stateCommitments,
-		Proofs:           proofs,
-		Events:           events,
-		EventsHashes:     eventHashes,
+		TransactionResultIndex: make([]int, numChunks),
+		ExecutableBlock:        completeBlock,
+		StateSnapshots:         stateViews,
+		StateCommitments:       stateCommitments,
+		Proofs:                 proofs,
+		Events:                 events,
+		EventsHashes:           eventHashes,
 	}
 }

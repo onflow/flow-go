@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -25,19 +26,23 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type CommandRunnerSuite struct {
 	suite.Suite
 
-	runner       *CommandRunner
-	bootstrapper *CommandRunnerBootstrapper
-	httpAddress  string
+	runner          *CommandRunner
+	bootstrapper    *CommandRunnerBootstrapper
+	httpAddress     string
+	grpcAddressSock string
 
 	client pb.AdminClient
 	conn   *grpc.ClientConn
@@ -50,13 +55,19 @@ func TestCommandRunner(t *testing.T) {
 }
 
 func (suite *CommandRunnerSuite) SetupTest() {
-	suite.httpAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
+	suite.httpAddress = unittest.IPPort(testingdock.RandomPort(suite.T()))
 	suite.bootstrapper = NewCommandRunnerBootstrapper()
 }
 
 func (suite *CommandRunnerSuite) TearDownTest() {
-	err := suite.conn.Close()
-	suite.NoError(err)
+	if suite.conn != nil {
+		err := suite.conn.Close()
+		suite.NoError(err)
+	}
+	if suite.grpcAddressSock != "" {
+		err := os.Remove(suite.grpcAddressSock)
+		suite.NoError(err)
+	}
 	suite.cancel()
 	<-suite.runner.Done()
 }
@@ -65,22 +76,17 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
+	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock), WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
 	suite.runner.Start(signalerCtx)
 	<-suite.runner.Ready()
-	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-errChan:
-			suite.Fail("encountered unexpected error", err)
-		}
-	}()
 
-	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
+	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	suite.NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)
@@ -159,7 +165,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 		return "ok", nil
 	})
 
-	validatorErr := errors.New("unexpected value")
+	validatorErr := NewInvalidAdminReqErrorf("unexpected value")
 	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
 		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
@@ -280,6 +286,22 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
+}
+
+func (suite *CommandRunnerSuite) TestHTTPPProf() {
+	suite.SetupCommandRunner()
+
+	url := fmt.Sprintf("http://%s/debug/pprof/goroutine", suite.httpAddress)
+	resp, err := http.Get(url)
+	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	suite.Equal(resp.Status, "200 OK")
+	suite.Equal(resp.Header.Get("Content-Type"), "application/octet-stream")
 }
 
 func (suite *CommandRunnerSuite) TestListCommands() {

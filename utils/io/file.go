@@ -3,10 +3,10 @@ package io
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"go.uber.org/multierr"
 )
 
 // ReadFile reads the file from path, if not found, it will print the absolute path, instead of
@@ -17,7 +17,7 @@ func ReadFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("could not get absolution path: %w", err)
 	}
 
-	data, err := ioutil.ReadFile(absPath)
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %w", err)
 	}
@@ -36,7 +36,7 @@ func FileExists(filename string) bool {
 // CopyDirectory recursively copies a directory.
 // From https://stackoverflow.com/questions/51779243/copy-a-folder-in-go
 func CopyDirectory(scrDir, dest string) error {
-	entries, err := ioutil.ReadDir(scrDir)
+	entries, err := os.ReadDir(scrDir)
 	if err != nil {
 		return err
 	}
@@ -47,11 +47,6 @@ func CopyDirectory(scrDir, dest string) error {
 		fileInfo, err := os.Stat(sourcePath)
 		if err != nil {
 			return err
-		}
-
-		stat, ok := fileInfo.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("failed to get raw syscall.Stat_t data for '%s'", sourcePath)
 		}
 
 		switch fileInfo.Mode() & os.ModeType {
@@ -72,13 +67,18 @@ func CopyDirectory(scrDir, dest string) error {
 			}
 		}
 
-		if err := os.Lchown(destPath, int(stat.Uid), int(stat.Gid)); err != nil {
+		if err := chown(destPath, fileInfo); err != nil {
 			return err
 		}
 
-		isSymlink := entry.Mode()&os.ModeSymlink != 0
+		fInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+
+		isSymlink := fInfo.Mode()&os.ModeSymlink != 0
 		if !isSymlink {
-			if err := os.Chmod(destPath, entry.Mode()); err != nil {
+			if err := os.Chmod(destPath, fInfo.Mode()); err != nil {
 				return err
 			}
 		}
@@ -86,23 +86,24 @@ func CopyDirectory(scrDir, dest string) error {
 	return nil
 }
 
-func Copy(srcFile, dstFile string) error {
-	out, err := os.Create(dstFile)
-	if err != nil {
-		return err
-	}
-
-	defer out.Close()
-
+func Copy(srcFile, dstFile string) (errToReturn error) {
 	in, err := os.Open(srcFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not open file %v to copy from: %w", srcFile, err)
 	}
-	defer in.Close()
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(in))
+
+	out, err := os.Create(dstFile)
+	if err != nil {
+		return fmt.Errorf("can not create file %v to copy to: %w", dstFile, err)
+	}
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(out))
 
 	_, err = io.Copy(out, in)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not copy file: %w", err)
 	}
 
 	return nil

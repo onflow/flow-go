@@ -49,6 +49,8 @@ type VerificationConfig struct {
 
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
+
+	stopAtHeight uint64 // height to stop the node on
 }
 
 type VerificationNodeBuilder struct {
@@ -75,6 +77,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.requestTargets, "request-targets", requester.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
 		})
 }
 
@@ -192,9 +195,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vm := fvm.NewVirtualMachine()
+			fvmOptions := append(
+				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				node.FvmOptions...,
+			)
+			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
@@ -241,7 +247,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				requesterEngine)
+				requesterEngine,
+				v.verConf.stopAtHeight)
 
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
@@ -276,7 +283,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.State,
 				chunkAssigner,
 				chunkQueue,
-				chunkConsumer)
+				chunkConsumer,
+				v.verConf.stopAtHeight)
 
 			return assignerEngine, nil
 		}).

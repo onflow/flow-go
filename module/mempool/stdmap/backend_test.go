@@ -181,7 +181,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 }
 
 // TestBackend_Multiple_OnEjectionCallbacks verifies that the Backend
-//  handles multiple ejection callbacks correctly
+// handles multiple ejection callbacks correctly
 func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	// ejection callback counts number of calls
 	calls := uint64(0)

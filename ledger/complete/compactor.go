@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/ledger"
@@ -45,16 +46,17 @@ type checkpointResult struct {
 // This will be resolved automaticaly after the forest LRU Cache
 // (code outside checkpointing) is replaced by something like a FIFO queue.
 type Compactor struct {
-	checkpointer       *realWAL.Checkpointer
-	wal                realWAL.LedgerWAL
-	trieQueue          *realWAL.TrieQueue
-	logger             zerolog.Logger
-	lm                 *lifecycle.LifecycleManager
-	observers          map[observable.Observer]struct{}
-	checkpointDistance uint
-	checkpointsToKeep  uint
-	stopCh             chan chan struct{}
-	trieUpdateCh       <-chan *WALTrieUpdate
+	checkpointer                         *realWAL.Checkpointer
+	wal                                  realWAL.LedgerWAL
+	trieQueue                            *realWAL.TrieQueue
+	logger                               zerolog.Logger
+	lm                                   *lifecycle.LifecycleManager
+	observers                            map[observable.Observer]struct{}
+	checkpointDistance                   uint
+	checkpointsToKeep                    uint
+	stopCh                               chan chan struct{}
+	trieUpdateCh                         <-chan *WALTrieUpdate
+	triggerCheckpointOnNextSegmentFinish *atomic.Bool // to trigger checkpoint manually
 }
 
 // NewCompactor creates new Compactor which writes WAL record and triggers
@@ -73,6 +75,7 @@ func NewCompactor(
 	checkpointCapacity uint,
 	checkpointDistance uint,
 	checkpointsToKeep uint,
+	triggerCheckpointOnNextSegmentFinish *atomic.Bool,
 ) (*Compactor, error) {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
@@ -100,16 +103,17 @@ func NewCompactor(
 	trieQueue := realWAL.NewTrieQueueWithValues(checkpointCapacity, tries)
 
 	return &Compactor{
-		checkpointer:       checkpointer,
-		wal:                w,
-		trieQueue:          trieQueue,
-		logger:             logger,
-		stopCh:             make(chan chan struct{}),
-		trieUpdateCh:       trieUpdateCh,
-		observers:          make(map[observable.Observer]struct{}),
-		lm:                 lifecycle.NewLifecycleManager(),
-		checkpointDistance: checkpointDistance,
-		checkpointsToKeep:  checkpointsToKeep,
+		checkpointer:                         checkpointer,
+		wal:                                  w,
+		trieQueue:                            trieQueue,
+		logger:                               logger.With().Str("ledger_mod", "compactor").Logger(),
+		stopCh:                               make(chan chan struct{}),
+		trieUpdateCh:                         trieUpdateCh,
+		observers:                            make(map[observable.Observer]struct{}),
+		lm:                                   lifecycle.NewLifecycleManager(),
+		checkpointDistance:                   checkpointDistance,
+		checkpointsToKeep:                    checkpointsToKeep,
+		triggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
 	}, nil
 }
 
@@ -220,6 +224,19 @@ Loop:
 				continue
 			}
 
+			// listen to signals from admin tool in order to trigger a checkpoint when the current segment file is finished
+			if c.triggerCheckpointOnNextSegmentFinish.CompareAndSwap(true, false) {
+				// sanity checking, usually the nextCheckpointNum is a segment number in the future that when the activeSegmentNum
+				// finishes and reaches the nextCheckpointNum, then checkpoint will be triggered.
+				if nextCheckpointNum >= activeSegmentNum {
+					originalNextCheckpointNum := nextCheckpointNum
+					nextCheckpointNum = activeSegmentNum
+					c.logger.Info().Msgf("compactor will trigger once finish writing segment %v, originalNextCheckpointNum: %v", nextCheckpointNum, originalNextCheckpointNum)
+				} else {
+					c.logger.Warn().Msgf("could not force triggering checkpoint, nextCheckpointNum %v is smaller than activeSegmentNum %v", nextCheckpointNum, activeSegmentNum)
+				}
+			}
+
 			var checkpointNum int
 			var checkpointTries []*trie.MTrie
 			activeSegmentNum, checkpointNum, checkpointTries =
@@ -310,23 +327,12 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 // Caller should handle returned errors by retrying checkpointing when appropriate.
 func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int) error {
 
-	logger.Info().Msgf("serializing checkpoint %d", checkpointNum)
+	logger.Info().Msgf("serializing checkpoint %d with %v tries", checkpointNum, len(tries))
 
 	startTime := time.Now()
 
-	writer, err := checkpointer.CheckpointWriter(checkpointNum)
-	if err != nil {
-		return fmt.Errorf("cannot generate checkpoint writer: %w", err)
-	}
-	defer func() {
-		closeErr := writer.Close()
-		// Return close error if there isn't any prior error to return.
-		if err == nil {
-			err = closeErr
-		}
-	}()
-
-	err = realWAL.StoreCheckpoint(writer, tries...)
+	fileName := realWAL.NumberToFilename(checkpointNum)
+	err := realWAL.StoreCheckpointV6SingleThread(tries, checkpointer.Dir(), fileName, &logger)
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint (%d): %w", checkpointNum, err)
 	}
@@ -419,6 +425,9 @@ func (c *Compactor) processTrieUpdate(
 	// Update activeSegmentNum
 	prevSegmentNum := activeSegmentNum
 	activeSegmentNum = segmentNum
+
+	c.logger.Info().Msgf("finish writing segment file %v, trie update is writing to segment file %v, checkpoint will trigger when segment %v is finished",
+		prevSegmentNum, activeSegmentNum, nextCheckpointNum)
 
 	if nextCheckpointNum > prevSegmentNum {
 		// Not enough segments for checkpointing

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
-	"github.com/onflow/flow-go/insecure/attacknetwork"
+	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +34,7 @@ type Suite struct {
 	verID                   flow.Identifier      // corrupted verification node
 	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 	Orchestrator            *dummyOrchestrator
-	attackNet               *attacknetwork.AttackNetwork
+	orchestratorNetwork     *orchestrator.Network
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -60,11 +60,7 @@ func (s *Suite) AccessClient() *testnet.Client {
 // - One corrupted verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "suite.go").
-		Str("testcase", s.T().Name()).
-		Logger()
-	s.log = logger
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
@@ -87,7 +83,7 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
@@ -95,14 +91,14 @@ func (s *Suite) SetupSuite() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
@@ -146,36 +142,36 @@ func (s *Suite) SetupSuite() {
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 
-	s.Orchestrator = NewDummyOrchestrator(logger)
+	s.Orchestrator = NewDummyOrchestrator(s.log)
 
-	// start attack network
+	// start orchestrator network
 	codec := unittest.NetworkCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
+	connector := orchestrator.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,
 		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
-	s.attackNet = attackNetwork
+	s.orchestratorNetwork = orchestratorNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			s.T().Error("attackNetwork startup encountered fatal error", err)
+			s.T().Error("orchestratorNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	attackNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+	orchestratorNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
 }
 
-// TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
+	unittest.RequireCloseBefore(s.T(), s.orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
 }

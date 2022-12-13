@@ -3,77 +3,89 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
 
-func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
-	return &TransactionSequenceNumberChecker{}
-}
-
-func (c *TransactionSequenceNumberChecker) Process(
-	_ *VirtualMachine,
-	ctx *Context,
+func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
+	tracer module.Tracer,
 	proc *TransactionProcedure,
-	sth *state.StateHolder,
-	_ *programs.Programs,
+	txnState *state.TransactionState,
 ) error {
-	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
-}
+	// TODO(Janez): verification is part of inclusion fees, not execution fees.
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		err = c.checkAndIncrementSequenceNumber(tracer, proc, txnState)
+	})
 
-func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	proc *TransactionProcedure,
-	ctx *Context,
-	sth *state.StateHolder,
-) error {
-
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
-		defer span.End()
+	if err != nil {
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
-	parentState := sth.State()
-	childState := sth.NewChild()
+	return nil
+}
+
+func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
+	tracer module.Tracer,
+	proc *TransactionProcedure,
+	txnState *state.TransactionState,
+) error {
+
+	defer proc.StartSpanFromProcTraceSpan(
+		tracer,
+		trace.FVMSeqNumCheckTransaction).End()
+
+	nestedTxnId, err := txnState.BeginNestedTransaction()
+	if err != nil {
+		return err
+	}
+
 	defer func() {
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			panic(mergeError)
+		_, commitError := txnState.Commit(nestedTxnId)
+		if commitError != nil {
+			panic(commitError)
 		}
-		sth.SetActiveState(parentState)
 	}()
 
-	accounts := state.NewAccounts(sth)
+	accounts := environment.NewAccounts(txnState)
 	proposalKey := proc.Transaction.ProposalKey
 
-	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	var accountKey flow.AccountPublicKey
+
+	accountKey, err = accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
 
 	if accountKey.Revoked {
-		err = fmt.Errorf("proposal key has been revoked")
-		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(
+			proposalKey,
+			fmt.Errorf("proposal key has been revoked"))
 	}
 
 	// Note that proposal key verification happens at the txVerifier and not here.
-
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return errors.NewInvalidProposalSeqNumberError(proposalKey.Address, proposalKey.KeyIndex, accountKey.SeqNumber, proposalKey.SequenceNumber)
+		return errors.NewInvalidProposalSeqNumberError(proposalKey, accountKey.SeqNumber)
 	}
 
 	accountKey.SeqNumber++
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		childState.View().DropDelta()
-		return fmt.Errorf("checking sequence number failed: %w", err)
+		restartError := txnState.RestartNestedTransaction(nestedTxnId)
+		if restartError != nil {
+			panic(restartError)
+		}
+		return err
 	}
+
 	return nil
 }

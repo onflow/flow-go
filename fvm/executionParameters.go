@@ -1,36 +1,141 @@
 package fvm
 
 import (
+	"context"
+	"fmt"
+	"math"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-func setMeterParameters(env *commonEnv) error {
-	// TODO(patrick): Don't enforce limits while setting up limits.
+// getBasicMeterParameters returns the set of meter parameters used for
+// general procedure execution.  Subparts of the procedure execution may
+// specify custom meter parameters via nested transactions.
+func getBasicMeterParameters(
+	ctx Context,
+	proc Procedure,
+) meter.MeterParameters {
+	params := meter.DefaultParameters().
+		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+		WithMemoryLimit(proc.MemoryLimit(ctx)).
+		WithEventEmitByteLimit(ctx.EventCollectionByteSizeLimit).
+		WithStorageInteractionLimit(ctx.MaxStateInteractionSize)
 
-	if env.ctx.AllowContextOverrideByExecutionState {
-		err := setExecutionParameters(env)
-		if err != nil {
-			return err
-		}
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		params = params.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
-	// TODO(patrick): disable memory/interaction limits for service account
-
-	return nil
+	return params
 }
 
-func setExecutionParameters(env *commonEnv) error {
+// getBodyMeterParameters returns the set of meter parameters used for
+// transaction/script body execution.
+func getBodyMeterParameters(
+	ctx Context,
+	proc Procedure,
+	txnState *state.TransactionState,
+	derivedTxnData *derived.DerivedTransactionData,
+) (
+	meter.MeterParameters,
+	error,
+) {
+	procParams := getBasicMeterParameters(ctx, proc)
+
+	overrides, err := derivedTxnData.GetMeterParamOverrides(
+		txnState,
+		NewMeterParamOverridesComputer(ctx, derivedTxnData))
+	if err != nil {
+		return procParams, err
+	}
+
+	if overrides.ComputationWeights != nil {
+		procParams = procParams.WithComputationWeights(
+			overrides.ComputationWeights)
+	}
+
+	if overrides.MemoryWeights != nil {
+		procParams = procParams.WithMemoryWeights(overrides.MemoryWeights)
+	}
+
+	if overrides.MemoryLimit != nil {
+		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
+	}
+
+	// NOTE: The memory limit (and interaction limit) may be overridden by the
+	// environment.  We need to ignore the override in that case.
+	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
+		procParams = procParams.WithMemoryLimit(math.MaxUint64).
+			WithStorageInteractionLimit(math.MaxUint64)
+	}
+
+	return procParams, nil
+}
+
+type MeterParamOverridesComputer struct {
+	ctx            Context
+	derivedTxnData *derived.DerivedTransactionData
+}
+
+func NewMeterParamOverridesComputer(
+	ctx Context,
+	derivedTxnData *derived.DerivedTransactionData,
+) MeterParamOverridesComputer {
+	return MeterParamOverridesComputer{ctx, derivedTxnData}
+}
+
+func (computer MeterParamOverridesComputer) Compute(
+	txnState *state.TransactionState,
+	_ struct{},
+) (
+	derived.MeterParamOverrides,
+	error,
+) {
+	var overrides derived.MeterParamOverrides
+	var err error
+	txnState.RunWithAllLimitsDisabled(func() {
+		overrides, err = computer.getMeterParamOverrides(txnState)
+	})
+
+	if err != nil {
+		return overrides, fmt.Errorf(
+			"error getting environment meter parameter overrides: %w",
+			err)
+	}
+
+	return overrides, nil
+}
+
+func (computer MeterParamOverridesComputer) getMeterParamOverrides(
+	txnState *state.TransactionState,
+) (
+	derived.MeterParamOverrides,
+	error,
+) {
 	// Check that the service account exists because all the settings are
 	// stored in it
-	serviceAddress := env.Context().Chain.ServiceAddress()
+	serviceAddress := computer.ctx.Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
+
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		computer.ctx.EnvironmentParams,
+		txnState,
+		computer.derivedTxnData)
+
+	overrides := derived.MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -38,7 +143,7 @@ func setExecutionParameters(env *commonEnv) error {
 		err, fatal = errors.SplitErrorTypes(err)
 		if fatal != nil {
 			// this is a fatal error. return it
-			env.ctx.Logger.
+			computer.ctx.Logger.
 				Error().
 				Err(fatal).
 				Msgf("error getting %s", prop)
@@ -49,7 +154,7 @@ func setExecutionParameters(env *commonEnv) error {
 			// could be that no setting was present in the state,
 			// or that the setting was not parseable,
 			// or some other deterministic thing.
-			env.ctx.Logger.
+			computer.ctx.Logger.
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
@@ -60,40 +165,38 @@ func setExecutionParameters(env *commonEnv) error {
 		return nil
 	}
 
-	meter := env.sth.Meter()
-
-	computationWeights, err := GetExecutionEffortWeights(env.fullEnv, service)
+	computationWeights, err := GetExecutionEffortWeights(env, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { meter.SetComputationWeights(computationWeights) })
+		func() { overrides.ComputationWeights = computationWeights })
 	if err != nil {
-		return err
+		return overrides, err
 	}
 
-	memoryWeights, err := GetExecutionMemoryWeights(env.fullEnv, service)
+	memoryWeights, err := GetExecutionMemoryWeights(env, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { meter.SetMemoryWeights(memoryWeights) })
+		func() { overrides.MemoryWeights = memoryWeights })
 	if err != nil {
-		return err
+		return overrides, err
 	}
 
-	memoryLimit, err := GetExecutionMemoryLimit(env.fullEnv, service)
+	memoryLimit, err := GetExecutionMemoryLimit(env, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { meter.SetTotalMemoryLimit(memoryLimit) })
+		func() { overrides.MemoryLimit = &memoryLimit })
 	if err != nil {
-		return err
+		return overrides, err
 	}
 
-	return nil
+	return overrides, nil
 }
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 	path cadence.Path,
 	defaultWeights map[KindType]uint64,
@@ -101,11 +204,10 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	map[KindType]uint64,
 	error,
 ) {
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		path,
-		runtime.Context{Interface: env},
-	)
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.ReadStored(service, path)
 
 	if err != nil {
 		// this might be fatal, return as is
@@ -117,8 +219,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			path.Domain,
-			path.Identifier)
+			path.String())
 	}
 
 	// Merge the default weights with the weights from the state.
@@ -139,7 +240,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
 func GetExecutionEffortWeights(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	computationWeights meter.ExecutionEffortWeights,
@@ -148,16 +249,13 @@ func GetExecutionEffortWeights(
 	return getExecutionWeights(
 		env,
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionEffortWeightsPath,
 		meter.DefaultComputationWeights)
 }
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	memoryWeights meter.ExecutionMemoryWeights,
@@ -166,29 +264,24 @@ func GetExecutionMemoryWeights(
 	return getExecutionWeights(
 		env,
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionMemoryWeightsPath,
 		meter.DefaultMemoryWeights)
 }
 
 // GetExecutionMemoryLimit reads the stored execution memory limit from the service account
 func GetExecutionMemoryLimit(
-	env Environment,
+	env environment.Environment,
 	service runtime.Address,
 ) (
 	memoryLimit uint64,
 	err error,
 ) {
-	value, err := env.VM().Runtime.ReadStored(
+	runtime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier,
-		},
-		runtime.Context{Interface: env},
-	)
+		blueprints.TransactionFeesExecutionMemoryLimitPath)
 	if err != nil {
 		// this might be fatal, return as is
 		return 0, err
@@ -199,8 +292,7 @@ func GetExecutionMemoryLimit(
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return 0, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			blueprints.TransactionExecutionParametersPathDomain,
-			blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier)
+			blueprints.TransactionFeesExecutionMemoryLimitPath.String())
 	}
 
 	return memoryLimitRaw.ToGoValue().(uint64), nil

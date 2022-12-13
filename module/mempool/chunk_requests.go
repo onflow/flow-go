@@ -96,3 +96,14 @@ type ChunkRequests interface {
 	// Size returns total number of chunk requests in the memory pool.
 	Size() uint
 }
+
+const DefaultChunkDataPackRequestQueueSize = 100_000
+
+// ChunkDataPackRequest is an internal data type for Execution Nodes that
+// represents a request for a chunk data pack.
+type ChunkDataPackRequest struct {
+	// Identifier of the chunk.
+	ChunkId flow.Identifier
+	// Identifier of the requester node.
+	RequesterId flow.Identifier
+}

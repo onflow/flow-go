@@ -14,10 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const IdentifierLen = 32
@@ -139,20 +137,12 @@ func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 }
 
 // GetIDs gets the IDs for a slice of entities.
-func GetIDs(value interface{}) []Identifier {
-	v := reflect.ValueOf(value)
-	if v.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("non-slice value (%T)", value))
+func GetIDs[T Entity](entities []T) IdentifierList {
+	ids := make([]Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.ID())
 	}
-	slice := make([]Identifier, 0, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		entity, ok := v.Index(i).Interface().(Entity)
-		if !ok {
-			panic(fmt.Sprintf("slice contains non-entity (%T)", v.Index(i).Interface()))
-		}
-		slice = append(slice, entity.ID())
-	}
-	return slice
+	return ids
 }
 
 func MerkleRoot(ids ...Identifier) Identifier {
@@ -208,7 +198,6 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 
 func CidToId(c cid.Cid) (Identifier, error) {
 	decoded, err := mh.Decode(c.Hash())
-
 	if err != nil {
 		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
 	}
@@ -216,7 +205,6 @@ func CidToId(c cid.Cid) (Identifier, error) {
 	if decoded.Code != mh.SHA2_256 {
 		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
 	}
-
 	if decoded.Length != IdentifierLen {
 		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
 	}
