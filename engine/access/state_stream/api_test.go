@@ -46,7 +46,8 @@ func (suite *Suite) TestGetExecutionDataByBlockID() {
 	// create the handler with the mock
 	bs := blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
 	eds := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
-	client := New(suite.headers, suite.seals, suite.results, eds)
+	client, err := New(suite.headers, suite.seals, suite.results, eds, unittest.Logger())
+	require.NoError(suite.T(), err)
 
 	// mock parameters
 	ctx := context.Background()

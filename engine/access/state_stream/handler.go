@@ -41,3 +41,21 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 
 	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: execData}, nil
 }
+
+func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataRequest, stream access.ExecutionDataAPI_SubscribeExecutionDataServer) error {
+	ctx := stream.Context()
+	sub := h.api.SubscribeExecutionData(ctx)
+
+	for {
+		// TODO: this should handle graceful shutdown from the server
+		resp, ok := <-sub.Channel()
+		if !ok {
+			return sub.Err()
+		}
+
+		err := stream.Send(resp)
+		if err != nil {
+			return err
+		}
+	}
+}

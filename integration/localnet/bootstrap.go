@@ -62,6 +62,7 @@ const (
 	AdminToolPort            = 9002
 	AdminToolLocalPort       = 3700
 	HTTPPort                 = 8000
+	ExecutionStateAPIPort    = 9003
 )
 
 var (
@@ -454,12 +455,14 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
+		fmt.Sprintf("--state-stream-addr=%s:%d", container.ContainerName, ExecutionStateAPIPort),
 	)
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
-		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
-		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+3*i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(3*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(3*i+2), ExecutionStateAPIPort),
 		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
 	}
 

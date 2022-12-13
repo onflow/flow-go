@@ -3,12 +3,15 @@ package state_stream
 import (
 	"fmt"
 	"net"
+	"sync"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	lru "github.com/hashicorp/golang-lru"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -36,6 +39,10 @@ type Engine struct {
 	chain   flow.Chain
 	handler *Handler
 
+	execDataBroadcaster *engine.Broadcaster
+	execDataCache       *lru.Cache
+	latestExecDataCache *LatestEntityIDCache
+
 	stateStreamGrpcAddress net.Addr
 }
 
@@ -50,7 +57,9 @@ func NewEng(
 	chainID flow.ChainID,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
-) *Engine {
+) (*Engine, error) {
+	logger := log.With().Str("engine", "state_stream_rpc").Logger()
+
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(int(config.MaxExecutionDataMsgSize)),
@@ -79,15 +88,31 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	backend := New(headers, seals, results, execDataStore)
+	execDataCache, err := lru.New(DefaultCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("could not create cache: %w", err)
+	}
+
+	latestExecDataCache := NewLatestEntityIDCache()
+	broadcaster := engine.NewBroadcaster()
+
+	backend, err := New(logger, headers, seals, results, execDataStore, execDataCache, broadcaster, latestExecDataCache)
+	if err != nil {
+		return nil, fmt.Errorf("could not create state stream backend: %w", err)
+	}
+
+	handler := NewHandler(backend, chainID.Chain())
 
 	e := &Engine{
-		log:     log.With().Str("engine", "state_stream_rpc").Logger(),
-		backend: backend,
-		server:  server,
-		chain:   chainID.Chain(),
-		config:  config,
-		handler: NewHandler(backend, chainID.Chain()),
+		log:                 logger,
+		backend:             backend,
+		server:              server,
+		chain:               chainID.Chain(),
+		config:              config,
+		handler:             handler,
+		execDataBroadcaster: broadcaster,
+		execDataCache:       execDataCache,
+		latestExecDataCache: latestExecDataCache,
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
@@ -95,7 +120,15 @@ func NewEng(
 		Build()
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
 
-	return e
+	return e, nil
+}
+
+func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionData) {
+	e.log.Debug().Msgf("received execution data %v", executionData.BlockID)
+	_ = e.execDataCache.Add(executionData.BlockID, executionData)
+	e.latestExecDataCache.Set(executionData.BlockID)
+	e.execDataBroadcaster.Publish()
+	e.log.Debug().Msg("sent broadcast notification")
 }
 
 // serve starts the gRPC server.
@@ -120,4 +153,25 @@ func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyF
 
 	<-ctx.Done()
 	e.server.GracefulStop()
+}
+
+type LatestEntityIDCache struct {
+	mu sync.RWMutex
+	id flow.Identifier
+}
+
+func NewLatestEntityIDCache() *LatestEntityIDCache {
+	return &LatestEntityIDCache{}
+}
+
+func (c *LatestEntityIDCache) Get() flow.Identifier {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.id
+}
+
+func (c *LatestEntityIDCache) Set(id flow.Identifier) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.id = id
 }

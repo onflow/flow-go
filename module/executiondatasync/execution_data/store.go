@@ -259,3 +259,9 @@ func NewBlobNotFoundError(cid cid.Cid) *BlobNotFoundError {
 func (e *BlobNotFoundError) Error() string {
 	return fmt.Sprintf("blob %v not found", e.cid.String())
 }
+
+// IsBlobNotFoundError returns whether an error is BlobNotFoundError
+func IsBlobNotFoundError(err error) bool {
+	var blobNotFoundError *BlobNotFoundError
+	return errors.As(err, &blobNotFoundError)
+}
