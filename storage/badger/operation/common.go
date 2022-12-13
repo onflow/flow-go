@@ -209,6 +209,9 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 	}
 }
 
+// batchRemoveByPrefix removes all items under the keys match the given prefix in a batch write transaction.
+// no error would be returned if no key was found with the given prefix.
+// all error returned should be exception
 func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
 	return func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
 
