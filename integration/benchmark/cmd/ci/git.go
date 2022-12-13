@@ -88,3 +88,16 @@ func (g *Git) GetRepoInfo() (*RepoInfo, error) {
 		CommitTime:    commit.Author.When,
 	}, nil
 }
+
+func MustGetRepoInfo(log zerolog.Logger, gitRepoURL string, gitRepoPath string) *RepoInfo {
+	git, err := NewGit(log, gitRepoPath, gitRepoURL)
+	if err != nil {
+		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to clone/open git repo")
+	}
+	repoInfo, err := git.GetRepoInfo()
+	if err != nil {
+		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to get repo info")
+	}
+	log.Info().Interface("repoInfo", repoInfo).Msg("parsed repo info")
+	return repoInfo
+}

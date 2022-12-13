@@ -219,7 +219,7 @@ func main() {
 
 	// only upload valid data
 	if *bigQueryUpload {
-		repoInfo := mustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
+		repoInfo := MustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
 		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
@@ -228,19 +228,6 @@ func main() {
 			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
-}
-
-func mustGetRepoInfo(log zerolog.Logger, gitRepoURL string, gitRepoPath string) *RepoInfo {
-	git, err := NewGit(log, gitRepoPath, gitRepoURL)
-	if err != nil {
-		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to clone/open git repo")
-	}
-	repoInfo, err := git.GetRepoInfo()
-	if err != nil {
-		log.Fatal().Err(err).Str("path", gitRepoPath).Msg("failed to get repo info")
-	}
-	log.Info().Interface("repoInfo", repoInfo).Msg("parsed repo info")
-	return repoInfo
 }
 
 func mustUploadData(
