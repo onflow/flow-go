@@ -1,9 +1,8 @@
 package insecure
 
 import (
-	"context"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the attack network.
@@ -18,8 +17,8 @@ type CorruptedNodeConnection interface {
 // CorruptedNodeConnector establishes a connection to a remote corrupted node.
 type CorruptedNodeConnector interface {
 	// Connect creates a connection the corruptible conduit factory of the given corrupted identity.
-	Connect(context.Context, flow.Identifier) (CorruptedNodeConnection, error)
+	Connect(irrecoverable.SignalerContext, flow.Identifier) (CorruptedNodeConnection, error)
 
-	// WithAttackerAddress sets the address of attacker for registration on corruptible conduit factories.
-	WithAttackerAddress(string)
+	// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
+	WithIncomingMessageHandler(func(*Message))
 }

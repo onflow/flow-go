@@ -22,12 +22,14 @@ int get_sk_len() {
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
 int check_membership_Zr(const bn_t a){
+    int ret; // return value
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) 
-        return INVALID; 
-    return VALID;
+    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) ret = INVALID; 
+    else ret = VALID;
+    bn_free(r);
+    return ret;
 }
 
 // checks if input point s is on the curve E1
@@ -142,10 +144,11 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     
-    if (res == RLC_EQ && core_get()->code == RLC_OK) {
-        return VALID;
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) return VALID;
+        return INVALID;
     }
-    return INVALID;
+    return UNDEFINED;
 }
 
 
@@ -165,29 +168,34 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 int bls_verifyPerDistinctMessage(const byte* sig, 
                          const int nb_hashes, const byte* hashes, const uint32_t* len_hashes,
                          const uint32_t* pks_per_hash, const ep2_st* pks) {  
+
+    int ret = UNDEFINED; // return value
     
     ep_t* elemsG1 = (ep_t*)malloc((nb_hashes + 1) * sizeof(ep_t));
+    if (!elemsG1) goto outG1;
     ep2_t* elemsG2 = (ep2_t*)malloc((nb_hashes + 1) * sizeof(ep2_t));
+    if (!elemsG2) goto outG2;
+
+    for (int i=0; i < nb_hashes+1; i++) {
+        ep_new(elemsG1[i]);
+        ep2_new(elemsG2[i]);
+    }
 
     // elemsG1[0] = sig
-    ep_new(elemsG1[0]);
-    int read_ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
+    ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
+    if (ret != RLC_OK) goto out;
 
     // check s is on curve and in G1
-    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
-        return INVALID;
+    ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
-    ep2_new(&elemsG2[0]);
     ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
 
     // map all hashes to G1
     int offset = 0;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG1[i] = h
-        ep_new(elemsG1[i]);
         // hash to G1 
         map_to_G1(elemsG1[i], &hashes[offset], len_hashes[i-1]); 
         offset += len_hashes[i-1];
@@ -197,7 +205,6 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     offset = 0;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG2[i] = agg_pk[i]
-        ep2_new(elemsG2[i]);
         ep2_sum_vector(elemsG2[i], (ep2_st*) &pks[offset] , pks_per_hash[i-1]);
         offset += pks_per_hash[i-1];
     }
@@ -208,19 +215,25 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_hashes+1);
 
     // compare the result to 1
-    int res = fp12_cmp_dig(pair, 1);
+    int cmp_res = fp12_cmp_dig(pair, 1);
+    
+    if (core_get()->code == RLC_OK) {
+        if (cmp_res == RLC_EQ) ret = VALID;
+        else ret = INVALID;
+    } else {
+        ret = UNDEFINED;
+    }
 
+out:
     for (int i=0; i < nb_hashes+1; i++) {
         ep_free(elemsG1[i]);
         ep2_free(elemsG2[i]);
     }
-    free(elemsG1);
     free(elemsG2);
-    
-    if (res == RLC_EQ && core_get()->code == RLC_OK) {
-        return VALID;
-    }
-    return INVALID;
+outG2:
+    free(elemsG1);
+outG1:
+    return ret;
 }
 
 
@@ -241,51 +254,63 @@ int bls_verifyPerDistinctKey(const byte* sig,
                          const int nb_pks, const ep2_st* pks, const uint32_t* hashes_per_pk,
                          const byte* hashes, const uint32_t* len_hashes){
 
+    int ret = UNDEFINED; // return value
     
     ep_t* elemsG1 = (ep_t*)malloc((nb_pks + 1) * sizeof(ep_t));
+    if (!elemsG1) goto outG1;
     ep2_t* elemsG2 = (ep2_t*)malloc((nb_pks + 1) * sizeof(ep2_t));
+    if (!elemsG2) goto outG2;
+    for (int i=0; i < nb_pks+1; i++) {
+        ep_new(elemsG1[i]);
+        ep2_new(elemsG2[i]);
+    }
 
     // elemsG1[0] = s
-    ep_new(elemsG1[0]);
-    int read_ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
+    ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
+    if (ret != RLC_OK) goto out;
 
     // check s is on curve and in G1
-    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
-        return INVALID;
+    ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
-    ep2_new(&elemsG2[0]);
     ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
 
     // set the public keys
     for (int i=1; i < nb_pks+1; i++) {
-        ep2_new(elemsG2[i]);
         ep2_copy(elemsG2[i], (ep2_st*) &pks[i-1]);
     }
 
     // map all hashes to G1 and aggregate the ones with the same public key
+    
+    // tmp_hashes is a temporary array of all hashes under a same key mapped to a G1 point.
+    // tmp_hashes size is set to the maximum possible size to minimize malloc calls.
+    int tmp_hashes_size = hashes_per_pk[0];
+    for (int i=1; i<nb_pks; i++) 
+        if (hashes_per_pk[i] > tmp_hashes_size) 
+            tmp_hashes_size = hashes_per_pk[i];
+    ep_st* tmp_hashes = (ep_st*)malloc(tmp_hashes_size * sizeof(ep_st));
+    if (!tmp_hashes) {
+        ret = UNDEFINED;
+        goto out;
+    }
+
+    // sum hashes under the same key
+    for (int i=0; i<tmp_hashes_size; i++) ep_new(&tmp_hashes[i]);
     int data_offset = 0;
     int index_offset = 0;
     for (int i=1; i < nb_pks+1; i++) {
-        // array for all the hashes under the same key
-        ep_st* h_array = (ep_st*)malloc(hashes_per_pk[i-1] * sizeof(ep_st));
         for (int j=0; j < hashes_per_pk[i-1]; j++) {
-            ep_new(&h_array[j]);
             // map the hash to G1
-            map_to_G1(&h_array[j], &hashes[data_offset], len_hashes[index_offset]); 
+            map_to_G1(&tmp_hashes[j], &hashes[data_offset], len_hashes[index_offset]); 
             data_offset += len_hashes[index_offset];
             index_offset++; 
         }
-        // aggregate all the points of the array
-        ep_new(elemsG1[i]);   
-        ep_sum_vector(elemsG1[i], h_array, hashes_per_pk[i-1]);
-
-        // free the array
-        for (int j=0; j < hashes_per_pk[i-1]; j++) ep_free(h_array[j]);
-        free(h_array);
+        // aggregate all the points of the array 
+        ep_sum_vector(elemsG1[i], tmp_hashes, hashes_per_pk[i-1]);
     }
+    for (int i=0; i<tmp_hashes_size; i++) ep_free(&tmp_hashes[i]);
+    free(tmp_hashes);
 
     fp12_t pair;
     fp12_new(&pair);
@@ -293,19 +318,25 @@ int bls_verifyPerDistinctKey(const byte* sig,
     pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_pks+1);
 
     // compare the result to 1
-    int res = fp12_cmp_dig(pair, 1);
+    int cmp_res = fp12_cmp_dig(pair, 1);
+    
+    if (core_get()->code == RLC_OK) {
+        if (cmp_res == RLC_EQ) ret = VALID;
+        else ret = INVALID;
+    } else {
+        ret = UNDEFINED;
+    }
 
+out:
     for (int i=0; i < nb_pks+1; i++) {
         ep_free(elemsG1[i]);
         ep2_free(elemsG2[i]);
     }
-    free(elemsG1);
     free(elemsG2);
-    
-    if (res == RLC_EQ && core_get()->code == RLC_OK) {
-        return VALID;
-    }
-    return INVALID;
+outG2:
+    free(elemsG1);
+outG1:
+    return ret;
 }
 
 // Verifies a BLS signature in a byte buffer.
@@ -341,42 +372,25 @@ typedef struct st_node {
 
 static node* new_node(const ep2_st* pk, const ep_st* sig){
     node* t = (node*) malloc(sizeof(node));
-    t->pk = (ep2_st*)pk;
-    t->sig = (ep_st*)sig;
-    t->right = t->left = NULL;
-    return t;
-}
-
-// builds a binary tree of aggregation of signatures and public keys recursively.
-static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
-    // check if a leaf is reached
-    if (len == 1) {
-        return new_node(pks, sigs);  // use the first element of the arrays
+    if (t) {
+        t->pk = (ep2_st*)pk;
+        t->sig = (ep_st*)sig;
+        t->right = t->left = NULL;
     }
-
-    // a leaf is not reached yet, 
-    int right_len = len/2;
-    int left_len = len - right_len;
-
-    // create a new node with new points
-    node* t = new_node((ep2_st*)malloc(sizeof(ep2_st)), (ep_st*)malloc(sizeof(ep_st)));
-    ep_new(t->sig);
-    ep_new(t->pk);
-    // build the tree in a top-down way
-    t->left = build_tree(left_len, &pks[0], &sigs[0]);
-    t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
-    // sum the children
-    ep_add_jacob(t->sig, t->left->sig, t->right->sig);
-    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
 }
 
 static void free_tree(node* root) {
-    // relic free
-    ep_free(root->sig);
-    ep2_free(root->pk);
-    if (root->left) {
-        // only free non-leaves, leaves are allocated as an entire array
+    if (!root) return;
+
+    // only free pks and sigs of non-leafs, data of leafs are allocated 
+    // as an entire array in `bls_batchVerify`.
+    if (root->left) {   // no need to check the right child for the leaf check because
+                        //  the recursive build starts with the left side first
+        // relic free 
+        if (root->sig) ep_free(root->sig);
+        if (root->pk) ep2_free(root->pk);
+        // pointer free
         free(root->sig);
         free(root->pk);
         // free the children nodes
@@ -384,6 +398,47 @@ static void free_tree(node* root) {
         free_tree(root->right);
     }
     free(root);
+}
+
+// builds a binary tree of aggregation of signatures and public keys recursively.
+static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
+    // check if a leaf is reached
+    if (len == 1) {
+        return new_node(&pks[0], &sigs[0]);  // use the first element of the arrays
+    }
+
+    // a leaf is not reached yet, 
+    int right_len = len/2;
+    int left_len = len - right_len;
+
+    // create a new node with new points
+    ep2_st* new_pk = (ep2_st*)malloc(sizeof(ep2_st));
+    if (!new_pk) goto error;
+    ep_st* new_sig = (ep_st*)malloc(sizeof(ep_st));
+    if (!new_sig) goto error_sig;
+
+    node* t = new_node(new_pk, new_sig);
+    if (!t) goto error_node;
+    ep_new(t->sig);
+    ep2_new(t->pk);
+
+    // build the tree in a top-down way
+    t->left = build_tree(left_len, &pks[0], &sigs[0]);
+    if (!t->left) { free_tree(t); goto error; }
+
+    t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
+    if (!t->right) { free_tree(t); goto error; }
+    // sum the children
+    ep_add_jacob(t->sig, t->left->sig, t->right->sig);
+    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
+    return t;
+
+error_node:
+    free(new_sig);
+error_sig:
+    free(new_pk);
+error:
+    return NULL;
 }
 
 // verify the binary tree and fill the results using recursive batch verifications.
@@ -430,11 +485,16 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
     
     // build the arrays of G1 and G2 elements to verify
     ep2_st* pks = (ep2_st*) malloc(sigs_len * sizeof(ep2_st));
+    if (!pks) return;
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
-    bn_t r;
+    if (!sigs) goto out_sigs;
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
         ep2_new(pks[i]);
+    }
+    bn_t r; bn_new(r);
+
+    for (int i=0; i < sigs_len; i++) {
         // convert the signature points:
         // - invalid points are stored as infinity points with an invalid result, so that
         // the tree aggregations remain valid.
@@ -443,7 +503,7 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
         if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) // unexpected error case 
-                return;
+                goto out;
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
             ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
@@ -460,13 +520,20 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
 
     // build a binary tree of aggreagtions
     node* root = build_tree(sigs_len, &pks[0], &sigs[0]);
+    if (!root) goto out;
 
     // verify the binary tree and fill the results using batch verification
     bls_batchVerify_tree(root, sigs_len, &results[0], data, data_len);
+    // free the allocated tree 
+    free_tree(root);
 
-    // free the allocated memory 
-    free_tree(root); // (relic free is called in free_tree)
+out:
+    bn_free(r);  
+    for (int i=0; i < sigs_len; i++) {
+        ep_free(sigs[i]);
+        ep2_free(pks[i]);
+    }
     free(sigs); 
+out_sigs:
     free(pks);
-    bn_free(r);   
 }

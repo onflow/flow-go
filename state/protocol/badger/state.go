@@ -201,7 +201,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}
-			err = transaction.WithTx(operation.IndexBlockSeal(blockID, latestSealID))(tx)
+			err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
@@ -235,6 +235,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 		highest := segment.Highest()
 		lowest := segment.Lowest()
+		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
+		seal, err := segment.FinalizedSeal()
+		if err != nil {
+			return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)
+		}
 
 		// insert initial views for HotStuff
 		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
@@ -258,6 +263,10 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		err = operation.InsertSealedHeight(lowest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
+		}
+		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index sealed block: %w", err)
 		}
 
 		return nil

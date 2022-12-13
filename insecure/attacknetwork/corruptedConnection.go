@@ -1,19 +1,60 @@
 package attacknetwork
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the attack network.
+// CorruptedNodeConnection abstracts connection between an attack orchestrator to a corruptible conduit factory (ccf)
+// through the attack network.
 type CorruptedNodeConnection struct {
-	stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient
+	component.Component
+	cm             *component.ComponentManager
+	logger         zerolog.Logger
+	inboundHandler func(*insecure.Message)                                         // handler for incoming messages from corruptible conduit factories.
+	outbound       insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient // from orchestrator to ccf.
+	inbound        insecure.CorruptibleConduitFactory_ConnectAttackerClient        // from ccf to orchestrator.
+}
+
+func NewCorruptedNodeConnection(
+	logger zerolog.Logger,
+	inboundHandler func(message *insecure.Message),
+	outbound insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
+	inbound insecure.CorruptibleConduitFactory_ConnectAttackerClient) *CorruptedNodeConnection {
+	c := &CorruptedNodeConnection{
+		logger:         logger.With().Str("component", "corrupted-connector").Logger(),
+		outbound:       outbound,
+		inbound:        inbound,
+		inboundHandler: inboundHandler,
+	}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+
+			ready()
+			c.receiveLoop()
+
+			<-ctx.Done()
+
+		}).Build()
+
+	c.Component = cm
+	c.cm = cm
+
+	return c
 }
 
 // SendMessage sends the message from orchestrator to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
-	err := c.stream.Send(message)
+	err := c.outbound.Send(message)
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)
 	}
@@ -21,11 +62,35 @@ func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	return nil
 }
 
+// receiveLoop implements the continuous procedure of reading from inbound stream of this connection, which
+// is established from the remote ccf to the local attack orchestrator.
+func (c *CorruptedNodeConnection) receiveLoop() {
+	c.logger.Info().Msg("receive loop started")
+
+	for {
+		select {
+		case <-c.cm.ShutdownSignal():
+			// connection closed
+			c.logger.Info().Msg("receive loop terminated")
+			return
+		default:
+			msg, err := c.inbound.Recv()
+			if err == io.EOF || errors.Is(c.inbound.Context().Err(), context.Canceled) {
+				c.logger.Warn().Msg("inbound stream closed")
+				return
+			} else if err != nil {
+				c.logger.Error().Err(err).Msg("error reading inbound stream")
+			}
+			c.inboundHandler(msg)
+		}
+	}
+}
+
 // CloseConnection closes the connection to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) CloseConnection() error {
-	err := c.stream.CloseSend()
+	err := c.outbound.CloseSend()
 	if err != nil {
-		return fmt.Errorf("could not close grpc send connection: %w", err)
+		return fmt.Errorf("could not close outbound connection: %w", err)
 	}
 
 	return nil

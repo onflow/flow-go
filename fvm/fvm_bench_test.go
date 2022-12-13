@@ -10,11 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	flow2 "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -29,7 +37,12 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -125,6 +138,7 @@ type BasicBlockExecutor struct {
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
+	onStopFunc            func()
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
@@ -146,6 +160,14 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(tb, err)
 
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+
+	onStopFunc := func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}
+
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
 	serviceAccount := &TestBenchAccount{
@@ -166,8 +188,22 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	)
 	require.NoError(tb, err)
 
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, prov)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
@@ -179,6 +215,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		activeView:            view,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
+		onStopFunc:            onStopFunc,
 	}
 }
 
@@ -195,7 +232,7 @@ func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 }
 
 func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult {
-	executableBlock := unittest.ExecutableBlockFromTransactions(collections)
+	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
 	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
@@ -212,29 +249,24 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	accounts := make([]TestBenchAccount, 0)
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
-	accontCreationScript := `
-		transaction(publicKey: [UInt8]) {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-				acct.addPublicKey(publicKey)
-			}
-		}
-	`
-
 	for _, privateKey := range privateKeys {
-		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
-		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+		accountKey := flow2.NewAccountKey().
+			FromPrivateKey(privateKey.PrivateKey).
+			SetWeight(fvm.AccountKeyWeightThreshold).
+			SetHashAlgo(privateKey.HashAlgo).
+			SetSigAlgo(privateKey.SignAlgo)
+
+		sdkTX, err := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		require.NoError(tb, err)
 
 		txBody := flow.NewTransactionBody().
-			SetScript([]byte(accontCreationScript)).
-			AddArgument(encCadAccountKey).
+			SetScript(sdkTX.Script).
+			SetArguments(sdkTX.Arguments).
 			AddAuthorizer(serviceAddress).
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
 			SetPayer(serviceAddress)
 
-		err := testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
@@ -245,7 +277,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		for _, eventList := range computationResult.Events {
 			for _, event := range eventList {
 				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(event.Payload)
+					data, err := jsoncdc.Decode(nil, event.Payload)
 					if err != nil {
 						tb.Fatal("setup account failed, error decoding events")
 					}
@@ -272,7 +304,7 @@ type txWeights struct {
 	TXHash                string `json:"txHash"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
-	MemoryUsed            uint   `json:"memoryUsed"`
+	MemoryEstimate        uint   `json:"memoryEstimate"`
 }
 
 type txSuccessfulLog struct {
@@ -329,13 +361,22 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
 
 		blockExecutor := NewBasicBlockExecutor(b, chain, logger)
-		serviceAccount := blockExecutor.ServiceAccount(b)
+		defer func() {
+			blockExecutor.onStopFunc()
+		}()
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(b, err)
 
 		accounts := blockExecutor.SetupAccounts(b, privateKeys)
+
+		addrs := []flow.Address{}
+		for _, account := range accounts {
+			addrs = append(addrs, account.Address)
+		}
+		// fund all accounts so not to run into storage problems
+		fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {
@@ -350,9 +391,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 			`)
 
-		serviceAccount.AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
+		accounts[0].AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
 
 		btx := []byte(tx)
+
+		benchmarkAccount := &accounts[0]
 
 		b.ResetTimer() // setup done, lets start measuring
 		for i := 0; i < b.N; i++ {
@@ -360,11 +403,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			for j := 0; j < transactionsPerBlock; j++ {
 				txBody := flow.NewTransactionBody().
 					SetScript(btx).
-					AddAuthorizer(serviceAccount.Address).
-					SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-					SetPayer(serviceAccount.Address)
+					AddAuthorizer(benchmarkAccount.Address).
+					SetProposalKey(benchmarkAccount.Address, 0, benchmarkAccount.RetAndIncSeqNumber()).
+					SetPayer(benchmarkAccount.Address)
 
-				err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+				err = testutil.SignEnvelope(txBody, benchmarkAccount.Address, benchmarkAccount.PrivateKey)
 				require.NoError(b, err)
 
 				transactions[j] = txBody
@@ -428,35 +471,50 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
 	})
 	b.Run("get signer vault", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
+		benchTransaction(
+			b,
+			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `let receiverRef =  getAccount(signer.address)
+		benchTransaction(
+			b,
+			templateTx(100, `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`))
+				.borrow<&{FungibleToken.Receiver}>()!`),
+		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!
-			
-			let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let receiverRef =  getAccount(signer.address)
+					.getCapability(/public/flowTokenReceiver)
+					.borrow<&{FungibleToken.Receiver}>()!
 
-			receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
-			`))
+				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+
+				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
+			`),
+		)
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
+		benchTransaction(
+			b,
+			templateTx(100, `
 				signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
-			`))
+			`),
+		)
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, fmt.Sprintf(`
+		benchTransaction(
+			b,
+			templateTx(100, fmt.Sprintf(`
 				signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
-			`, longString)))
+			`, longString)),
+		)
 	})
 	b.Run("create new account", func(b *testing.B) {
 		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
@@ -468,24 +526,30 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(b, templateTx(100, `TestContract.emit()`))
 	})
 	b.Run("borrow array from storage", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let strings = signer.borrow<&[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
-			}
-		`))
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.borrow<&[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let strings = signer.copy<[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
-			}
-		`))
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.copy<[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
 	})
 }
 
@@ -515,6 +579,9 @@ const TransferTxTemplate = `
 // BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
 	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain(), zerolog.Nop())
+	defer func() {
+		blockExecutor.onStopFunc()
+	}()
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
@@ -890,7 +957,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						pre {
 							BatchNFT.sets[setID] != nil: "Cannot borrow Set: The Set doesn't exist"
 						}
-						return &BatchNFT.sets[setID] as &Set
+						return (&BatchNFT.sets[setID] as &Set?)!
 					}
 
 					pub fun startNewSeries(): UInt32 {
@@ -971,12 +1038,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 
 					pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-						return &self.ownedNFTs[id] as &NonFungibleToken.NFT
+						return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
 					}
 
 					pub fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
 						if self.ownedNFTs[id] != nil {
-							let ref = &self.ownedNFTs[id] as auth &NonFungibleToken.NFT
+							let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
 							return ref as! &BatchNFT.NFT
 						} else {
 							return nil

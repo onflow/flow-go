@@ -5,7 +5,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -33,12 +33,12 @@ type TransactionProcedure struct {
 	Events          []flow.Event
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
+	MemoryEstimate  uint64
 	Err             errors.Error
-	Retried         int
-	TraceSpan       opentracing.Span
+	TraceSpan       otelTrace.Span
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 
@@ -47,9 +47,9 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	defer func() {
 		if r := recover(); r != nil {
 
-			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerIntractionLimitExceededError.String()) {
+			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerInteractionLimitExceededError.String()) {
 				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
-				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
+				proc.Err = errors.NewLedgerInteractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
 			}
 
@@ -101,7 +101,7 @@ func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
 	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
-	memoryLimit := uint64(DefaultMemoryLimit) // TODO use the one set by tx
+	memoryLimit := ctx.MemoryLimit // TODO use the one set by tx
 	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
 	if memoryLimit == 0 {
 		memoryLimit = ctx.MemoryLimit

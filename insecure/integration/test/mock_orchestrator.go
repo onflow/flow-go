@@ -8,7 +8,7 @@ import (
 type mockOrchestrator struct {
 	attackNetwork insecure.AttackNetwork
 	// eventCorrupter is an injectable function that tampers with the given event.
-	eventCorrupter func(event *insecure.Event)
+	eventCorrupter func(event *insecure.EgressEvent)
 }
 
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
@@ -18,7 +18,7 @@ type mockOrchestrator struct {
 //
 // In this mock orchestrator, the event corrupter is invoked on the event, and the altered event is sent back to
 // the flow network.
-func (m *mockOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
+func (m *mockOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
 	m.eventCorrupter(event)
 	return m.attackNetwork.Send(event)
 }

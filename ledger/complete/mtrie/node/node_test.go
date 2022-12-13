@@ -8,14 +8,14 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
-	path := utils.PathByUint16(56809)
-	payload := utils.LightPayload(56810, 59656)
+	path := testutils.PathByUint16(56809)
+	payload := testutils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 0)
 	expectedRootHashHex := "0ee164bc69981088186b5ceeb666e90e8e11bb15a1427aa56f47a484aedf73b4"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
@@ -26,8 +26,8 @@ func Test_ProperLeaf(t *testing.T) {
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
 // at an interim height (9) and the max possible height (256)
 func Test_CompactifiedLeaf(t *testing.T) {
-	path := utils.PathByUint16(56809)
-	payload := utils.LightPayload(56810, 59656)
+	path := testutils.PathByUint16(56809)
+	payload := testutils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 1)
 	expectedRootHashHex := "aa496f68adbbf43197f7e4b6ba1a63a47b9ce19b1587ca9ce587a7f29cad57d5"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
@@ -63,8 +63,8 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
-	path := utils.PathByUint16(56809)
-	payload := utils.LightPayload(56810, 59656)
+	path := testutils.PathByUint16(56809)
+	payload := testutils.LightPayload(56810, 59656)
 	c := node.NewLeaf(path, payload, 0)
 
 	n := node.NewInterimNode(1, c, nil)
@@ -79,12 +79,12 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // Test_InterimNodeWithBothChildren verifies that the hash value of an interim node with
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
-	leftPath := utils.PathByUint16(56809)
-	leftPayload := utils.LightPayload(56810, 59656)
+	leftPath := testutils.PathByUint16(56809)
+	leftPayload := testutils.LightPayload(56810, 59656)
 	leftChild := node.NewLeaf(leftPath, leftPayload, 0)
 
-	rightPath := utils.PathByUint16(2)
-	rightPayload := utils.LightPayload(11, 22)
+	rightPath := testutils.PathByUint16(2)
+	rightPayload := testutils.LightPayload(11, 22)
 	rightChild := node.NewLeaf(rightPath, rightPayload, 0)
 
 	n := node.NewInterimNode(1, leftChild, rightChild)
@@ -93,8 +93,8 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 }
 
 func Test_AllPayloads(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
+	path := testutils.PathByUint16(1)
+	payload := testutils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 1)
@@ -104,8 +104,8 @@ func Test_AllPayloads(t *testing.T) {
 }
 
 func Test_VerifyCachedHash(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
+	path := testutils.PathByUint16(1)
+	payload := testutils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 1)
@@ -121,8 +121,8 @@ func Test_Compactify_EmptySubtrie(t *testing.T) {
 	//      n3
 	//    /   \
 	// n1(-)  n2(-)
-	n1 := node.NewLeaf(utils.PathByUint16LeftPadded(0), &ledger.Payload{}, 4)    // path: ...0000 0000
-	n2 := node.NewLeaf(utils.PathByUint16LeftPadded(1<<4), &ledger.Payload{}, 4) // path: ...0001 0000
+	n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), &ledger.Payload{}, 4)    // path: ...0000 0000
+	n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), &ledger.Payload{}, 4) // path: ...0001 0000
 
 	t.Run("both children empty", func(t *testing.T) {
 		require.Nil(t, node.NewInterimCompactifiedNode(5, n1, n2))
@@ -142,10 +142,10 @@ func Test_Compactify_EmptySubtrie(t *testing.T) {
 // where one child is empty and the other child is a leaf. We expect the compactified node
 // to be a leaf, as it only contains a single allocated register.
 func Test_Compactify_ToLeaf(t *testing.T) {
-	path1 := utils.PathByUint16LeftPadded(0)      // ...0000 0000
-	path2 := utils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
+	path1 := testutils.PathByUint16LeftPadded(0)      // ...0000 0000
+	path2 := testutils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
 	emptyPayload := &ledger.Payload{}
-	payloadA := utils.LightPayload(2, 2)
+	payloadA := testutils.LightPayload(2, 2)
 
 	t.Run("left child empty", func(t *testing.T) {
 		// constructing an un-pruned tree first as reference:
@@ -190,8 +190,8 @@ func Test_Compactify_ToLeaf(t *testing.T) {
 // where one child is empty and the other child holds _multiple_ allocated registers (more than one).
 // We expect in the compactified node, the empty subtrie is completely removed and replaced by nil.
 func Test_Compactify_EmptyChild(t *testing.T) {
-	payloadA := utils.LightPayload(2, 2)
-	payloadB := utils.LightPayload(4, 4)
+	payloadA := testutils.LightPayload(2, 2)
+	payloadB := testutils.LightPayload(4, 4)
 	emptyPayload := &ledger.Payload{}
 
 	t.Run("right child empty", func(t *testing.T) {
@@ -201,10 +201,10 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		//      n3      n4(-)
 		//   /    \
 		// n1(A)  n2(B)
-		n1 := node.NewLeaf(utils.PathByUint16LeftPadded(0), payloadA, 4)    // path: ...0000 0000
-		n2 := node.NewLeaf(utils.PathByUint16LeftPadded(1<<4), payloadB, 4) // path: ...0001 0000
+		n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), payloadA, 4)    // path: ...0000 0000
+		n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), payloadB, 4) // path: ...0001 0000
 		n3 := node.NewInterimNode(5, n1, n2)
-		n4 := node.NewLeaf(utils.PathByUint16LeftPadded(3<<4), emptyPayload, 5) // path: ...0011 0000
+		n4 := node.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), emptyPayload, 5) // path: ...0011 0000
 		n5 := node.NewInterimNode(6, n3, n4)
 
 		// Constructing a trie with pruning/compactification should result
@@ -223,9 +223,9 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		//    n3(-)    n4
 		//           /   \
 		//        n1(A)  n2(B)
-		n1 := node.NewLeaf(utils.PathByUint16LeftPadded(2<<4), payloadA, 4)  // path: ...0010 0000
-		n2 := node.NewLeaf(utils.PathByUint16LeftPadded(3<<4), payloadB, 4)  // path: ...0011 0000
-		n3 := node.NewLeaf(utils.PathByUint16LeftPadded(0), emptyPayload, 5) // path: ...0000 0000
+		n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(2<<4), payloadA, 4)  // path: ...0010 0000
+		n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), payloadB, 4)  // path: ...0011 0000
+		n3 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), emptyPayload, 5) // path: ...0000 0000
 		n4 := node.NewInterimNode(5, n1, n2)
 		n5 := node.NewInterimNode(6, n3, n4)
 
@@ -247,12 +247,12 @@ func Test_Compactify_BothChildrenPopulated(t *testing.T) {
 	//      n3      n4(C)
 	//   /    \
 	// n1(A)  n2(B)
-	path1 := utils.PathByUint16LeftPadded(0)      // ...0000 0000
-	path2 := utils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
-	path4 := utils.PathByUint16LeftPadded(3 << 4) // ...0011 0000
-	payloadA := utils.LightPayload(2, 2)
-	payloadB := utils.LightPayload(3, 3)
-	payloadC := utils.LightPayload(4, 4)
+	path1 := testutils.PathByUint16LeftPadded(0)      // ...0000 0000
+	path2 := testutils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
+	path4 := testutils.PathByUint16LeftPadded(3 << 4) // ...0011 0000
+	payloadA := testutils.LightPayload(2, 2)
+	payloadB := testutils.LightPayload(3, 3)
+	payloadC := testutils.LightPayload(4, 4)
 
 	// constructing an un-pruned tree first as reference:
 	n1 := node.NewLeaf(path1, payloadA, 4)

@@ -31,18 +31,15 @@ import (
 // #include "bls_include.h"
 import "C"
 
-// prefix for all application tags (any non PoP tag)
-const applicationTagPrefix = "APP"
-
-// prefix only for the PoP tag
-const popTagPrefix = "POP"
-
 // the PoP hasher, used to generate and verify PoPs
-var popKMAC = internalBLSKMAC(popTagPrefix)
+// The key is based on blsPOPCipherSuite which guarantees
+// that hash_to_field of PoP is orthogonal to all hash_to_field functions
+// used for signatures.
+var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //
-// The KMAC hasher used in the function is guaranted to be orthogonal to all hashers used
+// The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
 // for signatures or SPoCK proofs. This means a specific domain tag is used to generate PoP
 // and is not used by any other application.
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
@@ -295,10 +292,10 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 		if k == nil {
 			return false, invalidInputsErrorf("hasher at index %d is nil", i)
 		}
-		if k.Size() < minHashSizeBLSBLS12381 {
+		if k.Size() != expandMsgOutput {
 			return false, invalidInputsErrorf(
-				"Hasher with at least %d output byte size is required, current size is %d",
-				minHashSizeBLSBLS12381,
+				"Hasher with %d output byte size is required, current size is %d",
+				expandMsgOutput,
 				k.Size())
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
@@ -428,10 +425,10 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		return verifBool, invalidInputsErrorf("verification requires a Hasher")
 	}
 
-	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+	if kmac.Size() < expandMsgOutput {
 		return verifBool, invalidInputsErrorf(
 			"hasher with at least %d output byte size is required, current size is %d",
-			opSwUInputLenBLSBLS12381,
+			expandMsgOutput,
 			kmac.Size())
 	}
 

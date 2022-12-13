@@ -57,10 +57,10 @@ func BenchmarkOriginalCanonicalForm(b *testing.B) {
 	}
 }
 
-// TestPayloadKeyEquals tests whether keys are equal.
+// TestKeyEquals tests whether keys are equal.
 // It tests equality of empty, nil, and not-empty keys.
 // Empty key and nil key should be equal.
-func TestPayloadKeyEquals(t *testing.T) {
+func TestKeyEquals(t *testing.T) {
 
 	nilKey := (*Key)(nil)
 	emptyKey := &Key{}
@@ -186,10 +186,10 @@ func TestPayloadKeyEquals(t *testing.T) {
 	})
 }
 
-// TestPayloadValueEquals tests whether values are equal.
+// TestValueEquals tests whether values are equal.
 // It tests equality of empty, nil, and not-empty values.
 // Empty value and nil value should be equal.
-func TestPayloadValueEquals(t *testing.T) {
+func TestValueEquals(t *testing.T) {
 
 	nilValue := (Value)(nil)
 	emptyValue := Value{}
@@ -238,115 +238,5 @@ func TestPayloadValueEquals(t *testing.T) {
 		v2 := Value{0x01, 0x02}
 		require.True(t, v1.Equals(v2))
 		require.True(t, v2.Equals(v1))
-	})
-}
-
-// TestPayloadEquals tests whether payloads are equal.
-// It tests equality of empty, nil, and not-empty payloads.
-// Empty payload and nil payload should be equal.
-func TestPayloadEquals(t *testing.T) {
-	nilPayload := (*Payload)(nil)
-	emptyPayload := EmptyPayload()
-
-	t.Run("nil vs empty", func(t *testing.T) {
-		require.True(t, nilPayload.Equals(emptyPayload))
-		require.True(t, emptyPayload.Equals(nilPayload))
-	})
-
-	t.Run("nil vs nil", func(t *testing.T) {
-		require.True(t, nilPayload.Equals(nilPayload))
-	})
-
-	t.Run("empty vs empty", func(t *testing.T) {
-		require.True(t, emptyPayload.Equals(emptyPayload))
-	})
-
-	t.Run("empty vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		require.False(t, emptyPayload.Equals(p))
-		require.False(t, p.Equals(emptyPayload))
-	})
-
-	t.Run("nil vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		require.False(t, nilPayload.Equals(p))
-		require.False(t, p.Equals(nilPayload))
-	})
-
-	t.Run("different key", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		// p1.Key.KeyParts[0].Type is different
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		// p2.Key.KeyParts[0].Value is different
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		// len(p3.Key.KeyParts) is different
-		p3 := &Payload{
-			Key: Key{KeyParts: []KeyPart{
-				{1, []byte{0x01, 0x02}},
-				{2, []byte{0x03, 0x04}}},
-			},
-			Value: []byte{0x03, 0x04},
-		}
-		require.False(t, p.Equals(p1))
-		require.False(t, p.Equals(p2))
-		require.False(t, p.Equals(p3))
-	})
-
-	t.Run("different value", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		// p1.Value is nil
-		p1 := &Payload{
-			Key: Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-		}
-		// p2.Value is empty
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{},
-		}
-		// p3.Value length is different
-		p3 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03},
-		}
-		// p4.Value data is different
-		p4 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x05},
-		}
-		require.False(t, p.Equals(p1))
-		require.False(t, p.Equals(p2))
-		require.False(t, p.Equals(p3))
-		require.False(t, p.Equals(p4))
-	})
-
-	t.Run("same", func(t *testing.T) {
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		require.True(t, p1.Equals(p2))
-		require.True(t, p2.Equals(p1))
 	})
 }

@@ -42,7 +42,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := transactions.Rem(tx2.ID())
+		ok := transactions.Remove(tx2.ID())
 		assert.True(t, ok)
 	})
 

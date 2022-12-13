@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -40,7 +41,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -309,7 +310,7 @@ transaction(keyIndex1: Int, keyIndex2: Int) {
 `
 
 func newAccountKey(
-	t *testing.T,
+	tb testing.TB,
 	privateKey *flow.AccountPrivateKey,
 	apiVersion accountKeyAPIVersion,
 ) (
@@ -322,14 +323,14 @@ func newAccountKey(
 	if apiVersion == accountKeyAPIVersionV1 {
 		var err error
 		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	} else {
 		publicKeyBytes = publicKey.PublicKey.Encode()
 	}
 
 	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return publicKey, encodedCadencePublicKey
 }
@@ -359,7 +360,7 @@ func TestCreateAccount(t *testing.T) {
 				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 				require.Len(t, accountCreatedEvents, 1)
 
-				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -394,7 +395,7 @@ func TestCreateAccount(t *testing.T) {
 					}
 					accountCreatedEventCount += 1
 
-					data, err := jsoncdc.Decode(tx.Events[i].Payload)
+					data, err := jsoncdc.Decode(nil, tx.Events[i].Payload)
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -1228,7 +1229,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
@@ -1248,7 +1249,61 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 
-				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
+				assert.Equal(t, cadence.UFix64(100_000_000), script.Value)
+			}),
+	)
+
+	// TODO - this is because get account + borrow returns
+	// empty values instead of failing for an account that doesnt exist
+	// this behavior needs to addressed on Cadence side
+	t.Run("Get balance returns 0 for accounts that don't exist",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				nonExistentAddress, err := chain.AddressAtIndex(100)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.balance
+					}
+				`, nonExistentAddress)))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+				require.Equal(t, cadence.UFix64(0), script.Value)
+			}),
+	)
+
+	t.Run("Get balance fails if view returns an error",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
+				address := chain.ServiceAddress()
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.balance
+					}
+				`, address)))
+
+				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
+				})
+
+				err := vm.Run(ctx, script, view, programs)
+				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)
 
@@ -1258,13 +1313,13 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(
-			fvm.WithStorageMBPerFLOW(10_0000_0000),
+			fvm.WithStorageMBPerFLOW(1000_000_000),
 		).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
@@ -1284,7 +1339,33 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_2520), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3120), script.Value)
+			}),
+	)
+
+	t.Run("Get available balance fails for accounts that don't exist",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(1_000_000_000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				nonExistentAddress, err := chain.AddressAtIndex(100)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.availableBalance
+					}
+				`, nonExistentAddress)))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				require.NoError(t, err)
+				require.Error(t, script.Err)
 			}),
 	)
 
@@ -1294,15 +1375,15 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(
-			fvm.WithStorageMBPerFLOW(10_0000_0000),
-			fvm.WithAccountCreationFee(10_0000),
-			fvm.WithMinimumStorageReservation(10_0000),
+			fvm.WithStorageMBPerFLOW(1000_000_000),
+			fvm.WithAccountCreationFee(100_000),
+			fvm.WithMinimumStorageReservation(100_000),
 		).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				account := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := transferTokensTx(chain).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
@@ -1323,8 +1404,108 @@ func TestAccountBalanceFields(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
 
-				// Should be 1_0000_0000 because 10_0000 was given to it during account creation and is now locked up
-				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
+				// Should be 100_000_000 because 100_000 was given to it during account creation and is now locked up
+				assert.Equal(t, cadence.UFix64(100_000_000), script.Value)
+			}),
+	)
+}
+
+func TestGetStorageCapacity(t *testing.T) {
+	t.Run("Get storage capacity",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(1_000_000_000),
+			fvm.WithAccountCreationFee(100_000),
+			fvm.WithMinimumStorageReservation(100_000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UInt64 {
+						let acc = getAccount(0x%s)
+						return acc.storageCapacity
+					}
+				`, account)))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+
+				require.Equal(t, cadence.UInt64(10_010_000), script.Value)
+			}),
+	)
+	t.Run("Get storage capacity returns 0 for accounts that don't exist",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(1_000_000_000),
+			fvm.WithAccountCreationFee(100_000),
+			fvm.WithMinimumStorageReservation(100_000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				nonExistentAddress, err := chain.AddressAtIndex(100)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UInt64 {
+						let acc = getAccount(0x%s)
+						return acc.storageCapacity
+					}
+				`, nonExistentAddress)))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+				require.Equal(t, cadence.UInt64(0), script.Value)
+			}),
+	)
+	t.Run("Get storage capacity fails if view returns an error",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(1_000_000_000),
+			fvm.WithAccountCreationFee(100_000),
+			fvm.WithMinimumStorageReservation(100_000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := chain.ServiceAddress()
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UInt64 {
+						let acc = getAccount(0x%s)
+						return acc.storageCapacity
+					}
+				`, address)))
+
+				newview := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
+				})
+
+				err := vm.Run(ctx, script, newview, programs)
+				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)
 }

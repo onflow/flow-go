@@ -4,22 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -30,18 +31,18 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit        *engine.Unit               // used to control startup/shutdown
-	log         zerolog.Logger             // used to log relevant actions
-	metrics     module.VerificationMetrics // used to capture the performance metrics
-	tracer      module.Tracer              // used for tracing
-	pushConduit network.Conduit            // used to push result approvals
-	pullConduit network.Conduit            // used to respond to requests for result approvals
-	me          module.Local               // used to access local node information
-	state       protocol.State             // used to access the protocol state
-	rah         hash.Hasher                // used as hasher to sign the result approvals
-	chVerif     module.ChunkVerifier       // used to verify chunks
-	spockHasher hash.Hasher                // used for generating spocks
-	approvals   storage.ResultApprovals    // used to store result approvals
+	unit           *engine.Unit               // used to control startup/shutdown
+	log            zerolog.Logger             // used to log relevant actions
+	metrics        module.VerificationMetrics // used to capture the performance metrics
+	tracer         module.Tracer              // used for tracing
+	pushConduit    network.Conduit            // used to push result approvals
+	pullConduit    network.Conduit            // used to respond to requests for result approvals
+	me             module.Local               // used to access local node information
+	state          protocol.State             // used to access the protocol state
+	approvalHasher hash.Hasher                // used as hasher to sign the result approvals
+	chVerif        module.ChunkVerifier       // used to verify chunks
+	spockHasher    hash.Hasher                // used for generating spocks
+	approvals      storage.ResultApprovals    // used to store result approvals
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -57,25 +58,25 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log.With().Str("engine", "verifier").Logger(),
-		metrics:     metrics,
-		tracer:      tracer,
-		state:       state,
-		me:          me,
-		chVerif:     chVerif,
-		rah:         utils.NewResultApprovalHasher(),
-		spockHasher: crypto.NewBLSKMAC(encoding.SPOCKTag),
-		approvals:   approvals,
+		unit:           engine.NewUnit(),
+		log:            log.With().Str("engine", "verifier").Logger(),
+		metrics:        metrics,
+		tracer:         tracer,
+		state:          state,
+		me:             me,
+		chVerif:        chVerif,
+		approvalHasher: utils.NewResultApprovalHasher(),
+		spockHasher:    signature.NewBLSHasher(signature.SPOCKTag),
+		approvals:      approvals,
 	}
 
 	var err error
-	e.pushConduit, err = net.Register(engine.PushApprovals, e)
+	e.pushConduit, err = net.Register(channels.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval push channel: %w", err)
 	}
 
-	e.pullConduit, err = net.Register(engine.ProvideApprovalsByChunk, e)
+	e.pullConduit, err = net.Register(channels.ProvideApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval pull channel: %w", err)
 	}
@@ -106,7 +107,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -124,7 +125,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -194,7 +195,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	} else {
 		spockSecret, chFault, err = e.chVerif.Verify(vc)
 	}
-	span.Finish()
+	span.End()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
 	if err != nil {
@@ -227,8 +228,19 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	approval, err := e.GenerateResultApproval(vc.Chunk.Index, vc.Result.ID(), vc.Header.ID(), spockSecret)
-	span.Finish()
+	attestation := &flow.Attestation{
+		BlockID:           vc.Header.ID(),
+		ExecutionResultID: vc.Result.ID(),
+		ChunkIndex:        vc.Chunk.Index,
+	}
+	approval, err := GenerateResultApproval(
+		e.me,
+		e.approvalHasher,
+		e.spockHasher,
+		attestation,
+		spockSecret)
+
+	span.End()
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
@@ -266,43 +278,38 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 }
 
 // GenerateResultApproval generates result approval for specific chunk of an execution receipt.
-func (e *Engine) GenerateResultApproval(chunkIndex uint64,
-	execResultID flow.Identifier,
-	blockID flow.Identifier,
+func GenerateResultApproval(
+	me module.Local,
+	approvalHasher hash.Hasher,
+	spockHasher hash.Hasher,
+	attestation *flow.Attestation,
 	spockSecret []byte,
 ) (*flow.ResultApproval, error) {
 
-	// attestation
-	atst := flow.Attestation{
-		BlockID:           blockID,
-		ExecutionResultID: execResultID,
-		ChunkIndex:        chunkIndex,
-	}
-
 	// generates a signature over the attestation part of approval
-	atstID := atst.ID()
-	atstSign, err := e.me.Sign(atstID[:], e.rah)
+	atstID := attestation.ID()
+	atstSign, err := me.Sign(atstID[:], approvalHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign attestation: %w", err)
 	}
 
 	// generates spock
-	spock, err := e.me.SignFunc(spockSecret, e.spockHasher, crypto.SPOCKProve)
+	spock, err := me.SignFunc(spockSecret, spockHasher, crypto.SPOCKProve)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate SPoCK: %w", err)
 	}
 
 	// result approval body
 	body := flow.ResultApprovalBody{
-		Attestation:          atst,
-		ApproverID:           e.me.NodeID(),
+		Attestation:          *attestation,
+		ApproverID:           me.NodeID(),
 		AttestationSignature: atstSign,
 		Spock:                spock,
 	}
 
 	// generates a signature over result approval body
 	bodyID := body.ID()
-	bodySign, err := e.me.Sign(bodyID[:], e.rah)
+	bodySign, err := me.Sign(bodyID[:], approvalHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
@@ -318,11 +325,13 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 
 	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
 	if isSampled {
-		span.LogFields(log.String("result_id", ch.Result.ID().String()))
-		span.LogFields(log.Uint64("chunk_index", ch.Chunk.Index))
-		span.SetTag("origin_id", originID)
+		span.SetAttributes(
+			attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
+			attribute.String("result_id", ch.Result.ID().String()),
+			attribute.String("origin_id", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	// increments number of received verifiable chunks
 	// for sake of metrics

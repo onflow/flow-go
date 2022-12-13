@@ -2,27 +2,33 @@ package execution_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
+	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine"
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *messages.BlockProposal) error {
-	return exeNode.FollowerEngine.Process(engine.ReceiveBlocks, from, proposal)
+	return exeNode.FollowerEngine.Process(channels.ReceiveBlocks, from, proposal)
 }
 
 // Test when the ingestion engine receives a block, it will
@@ -31,7 +37,7 @@ func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *
 // create a block that has two collections: col1 and col2;
 // col1 has tx1 and tx2, col2 has tx3 and tx4.
 // create another child block which will trigger the parent
-// block to valid and be passed to the ingestion engine
+// block to be incorporated and be passed to the ingestion engine
 func TestExecutionFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -54,7 +60,7 @@ func TestExecutionFlow(t *testing.T) {
 		unittest.WithKeys,
 	)
 
-	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID)
+	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID).Sort(order.Canonical)
 
 	// create execution node
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
@@ -88,23 +94,40 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): &col2,
 	}
 
-	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID)
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+
+	// signed by the only collector
+	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
+	voterIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+	block.Header.ParentVoterIndices = voterIndices
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
 				CollectionID:     col1.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
+				ChainID:          clusterChainID,
 				ReferenceBlockID: genesis.ID(),
 			},
 			{
 				CollectionID:     col2.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
+				ChainID:          clusterChainID,
 				ReferenceBlockID: genesis.ID(),
 			},
 		},
 	})
 
-	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
+	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	// the default signer indices is 2 bytes, but in this test cases
+	// we need 1 byte
+	child.Header.ParentVoterIndices = voterIndices
+
+	log.Info().Msgf("child block ID: %v, indices: %x", child.Header.ID(), child.Header.ParentVoterIndices)
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -116,8 +139,8 @@ func TestExecutionFlow(t *testing.T) {
 	// create collection node that can respond collections to execution node
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
-	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
-	providerEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	provConduit, _ := collectionNode.Net.Register(channels.ProvideCollections, providerEngine)
+	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*messages.EntityRequest)
@@ -147,14 +170,17 @@ func TestExecutionFlow(t *testing.T) {
 		Once().
 		Return(nil)
 
+	var lock sync.Mutex
 	var receipt *flow.ExecutionReceipt
 
 	// create verification engine that can create approvals and send to consensus nodes
 	// check the verification engine received the ER from execution node
 	verificationEngine := new(mocknetwork.Engine)
-	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	_, _ = verificationNode.Net.Register(channels.ReceiveReceipts, verificationEngine)
+	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
+			lock.Lock()
+			defer lock.Unlock()
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -165,9 +191,12 @@ func TestExecutionFlow(t *testing.T) {
 	// create consensus engine that accepts the result
 	// check the consensus engine has received the result from execution node
 	consensusEngine := new(mocknetwork.Engine)
-	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
+	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
+			lock.Lock()
+			defer lock.Unlock()
+
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -193,6 +222,9 @@ func TestExecutionFlow(t *testing.T) {
 		// when sendBlock returned, ingestion engine might not have processed
 		// the block yet, because the process is async. we have to wait
 		hub.DeliverAll()
+
+		lock.Lock()
+		defer lock.Unlock()
 		return receipt != nil
 	}, time.Second*10, time.Millisecond*500)
 
@@ -219,13 +251,24 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
+
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	voterIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+	block.Header.ParentVoterIndices = voterIndices
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
 				CollectionID:     col.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
+				ChainID:          clusterChainID,
 				ReferenceBlockID: ref.ID(),
 			},
 		},
@@ -247,11 +290,21 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	voterIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+	block.Header.ParentVoterIndices = voterIndices
+
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
+
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
-			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 		},
 	})
 
@@ -266,11 +319,20 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
 
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	voterIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+	block.Header.ParentVoterIndices = voterIndices
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
-			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 		},
 	})
 
@@ -279,21 +341,9 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	return tx, col, block, proposal, seq + 1
 }
 
-// Test the following behaviors:
-// (1) ENs sync statecommitment with each other
-// (2) a failed transaction will not change statecommitment
-//
-// We prepare 3 transactions in 3 blocks:
-// tx1 will deploy a contract
-// tx2 will always panic
-// tx3 will be succeed and change statecommitment
-// and then create 2 EN nodes, both have tx1 executed. To test the synchronization,
-// we send tx2 and tx3 in 2 blocks to only EN1, and check that tx2 will not change statecommitment for
-// verifying behavior (1);
-// and check EN2 should have the same statecommitment as EN1 since they sync
-// with each other for verifying behavior (2).
-// TODO: state sync is disabled, we are only verifying 2) for now.
-func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
+// Test a successful tx should change the statecommitment,
+// but a failed Tx should not change the statecommitment.
+func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
 	chainID := flow.Emulator
@@ -349,13 +399,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		[]*flow.Collection{col1, col2, col3},
 	)
 
-	receiptsReceived := 0
+	receiptsReceived := atomic.Uint64{}
 
 	consensusEngine := new(mocknetwork.Engine)
-	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
+	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
+	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receiptsReceived++
+			receiptsReceived.Inc()
 			originID := args[1].(flow.Identifier)
 			receipt := args[2].(*flow.ExecutionReceipt)
 			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
@@ -375,7 +425,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// ensure block 1 has been executed
 	hub.DeliverAllEventually(t, func() bool {
-		return receiptsReceived == 1
+		return receiptsReceived.Load() == 1
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
 
@@ -395,7 +445,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// ensure block 1, 2 and 3 have been executed
 	hub.DeliverAllEventually(t, func() bool {
-		return receiptsReceived == 3
+		return receiptsReceived.Load() == 3
 	})
 
 	// ensure state has been synced across both nodes
@@ -415,7 +465,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *mocknetwork.Engine {
 	collectionEngine := new(mocknetwork.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(channels.RequestCollections, collectionEngine)
 
 	// make lookup
 	colMap := make(map[flow.Identifier][]byte)
@@ -423,7 +473,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 		blob, _ := msgpack.Marshal(col)
 		colMap[col.ID()] = blob
 	}
-	collectionEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
+	collectionEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[1].(flow.Identifier)
 			req := args[2].(*messages.EntityRequest)
@@ -481,23 +531,28 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	genesis, err := exeNode.State.AtHeight(0).Head()
 	require.NoError(t, err)
 
-	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
+	voterIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+	block.Header.ParentVoterIndices = voterIndices
 	block.Header.View = 42
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 
-	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
+	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	child.Header.ParentVoterIndices = voterIndices
 
-	actualCalls := 0
-
-	var receipt *flow.ExecutionReceipt
+	actualCalls := atomic.Uint64{}
 
 	verificationEngine := new(mocknetwork.Engine)
-	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	_, _ = verification1Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
+	_, _ = verification2Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
+	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			actualCalls++
+			actualCalls.Inc()
+
+			var receipt *flow.ExecutionReceipt
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -511,7 +566,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {
-		return actualCalls == 2
+		return actualCalls.Load() == 2
 	})
 
 	verificationEngine.AssertExpectations(t)

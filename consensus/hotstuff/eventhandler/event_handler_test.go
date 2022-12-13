@@ -375,10 +375,10 @@ func (es *EventHandlerSuite) SetupTest() {
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{
-		BlockID:   es.votingBlock.BlockID,
-		View:      es.votingBlock.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       es.votingBlock.BlockID,
+		View:          es.votingBlock.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
@@ -852,10 +852,10 @@ func createBlockWithQC(view uint64, qcview uint64) *model.Block {
 
 func createQC(parent *model.Block) *flow.QuorumCertificate {
 	qc := &flow.QuorumCertificate{
-		BlockID:   parent.BlockID,
-		View:      parent.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       parent.BlockID,
+		View:          parent.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	return qc
 }

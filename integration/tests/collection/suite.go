@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -96,14 +97,16 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	// instantiate the network
 	nodes = append(nodes, colNodes...)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
 
 	// start the network
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	var err error
+	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	require.NoError(suite.T(), err)
 	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost
@@ -144,7 +147,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	suite.Require().True(ok)
 
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
-	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
 }

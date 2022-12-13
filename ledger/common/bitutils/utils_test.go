@@ -23,6 +23,18 @@ func TestBitVectorAllocation(t *testing.T) {
 	}
 }
 
+// Test_PaddedByteSliceLength tests that MinimalByteSliceLength returns the
+func Test_PaddedByteSliceLength(t *testing.T) {
+	for bits := 0; bits <= 127; bits++ {
+		numBytes := bits / 8 // integer division with floor
+		if bits%8 > 0 {
+			numBytes += 1
+		}
+
+		assert.Equal(t, numBytes, MinimalByteSliceLength(bits))
+	}
+}
+
 func TestBitTools(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("rand seed is %d", seed)

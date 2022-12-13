@@ -13,8 +13,8 @@ type Identifiers interface {
 	// false if it was already in the mempool.
 	Add(id flow.Identifier) bool
 
-	// Rem removes the given identifier
-	Rem(id flow.Identifier) bool
+	// Remove removes the given identifier
+	Remove(id flow.Identifier) bool
 
 	// Size returns total number of identifiers in mempool
 	Size() uint

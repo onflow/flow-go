@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,6 +31,7 @@ type ResolverMetrics interface {
 
 type NetworkMetrics interface {
 	ResolverMetrics
+	DHTMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
@@ -317,8 +319,20 @@ type LedgerMetrics interface {
 }
 
 type WALMetrics interface {
-	// DiskSize records the amount of disk space used by the storage (in bytes)
-	DiskSize(uint64)
+}
+
+type ExecutionDataRequesterMetrics interface {
+	// ExecutionDataFetchStarted records an in-progress download
+	ExecutionDataFetchStarted()
+
+	// ExecutionDataFetchFinished records a completed download
+	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// NotificationSent reports that ExecutionData received notifications were sent for a block height
+	NotificationSent(height uint64)
+
+	// FetchRetried reports that a download retry was processed
+	FetchRetried()
 }
 
 type RuntimeMetrics interface {
@@ -347,7 +361,7 @@ type ExecutionDataProviderMetrics interface {
 	AddBlobsFailed()
 }
 
-type ExecutionDataRequesterMetrics interface {
+type ExecutionDataRequesterV2Metrics interface {
 	FulfilledHeight(blockHeight uint64)
 	ReceiptSkipped()
 	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
@@ -358,6 +372,29 @@ type ExecutionDataRequesterMetrics interface {
 
 type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
+}
+
+type AccessMetrics interface {
+	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
+	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
+
+	// ConnectionFromPoolReused tracks the number of times a connection to a collection/execution node is reused from the connection pool
+	ConnectionFromPoolReused()
+
+	// ConnectionAddedToPool tracks the number of times a collection/execution node is added to the connection pool
+	ConnectionAddedToPool()
+
+	// NewConnectionEstablished tracks the number of times a new grpc connection is established
+	NewConnectionEstablished()
+
+	// ConnectionFromPoolInvalidated tracks the number of times a cached grpc connection is invalidated and closed
+	ConnectionFromPoolInvalidated()
+
+	// ConnectionFromPoolUpdated tracks the number of times a cached connection is updated
+	ConnectionFromPoolUpdated()
+
+	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
+	ConnectionFromPoolEvicted()
 }
 
 type ExecutionMetrics interface {
@@ -389,11 +426,11 @@ type ExecutionMetrics interface {
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
-	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
+	// ExecutionTransactionExecuted reports the total time, computation and memory spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64, eventCounts int, failed bool)
 
-	// ExecutionScriptExecuted reports the time spent on executing an script
-	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
+	// ExecutionScriptExecuted reports the time and memory spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
@@ -407,9 +444,21 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadStarted()
 
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+
+	UpdateCollectionMaxHeight(height uint64)
+}
+
+type BackendScriptsMetrics interface {
+	// Record the round trip time while executing a script
+	ScriptExecuted(dur time.Duration, size int)
 }
 
 type TransactionMetrics interface {
+	BackendScriptsMetrics
+
+	// Record the round trip time while getting a transaction result
+	TransactionResultFetched(dur time.Duration, size int)
+
 	// TransactionReceived starts tracking of transaction execution/finalization/sealing
 	TransactionReceived(txID flow.Identifier, when time.Time)
 
@@ -426,6 +475,9 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {
@@ -470,4 +522,24 @@ type HeroCacheMetrics interface {
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 	OnEntityEjectionDueToEmergency()
+}
+
+type ChainSyncMetrics interface {
+	// record pruned blocks. requested and received times might be zero values
+	PrunedBlockById(status *chainsync.Status)
+
+	PrunedBlockByHeight(status *chainsync.Status)
+
+	// totalByHeight and totalById are the number of blocks pruned for blocks requested by height and by id
+	// storedByHeight and storedById are the number of blocks still stored by height and id
+	PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int)
+
+	RangeRequested(ran chainsync.Range)
+
+	BatchRequested(batch chainsync.Batch)
+}
+
+type DHTMetrics interface {
+	RoutingTablePeerAdded()
+	RoutingTablePeerRemoved()
 }

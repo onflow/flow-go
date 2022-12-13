@@ -26,6 +26,7 @@ import (
 type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
+	blockStore   blockstore.Blockstore
 	reprovider   provider.Reprovider
 	config       *BlobServiceConfig
 }
@@ -45,9 +46,19 @@ func WithReprovideInterval(d time.Duration) network.BlobServiceOption {
 	}
 }
 
+// WithBitswapOptions sets additional options for Bitswap exchange
 func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		bs.(*blobService).config.BitswapOptions = opts
+	}
+}
+
+// WithHashOnRead sets whether or not the blobstore will rehash the blob data on read
+// When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
+// match its CID
+func WithHashOnRead(enabled bool) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).blockStore.HashOnRead(enabled)
 	}
 }
 
@@ -59,12 +70,13 @@ func NewBlobService(
 	ds datastore.Batching,
 	opts ...network.BlobServiceOption,
 ) *blobService {
-	bstore := blockstore.NewBlockstore(ds)
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
-	config := &BlobServiceConfig{
-		ReprovideInterval: 12 * time.Hour,
+	bs := &blobService{
+		config: &BlobServiceConfig{
+			ReprovideInterval: 12 * time.Hour,
+		},
+		blockStore: blockstore.NewBlockstore(ds),
 	}
-	bs := &blobService{config: config}
 
 	for _, opt := range opts {
 		opt(bs)
@@ -72,12 +84,12 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore, config.BitswapOptions...))
+			bs.blockService = blockservice.New(bs.blockStore, bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...))
 
 			ready()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.reprovider = simple.NewReprovider(ctx, config.ReprovideInterval, r, simple.NewBlockstoreProvider(bstore))
+			bs.reprovider = simple.NewReprovider(ctx, bs.config.ReprovideInterval, r, simple.NewBlockstoreProvider(bs.blockStore))
 
 			ready()
 

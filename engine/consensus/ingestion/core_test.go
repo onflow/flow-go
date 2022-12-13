@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -64,7 +66,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.execID = exec.NodeID
 	suite.verifID = verif.NodeID
 
-	clusters := flow.ClusterList{flow.IdentityList{coll}}
+	clusters := flow.IdentityList{coll}
 
 	identities := flow.IdentityList{access, con, coll, exec, verif}
 	suite.finalIdentities = identities.Copy()
@@ -79,12 +81,13 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
 	pool := &mockmempool.Guarantees{}
+	cluster := &mockprotocol.Cluster{}
 
 	// this state basically works like a normal protocol state
 	// returning everything correctly, using the created header
 	// as head of the protocol state
 	state.On("Final").Return(final)
-	final.On("Head").Return(&head, nil)
+	final.On("Head").Return(head, nil)
 	final.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {
 			identity, _ := suite.finalIdentities.ByNodeID(nodeID)
@@ -106,7 +109,8 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	suite.epoch.On("Clustering").Return(clusters, nil)
+	cluster.On("Members").Return(clusters)
+	suite.epoch.On("ClusterByChainID", head.ChainID).Return(cluster, nil)
 
 	state.On("AtBlockID", mock.Anything).Return(ref)
 	ref.On("Identity", mock.Anything).Return(
@@ -124,14 +128,14 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 
 	// we need to return the head as it's also used as reference block
-	headers.On("ByBlockID", head.ID()).Return(&head, nil)
+	headers.On("ByBlockID", head.ID()).Return(head, nil)
 
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
 
 	ingest := NewCore(unittest.Logger(), tracer, metrics, state, headers, pool)
 
-	suite.head = &head
+	suite.head = head
 	suite.final = final
 	suite.ref = ref
 	suite.headers = headers
@@ -195,7 +199,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantors() {
 	// create a guarantee without any signers
 	guarantee := suite.validGuarantee()
-	guarantee.SignerIDs = nil
+	guarantee.SignerIndices = nil
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -210,35 +214,12 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantors() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 }
 
-// TestOnGuaranteeInvalidRole verifies that a collection is rejected if any of
-// the signers has a role _different_ than collection.
-// We expect an engine.InvalidInputError.
-func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidRole() {
-	for _, invalidSigner := range []flow.Identifier{suite.accessID, suite.conID, suite.execID, suite.verifID} {
-		// add signer with role other than collector
-		guarantee := suite.validGuarantee()
-		guarantee.SignerIDs = append(guarantee.SignerIDs, invalidSigner)
-
-		// the guarantee is not part of the memory pool
-		suite.pool.On("Has", guarantee.ID()).Return(false)
-		suite.pool.On("Add", guarantee).Return(true)
-
-		// submit the guarantee as if it was sent by a consensus node
-		err := suite.core.OnGuarantee(suite.collID, guarantee)
-		suite.Assert().Error(err, "should error with missing guarantor")
-		suite.Assert().True(engine.IsInvalidInputError(err))
-
-		// check that the guarantee has _not_ been added to the mempool
-		suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
-	}
-}
-
 func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 
 	// create an alternative block
 	header := unittest.BlockHeaderFixture()
 	header.Height = suite.head.Height - flow.DefaultTransactionExpiry - 1
-	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil)
+	suite.headers.On("ByBlockID", header.ID()).Return(header, nil)
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
@@ -262,7 +243,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 
 	// create a guarantee  and add random (unknown) signer ID
 	guarantee := suite.validGuarantee()
-	guarantee.SignerIDs = append(guarantee.SignerIDs, unittest.IdentifierFixture())
+	guarantee.SignerIndices = []byte{4}
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -271,7 +252,8 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
-	suite.Assert().True(engine.IsInvalidInputError(err))
+	suite.Assert().True(engine.IsInvalidInputError(err), err)
+	suite.Assert().True(signature.IsInvalidSignerIndicesError(err), err)
 
 	// check that the guarantee has _not_ been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
@@ -324,7 +306,13 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 // validGuarantee returns a valid collection guarantee based on the suite state.
 func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ChainID = suite.head.ChainID
+
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{suite.collID}, []flow.Identifier{suite.collID})
+	require.NoError(suite.T(), err)
+
+	guarantee.SignerIndices = signerIndices
 	guarantee.ReferenceBlockID = suite.head.ID()
 	return guarantee
 }

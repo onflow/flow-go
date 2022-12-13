@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/rs/zerolog"
 
@@ -43,9 +44,6 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -57,9 +55,24 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
+	const (
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep)
+	if err != nil {
+		return fmt.Errorf("cannot create compactor: %w", err)
+	}
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
 	var migrations []ledger.Migration
-	var rs map[string]ledger.Reporter
-	extractionReportName := "extractionReport"
+	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
 
 	if migrate {
@@ -67,14 +80,12 @@ func extractExecutionState(
 			Log:       log,
 			OutputDir: outputDir,
 		}
-
-		orderedMapMigration := mgr.OrderedMapMigration{
-			Log:       log,
-			OutputDir: dir,
-		}
+		accountStatusMigration := mgr.NewAccountStatusMigration(log)
+		legacyControllerMigration := mgr.LegacyControllerMigration{Logger: log}
 
 		migrations = []ledger.Migration{
-			orderedMapMigration.Migrate,
+			accountStatusMigration.Migrate,
+			legacyControllerMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
@@ -86,28 +97,33 @@ func extractExecutionState(
 		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		rs = map[string]ledger.Reporter{
-			// The ExportReporter needs to be run first so that it can be used
-			// immediately after execution
-			extractionReportName: reporters.NewExportReporter(log,
+		preCheckpointReporters = []ledger.Reporter{
+			// report epoch counter which is needed for finalizing root block
+			reporters.NewExportReporter(log,
 				chain,
 				func() flow.StateCommitment { return targetHash },
-				func() flow.StateCommitment { return flow.StateCommitment(newState) },
 			),
-			"account": &reporters.AccountReporter{
+		}
+
+		postCheckpointReporters = []ledger.Reporter{
+			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
 			},
-			"newFungibleTokenTracker": reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			&reporters.AtreeReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
+			},
 		}
 	}
 
-	newState, err = led.ExportCheckpointAt(
+	migratedState, err := led.ExportCheckpointAt(
 		newState,
 		migrations,
-		rs,
-		extractionReportName,
+		preCheckpointReporters,
+		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
@@ -118,8 +134,8 @@ func extractExecutionState(
 
 	log.Info().Msgf(
 		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
+		migratedState.String(),
+		migratedState.Base64(),
 	)
 
 	return nil

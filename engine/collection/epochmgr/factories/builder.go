@@ -1,7 +1,10 @@
 package factories
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	builder "github.com/onflow/flow-go/module/builder/collection"
@@ -18,6 +21,7 @@ type BuilderFactory struct {
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
 	pusher           network.Engine // engine for pushing finalized collection to consensus committee
+	log              zerolog.Logger
 }
 
 func NewBuilderFactory(
@@ -26,6 +30,7 @@ func NewBuilderFactory(
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
 	pusher network.Engine,
+	log zerolog.Logger,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 
@@ -35,6 +40,7 @@ func NewBuilderFactory(
 		trace:            trace,
 		metrics:          metrics,
 		pusher:           pusher,
+		log:              log,
 		opts:             opts,
 	}
 	return factory, nil
@@ -46,15 +52,19 @@ func (f *BuilderFactory) Create(
 	pool mempool.Transactions,
 ) (module.Builder, *finalizer.Finalizer, error) {
 
-	build := builder.NewBuilder(
+	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
 		f.mainChainHeaders,
 		clusterHeaders,
 		clusterPayloads,
 		pool,
+		f.log,
 		f.opts...,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create builder: %w", err)
+	}
 
 	final := finalizer.NewFinalizer(
 		f.db,

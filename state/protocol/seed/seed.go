@@ -3,7 +3,7 @@ package seed
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
@@ -34,7 +34,7 @@ const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
 func FromParentQCSignature(sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
-	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
+	randomBeaconSig, err := model.UnpackRandomBeaconSig(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}

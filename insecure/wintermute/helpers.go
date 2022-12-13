@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/insecure"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,7 +25,7 @@ func chunkDataPackRequestForReceipts(
 	// returns:
 	// map of chunk ids -> chunk data pack requests from each of corrupted verification nodes.
 	// list of chunk ids in the receipt.
-) (map[flow.Identifier][]*insecure.Event, flow.IdentifierList) {
+) (map[flow.Identifier][]*insecure.EgressEvent, flow.IdentifierList) {
 
 	// stratifies result ids based on executor.
 	executorIds := make(map[flow.Identifier]flow.IdentifierList)
@@ -35,7 +35,7 @@ func chunkDataPackRequestForReceipts(
 	}
 
 	chunkIds := flow.IdentifierList{}
-	cdpReqMap := make(map[flow.Identifier][]*insecure.Event)
+	cdpReqMap := make(map[flow.Identifier][]*insecure.EgressEvent)
 	for _, receipt := range receipts {
 		result := receipt.ExecutionResult
 		for _, chunk := range result.Chunks {
@@ -51,13 +51,13 @@ func chunkDataPackRequestForReceipts(
 			}
 			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
 
-			requests := make([]*insecure.Event, 0)
+			requests := make([]*insecure.EgressEvent, 0)
 
 			// creates a request event per verification node
 			for _, verId := range corVnIds {
-				event := &insecure.Event{
+				event := &insecure.EgressEvent{
 					CorruptedNodeId:   verId,
-					Channel:           engine.RequestChunks,
+					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         executorIds[result.ID()],
@@ -81,12 +81,12 @@ func receiptsWithSameResultFixture(
 	count int, // total receipts per execution id.
 	exeIds flow.IdentifierList, // identifier of execution nodes.
 	targetIds flow.IdentifierList, // target recipients of the execution receipts.
-) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
+) (map[flow.Identifier]*insecure.EgressEvent, []*flow.ExecutionReceipt) {
 	// list of execution receipts
 	receipts := make([]*flow.ExecutionReceipt, 0)
 
 	// map of execution receipt ids to their event.
-	eventMap := make(map[flow.Identifier]*insecure.Event)
+	eventMap := make(map[flow.Identifier]*insecure.EgressEvent)
 
 	// generates "count"-many receipts per execution nodes with the same
 	// set of results.
@@ -116,10 +116,10 @@ func receiptsWithSameResultFixture(
 }
 
 // executionReceiptEvent creates the attack network event of the corresponding execution receipt.
-func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.Event {
-	return &insecure.Event{
+func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
+	return &insecure.EgressEvent{
 		CorruptedNodeId:   receipt.ExecutorID,
-		Channel:           engine.PushReceipts,
+		Channel:           channels.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetIds:         targetIds,
 		FlowProtocolEvent: receipt,
@@ -127,9 +127,9 @@ func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.Identi
 }
 
 // chunkDataPackResponseForReceipts creates and returns chunk data pack response as well as their corresponding events for the given set of receipts.
-func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds flow.IdentifierList) ([]*insecure.Event, flow.IdentifierList) {
+func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds flow.IdentifierList) ([]*insecure.EgressEvent, flow.IdentifierList) {
 	chunkIds := flow.IdentifierList{}
-	responseList := make([]*insecure.Event, 0)
+	responseList := make([]*insecure.EgressEvent, 0)
 
 	for _, receipt := range receipts {
 		result := receipt.ExecutionResult
@@ -148,9 +148,9 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 
 			// creates a request event per verification node
 			for _, verId := range verIds {
-				event := &insecure.Event{
+				event := &insecure.EgressEvent{
 					CorruptedNodeId:   receipt.ExecutorID,
-					Channel:           engine.RequestChunks,
+					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         flow.IdentifierList{verId},
@@ -192,7 +192,7 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 // An execution receipt is "bounced" back when orchestrator doesn't tamper with it, and let it go to the flow network as it is.
 func orchestratorOutputSanityCheck(
 	t *testing.T,
-	outputEvents []*insecure.Event, // list of all output events of the wintermute orchestrator.
+	outputEvents []*insecure.EgressEvent, // list of all output events of the wintermute orchestrator.
 	corrEnIds flow.IdentifierList, // list of all corrupted execution node ids.
 	orgReceiptIds flow.IdentifierList, // list of all execution receipt ids originally sent to orchestrator.
 	expBouncedReceiptCount int, // expected number of execution receipts that must remain uncorrupted.
@@ -201,24 +201,29 @@ func orchestratorOutputSanityCheck(
 	// keeps a map of (corrupted results ids -> execution node ids)
 	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
 
-	// keeps a list of all bounced back events.
-	bouncedReceipts := flow.IdentifierList{}
+	// keeps a list of all pass through receipts.
+	passThroughReceipts := flow.IdentifierList{}
 
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
-			// makes sure sender is a corrupted execution node.
-			ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
-			require.True(t, ok)
-			// uses union to avoid adding duplicate.
-			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
-		case *flow.ExecutionResult:
-			resultId := event.ID()
-			if dictatedResults[resultId] == nil {
-				dictatedResults[resultId] = flow.IdentifierList{}
+			if len(event.ExecutorSignature.Bytes()) != 0 {
+				// a receipt with a non-empty signature is a pass-through receipt.
+				// makes sure sender is a corrupted execution node.
+				ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
+				require.True(t, ok)
+				// uses union to avoid adding duplicate.
+				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
+			} else {
+				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
+				// the rest of receipt will be filled by the corrupted node
+				resultId := event.ExecutionResult.ID()
+				if dictatedResults[resultId] == nil {
+					dictatedResults[resultId] = flow.IdentifierList{}
+				}
+				// uses union to avoid adding duplicate.
+				dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 			}
-			// uses union to avoid adding duplicate.
-			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 		}
 	}
 
@@ -229,14 +234,14 @@ func orchestratorOutputSanityCheck(
 		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)
 	}
 
-	// number of bounced receipts should match the expected value.
-	actualBouncedReceiptCount := 0
+	// number of passed through receipts should match the expected value.
+	actualPassedThroughReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
-		if bouncedReceipts.Contains(originalReceiptId) {
-			actualBouncedReceiptCount++
+		if passThroughReceipts.Contains(originalReceiptId) {
+			actualPassedThroughReceiptCount++
 		}
 	}
-	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
+	require.Equal(t, expBouncedReceiptCount, actualPassedThroughReceiptCount)
 }
 
 // receiptsWithDistinctResultFixture creates a set of execution receipts (with distinct result) one per given executor id.
@@ -246,13 +251,13 @@ func receiptsWithDistinctResultFixture(
 	count int,
 	exeIds flow.IdentifierList,
 	targetIds flow.IdentifierList,
-) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
+) (map[flow.Identifier]*insecure.EgressEvent, []*flow.ExecutionReceipt) {
 
 	// list of execution receipts
 	receipts := make([]*flow.ExecutionReceipt, 0)
 
 	// map of execution receipt ids to their event.
-	eventMap := make(map[flow.Identifier]*insecure.Event)
+	eventMap := make(map[flow.Identifier]*insecure.EgressEvent)
 
 	for i := 0; i < count; i++ {
 		for _, exeId := range exeIds {

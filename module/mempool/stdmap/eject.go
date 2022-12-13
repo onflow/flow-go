@@ -85,7 +85,7 @@ func EjectTrueRandomFast(b *Backend) bool {
 	i := 0                       // index into the entities map
 	for entityID, entity := range b.backData.All() {
 		if i == next2Remove {
-			b.backData.Rem(entityID) // remove entity
+			b.backData.Remove(entityID) // remove entity
 			for _, callback := range b.ejectionCallbacks {
 				callback(entity) // notify callback
 			}

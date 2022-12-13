@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
-	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/onflow/cadence/runtime/parser"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -50,12 +50,8 @@ type TransactionValidationOptions struct {
 	AllowUnknownReferenceBlockID bool
 	MaxGasLimit                  uint64
 	CheckScriptsParse            bool
-	// MaxAddressIndex is a simple spam prevention measure. It rejects any
-	// transactions referencing an address with index newer than the specified
-	// maximum. A zero value indicates no address checking.
-	MaxAddressIndex        uint64
-	MaxTransactionByteSize uint64
-	MaxCollectionByteSize  uint64
+	MaxTransactionByteSize       uint64
+	MaxCollectionByteSize        uint64
 }
 
 type TransactionValidator struct {
@@ -229,7 +225,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
 	if v.options.CheckScriptsParse {
-		_, err := parser2.ParseProgram(string(tx.Script))
+		_, err := parser.ParseProgram(string(tx.Script), nil)
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
@@ -241,23 +237,8 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error 
 func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 
 	for _, address := range append(tx.Authorizers, tx.Payer) {
-		// first we check objective validity, essentially whether or not this
-		// is a valid output of the address generator
+		// we check whether this is a valid output of the address generator
 		if !v.chain.IsValid(address) {
-			return InvalidAddressError{Address: address}
-		}
-
-		// skip second check if not configured
-		if v.options.MaxAddressIndex == 0 {
-			continue
-		}
-
-		// next we check subjective validity based on the configured maximum index
-		index, err := v.chain.IndexFromAddress(address)
-		if err != nil {
-			return fmt.Errorf("could not get index for address (%s): %w", address, err)
-		}
-		if index > v.options.MaxAddressIndex {
 			return InvalidAddressError{Address: address}
 		}
 	}
@@ -267,13 +248,16 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 
 // every key (account, key index combination) can only be used once for signing
 func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
-	observedSigs := make(map[string]bool)
+	type uniqueKey struct {
+		address flow.Address
+		index   uint64
+	}
+	observedSigs := make(map[uniqueKey]bool)
 	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
-		keyStr := sig.UniqueKeyString()
-		if observedSigs[keyStr] {
+		if observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] {
 			return DuplicatedSignatureError{Address: sig.Address, KeyIndex: sig.KeyIndex}
 		}
-		observedSigs[keyStr] = true
+		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
 	return nil
 }

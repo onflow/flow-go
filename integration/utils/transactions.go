@@ -2,11 +2,14 @@ package utils
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	fttemplates "github.com/onflow/flow-ft/lib/go/templates"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
+	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -63,7 +66,7 @@ func MakeStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey string,
+	machineKey *sdk.AccountKey,
 ) (*sdk.Transaction, error) {
 	accountKey := stakingAccount.Keys[stakingAccountKeyID]
 	tx := sdk.NewTransaction().
@@ -110,14 +113,24 @@ func MakeStakingCollectionRegisterNodeTx(
 		return nil, err
 	}
 
-	machineKeyCDC, _ := cadence.NewString(machineKey)
-	publicKeys := make([]cadence.Value, 1)
-	publicKeys[0] = machineKeyCDC
-	publicKeysCDC := cadence.NewArray(publicKeys)
+	if machineKey != nil {
+		// for collection/consensus nodes, register the machine account key
+		publicKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(machineKey)
+		if err != nil {
+			return nil, err
+		}
+		publicKeysCDC := cadence.NewArray([]cadence.Value{publicKey})
 
-	err = tx.AddArgument(cadence.NewOptional(publicKeysCDC))
-	if err != nil {
-		return nil, err
+		err = tx.AddArgument(cadence.NewOptional(publicKeysCDC))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// for other nodes, pass nil to avoid registering any machine account key
+		err = tx.AddArgument(cadence.NewOptional(nil))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)

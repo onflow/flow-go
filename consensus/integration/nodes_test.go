@@ -343,23 +343,23 @@ func createNode(
 ) *Node {
 
 	db, dbDir := unittest.TempBadgerDB(t)
-	metrics := metrics.NewNoopCollector()
+	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headersDB := storage.NewHeaders(metrics, db)
-	guaranteesDB := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
-	sealsDB := storage.NewSeals(metrics, db)
-	indexDB := storage.NewIndex(metrics, db)
-	resultsDB := storage.NewExecutionResults(metrics, db)
-	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB, storage.DefaultCacheSize)
+	headersDB := storage.NewHeaders(metricsCollector, db)
+	guaranteesDB := storage.NewGuarantees(metricsCollector, db, storage.DefaultCacheSize)
+	sealsDB := storage.NewSeals(metricsCollector, db)
+	indexDB := storage.NewIndex(metricsCollector, db)
+	resultsDB := storage.NewExecutionResults(metricsCollector, db)
+	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
-	setupsDB := storage.NewEpochSetups(metrics, db)
-	commitsDB := storage.NewEpochCommits(metrics, db)
-	statusesDB := storage.NewEpochStatuses(metrics, db)
+	setupsDB := storage.NewEpochSetups(metricsCollector, db)
+	commitsDB := storage.NewEpochCommits(metricsCollector, db)
+	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
 	consumer := events.NewDistributor()
 
-	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
+	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
@@ -422,7 +422,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
+	build, err := builder.NewBuilder(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
 		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
 
@@ -445,7 +445,7 @@ func createNode(
 	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
-	syncCore, err := synccore.New(log, synccore.DefaultConfig())
+	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
 	require.NoError(t, err)
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
@@ -453,7 +453,7 @@ func createNode(
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	validator := consensus.NewValidator(metrics, committee, forks)
+	validator := consensus.NewValidator(metricsCollector, committee, forks)
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}
@@ -504,10 +504,10 @@ func createNode(
 	// initialize the compliance engine
 	compCore, err := compliance.NewCore(
 		log,
-		metrics,
+		metricsCollector,
 		tracer,
-		metrics,
-		metrics,
+		metricsCollector,
+		metricsCollector,
 		cleaner,
 		headersDB,
 		payloadsDB,
@@ -534,7 +534,7 @@ func createNode(
 	// initialize the synchronization engine
 	sync, err := synceng.New(
 		log,
-		metrics,
+		metricsCollector,
 		net,
 		me,
 		blocksDB,
@@ -548,7 +548,7 @@ func createNode(
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(
 		log,
-		metrics,
+		metricsCollector,
 		build,
 		comp,
 		rootHeader,

@@ -41,7 +41,7 @@ func TestPendingReceipts(t *testing.T) {
 		actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 		require.Equal(t, []*flow.ExecutionReceipt{r}, actual)
 
-		deleted := pool.Rem(r.ID())
+		deleted := pool.Remove(r.ID())
 		require.True(t, deleted)
 
 		actual = pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
@@ -83,7 +83,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			r := rs[i]
-			ok := pool.Rem(r.ID())
+			ok := pool.Remove(r.ID())
 			require.True(t, ok)
 		}
 
@@ -145,7 +145,7 @@ func TestPendingReceipts(t *testing.T) {
 		// since there are 60 left, should remove 60 in total
 		total = 0
 		for i := 0; i < 100; i++ {
-			ok := pool.Rem(rs[i].ID())
+			ok := pool.Remove(rs[i].ID())
 			if ok {
 				total++
 			}
@@ -175,7 +175,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
-			ok := pool.Rem(r.ID())
+			ok := pool.Remove(r.ID())
 			require.True(t, ok)
 		})
 

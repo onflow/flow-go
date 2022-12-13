@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -212,7 +213,7 @@ func TestClusters(t *testing.T) {
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
-	clusterQCs := unittest.QuorumCertificatesFixtures(uint(nClusters))
+	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
 
@@ -220,7 +221,7 @@ func TestClusters(t *testing.T) {
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
-		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
+		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
@@ -259,6 +260,30 @@ func TestSealingSegment(t *testing.T) {
 			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(head.ID()))
+		})
+	})
+
+	// test sealing segment for non-root segment where the latest seal is the
+	// root seal, but the segment contains more than the root block.
+	// ROOT <- B1
+	// Expected sealing segment: [ROOT, B1]
+	t.Run("non-root with root seal as latest seal", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// build an extra block on top of root
+			block1 := unittest.BlockWithParentFixture(head)
+			buildBlock(t, state, block1)
+
+			segment, err := state.AtBlockID(block1.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			// build a valid child B2 to ensure we have a QC
+			buildBlock(t, state, unittest.BlockWithParentFixture(block1.Header))
+
+			// sealing segment should contain B1 and B2
+			// B2 is reference of snapshot, B1 is latest sealed
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Lowest(), block1}, segment.Blocks)
+			assert.Len(t, segment.ExecutionResults, 1)
+			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
 		})
 	})
 
@@ -694,7 +719,7 @@ func TestQuorumCertificate(t *testing.T) {
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Nil(t, err)
 			// should have signatures from valid child (block 2)
-			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
+			assert.Equal(t, block2.Header.ParentVoterIndices, qc.SignerIndices)
 			assert.Equal(t, block2.Header.ParentVoterSigData, qc.SigData)
 			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)

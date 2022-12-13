@@ -110,13 +110,13 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 // TestStakingSigner_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
 func TestStakingSigner_VerifyQC(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(&header, header.View-1)
+	block := model.BlockFromFlow(header, header.View-1)
 	sigData := unittest.RandomBytes(127)
 
 	verifier := NewStakingVerifier()
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInvalidFormatError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInvalidFormatError(err))
 }

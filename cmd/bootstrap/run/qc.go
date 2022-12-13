@@ -73,6 +73,11 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 		}
 	}
 
+	if createdQC == nil {
+		return nil, fmt.Errorf("QC is not created, total number of votes %v, expect to have 2/3 votes of %v participants",
+			len(votes), len(identities))
+	}
+
 	// STEP 3: validate constructed QC
 	val, err := createValidator(committee)
 	if err != nil {

@@ -18,9 +18,13 @@ func (l *testLog) Logf(msg string, args ...interface{}) {
 func (l *testLog) Log(msg string) {
 	l.mux.Lock()
 	defer l.mux.Unlock()
+
 	l.logs = append(l.logs, msg)
 }
 
 func (l *testLog) Reset() {
+	l.mux.Lock()
+	defer l.mux.Unlock()
+
 	l.logs = []string{}
 }

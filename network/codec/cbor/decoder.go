@@ -7,6 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -24,23 +25,21 @@ func (d *Decoder) Decode() (interface{}, error) {
 	err := d.dec.Decode(data)
 	//binstat.LeaveVal(bs1, int64(len(data)))
 	if err != nil || len(data) == 0 {
-		return nil, fmt.Errorf("could not decode envelope; len(data)=%d: %w", len(data), err)
+		return nil, fmt.Errorf("could not decode message; len(data)=%d: %w", len(data), err)
 	}
 
-	code := data[0] // only first byte
-
-	what, v, err := envelopeCode2v(code)
+	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm>2(cbor)", what, code), int64(len(data))) // e.g. ~3net:strm>2(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], v) // all but first byte
+	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelop code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
-	return v, nil
+	return msgInterface, nil
 }

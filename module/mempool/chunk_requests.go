@@ -63,10 +63,10 @@ type ChunkRequests interface {
 	// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 	Add(request *verification.ChunkDataPackRequest) bool
 
-	// Rem provides deletion functionality from the memory pool.
-	// If there is a chunk request with this ID, Rem removes it and returns true.
+	// Remove provides deletion functionality from the memory pool.
+	// If there is a chunk request with this ID, Remove removes it and returns true.
 	// Otherwise, it returns false.
-	Rem(chunkID flow.Identifier) bool
+	Remove(chunkID flow.Identifier) bool
 
 	// PopAll atomically returns all locators associated with this chunk ID while clearing out the
 	// chunk request status for this chunk id.

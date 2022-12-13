@@ -39,6 +39,7 @@ import "unsafe"
 // A storageBuf is an aligned array of maxRate bytes.
 type storageBuf [maxRate / 8]uint64
 
+//go:nocheckptr ignore "pointer arithmetic result points to invalid allocation"
 func (b *storageBuf) asBytes() *[maxRate]byte {
 	// re-using a trick from https://github.com/golang/go/blob/master/src/runtime/stubs.go#L178:
 	// to hide the input pointer from escape analysis and avoid

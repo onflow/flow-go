@@ -102,20 +102,24 @@ go build -tags=relic
 All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`. All signatures are of the generic type `Signature`.
 
  * ECDSA
-    * public keys are uncompressed.
+    * public keys are compressed or uncompressed.
     * ephemeral key is derived from the private key, hash and an external entropy using a CSPRNG (based on https://golang.org/pkg/crypto/ecdsa/).
     * supports NIST P-256 (secp256r1) and secp256k1 curves.
 
  * BLS
     * supports [BLS 12-381](https://electriccoin.co/blog/new-snark-curve/) curve.
-    * is optimized for shorter signatures (on G1)
-    * public keys are longer (on G2)
-    * supports [compressed](https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) and uncompressed serialization of G1/G2 points.
-    * hash to curve is using the [optimized SWU map](https://eprint.iacr.org/2019/403.pdf).
-    * expanding the message is using KMAC 128 with a domain separation tag.
+    * is implementing the minimal-signature-size variant:
+    signatures in G1 and public keys in G2.
+    * default set-up uses [compressed](https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) G1/G2 points, 
+    but uncompressed format is also supported.
+    * hashing to curve uses the [Simplified SWU map-to-curve](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-6.6.3).
+    * expanding the message in hash-to-curve uses a cSHAKE-based KMAC128 with a domain separation tag.
+    KMAC128 serves as an expand_message_xof function.
+    * this results in the full ciphersuite BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for signatures
+    and BLS_POP_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for proofs of possession.
     * signature verification includes the signature membership check in G1.
     * public key membership check in G2 is provided outside of the signature verification.
-    * membership check in G1 is using [Bowe's fast check](https://eprint.iacr.org/2019/814.pdf), while membership check in G2 is using a simple scalar multiplication by the group order.
+    * membership check in G1 is using [Bowe's fast check](https://eprint.iacr.org/2019/814.pdf), while membership check in G2 is using a simple scalar multiplication by the group order (both will be updated to use Scott's method)
     * non-interactive aggregation of signatures, public keys and private keys.
     * multi-signature verification of an aggregated signature of a single message under multiple public keys.
     * multi-signature verification of an aggregated signature of multiple messages under multiple public keys.
@@ -124,8 +128,8 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * SPoCK scheme based on BLS: verifies two signatures have been generated from the same message that is unknown to the verifier.
 
  * Future features:
-    * membership checks in G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf).
-    * support a G1/G2 swap (signatures on G2 and public keys on G1).
+    * membership checks in G1/G2 using [Scotts's method](https://eprint.iacr.org/2021/1130.pdf).
+    * support minimal-pubkey-size variant
 
 ### PRNG
 

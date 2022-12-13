@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +55,7 @@ func (s *SealingEngineSuite) SetupTest() {
 		},
 	)
 
-	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles())).Head()
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{
@@ -73,7 +74,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	// setup inbound queues for trusted inputs and message handler for untrusted inputs
 	err = s.engine.setupTrustedInboundQueues()
 	require.NoError(s.T(), err)
-	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
+	err = s.engine.setupMessageHandler(unittest.NewSealingConfigs(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -86,9 +87,9 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
 
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -100,7 +101,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()
-	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(parentBlock)
 	incorporatedBlockID := incorporatedBlock.ID()
 	// setup payload fixture
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
@@ -117,10 +118,10 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 
 	// setup headers storage
 	headers := &mockstorage.Headers{}
-	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
+	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(&incorporatedBlock, incorporatedBlock.View-1))
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -165,7 +166,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -173,7 +174,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range responseApprovals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -192,7 +193,7 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
+	err := s.engine.Process(channels.ReceiveApprovals, originID, approval)
 	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// sealing engine has at least 100ms ticks for processing events

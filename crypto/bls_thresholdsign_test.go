@@ -43,7 +43,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		// generate signature shares
 		signers := make([]int, 0, n)
 		// hasher
-		kmac := NewBLSKMAC(thresholdSignatureTag)
+		kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
 		// fill the signers list and shuffle it
 		for i := 0; i < n; i++ {
 			signers = append(signers, i)
@@ -544,7 +544,7 @@ type statelessKeys struct {
 func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	n := proc.dkg.Size()
 	// Sign a share and broadcast it
-	kmac := NewBLSKMAC(thresholdSignatureTag)
+	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
 	ownSignShare, _ := proc.keys.myPrivateKey.Sign(thresholdSignatureMessage, kmac)
 	// the local valid signature shares
 	signShares := make([]Signature, 0, n)
@@ -612,7 +612,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
 		require.NoError(t, err)
 		// signature hasher
-		kmac := NewBLSKMAC(thresholdSignatureTag)
+		kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
 		// generate signature shares
 		signShares := make([]Signature, 0, n)
 		signers := make([]int, 0, n)

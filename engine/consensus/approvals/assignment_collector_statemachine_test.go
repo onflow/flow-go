@@ -39,7 +39,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		approvalConduit:                      s.Conduit,
 		requestTracker:                       s.RequestTracker,
 		requiredApprovalsForSealConstruction: 5,
-		executedBlock:                        &s.Block,
+		executedBlock:                        s.Block,
 		result:                               s.IncorporatedResult.Result,
 		resultID:                             s.IncorporatedResult.Result.ID(),
 	})
@@ -54,8 +54,8 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for i := range results {
-		block := unittest.BlockHeaderWithParentFixture(&s.Block)
-		s.Blocks[block.ID()] = &block
+		block := unittest.BlockHeaderWithParentFixture(s.Block)
+		s.Blocks[block.ID()] = block
 		result := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
@@ -105,12 +105,16 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	require.True(s.T(), ok)
 
 	for _, ir := range results {
+		verifyingCollector.lock.Lock()
 		collector, ok := verifyingCollector.collectors[ir.IncorporatedBlockID]
+		verifyingCollector.lock.Unlock()
 		require.True(s.T(), ok)
 
 		for _, approval := range approvals {
 			chunkCollector := collector.chunkCollectors[approval.Body.ChunkIndex]
+			chunkCollector.lock.Lock()
 			signed := chunkCollector.chunkApprovals.HasSigned(approval.Body.ApproverID)
+			chunkCollector.lock.Unlock()
 			require.True(s.T(), signed)
 		}
 	}

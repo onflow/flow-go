@@ -12,9 +12,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
-
+	"github.com/onflow/flow-go/admin/commands"
+	admincommon "github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
@@ -56,7 +56,9 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -98,28 +100,30 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                     error
-		mutableState            protocol.MutableState
-		beaconPrivateKey        *encodable.RandomBeaconPrivKey
-		guarantees              mempool.Guarantees
-		receipts                mempool.ExecutionTree
-		seals                   mempool.IncorporatedResultSeals
-		pendingReceipts         mempool.PendingReceipts
-		prov                    *provider.Engine
-		receiptRequester        *requester.Engine
-		syncCore                *chainsync.Core
-		comp                    *compliance.Engine
-		conMetrics              module.ConsensusMetrics
-		mainMetrics             module.HotstuffMetrics
-		receiptValidator        module.ReceiptValidator
-		chunkAssigner           *chmodule.ChunkAssigner
-		finalizationDistributor *pubsub.FinalizationDistributor
-		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
-		blockTimer              protocol.BlockTimer
-		finalizedHeader         *synceng.FinalizedHeaderCache
-		hotstuffModules         *consensus.HotstuffModules
-		dkgState                *bstorage.DKGState
-		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
+		err                          error
+		mutableState                 protocol.MutableState
+		beaconPrivateKey             *encodable.RandomBeaconPrivKey
+		guarantees                   mempool.Guarantees
+		receipts                     mempool.ExecutionTree
+		seals                        mempool.IncorporatedResultSeals
+		pendingReceipts              mempool.PendingReceipts
+		prov                         *provider.Engine
+		receiptRequester             *requester.Engine
+		syncCore                     *chainsync.Core
+		comp                         *compliance.Engine
+		conMetrics                   module.ConsensusMetrics
+		mainMetrics                  module.HotstuffMetrics
+		receiptValidator             module.ReceiptValidator
+		chunkAssigner                *chmodule.ChunkAssigner
+		finalizationDistributor      *pubsub.FinalizationDistributor
+		dkgBrokerTunnel              *dkgmodule.BrokerTunnel
+		blockTimer                   protocol.BlockTimer
+		finalizedHeader              *synceng.FinalizedHeaderCache
+		hotstuffModules              *consensus.HotstuffModules
+		dkgState                     *bstorage.DKGState
+		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
+		adminCmdSetRequiredApprovals commands.AdminCommand
+		getSealingConfigs            module.SealingConfigsGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -141,10 +145,10 @@ func main() {
 		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-		flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
-		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
-		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
@@ -180,7 +184,34 @@ func main() {
 		}).
 		Module("beacon keys", func(node *cmd.NodeConfig) error {
 			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
-			return err
+			return nil
+		}).
+		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
+			setter, err := updatable_configs.NewSealingConfigs(
+				requiredApprovalsForSealConstruction,
+				requiredApprovalsForSealVerification,
+				chunkAlpha,
+				emergencySealing,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			// update the getter with the setter, so other modules can only get, but not set
+			getSealingConfigs = setter
+
+			// admin tool is the only instance that have access to the setter interface, therefore, is
+			// the only module can change this config
+			adminCmdSetRequiredApprovals = admincommon.NewSetRequiredApprovalsForSealingCommand(setter)
+
+			return nil
+		}).
+		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return adminCmdSetRequiredApprovals
+		}).
+		AdminCommand("get-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return admincommon.NewGetRequiredApprovalsForSealingCommand(getSealingConfigs)
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -188,14 +219,6 @@ func main() {
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
-			}
-
-			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
-			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
-			}
-			if requiredApprovalsForSealConstruction > chunkAlpha {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
@@ -210,19 +233,15 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals)
 
-			sealValidator, err := validation.NewSealValidator(
+			sealValidator := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				requiredApprovalsForSealConstruction,
-				requiredApprovalsForSealVerification,
+				getSealingConfigs,
 				conMetrics)
-			if err != nil {
-				return fmt.Errorf("could not instantiate seal validator: %w", err)
-			}
 
 			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
 			if err != nil {
@@ -321,9 +340,16 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.NodeConfig) error {
-			// use a custom ejector so we don't eject seals that would break
+			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
+			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(
+				multipleReceiptsFilterMempool,
+				consensusMempools.LogForkAndCrash(node.Logger),
+				node.DB,
+				node.Logger,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
@@ -339,7 +365,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
@@ -388,10 +414,6 @@ func main() {
 
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
-			config := sealing.DefaultConfig()
-			config.EmergencySealingActive = emergencySealing
-			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
-
 			e, err := sealing.NewEngine(
 				node.Logger,
 				node.Tracer,
@@ -409,7 +431,7 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				seals,
-				config,
+				getSealingConfigs,
 			)
 
 			// subscribe for finalization events from hotstuff
@@ -425,7 +447,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.RequestReceiptsByBlockID,
+				channels.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
@@ -610,7 +632,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				seals,
 				receipts,
 				node.Tracer,
 				builder.WithBlockTimer(blockTimer),
@@ -818,7 +840,11 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(

@@ -42,6 +42,7 @@ const (
 	ContractServiceAccountFunction_defaultTokenBalance       = "defaultTokenBalance"
 	ContractServiceAccountFunction_deductTransactionFee      = "deductTransactionFee"
 	ContractStorageFeesFunction_calculateAccountCapacity     = "calculateAccountCapacity"
+	ContractStorageFeesFunction_calculateAccountsCapacity    = "calculateAccountsCapacity"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
 	ContractDeploymentAuditsFunction_useVoucherForDeploy     = "useVoucherForDeploy"
 )
@@ -152,7 +153,7 @@ var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
 var (
 	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
-	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet and Canary
+	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
 )
 
@@ -176,7 +177,15 @@ func init() {
 		ContractNameDKG:       stakingContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
-	contractAddressesByChainID[flow.Canary] = testnet
+
+	// Stagingnet test network
+	// All system contracts are deployed to the service account
+	stagingnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Stagingnet.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Stagingnet.Chain().ServiceAddress(),
+	}
+	contractAddressesByChainID[flow.Stagingnet] = stagingnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
@@ -187,5 +196,7 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient
+	contractAddressesByChainID[flow.BftTestnet] = transient
 	contractAddressesByChainID[flow.Benchnet] = transient
+
 }

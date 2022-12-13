@@ -61,8 +61,12 @@ func NewClusterCommittee(
 	return com, nil
 }
 
-func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-
+// Identities returns the identities of all cluster members that are authorized to
+// participate at the given block. The order of the identities is the canonical order.
+func (c *Cluster) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	// blockID is a collection block not a block produced by consensus,
+	// to query the identities from protocol state, we need to use the reference block id from the payload
+	//
 	// first retrieve the cluster block payload
 	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
@@ -74,14 +78,12 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 
 	// use the initial cluster members for root block
 	if isRootBlock {
-		return c.initialClusterMembers.Filter(selector), nil
+		return c.initialClusterMembers, nil
 	}
 
 	// otherwise use the snapshot given by the reference block
-	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
-		selector,
-		c.clusterMemberFilter,
-	))
+	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(c.clusterMemberFilter) // remove ejected nodes
+
 	return identities, err
 }
 

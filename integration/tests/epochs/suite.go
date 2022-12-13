@@ -2,18 +2,18 @@ package epochs
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -106,7 +106,7 @@ func (s *Suite) SetupTest() {
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
 
@@ -129,6 +129,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
+// TimedLogf logs the message using t.Log, but prefixes the current time.
+func (s *Suite) TimedLogf(msg string, args ...interface{}) {
+	args = append([]interface{}{time.Now().String()}, args...)
+	s.T().Logf("%s - "+msg, args...)
+}
+
 func (s *Suite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
@@ -139,16 +145,17 @@ func (s *Suite) TearDownTest() {
 // StakedNodeOperationInfo struct contains all the node information needed to
 // start a node after it is onboarded (staked and registered).
 type StakedNodeOperationInfo struct {
-	NodeID                  flow.Identifier
-	Role                    flow.Role
-	StakingAccountAddress   sdk.Address
-	FullAccountKey          *sdk.AccountKey
-	StakingAccountKey       sdkcrypto.PrivateKey
-	NetworkingKey           sdkcrypto.PrivateKey
-	StakingKey              sdkcrypto.PrivateKey
+	NodeID                flow.Identifier
+	Role                  flow.Role
+	StakingAccountAddress sdk.Address
+	FullAccountKey        *sdk.AccountKey
+	StakingAccountKey     sdkcrypto.PrivateKey
+	NetworkingKey         sdkcrypto.PrivateKey
+	StakingKey            sdkcrypto.PrivateKey
+	// machine account info defined only for consensus/collection nodes
 	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
-	MachineAccountPublicKey flow.AccountPublicKey
+	MachineAccountPublicKey *sdk.AccountKey
 	ContainerName           string
 }
 
@@ -193,13 +200,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	// if node has a machine account key encode it
-	var encMachinePubKey []byte
-	if machineAccountKey != nil {
-		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
-		require.NoError(s.T(), err)
-	}
-
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
@@ -214,7 +214,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
 		fmt.Sprintf("%f", stakeAmount),
-		hex.EncodeToString(encMachinePubKey),
+		machineAccountPubKey,
 	)
 
 	require.NoError(s.T(), err)
@@ -291,7 +291,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	networkingKey,
 	stakingKey,
 	machineAccountKey crypto.PrivateKey,
-	machineAccountPubKey flow.AccountPublicKey,
+	machineAccountPubKey *sdk.AccountKey,
 ) {
 	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
@@ -301,9 +301,9 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 
-		machineAccountPubKey = flow.AccountPublicKey{
+		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
-			SignAlgo:  machineAccountKey.PublicKey().Algorithm(),
+			SigAlgo:   machineAccountKey.PublicKey().Algorithm(),
 			HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 			Weight:    1000,
 		}
@@ -333,7 +333,8 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
 		env,
@@ -366,12 +367,13 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey string,
+	machineKey *sdk.AccountKey,
 ) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
 		env,
@@ -425,7 +427,8 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
 		env,
@@ -765,13 +768,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	}
 
 	// staking our new node and add get the corresponding container for that node
+	s.TimedLogf("staking joining node with role %s", role.String())
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)
+	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
+	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
 	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
+	s.TimedLogf("successfully removed node: %s", containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
+	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get latest snapshot and start new container
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -779,13 +788,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(s.ctx)
 
-	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	header, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+
+	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after the start of the next epoch before we pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
+	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+5)
 
-	//make sure container to replace removed from smart contract state
+	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
@@ -796,7 +811,9 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
+	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
+	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(s.ctx, env, snapshot, info)

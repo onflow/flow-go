@@ -10,18 +10,16 @@ import (
 )
 
 type RegisterID struct {
-	Owner      string
-	Controller string
-	Key        string
+	Owner string
+	Key   string
 }
 
-// this function returns a string format of a RegisterID in the form '%x/%x/%x'
+// this function returns a string format of a RegisterID in the form '%x/%x'
 // it has been optimized to avoid the memory allocations inside Sprintf
 func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
-	controllerLen := len(r.Controller)
 
-	requiredLen := ((ownerLen + controllerLen + len(r.Key)) * 2) + 2
+	requiredLen := ((ownerLen + len(r.Key)) * 2) + 1
 
 	arr := make([]byte, requiredLen)
 
@@ -29,11 +27,7 @@ func (r *RegisterID) String() string {
 
 	arr[2*ownerLen] = byte('/')
 
-	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
-
-	arr[2*(ownerLen+controllerLen)+1] = byte('/')
-
-	hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
+	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Key))
 
 	return string(arr)
 }
@@ -45,11 +39,10 @@ func (r *RegisterID) Bytes() []byte {
 	return fingerprint.Fingerprint(r)
 }
 
-func NewRegisterID(owner, controller, key string) RegisterID {
+func NewRegisterID(owner, key string) RegisterID {
 	return RegisterID{
-		Owner:      owner,
-		Controller: controller,
-		Key:        key,
+		Owner: owner,
+		Key:   key,
 	}
 }
 
@@ -71,8 +64,6 @@ func (d RegisterEntries) Len() int {
 func (d RegisterEntries) Less(i, j int) bool {
 	if d[i].Key.Owner != d[j].Key.Owner {
 		return d[i].Key.Owner < d[j].Key.Owner
-	} else if d[i].Key.Controller != d[j].Key.Controller {
-		return d[i].Key.Controller < d[j].Key.Controller
 	}
 	return d[i].Key.Key < d[j].Key.Key
 }
@@ -108,8 +99,11 @@ type StateCommitment hash.Hash
 // although it can represent a valid state commitment.
 var DummyStateCommitment = StateCommitment(hash.DummyHash)
 
-// ToStateCommitment converts a byte slice into a StateComitment.
+// ToStateCommitment converts a byte slice into a StateCommitment.
 // It returns an error if the slice has an invalid length.
+// The returned error indicates that the given byte slice is not a
+// valid root hash of an execution state.  As the function is
+// side-effect free, all failures are simply a no-op.
 func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	var state StateCommitment
 	if len(stateBytes) != len(state) {

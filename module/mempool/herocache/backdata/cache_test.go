@@ -311,8 +311,8 @@ func TestArrayBackData_All(t *testing.T) {
 	}
 }
 
-// TestArrayBackData_Rem checks correctness of removing elements from Cache.
-func TestArrayBackData_Rem(t *testing.T) {
+// TestArrayBackData_Remove checks correctness of removing elements from Cache.
+func TestArrayBackData_Remove(t *testing.T) {
 	tt := []struct {
 		limit uint32
 		items uint32
@@ -416,7 +416,7 @@ func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity
 	for removedCount := 0; removedCount < count; {
 		unittest.RequireReturnsBefore(t, func() {
 			index := rand.Int() % len(entities)
-			expected, removed := bd.Rem(entities[index].ID())
+			expected, removed := bd.Remove(entities[index].ID())
 			if !removed {
 				return
 			}
@@ -431,7 +431,7 @@ func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity
 // testRemoveRange is a test helper that removes specified range of entities from Cache.
 func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
-		expected, removed := bd.Rem(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].ID())
 		require.True(t, removed)
 		require.Equal(t, entities[i], expected)
 		// size sanity check after removal
@@ -443,7 +443,7 @@ func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, f
 func testCheckRangeRemoved(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
 		// both removal and retrieval must fail
-		expected, removed := bd.Rem(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].ID())
 		require.False(t, removed)
 		require.Nil(t, expected)
 

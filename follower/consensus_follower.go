@@ -9,12 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
@@ -33,15 +33,16 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPrivKey crypto.PrivateKey       // the network private key of this node
-	bootstrapNodes []BootstrapNodeInfo     // the bootstrap nodes to use
-	bindAddr       string                  // address to bind on
-	db             *badger.DB              // the badger DB storage to use for the protocol state
-	dataDir        string                  // directory to store the protocol state (if the badger storage is not provided)
-	bootstrapDir   string                  // path to the bootstrap directory
-	logLevel       string                  // log level
-	exposeMetrics  bool                    // whether to expose metrics
-	syncConfig     *synchronization.Config // sync core configuration
+	networkPrivKey   crypto.PrivateKey   // the network private key of this node
+	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
+	bindAddr         string              // address to bind on
+	db               *badger.DB          // the badger DB storage to use for the protocol state
+	dataDir          string              // directory to store the protocol state (if the badger storage is not provided)
+	bootstrapDir     string              // path to the bootstrap directory
+	logLevel         string              // log level
+	exposeMetrics    bool                // whether to expose metrics
+	syncConfig       *chainsync.Config   // sync core configuration
+	complianceConfig *compliance.Config  // follower engine configuration
 }
 
 type Option func(c *Config)
@@ -83,9 +84,15 @@ func WithExposeMetrics(expose bool) Option {
 	}
 }
 
-func WithSyncCoreConfig(config *synchronization.Config) Option {
+func WithSyncCoreConfig(config *chainsync.Config) Option {
 	return func(c *Config) {
 		c.syncConfig = config
+	}
+}
+
+func WithComplianceConfig(config *compliance.Config) Option {
+	return func(c *Config) {
+		c.complianceConfig = config
 	}
 }
 
@@ -109,12 +116,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	return ids
 }
 
-func getAccessNodeOptions(config *Config) []access.Option {
+func getFollowerServiceOptions(config *Config) []FollowerOption {
 	ids := bootstrapIdentities(config.bootstrapNodes)
-	return []access.Option{
-		access.WithBootStrapPeers(ids...),
-		access.WithBaseOptions(getBaseOptions(config)),
-		access.WithNetworkKey(config.networkPrivKey),
+	return []FollowerOption{
+		WithBootStrapPeers(ids...),
+		WithBaseOptions(getBaseOptions(config)),
+		WithNetworkKey(config.networkPrivKey),
 	}
 }
 
@@ -144,13 +151,15 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.syncConfig != nil {
 		options = append(options, cmd.WithSyncCoreConfig(*config.syncConfig))
 	}
+	if config.complianceConfig != nil {
+		options = append(options, cmd.WithComplianceConfig(*config.complianceConfig))
+	}
 
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessNodeBuilder, error) {
-	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
+func buildConsensusFollower(opts []FollowerOption) (*FollowerServiceBuilder, error) {
+	nodeBuilder := FlowConsensusFollowerService(opts...)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
@@ -186,8 +195,8 @@ func NewConsensusFollower(
 		opt(config)
 	}
 
-	accessNodeOptions := getAccessNodeOptions(config)
-	anb, err := buildAccessNode(accessNodeOptions)
+	accessNodeOptions := getFollowerServiceOptions(config)
+	anb, err := buildConsensusFollower(accessNodeOptions)
 	if err != nil {
 		return nil, err
 	}

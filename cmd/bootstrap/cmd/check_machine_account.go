@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/epochs"
@@ -62,7 +62,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")
 
-	flowClient, err := client.New(flagAccessAPIAddress, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(flagAccessAPIAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not connect to access API at address %s", flagAccessAPIAddress)
 	}

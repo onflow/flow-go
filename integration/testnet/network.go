@@ -14,33 +14,42 @@ import (
 	"testing"
 	"time"
 
+	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/insecure/cmd"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+	crypto2 "github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/cluster"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -71,6 +80,12 @@ const (
 	ColNodeAPIPort = "col-ingress-port"
 	// ExeNodeAPIPort is the name used for the execution node API port.
 	ExeNodeAPIPort = "exe-api-port"
+	// ObserverNodeAPIPort is the name used for the observer node API port.
+	ObserverNodeAPIPort = "observer-api-port"
+	// ObserverNodeAPISecurePort is the name used for the secure observer API port.
+	ObserverNodeAPISecurePort = "observer-api-secure-port"
+	// ObserverNodeAPIProxyPort is the name used for the observer node API HTTP proxy port.
+	ObserverNodeAPIProxyPort = "observer-api-http-proxy-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPISecurePort is the name used for the secure access API port.
@@ -133,6 +148,8 @@ type FlowNetwork struct {
 	network                     *testingdock.Network
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
+	ObserverPorts               map[string]string
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
@@ -141,6 +158,27 @@ type FlowNetwork struct {
 	seal                        *flow.Seal
 	BootstrapDir                string
 	BootstrapSnapshot           *inmem.Snapshot
+	BootstrapData               *BootstrapData
+}
+
+// CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
+func (net *FlowNetwork) CorruptedIdentities() flow.IdentityList {
+	// lists up the corrupted identifiers
+	corruptedIdentifiers := flow.IdentifierList{}
+	for _, c := range net.config.Nodes {
+		if c.Corrupted {
+			corruptedIdentifiers = append(corruptedIdentifiers, c.Identifier)
+		}
+	}
+
+	// extracts corrupted identities to corrupted identifiers
+	corruptedIdentities := flow.IdentityList{}
+	for _, c := range net.Containers {
+		if corruptedIdentifiers.Contains(c.Config.Identity().NodeID) {
+			corruptedIdentities = append(corruptedIdentities, c.Config.Identity())
+		}
+	}
+	return corruptedIdentities
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -316,7 +354,7 @@ type ConsensusFollowerConfig struct {
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
 	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
-	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
+	nodeID, err := p2p.NewPublicNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
 	return ConsensusFollowerConfig{
 		NetworkingPrivKey: networkingPrivKey,
@@ -427,6 +465,7 @@ func (n *NetworkConfig) Swap(i, j int) {
 // to network creation.
 type NodeConfig struct {
 	Role                  flow.Role
+	Corrupted             bool
 	Weight                uint64
 	Identifier            flow.Identifier
 	LogLevel              zerolog.Level
@@ -503,11 +542,25 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 	}
 }
 
+// AsCorrupted sets the configuration of a node as corrupted, hence the node is pulling
+// the corrupted image of its role at the build time.
+// A corrupted image is running with Corruptible Conduit Factory hence enabling BFT testing
+// on the node.
+func AsCorrupted() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		if config.Ghost {
+			panic("a node cannot be both corrupted and ghost at the same time")
+		}
+		config.Corrupted = true
+	}
+}
+
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
+		if config.Corrupted {
+			panic("a node cannot be both corrupted and ghost at the same time")
+		}
 		config.Ghost = true
-		// using the fully-connectred topology to ensure a ghost node is always connected to all other nodes in the network,
-		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
@@ -529,7 +582,7 @@ func integrationBootstrapDir() (string, error) {
 	return ioutil.TempDir(TmpRoot, integrationBootstrap)
 }
 
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 
@@ -560,8 +613,14 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
-	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
+	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
+
+	root := bootstrapData.Root
+	result := bootstrapData.Result
+	seal := bootstrapData.Seal
+	confs := bootstrapData.StakedConfs
+	bootstrapSnapshot := bootstrapData.Snapshot
 
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("module", "flownetwork").
@@ -577,17 +636,20 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		log:                         logger,
 		Containers:                  make(map[string]*Container, nNodes),
 		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		ObserverPorts:               make(map[string]string),
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
+		CorruptedPortMapping:        make(map[flow.Identifier]string),
 		root:                        root,
 		seal:                        seal,
 		result:                      result,
 		BootstrapDir:                bootstrapDir,
 		BootstrapSnapshot:           bootstrapSnapshot,
+		BootstrapData:               bootstrapData,
 	}
 
-	// check that at-least 2 full access nodes must be configure in your test suite
+	// check that at-least 2 full access nodes must be configured in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
@@ -620,7 +682,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
-
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -698,6 +759,140 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
 
+func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName string) error {
+	container := net.ContainerByName(containerName)
+	if container == nil {
+		return fmt.Errorf("%s container not found", containerName)
+	}
+	return net.cli.ContainerStop(ctx, container.ID, nil)
+}
+
+type ObserverConfig struct {
+	ObserverName            string
+	ObserverImage           string
+	AccessName              string // Does not change the access node.
+	AccessPublicNetworkPort string // Does not change the access node
+	AccessGRPCSecurePort    string // Does not change the access node
+}
+
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
+	// Find the public key for the access node
+	accessPublicKey := ""
+	for _, stakedConf := range net.BootstrapData.StakedConfs {
+		if stakedConf.ContainerName == conf.AccessName {
+			accessPublicKey = hex.EncodeToString(stakedConf.NetworkPubKey().Encode())
+		}
+	}
+	if accessPublicKey == "" {
+		panic(fmt.Sprintf("failed to find the staked conf for access node with container name '%s'", conf.AccessName))
+	}
+
+	// Copy of writeObserverPrivateKey in localnet bootstrap.go
+	func() {
+		// make the observer private key for named observer
+		// only used for localnet, not for use with production
+		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLenECDSASecp256k1)
+		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+		if err != nil {
+			panic(err)
+		}
+
+		// hex encode
+		keyBytes := networkKey.Encode()
+		output := make([]byte, hex.EncodedLen(len(keyBytes)))
+		hex.Encode(output, keyBytes)
+
+		// write to file
+		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", net.BootstrapDir, conf.ObserverName)
+		err = ioutil.WriteFile(outputFile, output, 0600)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// Setup directories
+	tmpdir, _ := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+
+	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+
+	observerUnsecurePort := testingdock.RandomPort(t)
+	observerSecurePort := testingdock.RandomPort(t)
+	observerHttpPort := testingdock.RandomPort(t)
+
+	net.ObserverPorts[ObserverNodeAPIPort] = observerUnsecurePort
+	net.ObserverPorts[ObserverNodeAPISecurePort] = observerSecurePort
+	net.ObserverPorts[ObserverNodeAPIProxyPort] = observerHttpPort
+
+	container, err := net.cli.ContainerCreate(ctx,
+		&container.Config{
+			Image: conf.ObserverImage,
+			Cmd: []string{
+				fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
+				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
+				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
+				fmt.Sprintf("--bind=0.0.0.0:0"),
+				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
+				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
+				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
+				"--bootstrapdir=/bootstrap",
+				"--datadir=/data/protocol",
+				"--secretsdir=/data/secrets",
+				"--loglevel=DEBUG",
+				fmt.Sprintf("--profiler-enabled=%t", false),
+				fmt.Sprintf("--tracer-enabled=%t", false),
+				"--profiler-dir=/profiler",
+				"--profiler-interval=2m",
+			},
+			ExposedPorts: nat.PortSet{
+				"9000": struct{}{},
+				"9001": struct{}{},
+				"8000": struct{}{},
+			},
+		},
+		&container.HostConfig{
+			AutoRemove: true,
+			Binds: []string{
+				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+			},
+			PortBindings: nat.PortMap{
+				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
+			},
+		},
+		&network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				net.config.Name: {
+					NetworkID: net.network.ID(),
+				},
+			},
+		},
+		conf.ObserverName,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = net.cli.ContainerStart(ctx, container.ID, types.ContainerStartOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	containerID := container.ID
+	return func() {
+		// shutdown func
+		net.cli.ContainerStop(ctx, containerID, nil)
+	}, nil
+}
+
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
@@ -745,9 +940,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
-	flowProfilerDir := filepath.Join(tmpdir, profilerDir)
-	err = os.Mkdir(flowProfilerDir, 0755)
-	require.NoError(t, err)
+	// create the profiler dir for the node
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	t.Logf("create profiler dir: %v", flowProfilerDir)
+	err = os.MkdirAll(flowProfilerDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
 
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
@@ -815,7 +1014,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
@@ -835,12 +1033,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
-			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			exeDataDir := filepath.Join(tmpdir, "execution-data")
+			err = os.Mkdir(exeDataDir, 0700)
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+				fmt.Sprintf("%s:%s:rw", exeDataDir, DefaultExecutionDataServiceDir),
 			)
 
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
@@ -857,6 +1056,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.AddFlag("collection-ingress-port", "9000")
@@ -873,7 +1073,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
 				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("supports-observer", "true")
 				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
@@ -883,9 +1083,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 		case flow.RoleConsensus:
-			// use 1 here instead of the default 5, because the integration
-			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			if !nodeContainer.IsFlagSet("chunk-alpha") {
+				// use 1 here instead of the default 5, because most of the integration
+				// tests only start 1 verification node
+				nodeContainer.AddFlag("chunk-alpha", "1")
+			}
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
 
@@ -894,9 +1096,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
-			// use 1 here instead of the default 5, because the integration
-			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			if !nodeContainer.IsFlagSet("chunk-alpha") {
+				// use 1 here instead of the default 5, because most of the integration
+				// tests only start 1 verification node
+				nodeContainer.AddFlag("chunk-alpha", "1")
+			}
 
 			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			// nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
@@ -925,6 +1129,14 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		hostPort := "2345"
 		containerPort := "2345/tcp"
 		nodeContainer.bindPort(hostPort, containerPort)
+	}
+
+	if nodeConf.Corrupted {
+		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
+		// CCF port to local host so they can be accessible by the attack network.
+		hostPort := testingdock.RandomPort(t)
+		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
+		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
 	}
 
 	suiteContainer := net.suite.Container(*opts)
@@ -982,14 +1194,22 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	return nodeInfos, nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, *inmem.Snapshot, error) {
-	chainID := flow.Localnet
+type BootstrapData struct {
+	Root              *flow.Block
+	Result            *flow.ExecutionResult
+	Seal              *flow.Seal
+	StakedConfs       []ContainerConfig
+	Snapshot          *inmem.Snapshot
+	ClusterRootBlocks []*cluster.Block
+}
+
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
 	chain := chainID.Chain()
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -998,13 +1218,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate staking and networking keys for each configured node
 	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// generate the follower node keys (follower nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
+		return nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
@@ -1015,7 +1235,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
@@ -1026,7 +1246,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = WriteJSON(filepath.Join(bootstrapDir, path), sk)
 		if err != nil {
-			return nil, nil, nil, nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -1039,17 +1259,17 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
+		return nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
 
 	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+		return nil, fmt.Errorf("failed to write secrets db key files: %w", err)
 	}
 
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
+		return nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
 	// define root block parameters
@@ -1065,27 +1285,43 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate QC
 	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 	votes, err := run.GenerateRootBlockVotes(root, signerData)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	// generate root blocks for each collector cluster
-	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
+	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
+	}
+
+	// TODO: extract to func to be reused with `constructRootResultAndSeal`
+	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
+	for i, clusterQC := range clusterQCs {
+		members := clusterAssignments[i]
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode cluster QC signer indices: %w", err)
+		}
+		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
+			View:      clusterQC.View,
+			BlockID:   clusterQC.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   clusterQC.SigData,
+		})
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
@@ -1105,14 +1341,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            epochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
+		return nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
 		RewardCut:                    cadence.UFix64(0),
@@ -1143,27 +1379,39 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		fvm.WithIdentities(participants),
 	)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
+		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+	}
+
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
-	return root, result, seal, stakedConfs, snapshot, nil
+	return &BootstrapData{
+		Root:              root,
+		Result:            result,
+		Seal:              seal,
+		StakedConfs:       stakedConfs,
+		Snapshot:          snapshot,
+		ClusterRootBlocks: clusterRootBlocks,
+	}, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
@@ -1209,6 +1457,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			AdditionalFlags:       conf.AdditionalFlags,
 			Debug:                 conf.Debug,
 			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+			Corrupted:             conf.Corrupted,
 		}
 
 		confs = append(confs, containerConf)
@@ -1253,16 +1502,18 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific root block
 //   * a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
-	participants := toParticipants(confs)
+	participantsUnsorted := toParticipants(confs)
+	participants := participantsUnsorted.Sort(order.Canonical)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
+	rootBlocks := make([]*cluster.Block, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {
@@ -1275,28 +1526,31 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// gather cluster participants
-		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
-				participants = append(participants, conf.NodeInfo)
+				clusterNodeInfos = append(clusterNodeInfos, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(participants) { // sanity check
-			return nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
+		if len(cluster) != len(clusterNodeInfos) { // sanity check
+			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
-		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
+		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical)
+		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",
+				clusterNodeInfos, err)
 		}
 
 		// add block and qc to list
 		qcs = append(qcs, qc)
+		rootBlocks = append(rootBlocks, block)
 	}
 
-	return assignments, qcs, nil
+	return rootBlocks, assignments, qcs, nil
 }
 
 // writePrivateKeyFiles writes the staking and machine account private key files.

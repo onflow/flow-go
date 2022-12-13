@@ -15,11 +15,13 @@ import (
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
+	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
@@ -68,6 +70,8 @@ func addCommands() {
 	rootCmd.AddCommand(index_er.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
+	rootCmd.AddCommand(snapshot.Cmd)
+	rootCmd.AddCommand(export_json_transactions.Cmd)
 }
 
 func initConfig() {

@@ -3,21 +3,20 @@ package test
 import (
 	"context"
 	"net"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/attacknetwork"
 	"github.com/onflow/flow-go/insecure/corruptible"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/network"
@@ -35,72 +34,66 @@ import (
 func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	// We first start ccf and then the attack network, since the order of startup matters, i.e., on startup, the attack network tries
 	// to connect to all ccfs.
-	withCorruptibleConduitFactory(t, func(t *testing.T, corruptedIdentity flow.Identity, ccf *corruptible.ConduitFactory) {
+	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corruptible.Network, hub *stub.Hub) {
 		// this is the event orchestrator will send instead of the original event coming from corrupted engine.
 		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
 
 		// extracting port that ccf gRPC server is running on
-		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
-		require.NoError(t, err)
-		ccfPort, err := strconv.Atoi(ccfPortStr)
+		_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
 		require.NoError(t, err)
 
-		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, ccfPort, func(event *insecure.Event) {
-			// implementing the corruption functionality of the orchestrator.
-			event.FlowProtocolEvent = corruptedEvent
-		}, func(t *testing.T) {
-			hub := stub.NewNetworkHub()
-			originalEvent := &message.TestMessage{Text: "this is a test message"}
-			testChannel := flownet.Channel("test-channel")
+		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, map[flow.Identifier]string{corruptedIdentity.NodeID: ccfPortStr},
+			func(event *insecure.EgressEvent) {
+				// implementing the corruption functionality of the orchestrator.
+				event.FlowProtocolEvent = corruptedEvent
+			}, func(t *testing.T) {
 
-			// corrupted node network
-			corruptedEngine := &network.Engine{}
-			corruptedNodeNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-			corruptedConduit, err := corruptedNodeNetwork.Register(testChannel, corruptedEngine)
-			require.NoError(t, err)
+				require.Eventually(t, func() bool {
+					return corruptibleNetwork.AttackerRegistered() // attacker's registration must be done on corruptible network prior to sending any messages.
+				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
 
-			// honest network
-			honestIdentity := unittest.IdentityFixture()
-			honestEngine := &network.Engine{}
-			honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
-			// in this test, the honest node is only the receiver, hence, we discard
-			// the created conduit.
-			_, err = honestNodeNetwork.Register(testChannel, honestEngine)
-			require.NoError(t, err)
+				originalEvent := &message.TestMessage{Text: "this is a test message"}
+				testChannel := channels.TestNetworkChannel
 
-			wg := &sync.WaitGroup{}
-			wg.Add(1)
-			honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
-				// implementing the process logic of the honest engine on reception of message from underlying network.
-				require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
-				require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-				require.Equal(t, corruptedEvent, event)              // content of event must be swapped with corrupted event.
+				// corrupted node network
+				corruptedEngine := &network.Engine{}
+				corruptedConduit, err := corruptibleNetwork.Register(testChannel, corruptedEngine)
+				require.NoError(t, err)
 
-				wg.Done()
-				return nil
+				// honest network
+				honestIdentity := unittest.IdentityFixture()
+				honestEngine := &network.Engine{}
+				honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
+				// in this test, the honest node is only the receiver, hence, we discard
+				// the created conduit.
+				_, err = honestNodeNetwork.Register(testChannel, honestEngine)
+				require.NoError(t, err)
+
+				wg := &sync.WaitGroup{}
+				wg.Add(1)
+				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
+					// implementing the process logic of the honest engine on reception of message from underlying network.
+					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
+					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
+					require.Equal(t, corruptedEvent, event)              // content of event must be swapped with corrupted event.
+
+					wg.Done()
+					return nil
+				})
+
+				require.NoError(t, corruptedConduit.Unicast(originalEvent, honestIdentity.NodeID))
+
+				unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
+
 			})
-
-			unittest.RequireReturnsBefore(t, func() {
-				// starts the stub network of the corrupted node so that messages sent by its registered engines can be delivered.
-				corruptedNodeNetwork.StartConDev(100*time.Millisecond, true)
-			}, 100*time.Millisecond, "failed to start corrupted node network")
-
-			require.NoError(t, corruptedConduit.Unicast(originalEvent, honestIdentity.NodeID))
-
-			unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
-			unittest.RequireReturnsBefore(t, func() {
-				// stops the stub network of corrupted node.
-				corruptedNodeNetwork.StopConDev()
-			}, 100*time.Millisecond, "failed to stop verification network")
-		})
 	})
 
 }
 
-// withCorruptibleConduitFactory creates a real corruptible conduit factory (ccf), starts it, runs the "run" function, and then stops it.
-func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.ConduitFactory)) {
-	codec := cbor.NewCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+// withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
+func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
+	codec := unittest.NetworkCodec()
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -113,35 +106,58 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 			return
 		}
 	}()
-	ccf := corruptible.NewCorruptibleConduitFactory(
+	hub := stub.NewNetworkHub()
+	ccf := corruptible.NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
+	corruptibleNetwork, err := corruptible.NewCorruptibleNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
-		corruptedIdentity.NodeID,
+		insecure.DefaultAddress,
+		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
-		"localhost:0")
+		flowNetwork,
+		ccf)
+	require.NoError(t, err)
 
 	// starts corruptible conduit factory
-	ccf.Start(ccfCtx)
+	corruptibleNetwork.Start(ccfCtx)
 	unittest.RequireCloseBefore(
 		t,
-		ccf.Ready(),
+		corruptibleNetwork.Ready(),
 		1*time.Second,
-		"could not start corruptible conduit factory on time")
+		"could not start corruptible network on time")
 
-	run(t, *corruptedIdentity, ccf)
+	unittest.RequireReturnsBefore(t, func() {
+		// starts the stub network of the corrupted node so that messages sent by its registered engines can be delivered.
+		flowNetwork.StartConDev(100*time.Millisecond, true)
+	}, 100*time.Millisecond, "failed to start corrupted node network")
+
+	run(t, *corruptedIdentity, corruptibleNetwork, hub)
 
 	// terminates attackNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible network on time")
+
+	unittest.RequireReturnsBefore(t, func() {
+		// stops the stub network of corrupted node.
+		flowNetwork.StopConDev()
+	}, 100*time.Millisecond, "failed to stop verification network")
 }
 
 // withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real attack network.
 // It then starts the attack network, executes the "run" function, and stops the attack network afterwards.
-func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, ccfPort int, corrupter func(*insecure.Event), run func(t *testing.T)) {
-	codec := cbor.NewCodec()
+func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corruptedPortMap map[flow.Identifier]string, corrupter func(*insecure.EgressEvent),
+	run func(t *testing.T)) {
+	codec := unittest.NetworkCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(corruptedIds, ccfPort)
-	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), "localhost:0", codec, o, connector, corruptedIds)
+	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
+
+	attackNetwork, err := attacknetwork.NewAttackNetwork(
+		unittest.Logger(),
+		codec,
+		o,
+		connector,
+		corruptedIds)
 	require.NoError(t, err)
 
 	// life-cycle management of attackNetwork.

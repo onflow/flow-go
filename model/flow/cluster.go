@@ -7,7 +7,7 @@ import (
 
 // AssignmentList is a list of identifier lists. Each list of identifiers lists the
 // identities that are part of the given cluster.
-type AssignmentList [][]Identifier
+type AssignmentList []IdentifierList
 
 // ClusterList is a list of identity lists. Each `IdentityList` represents the
 // nodes assigned to a specific cluster.
@@ -50,10 +50,11 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 	// build a lookup for all the identities by node identifier
 	lookup := make(map[Identifier]*Identity)
 	for _, collector := range collectors {
+		_, ok := lookup[collector.NodeID]
+		if ok {
+			return nil, fmt.Errorf("duplicate collector in list %v", collector.NodeID)
+		}
 		lookup[collector.NodeID] = collector
-	}
-	if len(lookup) != len(collectors) {
-		return nil, fmt.Errorf("duplicate collector in list")
 	}
 
 	// replicate the identifier list but use identities instead

@@ -30,9 +30,9 @@ type ComponentFactory func() (Component, error)
 // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
 // and then return an ErrorHandlingResult indicating how RunComponent should proceed.
 // Before returning, it could also:
-// - panic (in canary / benchmark)
+// - panic (in stagingnet / benchmark)
 // - log in various Error channels and / or send telemetry ...
-type OnError = func(err error) ErrorHandlingResult
+type OnError = func(error) ErrorHandlingResult
 
 type ErrorHandlingResult int
 
@@ -218,14 +218,16 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		// goroutine and the parent's are scheduled. If the parent is scheduled first, any errors
 		// thrown within workers would not have propagated, and it would only receive the done signal
 		defer func() {
+			cancel() // shutdown all workers
+			// wait for shutdown signal before signalling the component is done
+			// this guarantees that ShutdownSignal is closed before Done
+			<-c.shutdownSignal
 			<-c.workersDone
 			close(c.done)
 		}()
 
 		// wait until the workersDone channel is closed or an irrecoverable error is encountered
 		if err := util.WaitError(errChan, c.workersDone); err != nil {
-			cancel() // shutdown all workers
-
 			// propagate the error directly to the parent because a failure in a worker routine
 			// is considered irrecoverable
 			parent.Throw(err)

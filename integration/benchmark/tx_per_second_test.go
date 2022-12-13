@@ -228,16 +228,18 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
-	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	handle(err)
 
 	// Generate the account creation transaction
-	createAccountTx := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr).
-		SetReferenceBlockID(gs.ref.ID).
+	createAccountTx, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr)
+	handle(err)
+	createAccountTx.SetReferenceBlockID(gs.ref.ID).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -383,7 +385,10 @@ func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Addre
 		panic(err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	if err != nil {
+		panic(err)
+	}
 
 	return addr, accountKey, signer
 }
@@ -444,19 +449,30 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	ctx := context.Background()
 
 	gs.sequenceNumbers = make([]uint64, TotalAccounts)
-	publicKeysStr := strings.Builder{}
-	accountKeyBytes := gs.rootAcctKey.Encode()
+	publicKeyBytes := gs.rootAcctKey.PublicKey.Encode()
 
-	for i := 0; i < TotalAccounts; i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(publicKey)\n")
-	}
 	script := fmt.Sprintf(`
-	transaction(publicKey: [UInt8]) {
-		prepare(signer: AuthAccount) {
-			%s
-		}
-	}
-`, publicKeysStr.String())
+      transaction(counts: Int, key: [UInt8]) {
+        prepare(signer: AuthAccount) {
+          var i = 0
+          while i < counts {
+            i = i + 1
+            let acct = AuthAccount(payer: signer)
+            let publicKey = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: 1000.0
+            )
+	      }
+        }
+      }
+	}`,
+		gs.rootAcctKey.SigAlgo.String(),
+		gs.rootAcctKey.HashAlgo.String())
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
@@ -465,7 +481,10 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	err := addKeysTx.AddArgument(cadence.NewInt(TotalAccounts))
+	handle(err)
+
+	err = addKeysTx.AddArgument(bytesToCadenceArray(publicKeyBytes))
 	handle(err)
 
 	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.Index, gs.rootSigner)

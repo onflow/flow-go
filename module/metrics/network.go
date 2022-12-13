@@ -31,6 +31,7 @@ type NetworkCollector struct {
 	dnsCacheHitCount             prometheus.Counter
 	dnsCacheInvalidationCount    prometheus.Counter
 	dnsLookupRequestDroppedCount prometheus.Counter
+	routingTableSize             prometheus.Gauge
 
 	prefix string
 }
@@ -191,6 +192,15 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		},
 	)
 
+	nc.routingTableSize = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name:      nc.prefix + "routing_table_size",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemDHT,
+			Help:      "the size of the DHT routing table",
+		},
+	)
+
 	return nc
 }
 
@@ -233,6 +243,14 @@ func (nc *NetworkCollector) DirectMessageStarted(topic string) {
 
 func (nc *NetworkCollector) DirectMessageFinished(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
+}
+
+func (nc *NetworkCollector) RoutingTablePeerAdded() {
+	nc.routingTableSize.Inc()
+}
+
+func (nc *NetworkCollector) RoutingTablePeerRemoved() {
+	nc.routingTableSize.Dec()
 }
 
 // MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).

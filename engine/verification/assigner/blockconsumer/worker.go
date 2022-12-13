@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/jobqueue"
 )
 
 // worker is an internal type of this package.
@@ -31,7 +32,7 @@ func (w *worker) withBlockConsumer(consumer *BlockConsumer) {
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *worker) Run(job module.Job) error {
-	block, err := JobToBlock(job)
+	block, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		return err
 	}
@@ -45,6 +46,6 @@ func (w *worker) Run(job module.Job) error {
 // The worker translates the block ID into job ID and notifies the consumer
 // that the job is done.
 func (w *worker) Notify(blockID flow.Identifier) {
-	jobID := JobID(blockID)
+	jobID := jobqueue.JobID(blockID)
 	w.consumer.NotifyJobIsDone(jobID)
 }

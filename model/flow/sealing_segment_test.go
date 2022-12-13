@@ -258,7 +258,7 @@ func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
 // TestBuild_RootSegment tests we can build a valid root sealing segment.
 func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 
-	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5))
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addResult(result)
 	err := suite.builder.AddBlock(root)
@@ -277,7 +277,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 // a single-block sealing segment with a block view not equal to 0.
 func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 
-	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5))
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	root.Header.View = 10 // invalid root block view
 	suite.sealsByBlockID[root.ID()] = seal
 	suite.addResult(result)
@@ -285,7 +285,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 	require.NoError(suite.T(), err)
 
 	_, err = suite.builder.SealingSegment()
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentInvalidRootView)
+	require.Error(suite.T(), err)
 }
 
 // Test the case when the highest block in the segment does not contain seals but

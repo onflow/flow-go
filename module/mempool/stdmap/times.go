@@ -55,7 +55,7 @@ func (t *Times) ByID(id flow.Identifier) (time.Time, bool) {
 	return tt.ti, true
 }
 
-// Rem removes the time with the given ID.
-func (t *Times) Rem(id flow.Identifier) bool {
-	return t.Backend.Rem(id)
+// Remove removes the time with the given ID.
+func (t *Times) Remove(id flow.Identifier) bool {
+	return t.Backend.Remove(id)
 }

@@ -15,10 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
-// DefaultChunkAssignmentAlpha is the default number of verifiers that should be
-// assigned to each chunk.
-const DefaultChunkAssignmentAlpha = 3
-
 // ChunkAssigner implements an instance of the Public Chunk Assignment
 // algorithm for assigning chunks to verifier nodes in a deterministic but
 // unpredictable manner. It implements the ChunkAssigner interface.

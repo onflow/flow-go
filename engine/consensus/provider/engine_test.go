@@ -61,7 +61,7 @@ func (suite *Suite) SetupTest() {
 }
 
 // proposals submitted by remote nodes should not be accepted.
-func (suite Suite) TestOnBlockProposal_RemoteOrigin() {
+func (suite *Suite) TestOnBlockProposal_RemoteOrigin() {
 
 	proposal := unittest.ProposalFixture()
 	// message submitted by remote node

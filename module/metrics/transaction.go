@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -21,6 +22,14 @@ type TransactionCollector struct {
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
 	transactionSubmission      *prometheus.CounterVec
+	scriptExecutedDuration     *prometheus.HistogramVec
+	transactionResultDuration  *prometheus.HistogramVec
+	scriptSize                 prometheus.Histogram
+	transactionSize            prometheus.Histogram
+	maxReceiptHeight           prometheus.Gauge
+
+	// used to skip heights that are lower than the current max height
+	maxReceiptHeightValue counters.StrictMonotonousCounter
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -81,9 +90,73 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the success/failure of transaction submissions",
 		}, []string{"result"}),
+		scriptExecutedDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "script_executed_duration",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the duration in ms of the round trip time for executing a script",
+			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
+		}, []string{"script_size"}),
+		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "transaction_result_fetched_duration",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the duration in ms of the round trip time for getting a transaction result",
+			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
+		}, []string{"payload_size"}),
+		scriptSize: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:      "script_size",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the script size in kb of scripts used in ExecuteScript",
+		}),
+		transactionSize: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:      "transaction_size",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
+		}),
+		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "max_receipt_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the maximum block height of execution receipts received",
+		}),
+		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
 	}
 
 	return tc
+}
+
+func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
+	// record the execute script duration and script size
+	tc.scriptSize.Observe(float64(size / 1024))
+	tc.scriptExecutedDuration.With(prometheus.Labels{
+		"script_size": tc.sizeLabel(size),
+	}).Observe(float64(dur.Milliseconds()))
+}
+
+func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
+	// record the transaction result duration and transaction script/payload size
+	tc.transactionSize.Observe(float64(size / 1024))
+	tc.transactionResultDuration.With(prometheus.Labels{
+		"payload_size": tc.sizeLabel(size),
+	}).Observe(float64(dur.Milliseconds()))
+}
+
+func (tc *TransactionCollector) sizeLabel(size int) string {
+	// determine the script size label using the size in bytes
+	sizeKb := size / 1024
+	sizeLabel := "100+kb" //"1kb,10kb,100kb, 100+kb" -> [0,1] [2,10] [11,100] [100, +inf]
+
+	if sizeKb <= 1 {
+		sizeLabel = "1kb"
+	} else if sizeKb <= 10 {
+		sizeLabel = "10kb"
+	} else if sizeKb <= 100 {
+		sizeLabel = "100kb"
+	}
+	return sizeLabel
 }
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
@@ -119,7 +192,7 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -141,7 +214,7 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -205,5 +278,11 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 		return
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
-	tc.transactionTimings.Rem(txID)
+	tc.transactionTimings.Remove(txID)
+}
+
+func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+	if tc.maxReceiptHeightValue.Set(height) {
+		tc.maxReceiptHeight.Set(float64(height))
+	}
 }

@@ -33,20 +33,17 @@ type ExportReporter struct {
 	logger                   zerolog.Logger
 	chain                    flow.Chain
 	getBeforeMigrationSCFunc GetStateCommitmentFunc
-	getAfterMigrationSCFunc  GetStateCommitmentFunc
 }
 
 func NewExportReporter(
 	logger zerolog.Logger,
 	chain flow.Chain,
 	getBeforeMigrationSCFunc GetStateCommitmentFunc,
-	getAfterMigrationSCFunc GetStateCommitmentFunc,
 ) *ExportReporter {
 	return &ExportReporter{
 		logger:                   logger,
 		chain:                    chain,
 		getBeforeMigrationSCFunc: getBeforeMigrationSCFunc,
-		getAfterMigrationSCFunc:  getAfterMigrationSCFunc,
 	}
 }
 
@@ -54,10 +51,10 @@ func (e *ExportReporter) Name() string {
 	return "ExportReporter"
 }
 
-func (e *ExportReporter) Report(payload []ledger.Payload) error {
+func (e *ExportReporter) Report(payload []ledger.Payload, commit ledger.State) error {
 	script, _, err := ExecuteCurrentEpochScript(e.chain, payload)
 	failedExportReport := ExportReport{
-		ReportSucceeded: true,
+		ReportSucceeded: false,
 	}
 	failedReport, _ := json.MarshalIndent(failedExportReport, "", " ")
 
@@ -67,6 +64,8 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 			Err(err).
 			Msg("error running GetCurrentEpochCounter script")
 
+			// write the report with ReportSucceeded = false, so that the ansbile script can
+			// detect the failure
 		_ = ioutil.WriteFile("export_report.json", failedReport, 0644)
 		// Safely exit and move on to next reporter so we do not block other reporters
 		return nil
@@ -92,7 +91,7 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 	report := ExportReport{
 		EpochCounter:            script.Value.ToGoValue().(uint64),
 		PreviousStateCommitment: e.getBeforeMigrationSCFunc(),
-		CurrentStateCommitment:  e.getAfterMigrationSCFunc(),
+		CurrentStateCommitment:  flow.StateCommitment(commit),
 		ReportSucceeded:         true,
 	}
 	file, _ := json.MarshalIndent(report, "", " ")

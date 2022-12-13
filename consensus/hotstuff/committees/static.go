@@ -6,24 +6,26 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
 // NewStaticCommittee returns a new committee with a static participant set.
 func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dkgParticipants map[flow.Identifier]flow.DKGParticipant, dkgGroupKey crypto.PublicKey) (*Static, error) {
-	static := &Static{
-		participants: participants,
-		myID:         myID,
-		dkg: staticDKG{
-			dkgParticipants: dkgParticipants,
-			dkgGroupKey:     dkgGroupKey,
-		},
-	}
-	return static, nil
+
+	return NewStaticCommitteeWithDKG(participants, myID, staticDKG{
+		dkgParticipants: dkgParticipants,
+		dkgGroupKey:     dkgGroupKey,
+	})
 }
 
 // NewStaticCommitteeWithDKG returns a new committee with a static participant set.
 func NewStaticCommitteeWithDKG(participants flow.IdentityList, myID flow.Identifier, dkg protocol.DKG) (*Static, error) {
+	valid := order.IdentityListCanonical(participants)
+	if !valid {
+		return nil, fmt.Errorf("participants %v is not in Canonical order", participants)
+	}
+
 	static := &Static{
 		participants: participants,
 		myID:         myID,
@@ -40,8 +42,8 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
-func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.participants.Filter(selector), nil
+func (s Static) Identities(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.participants, nil
 }
 
 func (s Static) Identity(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

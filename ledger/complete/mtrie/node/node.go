@@ -147,7 +147,7 @@ func (n *Node) computeHash() hash.Hash {
 	if n.lChild == nil && n.rChild == nil {
 		// if payload is non-nil, compute the hash based on the payload content
 		if n.payload != nil {
-			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
+			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value(), n.height)
 		}
 		// if payload is nil, return the default hash
 		return ledger.GetDefaultHashForHeight(n.height)

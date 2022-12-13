@@ -17,7 +17,7 @@ import (
 // in particular with differing public key implementations
 func TestEncodeDecode(t *testing.T) {
 
-	participants := unittest.IdentityListFixture(10)
+	participants := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	// add a partner, which has its key represented as an encodable wrapper
 	// type rather than the direct crypto type
 	partner := unittest.IdentityFixture(unittest.WithKeys, func(identity *flow.Identity) {
@@ -41,7 +41,7 @@ func TestEncodeDecode(t *testing.T) {
 // TestStrippedEncodeDecode tests that the protocol state snapshot can be encoded to JSON skipping the network address
 // and decoded back successfully
 func TestStrippedEncodeDecode(t *testing.T) {
-	participants := unittest.IdentityListFixture(10)
+	participants := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	initialSnapshot := unittest.RootSnapshotFixture(participants)
 
 	// encode the snapshot

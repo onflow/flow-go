@@ -75,7 +75,7 @@ func TestIdentiferMap(t *testing.T) {
 
 	// tests against removing a key
 	t.Run("removing key", func(t *testing.T) {
-		ok := idMap.Rem(key1)
+		ok := idMap.Remove(key1)
 		require.True(t, ok)
 
 		// getting removed key should return false
@@ -123,7 +123,7 @@ func TestIdentiferMap(t *testing.T) {
 
 		// removes id1 and id2 from key3
 		// removing id1
-		err = idMap.RemIdFromKey(key3, id1)
+		err = idMap.RemoveIdFromKey(key3, id1)
 		require.NoError(t, err)
 
 		// key3 should still reside on idMap and id2 should be attached to it
@@ -133,7 +133,7 @@ func TestIdentiferMap(t *testing.T) {
 		require.Contains(t, ids, id2)
 
 		// removing id2
-		err = idMap.RemIdFromKey(key3, id2)
+		err = idMap.RemoveIdFromKey(key3, id2)
 		require.NoError(t, err)
 
 		// by removing id2 from key3, it is left out of id
@@ -150,7 +150,7 @@ func TestIdentiferMap(t *testing.T) {
 }
 
 // TestRaceCondition is meant for running with `-race` flag.
-// It performs Append, Has, Get, and RemIdFromKey methods of IdentifierMap concurrently
+// It performs Append, Has, Get, and RemoveIdFromKey methods of IdentifierMap concurrently
 // each in a different goroutine.
 // Running this test with `-race` flag detects and reports the existence of race condition if
 // it is the case.
@@ -181,7 +181,7 @@ func TestRaceCondition(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		require.NoError(t, idMap.RemIdFromKey(key, id))
+		require.NoError(t, idMap.RemoveIdFromKey(key, id))
 	}()
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")

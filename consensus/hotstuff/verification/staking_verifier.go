@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // StakingVerifier is a verifier capable of verifying staking signature for each
@@ -25,7 +25,7 @@ var _ hotstuff.Verifier = (*StakingVerifier)(nil)
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
 	return &StakingVerifier{
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		stakingHasher: msig.NewBLSHasher(msig.CollectorVoteTag),
 	}
 }
 
@@ -33,7 +33,7 @@ func NewStakingVerifier() *StakingVerifier {
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
 // The implementation returns the following sentinel errors:
-// * model.ErrInvalidFormat if the signature has an incompatible format.
+// * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
@@ -58,14 +58,14 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 // given block. It is the responsibility of the calling code to ensure
 // that all `voters` are authorized, without duplicates. Return values:
 //  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.InvalidFormatError if `sigData` has an incompatible format
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
 func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	if len(signers) == 0 {
-		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
+		return model.NewInvalidFormatErrorf("empty list of signers")
 	}
 	msg := MakeVoteMessage(block.View, block.BlockID)
 

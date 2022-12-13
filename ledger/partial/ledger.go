@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
@@ -28,7 +27,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	if len(proof) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	batchProof, err := encoding.DecodeTrieBatchProof(proof)
+	batchProof, err := ledger.DecodeTrieBatchProof(proof)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
@@ -61,6 +60,27 @@ func (l *Ledger) Done() <-chan struct{} {
 // InitialState returns the initial state of the ledger
 func (l *Ledger) InitialState() ledger.State {
 	return l.state
+}
+
+// HasState returns true if the given state exists inside the ledger
+func (l *Ledger) HasState(other ledger.State) bool {
+	return l.state.Equals(other)
+}
+
+// GetSingleValue reads value of a given key at the given state
+func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := l.ptrie.GetSinglePayload(path)
+	if err != nil {
+		if _, ok := err.(*ptrie.ErrMissingPath); ok {
+			return nil, &ledger.ErrMissingKeys{Keys: []ledger.Key{query.Key()}}
+		}
+		return nil, err
+	}
+	return payload.Value(), err
 }
 
 // Get read the values of the given keys at the given state
@@ -113,7 +133,21 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
-		// Returned error type is ledger.ErrMissingKeys
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[ledger.Path]ledger.Key)
+
+			for i, key := range update.Keys() {
+				path := trieUpdate.Paths[i]
+				pathToKey[path] = key
+			}
+
+			keys := make([]ledger.Key, len(pErr.Paths))
+			for i, path := range pErr.Paths {
+				keys[i] = pathToKey[path]
+			}
+			return ledger.DummyState, nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return ledger.DummyState, nil, err
 	}
 

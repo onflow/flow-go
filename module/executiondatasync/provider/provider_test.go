@@ -17,6 +17,7 @@ import (
 	goassert "gotest.tools/assert"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -45,7 +46,7 @@ func getBlobservice(ds datastore.Batching) network.BlobService {
 
 func getProvider(blobService network.BlobService) provider.Provider {
 	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.AnythingOfType("UpdateFn")).Return(func(fn tracker.UpdateFn) error {
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
 
@@ -60,13 +61,7 @@ func getProvider(blobService network.BlobService) provider.Provider {
 
 func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *execution_data.ChunkExecutionData {
 	ced := &execution_data.ChunkExecutionData{
-		TrieUpdate: &ledger.TrieUpdate{
-			Payloads: []*ledger.Payload{
-				{
-					Value: nil,
-				},
-			},
-		},
+		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
 	}
 
 	size := 1
@@ -81,8 +76,12 @@ func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *executi
 		}
 
 		v := make([]byte, size)
-		rand.Read(v)
-		ced.TrieUpdate.Payloads[0].Value = v
+		_, _ = rand.Read(v)
+
+		k, err := ced.TrieUpdate.Payloads[0].Key()
+		require.NoError(t, err)
+
+		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
 	}
 }
@@ -100,6 +99,19 @@ func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePe
 	return bed
 }
 
+func deepEqual(t *testing.T, expected, actual *execution_data.BlockExecutionData) {
+	assert.Equal(t, expected.BlockID, actual.BlockID)
+	assert.Equal(t, len(expected.ChunkExecutionDatas), len(actual.ChunkExecutionDatas))
+
+	for i, expectedChunk := range expected.ChunkExecutionDatas {
+		actualChunk := actual.ChunkExecutionDatas[i]
+
+		goassert.DeepEqual(t, expectedChunk.Collection, actualChunk.Collection)
+		goassert.DeepEqual(t, expectedChunk.Events, actualChunk.Events)
+		assert.True(t, expectedChunk.TrieUpdate.Equals(actualChunk.TrieUpdate))
+	}
+}
+
 func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
@@ -113,7 +125,7 @@ func TestHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		actual, err := store.GetExecutionData(context.Background(), executionDataID)
 		require.NoError(t, err)
-		goassert.DeepEqual(t, expected, actual)
+		deepEqual(t, expected, actual)
 	}
 
 	test(1, 0)                                   // small execution data (single level blob tree)

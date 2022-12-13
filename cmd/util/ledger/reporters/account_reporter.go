@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -57,7 +58,7 @@ type momentsRecord struct {
 	Moments int    `json:"moments"`
 }
 
-func (r *AccountReporter) Report(payload []ledger.Payload) error {
+func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
 	rwm := r.RWF.ReportWriter("moments_report")
@@ -66,7 +67,8 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := metering.NewMeter(metering.DefaultParameters())
+	st := state.NewState(l, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -141,9 +143,15 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := metering.NewMeter(metering.DefaultParameters())
+	st := state.NewState(v, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
+
+	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
+	if err != nil {
+		panic(err)
+	}
 
 	return &balanceProcessor{
 		vm:       vm,
@@ -152,7 +160,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		accounts: accounts,
 		st:       st,
 		prog:     prog,
-		intf:     fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog),
+		intf:     env,
 	}
 }
 

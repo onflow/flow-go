@@ -19,7 +19,7 @@ var ErrEmptyMessage = errors.New("protobuf message is empty")
 var ValidChainIds = map[string]bool{
 	flow.Mainnet.String():           true,
 	flow.Testnet.String():           true,
-	flow.Canary.String():            true,
+	flow.Stagingnet.String():        true,
 	flow.Benchnet.String():          true,
 	flow.Localnet.String():          true,
 	flow.Emulator.String():          true,
@@ -137,12 +137,11 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
-
-	parentVoterIds := IdentifiersToMessages(h.ParentVoterIDs)
+	parentVoterIds := IdentifiersToMessages(signerIDs)
 
 	return &entities.BlockHeader{
 		Id:                 id[:],
@@ -151,6 +150,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		PayloadHash:        h.PayloadHash[:],
 		Timestamp:          t,
 		View:               h.View,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterIds:     parentVoterIds,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
@@ -160,7 +160,6 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 }
 
 func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
-	parentVoterIds := MessagesToIdentifiers(m.ParentVoterIds)
 	chainId, err := MessageToChainId(m.ChainId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
@@ -171,7 +170,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		PayloadHash:        MessageToIdentifier(m.PayloadHash),
 		Timestamp:          m.Timestamp.AsTime(),
 		View:               m.View,
-		ParentVoterIDs:     parentVoterIds,
+		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
@@ -248,7 +247,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
 
 	id := h.ID()
 
@@ -263,7 +262,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		return nil, err
 	}
 
-	blockHeader, err := BlockHeaderToMessage(h.Header)
+	blockHeader, err := BlockHeaderToMessage(h.Header, signerIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +368,7 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 		Signatures:       [][]byte{g.Signature},
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,
-		SignerIds:        IdentifiersToMessages(g.SignerIDs),
+		SignerIndices:    g.SignerIndices,
 	}
 }
 
@@ -377,7 +376,7 @@ func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.Collect
 	return &flow.CollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
-		SignerIDs:        MessagesToIdentifiers(m.SignerIds),
+		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
 	}
 }

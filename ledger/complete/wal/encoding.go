@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -35,7 +34,7 @@ The code here is deliberately simple, for performance.
 */
 
 func EncodeUpdate(update *ledger.TrieUpdate) []byte {
-	encUpdate := encoding.EncodeTrieUpdate(update)
+	encUpdate := ledger.EncodeTrieUpdate(update)
 	buf := make([]byte, len(encUpdate)+1)
 	// set WAL type
 	buf[0] = byte(WALUpdate)
@@ -61,7 +60,7 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 	operation = WALOperation(data[0])
 	switch operation {
 	case WALUpdate:
-		update, err = encoding.DecodeTrieUpdate(data[1:])
+		update, err = ledger.DecodeTrieUpdate(data[1:])
 		return
 	case WALDelete:
 		var rootHashBytes []byte

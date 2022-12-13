@@ -13,8 +13,6 @@ type Config struct {
 	MaxGasLimit uint64
 	// whether or not we check that transaction scripts are parse-able
 	CheckScriptsParse bool
-	// the maximum address index we accept
-	MaxAddressIndex uint64
 	// how many extra nodes in the responsible cluster we propagate transactions to
 	// (we always send to at least one)
 	PropagationRedundancy uint
@@ -33,7 +31,6 @@ func DefaultConfig() Config {
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		CheckScriptsParse:      true,
-		MaxAddressIndex:        flow.DefaultMaxAddressIndex,
 		PropagationRedundancy:  2,
 		MaxMessageQueueSize:    10_000,
 	}

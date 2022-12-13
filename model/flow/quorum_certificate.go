@@ -7,21 +7,29 @@ type QuorumCertificate struct {
 	View    uint64
 	BlockID Identifier
 
-	// SignerIDs holds the IDs of HotStuff participants that voted for the block.
-	// Note that for the main consensus committee, members can provide a staking or a threshold signature
-	// to indicate their HotStuff vote. In addition to contributing to consensus progress, committee members
-	// contribute to running the Random Beacon if they express their vote through a threshold signature.
-	// In order to distinguish the signature types, the SigData has to be deserialized. Specifically,
-	// the field `SigData.SigType` (bit vector) indicates for each signer which sig type they provided.
-	// For collection cluster, the SignerIDs includes all the staking sig signers.
-	SignerIDs []Identifier
+	// SignerIndices encodes the HotStuff participants whose vote is included in this QC.
+	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
+	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
+	SignerIndices []byte
 
 	// For consensus cluster, the SigData is a serialization of the following fields
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
-	// - AggregatedStakingSig crypto.Signature,
-	// - AggregatedRandomBeaconSig crypto.Signature
-	// - ReconstrcutedRandomBeaconSig crypto.Signature
+	// - AggregatedStakingSig []byte
+	// - AggregatedRandomBeaconSig []byte
+	// - ReconstructedRandomBeaconSig crypto.Signature
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
 	SigData []byte
+}
+
+// QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are
+// identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
+// indices is less efficient, but simpler, because we don't require a canonical node order.
+// It is used for bootstrapping new Epochs, because the FlowEpoch smart contract has no
+// notion of node ordering.
+type QuorumCertificateWithSignerIDs struct {
+	View      uint64
+	BlockID   Identifier
+	SignerIDs []Identifier
+	SigData   []byte
 }

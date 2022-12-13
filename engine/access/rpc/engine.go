@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/access"
-	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -41,6 +41,7 @@ type Config struct {
 	MaxMsgSize                int                              // GRPC max message size
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
+	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
@@ -50,22 +51,24 @@ type Config struct {
 // An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
 // port 8000) are brought up.
 type Engine struct {
-	unit                *engine.Unit
-	log                 zerolog.Logger
-	backend             *backend.Backend // the gRPC service implementation
-	unsecureGrpcServer  *grpc.Server     // the unsecure gRPC server
-	secureGrpcServer    *grpc.Server     // the secure gRPC server
-	httpServer          *http.Server
-	restServer          *http.Server
-	config              Config
-	chain               flow.Chain
+	unit               *engine.Unit
+	log                zerolog.Logger
+	backend            *backend.Backend // the gRPC service implementation
+	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
+	secureGrpcServer   *grpc.Server     // the secure gRPC server
+	httpServer         *http.Server
+	restServer         *http.Server
+	config             Config
+	chain              flow.Chain
+
+	addrLock            sync.RWMutex
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
 }
 
-// New returns a new RPC engine.
-func New(log zerolog.Logger,
+// NewBuilder returns a new RPC engine builder.
+func NewBuilder(log zerolog.Logger,
 	state protocol.State,
 	config Config,
 	collectionRPC accessproto.AccessAPIClient,
@@ -78,13 +81,14 @@ func New(log zerolog.Logger,
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
+	accessMetrics module.AccessMetrics,
 	collectionGRPCPort uint,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-) *Engine {
+) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -106,7 +110,7 @@ func New(log zerolog.Logger,
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
-		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
+		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
@@ -128,11 +132,39 @@ func New(log zerolog.Logger,
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
+	var cache *lru.Cache
+	cacheSize := config.ConnectionPoolSize
+	if cacheSize > 0 {
+		// TODO: remove this fallback after fixing issues with evictions
+		// It was observed that evictions cause connection errors for in flight requests. This works around
+		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
+		if cacheSize < backend.DefaultConnectionPoolSize {
+			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
+			cacheSize = backend.DefaultConnectionPoolSize
+		}
+		var err error
+		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
+			store := evictedValue.(*backend.CachedClient)
+			store.Close()
+			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
+			if accessMetrics != nil {
+				accessMetrics.ConnectionFromPoolEvicted()
+			}
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
+		}
+	}
+
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
+		ConnectionsCache:          cache,
+		CacheSize:                 cacheSize,
+		AccessMetrics:             accessMetrics,
+		Log:                       log,
 	}
 
 	backend := backend.New(state,
@@ -166,34 +198,12 @@ func New(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	accessproto.RegisterAccessAPIServer(
-		eng.unsecureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
-
-	accessproto.RegisterAccessAPIServer(
-		eng.secureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
-
+	builder := NewRPCEngineBuilder(eng)
 	if rpcMetricsEnabled {
-		// Not interested in legacy metrics, so initialize here
-		grpc_prometheus.EnableHandlingTimeHistogram()
-		grpc_prometheus.Register(unsecureGrpcServer)
-		grpc_prometheus.Register(secureGrpcServer)
+		builder.WithMetrics()
 	}
 
-	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
-	legacyaccessproto.RegisterAccessAPIServer(
-		eng.unsecureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
-	)
-	legacyaccessproto.RegisterAccessAPIServer(
-		eng.secureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
-	)
-
-	return eng
+	return builder, nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -242,14 +252,20 @@ func (e *Engine) SubmitLocal(event interface{}) {
 }
 
 func (e *Engine) UnsecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.unsecureGrpcAddress
 }
 
 func (e *Engine) SecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.secureGrpcAddress
 }
 
 func (e *Engine) RestApiAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.restAPIAddress
 }
 
@@ -280,7 +296,9 @@ func (e *Engine) serveUnsecureGRPC() {
 
 	// save the actual address on which we are listening (may be different from e.config.UnsecureGRPCListenAddr if not port
 	// was specified)
+	e.addrLock.Lock()
 	e.unsecureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
 
@@ -302,7 +320,9 @@ func (e *Engine) serveSecureGRPC() {
 		return
 	}
 
+	e.addrLock.Lock()
 	e.secureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
 
@@ -345,7 +365,9 @@ func (e *Engine) serveREST() {
 		return
 	}
 
+	e.addrLock.Lock()
 	e.restAPIAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("rest_api_address", e.restAPIAddress.String()).Msg("listening on port")
 

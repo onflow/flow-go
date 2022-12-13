@@ -14,7 +14,6 @@ import (
 // EventHandler collect events, separates out service events, and enforces event size limits
 type EventHandler struct {
 	chain                         flow.Chain
-	eventCollectionEnabled        bool
 	serviceEventCollectionEnabled bool
 	eventCollectionByteSizeLimit  uint64
 	eventCollection               *EventCollection
@@ -22,12 +21,10 @@ type EventHandler struct {
 
 // NewEventHandler constructs a new EventHandler
 func NewEventHandler(chain flow.Chain,
-	eventCollectionEnabled bool,
 	serviceEventCollectionEnabled bool,
 	eventCollectionByteSizeLimit uint64) *EventHandler {
 	return &EventHandler{
 		chain:                         chain,
-		eventCollectionEnabled:        eventCollectionEnabled,
 		serviceEventCollectionEnabled: serviceEventCollectionEnabled,
 		eventCollectionByteSizeLimit:  eventCollectionByteSizeLimit,
 		eventCollection:               NewEventCollection(),
@@ -42,9 +39,6 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	txID flow.Identifier,
 	txIndex uint32,
 	payer flow.Address) error {
-	if !h.eventCollectionEnabled {
-		return nil
-	}
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {

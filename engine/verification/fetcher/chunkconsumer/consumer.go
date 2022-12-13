@@ -40,7 +40,7 @@ func NewChunkConsumer(
 	jobs := &ChunkJobs{locators: chunksQueue}
 
 	lg := log.With().Str("module", "chunk_consumer").Logger()
-	consumer := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing)
+	consumer := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing, 0)
 
 	chunkConsumer := &ChunkConsumer{
 		consumer:       consumer,

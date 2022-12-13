@@ -10,14 +10,15 @@ import (
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,9 +54,12 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	signerIndicesDecoder hotstuff.BlockSignerDecoder,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
+) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
-
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -65,10 +69,22 @@ func New(
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
 	if config.RpcMetricsEnabled {
-		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
+
+	if len(apiRatelimits) > 0 {
+		// create a rate limit interceptor
+		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		// append the rate limit interceptor to the list of interceptors
+		interceptors = append(interceptors, rateLimitInterceptor)
+	}
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	serverOptions = append(serverOptions, chainedInterceptors)
 
 	server := grpc.NewServer(serverOptions...)
 
@@ -76,15 +92,16 @@ func New(
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:             e,
-			chain:              chainID,
-			blocks:             blocks,
-			headers:            headers,
-			state:              state,
-			events:             events,
-			exeResults:         exeResults,
-			transactionResults: txResults,
-			log:                log,
+			engine:               e,
+			chain:                chainID,
+			blocks:               blocks,
+			headers:              headers,
+			state:                state,
+			signerIndicesDecoder: signerIndicesDecoder,
+			events:               events,
+			exeResults:           exeResults,
+			transactionResults:   txResults,
+			log:                  log,
 		},
 		server: server,
 		config: config,
@@ -134,21 +151,22 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine             ingestion.IngestRPC
-	chain              flow.ChainID
-	blocks             storage.Blocks
-	headers            storage.Headers
-	state              protocol.State
-	events             storage.Events
-	exeResults         storage.ExecutionResults
-	transactionResults storage.TransactionResults
-	log                zerolog.Logger
+	engine               ingestion.IngestRPC
+	chain                flow.ChainID
+	blocks               storage.Blocks
+	headers              storage.Headers
+	state                protocol.State
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	events               storage.Events
+	exeResults           storage.ExecutionResults
+	transactionResults   storage.TransactionResults
+	log                  zerolog.Logger
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -186,12 +204,11 @@ func (h *handler) GetRegisterAtBlockID(
 	}
 
 	owner := req.GetRegisterOwner()
-	controller := req.GetRegisterController()
 	key := req.GetRegisterKey()
-	value, err := h.engine.GetRegisterAtBlockID(ctx, owner, controller, key, blockID)
+	value, err := h.engine.GetRegisterAtBlockID(ctx, owner, key, blockID)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to collect register  (owner : %s, controller: %s, key: %s): %v", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+		return nil, status.Errorf(codes.Internal, "failed to collect register  (owner : %s, key: %s): %v", hex.EncodeToString(owner), string(key), err)
 	}
 
 	res := &execution.GetRegisterAtBlockIDResponse{
@@ -503,7 +520,7 @@ func (h *handler) GetAccountAtBlockID(
 
 // GetLatestBlockHeader gets the latest sealed or finalized block header.
 func (h *handler) GetLatestBlockHeader(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetLatestBlockHeaderRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	var header *flow.Header
@@ -516,16 +533,16 @@ func (h *handler) GetLatestBlockHeader(
 		// get the finalized header from state
 		header, err = h.state.Final().Head()
 	}
-
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-	return blockHeaderResponse(header)
+
+	return h.blockHeaderResponse(header)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
 func (h *handler) GetBlockHeaderByID(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetBlockHeaderByIDRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
@@ -536,12 +553,16 @@ func (h *handler) GetBlockHeaderByID(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-
-	return blockHeaderResponse(header)
+	return h.blockHeaderResponse(header)
 }
 
-func blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
-	msg, err := convert.BlockHeaderToMessage(header)
+func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
+	}
+
+	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
 		return nil, err
 	}

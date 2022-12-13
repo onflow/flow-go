@@ -20,10 +20,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -54,13 +55,13 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueNetworkInit enqueues the default network component with the given context
+	// EnqueueNetworkInit enqueues the default networking layer.
 	EnqueueNetworkInit()
 
-	// EnqueueMetricsServerInit enqueues the metrics component
+	// EnqueueMetricsServerInit enqueues the metrics component.
 	EnqueueMetricsServerInit()
 
-	// Enqueues the Tracer component
+	// EnqueueTracer enqueues the Tracer component.
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
@@ -73,6 +74,14 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and calls the provided error handler when an irrecoverable error is encountered.
+	// Use RestartableComponent if the component is not critical to the node's safe operation and
+	// can/should be independently restarted when an irrecoverable error is encountered.
+	//
+	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+	RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder
 
 	// ShutdownFunc adds a callback function that is called after all components have exited.
 	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
@@ -112,45 +121,49 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	nodeIDHex                       string
-	AdminAddr                       string
-	AdminCert                       string
-	AdminKey                        string
-	AdminClientCAs                  string
-	BindAddr                        string
-	NodeRole                        string
-	DynamicStartupANAddress         string
-	DynamicStartupANPubkey          string
-	DynamicStartupEpochPhase        string
-	DynamicStartupEpoch             string
-	DynamicStartupSleepInterval     time.Duration
-	datadir                         string
-	secretsdir                      string
-	secretsDBEnabled                bool
-	InsecureSecretsDB               bool
-	level                           string
-	metricsPort                     uint
-	BootstrapDir                    string
-	PeerUpdateInterval              time.Duration
-	UnicastMessageTimeout           time.Duration
-	DNSCacheTTL                     time.Duration
-	profilerEnabled                 bool
-	profilerDir                     string
-	profilerInterval                time.Duration
-	profilerDuration                time.Duration
-	profilerMemProfileRate          int
-	tracerEnabled                   bool
-	tracerSensitivity               uint
-	MetricsEnabled                  bool
-	guaranteesCacheSize             uint
-	receiptsCacheSize               uint
-	db                              *badger.DB
-	PreferredUnicastProtocols       []string
+	nodeIDHex                   string
+	AdminAddr                   string
+	AdminCert                   string
+	AdminKey                    string
+	AdminClientCAs              string
+	BindAddr                    string
+	NodeRole                    string
+	DynamicStartupANAddress     string
+	DynamicStartupANPubkey      string
+	DynamicStartupEpochPhase    string
+	DynamicStartupEpoch         string
+	DynamicStartupSleepInterval time.Duration
+	datadir                     string
+	secretsdir                  string
+	secretsDBEnabled            bool
+	InsecureSecretsDB           bool
+	level                       string
+	metricsPort                 uint
+	BootstrapDir                string
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	profilerEnabled             bool
+	uploaderEnabled             bool
+	profilerDir                 string
+	profilerInterval            time.Duration
+	profilerDuration            time.Duration
+	profilerMemProfileRate      int
+	tracerEnabled               bool
+	tracerSensitivity           uint
+	MetricsEnabled              bool
+	guaranteesCacheSize         uint
+	receiptsCacheSize           uint
+	db                          *badger.DB
+	PreferredUnicastProtocols   []string
+	// NetworkConnectionPruning determines whether connections to nodes
+	// that are not part of protocol state should be trimmed
+	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
+	NetworkConnectionPruning        bool
 	NetworkReceivedMessageCacheSize uint32
-	topologyProtocolName            string
-	topologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  chainsync.Config
+	CodecFactory                    func() network.Codec
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
@@ -205,6 +218,10 @@ func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 
+	// NOTE: if the codec used in the network component is ever changed any code relying on
+	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
+	codecFactory := func() network.Codec { return cbor.NewCodec() }
+
 	return &BaseConfig{
 		nodeIDHex:                       NotSet,
 		AdminAddr:                       NotSet,
@@ -221,6 +238,7 @@ func DefaultBaseConfig() *BaseConfig {
 		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
+		uploaderEnabled:                 false,
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,
@@ -231,10 +249,14 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-		topologyProtocolName:            string(topology.TopicBased),
-		topologyEdgeProbability:         topology.MaximumEdgeProbability,
-		HeroCacheMetricsEnable:          false,
-		SyncCoreConfig:                  chainsync.DefaultConfig(),
-		ComplianceConfig:                compliance.DefaultConfig(),
+
+		// By default we let networking layer trim connections to all nodes that
+		// are no longer part of protocol state.
+		NetworkConnectionPruning: p2p.ConnectionPruningEnabled,
+
+		HeroCacheMetricsEnable: false,
+		SyncCoreConfig:         chainsync.DefaultConfig(),
+		CodecFactory:           codecFactory,
+		ComplianceConfig:       compliance.DefaultConfig(),
 	}
 }

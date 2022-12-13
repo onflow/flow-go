@@ -21,7 +21,7 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 	msgLen := 100
 	msg := make([]byte, msgLen)
 	tag := "random_tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := NewBLSHasher(tag)
 
 	// create keys and signatures
 	keys := make([]crypto.PublicKey, 0, signersNumber)

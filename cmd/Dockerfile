@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.17-bullseye AS build-setup
+FROM golang:1.18-bullseye AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip
@@ -19,7 +19,7 @@ ARG VERSION
 
 COPY . .
 
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto_setup_gopath
 
@@ -28,11 +28,11 @@ WORKDIR /app
 ARG GOARCH=amd64
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-    -o ./app ./cmd/${TARGET}
+    -o ./app ${TARGET}
 
 RUN chmod a+x /app/app
 
@@ -48,17 +48,17 @@ FROM build-env as build-debug
 WORKDIR /app
 ARG GOARCH=amd64
 RUN --mount=type=ssh \
-    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-    -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
+    -gcflags="all=-N -l" -o ./app ${TARGET}
 
 RUN chmod a+x /app/app
 
-FROM golang:1.17-bullseye as debug
+FROM golang:1.18-bullseye as debug
 
-RUN go get -u github.com/go-delve/delve/cmd/dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 COPY --from=build-debug /app/app /bin/app
 

@@ -24,6 +24,7 @@ type ScriptProcedure struct {
 	Logs           []string
 	Events         []flow.Event
 	GasUsed        uint64
+	MemoryEstimate uint64
 	Err            errors.Error
 }
 
@@ -119,8 +120,12 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
-	location := common.ScriptLocation(proc.ID[:])
+	env, err := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	if err != nil {
+		return err
+	}
+
+	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
 			Source:    proc.Script,
@@ -140,5 +145,6 @@ func (i ScriptInvoker) Process(
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.ComputationUsed()
+	proc.MemoryEstimate = env.MemoryEstimate()
 	return nil
 }

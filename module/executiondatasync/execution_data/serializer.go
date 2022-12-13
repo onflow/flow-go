@@ -3,7 +3,9 @@ package execution_data
 import (
 	"fmt"
 	"io"
+	"math"
 
+	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -13,9 +15,30 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 )
 
-var DefaultSerializer = NewSerializer(&cbor.Codec{}, compressor.NewLz4Compressor())
+var DefaultSerializer Serializer
+
+func init() {
+	var codec encoding.Codec
+
+	decMode, err := cborlib.DecOptions{
+		MaxArrayElements: math.MaxInt64,
+		MaxMapPairs:      math.MaxInt64,
+		MaxNestedLevels:  math.MaxInt16,
+	}.DecMode()
+
+	if err != nil {
+		panic(err)
+	}
+
+	codec = cbor.NewCodec(cbor.WithDecMode(decMode))
+	DefaultSerializer = NewSerializer(codec, compressor.NewLz4Compressor())
+}
 
 // header codes to distinguish between different types of data
+// these codes provide simple versioning of execution state data blobs and indicate how the data
+// should be deserialized into their original form. Therefore, each input format must have a unique
+// code, and the codes must never be reused. This allows for libraries that can accurately decode
+// the data without juggling software versions.
 const (
 	codeRecursiveCIDs = iota + 1
 	codeExecutionDataRoot

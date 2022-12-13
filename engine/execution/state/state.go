@@ -40,6 +40,9 @@ type ReadOnlyExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
+	// HasState returns true if the state with the given state commitment exists in memory
+	HasState(flow.StateCommitment) bool
+
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
@@ -70,9 +73,11 @@ type ExecutionState interface {
 }
 
 const (
-	KeyPartOwner      = uint16(0)
-	KeyPartController = uint16(1)
-	KeyPartKey        = uint16(2)
+	KeyPartOwner = uint16(0)
+	// @deprecated - controller was used only by the very first
+	// version of cadence for access controll which was retired later on
+	// KeyPartController = uint16(1)
+	KeyPartKey = uint16(2)
 )
 
 type state struct {
@@ -94,7 +99,6 @@ type state struct {
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartController, []byte(reg.Controller)),
 		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
 	})
 }
@@ -133,11 +137,10 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(ledger.State(commitment),
-		[]ledger.Key{
-			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
-		})
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
+	return ledger.NewQuerySingleValue(ledger.State(commitment),
+		RegisterIDToKey(flow.NewRegisterID(owner, key)),
+	)
 }
 
 func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
@@ -170,43 +173,37 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
-	return func(owner, controller, key string) (flow.RegisterValue, error) {
+	return func(owner, key string) (flow.RegisterValue, error) {
 		regID := flow.RegisterID{
-			Owner:      owner,
-			Controller: controller,
-			Key:        key,
+			Owner: owner,
+			Key:   key,
 		}
 
 		if value, ok := readCache[regID]; ok {
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, controller, key)
+		query, err := makeSingleValueQuery(commitment, owner, key)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
 		}
 
-		values, err := ldg.Get(query)
+		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
-		if len(values) != 1 {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
-		}
-
 		// Prevent caching of value with len zero
-		if len(values[0]) == 0 {
+		if len(value) == 0 {
 			return nil, nil
 		}
 
 		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
 
-		return values[0], nil
+		return value, nil
 	}
 }
 
@@ -241,7 +238,7 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 //	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.Finish()
+//	defer span.End()
 //
 //	return CommitDelta(s.ls, delta, baseState)
 //}
@@ -268,7 +265,7 @@ func (s *state) GetRegisters(
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-	defer span.Finish()
+	defer span.End()
 
 	_, values, err := s.getRegisters(commit, registerIDs)
 	if err != nil {
@@ -290,7 +287,7 @@ func (s *state) GetProof(
 ) (flow.StorageProof, error) {
 
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
-	defer span.Finish()
+	defer span.End()
 
 	query, err := makeQuery(commit, registerIDs)
 
@@ -304,6 +301,10 @@ func (s *state) GetProof(
 		return nil, fmt.Errorf("cannot get proof: %w", err)
 	}
 	return proof, nil
+}
+
+func (s *state) HasState(commitment flow.StateCommitment) bool {
+	return s.ls.HasState(ledger.State(commitment))
 }
 
 func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -321,7 +322,7 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
-	defer span.Finish()
+	defer span.End()
 
 	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 	spew.Config.DisablePointerMethods = true
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStateSaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 
@@ -504,7 +505,7 @@ func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, e
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {

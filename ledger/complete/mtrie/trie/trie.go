@@ -26,6 +26,8 @@ import (
 // that where not affected by the write operation are shared between the original MTrie
 // (before the register updates) and the updated MTrie (after the register writes).
 //
+// MTrie expects that for a specific path, the register's key never changes.
+//
 // DEFINITIONS and CONVENTIONS:
 //   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the height of its root.
@@ -135,7 +137,7 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 			if *head.Path() == p {
 				payload := head.Payload()
 				if payload != nil {
-					sizes[i] = payload.Value.Size()
+					sizes[i] = payload.Value().Size()
 				}
 				// NOTE: break isn't used here because precondition
 				// doesn't require paths being deduplicated.
@@ -195,6 +197,39 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 	}
 }
 
+// ReadSinglePayload reads and returns a payload for a single path.
+func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
+	return readSinglePayload(path, mt.root)
+}
+
+// readSinglePayload reads and returns a payload for a single path in subtree with `head` as root node.
+func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
+	pathBytes := path[:]
+
+	if head == nil {
+		return ledger.EmptyPayload()
+	}
+
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+
+	// Traverse nodes following the path until a leaf node or nil node is reached.
+	for !head.IsLeaf() {
+		bit := bitutils.ReadBit(pathBytes, depth)
+		if bit == 0 {
+			head = head.LeftChild()
+		} else {
+			head = head.RightChild()
+		}
+		depth++
+	}
+
+	if head != nil && *head.Path() == path {
+		return head.Payload()
+	}
+
+	return ledger.EmptyPayload()
+}
+
 // UnsafeRead reads payloads for the given paths.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
@@ -228,6 +263,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 		}
 		return
 	}
+
 	// reached a leaf node
 	if head.IsLeaf() {
 		for i, p := range paths {
@@ -237,6 +273,13 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 				payloads[i] = ledger.EmptyPayload()
 			}
 		}
+		return
+	}
+
+	// reached an interim node
+	if len(paths) == 1 {
+		// call readSinglePayload to skip partition and recursive calls when there is only one path
+		payloads[0] = readSinglePayload(paths[0], head)
 		return
 	}
 
@@ -279,6 +322,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 //   * keys are NOT duplicated
 //   * requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
+// CAUTION: MTrie expects that for a specific path, the payload's key never changes.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(
 	parentTrie *MTrie,
@@ -362,7 +406,7 @@ func update(
 			if p == parentPath {
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
-					if !parentNode.Payload().Equals(&payloads[i]) {
+					if !parentNode.Payload().ValueEquals(&payloads[i]) {
 						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
 						allocatedRegCountDelta, allocatedRegSizeDelta =

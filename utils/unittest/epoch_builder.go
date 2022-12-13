@@ -376,9 +376,10 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 		err := state.Extend(context.Background(), block)
 		require.NoError(builder.t, err)
 
-		err = state.Finalize(context.Background(), blockID)
-		require.NoError(builder.t, err)
 		err = state.MarkValid(blockID)
+		require.NoError(builder.t, err)
+
+		err = state.Finalize(context.Background(), blockID)
 		require.NoError(builder.t, err)
 	}
 
@@ -395,14 +396,13 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
 		// - seal for A
 		// - execution result for B
-		a := builder.blocks[len(builder.blocks)-2]
 		b := builder.blocks[len(builder.blocks)-1]
 
 		receiptB := ReceiptForBlockFixture(b)
 
 		block := BlockWithParentFixture(b.Header)
 		seal := Seal.Fixture(
-			Seal.WithResult(a.Payload.Results[0]),
+			Seal.WithResult(b.Payload.Results[0]),
 		)
 
 		payload := PayloadFixture(

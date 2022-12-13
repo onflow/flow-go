@@ -5,12 +5,15 @@ const (
 	namespaceNetwork           = "network"
 	namespaceStorage           = "storage"
 	namespaceAccess            = "access"
+	namespaceObserver          = "observer"
 	namespaceCollection        = "collection"
 	namespaceConsensus         = "consensus"
 	namespaceVerification      = "verification"
 	namespaceExecution         = "execution"
 	namespaceLoader            = "loader"
+	namespaceStateSync         = "state_synchronization"
 	namespaceExecutionDataSync = "execution_data_sync"
+	namespaceChainsync         = "chainsync"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -19,6 +22,7 @@ const (
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
 	subsystemQueue  = "queue"
+	subsystemDHT    = "dht"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -32,6 +36,12 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemConnectionPool        = "connection_pool"
+)
+
+// Observer subsystem
+const (
+	subsystemObserverGRPC = "observer_grpc"
 )
 
 // Collection subsystem
@@ -68,9 +78,15 @@ const (
 
 // Execution Data Sync Subsystems
 const (
-	subsystemExeDataRequester = "requester"
-	subsystemExeDataProvider  = "provider"
-	subsystemExeDataPruner    = "pruner"
+	subsystemExeDataRequester       = "requester"
+	subsystemExeDataProvider        = "provider"
+	subsystemExeDataPruner          = "pruner"
+	subsystemExecutionDataRequester = "execution_data_requester"
+)
+
+// module/synchronization core
+const (
+	subsystemSyncCore = "sync_core"
 )
 
 // METRIC NAMING GUIDELINES

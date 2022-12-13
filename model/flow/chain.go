@@ -21,8 +21,8 @@ const (
 
 	// Testnet is the chain ID for the testnet chain.
 	Testnet ChainID = "flow-testnet"
-	// Canary is the chain ID for internal canary chain.
-	Canary ChainID = "flow-canary"
+	// Stagingnet is the chain ID for internal stagingnet chain.
+	Stagingnet ChainID = "flow-stagingnet"
 
 	// Transient test networks
 
@@ -41,7 +41,7 @@ const (
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
@@ -50,9 +50,11 @@ func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
 		return 0
-	case Testnet, Canary:
+	case Testnet:
 		return invalidCodeTestNetwork
-	case Emulator, Localnet, Benchnet:
+	case Stagingnet:
+		return invalidCodeStagingNetwork
+	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
@@ -167,9 +169,15 @@ var testnet = &addressedChain{
 	},
 }
 
-var canary = &addressedChain{
+var bftTestNet = &addressedChain{
 	chainImpl: &linearCodeImpl{
-		chainID: Canary,
+		chainID: BftTestnet,
+	},
+}
+
+var stagingnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Stagingnet,
 	},
 }
 
@@ -202,8 +210,8 @@ func (c ChainID) Chain() Chain {
 		return mainnet
 	case Testnet:
 		return testnet
-	case Canary:
-		return canary
+	case Stagingnet:
+		return stagingnet
 	case Benchnet:
 		return benchnet
 	case Localnet:
@@ -212,6 +220,8 @@ func (c ChainID) Chain() Chain {
 		return emulator
 	case MonotonicEmulator:
 		return monotonicEmulator
+	case BftTestnet:
+		return bftTestNet
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}

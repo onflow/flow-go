@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestCollectionGuaranteeInclusion(t *testing.T) {
@@ -84,7 +84,7 @@ func (is *InclusionSuite) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_inclusion", nodeConfigs)
 
 	// initialize the network
-	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig)
+	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,8 +120,13 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
-	sentinel.SignerIDs = []flow.Identifier{is.collID}
+	// there is only one collection node in the cluster
+	clusterCommittee := flow.IdentifierList{is.collID}
+	signerIndices, err := signature.EncodeSignersToIndices(clusterCommittee, clusterCommittee)
+	require.NoError(t, err)
+	sentinel.SignerIndices = signerIndices
 	sentinel.ReferenceBlockID = is.net.Root().ID()
+	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].Header.ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)
@@ -172,7 +177,7 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		is.T().Logf("%s sending collection %x to consensus node %v\n", time.Now(), colID, conID)
-		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
+		err := is.Collection().Send(ctx, channels.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
 			is.T().Logf("could not send collection guarantee: %s\n", err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -166,9 +167,9 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 
 	span, _, isSampled := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
 	if isSampled {
-		span.SetTag("collection_index", chunk.CollectionIndex)
+		span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	}
-	defer span.Finish()
+	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
 
@@ -253,7 +254,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Logger()
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
-	defer span.Finish()
+	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
 	if IsChunkDataPackValidationError(err) {
@@ -316,7 +317,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	removed := e.pendingChunks.Rem(status.ChunkIndex, status.ExecutionResult.ID())
+	removed := e.pendingChunks.Remove(status.ChunkIndex, status.ExecutionResult.ID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -481,7 +482,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Rem(chunkIndex, resultID)
+	removed := e.pendingChunks.Remove(chunkIndex, resultID)
 
 	e.chunkConsumerNotifier.Notify(chunkLocatorID)
 	lg.Info().

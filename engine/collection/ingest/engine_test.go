@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -87,7 +88,7 @@ func (suite *Suite) SetupTest() {
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
-	suite.clusters, err = flow.NewClusterList(assignments, collectors)
+	suite.clusters, err = factory.NewClusterList(assignments, collectors)
 	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture()
@@ -242,28 +243,14 @@ func (suite *Suite) TestInvalidTransaction() {
 	})
 
 	suite.Run("invalid address", func() {
-		suite.Run("objective check", func() {
-			invalid := unittest.InvalidAddressFixture()
-			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
-			tx.Payer = invalid
+		invalid := unittest.InvalidAddressFixture()
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
+		tx.Payer = invalid
 
-			err := suite.engine.ProcessTransaction(&tx)
-			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
-		})
-
-		suite.Run("subjective check with max index", func() {
-			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
-			suite.Require().NoError(err)
-			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = suite.root.ID()
-			tx.Authorizers[0] = invalid
-
-			err = suite.engine.ProcessTransaction(&tx)
-			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
-		})
+		err := suite.engine.ProcessTransaction(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
 	})
 
 	suite.Run("expired reference block ID", func() {
@@ -490,7 +477,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -529,7 +516,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -558,7 +545,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// include ourselves in cluster assignment
 	withMe := suite.identities.Filter(filter.HasRole(flow.RoleCollection))
 	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
-	epoch3Clusters, err := flow.NewClusterList(epoch3Assignment, withMe)
+	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)
 
 	epoch3 := new(protocol.Epoch)

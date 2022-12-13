@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAddRem(t *testing.T) {
+func TestAddRemove(t *testing.T) {
 	item1 := unittest.MockEntityFixture()
 	item2 := unittest.MockEntityFixture()
 
@@ -41,7 +41,7 @@ func TestAddRem(t *testing.T) {
 		})
 
 		t.Run("should be able to remove first", func(t *testing.T) {
-			removed := pool.Rem(item1.ID())
+			removed := pool.Remove(item1.ID())
 			assert.True(t, removed)
 			size := pool.Size()
 			assert.EqualValues(t, uint(1), size)

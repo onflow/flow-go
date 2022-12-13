@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -9,9 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/onflow/flow-go/fvm/state"
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
@@ -72,26 +75,27 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 
 	storageUsed := make(map[string]uint64)
 	storageUsedChan := make(chan accountPayloadSize, workerCount)
-	payloadChan := make(chan indexedPayload)
+	payloadChan := make(chan indexedPayload, workerCount)
 	storageUsedPayloadChan := make(chan accountStorageUsedPayload, workerCount)
 	storageUsedPayload := make(map[string]int)
 
-	inputWG := &sync.WaitGroup{}
+	inputEG, ctx := errgroup.WithContext(context.Background())
 	outputWG := &sync.WaitGroup{}
 
 	outputWG.Add(1)
 	go func() {
+		defer outputWG.Done()
 		for payloadSize := range storageUsedChan {
 			if _, ok := storageUsed[payloadSize.Address]; !ok {
 				storageUsed[payloadSize.Address] = 0
 			}
 			storageUsed[payloadSize.Address] = storageUsed[payloadSize.Address] + payloadSize.StorageUsed
 		}
-		outputWG.Done()
 	}()
 
 	outputWG.Add(1)
 	go func() {
+		defer outputWG.Done()
 		for su := range storageUsedPayloadChan {
 			if _, ok := storageUsedPayload[su.Address]; ok {
 				m.Log.Error().
@@ -100,23 +104,26 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 			}
 			storageUsedPayload[su.Address] = su.Index
 		}
-		outputWG.Done()
 	}()
 
 	for i := 0; i < workerCount; i++ {
-		inputWG.Add(1)
-		go func() {
+		inputEG.Go(func() error {
 			for p := range payloadChan {
-				var id flow.RegisterID
-				id, err = KeyToRegisterID(p.Payload.Key)
+				k, err := p.Payload.Key()
+				if err != nil {
+					log.Error().Err(err).Msg("error get payload key")
+					return err
+				}
+				id, err := KeyToRegisterID(k)
 				if err != nil {
 					log.Error().Err(err).Msg("error converting key to register ID")
+					return err
 				}
 				if len([]byte(id.Owner)) != flow.AddressLength {
 					// not an address
 					continue
 				}
-				if id.Key == fvm.KeyStorageUsed {
+				if id.Key == fvm.KeyAccountStatus {
 					storageUsedPayloadChan <- accountStorageUsedPayload{
 						Address: id.Owner,
 						Index:   p.Index,
@@ -127,19 +134,21 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					StorageUsed: uint64(registerSize(id, p.Payload)),
 				}
 			}
-			inputWG.Done()
-		}()
+			return nil
+		})
 	}
 
+Loop:
 	for i, p := range payload {
-		payloadChan <- indexedPayload{
-			Index:   i,
-			Payload: p,
+		select {
+		case <-ctx.Done():
+			break Loop
+		case payloadChan <- indexedPayload{Index: i, Payload: p}:
 		}
 	}
 
 	close(payloadChan)
-	inputWG.Wait()
+	err = inputEG.Wait()
 	close(storageUsedChan)
 	close(storageUsedPayloadChan)
 	outputWG.Wait()
@@ -168,27 +177,26 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 			return nil, fmt.Errorf(errStr)
 		}
 
-		id, err := KeyToRegisterID(p.Key)
+		k, err := p.Key()
+		if err != nil {
+			log.Error().Err(err).Msg("error get payload key")
+			return nil, err
+		}
+		id, err := KeyToRegisterID(k)
 		if err != nil {
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err
 		}
-		if id.Key != fvm.KeyStorageUsed {
-			return nil, fmt.Errorf("this is not a storage used register")
+		if id.Key != fvm.KeyAccountStatus {
+			return nil, fmt.Errorf("this is not a status register")
 		}
 
-		oldUsed, _, err := utils.ReadUint64(p.Value)
+		status, err := state.AccountStatusFromBytes(p.Value())
 		if err != nil {
-			errStr := "cannot decode storage used by address"
-			log.Error().
-				Str("address", flow.BytesToAddress([]byte(a)).Hex()).
-				Hex("storageUsed", p.Value).
-				Hex("storageUsedKey", p.Key.CanonicalForm()).
-				Err(err).
-				Msg(errStr)
-			return nil, fmt.Errorf(errStr)
+			log.Error().Err(err).Msg("error getting status")
+			return nil, err
 		}
-
+		oldUsed := status.StorageUsed()
 		if oldUsed > used {
 			storageDecreaseCount += 1
 			change = -int64(oldUsed - used)
@@ -203,8 +211,8 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 		if err != nil {
 			return nil, err
 		}
-
-		payload[pIndex].Value = utils.Uint64ToBinary(used)
+		status.SetStorageUsed(used)
+		payload[pIndex] = *ledger.NewPayload(k, status.ToBytes())
 	}
 
 	m.Log.Info().

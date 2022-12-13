@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
@@ -56,6 +57,7 @@ type Engine struct {
 	mempool                *Mempool
 	execState              state.ExecutionState
 	metrics                module.ExecutionMetrics
+	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
 	spockHasher            hash.Hasher
@@ -116,6 +118,7 @@ func New(
 		mempool:                mempool,
 		execState:              execState,
 		metrics:                metrics,
+		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
 		syncFilter:             syncFilter,
@@ -128,7 +131,7 @@ func New(
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	syncConduit, err := net.Register(channels.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
@@ -170,7 +173,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -184,7 +187,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -394,7 +397,7 @@ func (e *Engine) reloadBlock(
 	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block on reloading: %w", err)
+		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
 	return nil
@@ -437,7 +440,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
 	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
-	defer span.Finish()
+	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -459,7 +462,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block: %w", err)
+		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
 	return nil
@@ -569,7 +572,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	startedAt := time.Now()
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
-	defer span.Finish()
+	defer span.End()
 
 	view := e.execState.NewView(*executableBlock.StartState)
 
@@ -643,7 +646,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.log.Err(err).Msg("failed in process block's children")
 	}
 
-	e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	if e.executionDataPruner != nil {
+		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	}
 }
 
 // we've executed the block, now we need to check:
@@ -723,7 +728,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executed.ID())
+			executionQueues.Remove(executed.ID())
 
 			return nil
 		})
@@ -765,7 +770,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// 		Hex("delta_start_state", delta.ExecutableBlock.StartState).
 	// 		Msg("can not apply the state delta, the start state does not match")
 	//
-	// 	e.syncDeltas.Rem(eb.Block.ID())
+	// 	e.syncDeltas.Remove(eb.Block.ID())
 	// }
 
 	// if don't have the delta, then check if everything is ready for executing
@@ -815,7 +820,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	collID := collection.ID()
 
 	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
-	defer span.Finish()
+	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -849,6 +854,13 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 						blockID)
 				}
 
+				// record collection max height metrics
+				blockHeight := executableBlock.Block.Header.Height
+				if blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+					e.maxCollectionHeight = blockHeight
+				}
+
 				if completeCollection.IsCompleted() {
 					// already received transactions for this collection
 					continue
@@ -867,7 +879,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// this also prevents from executing the same block twice, because the second
 			// time when the collection arrives, it will not be found in the blockByCollectionID
 			// index.
-			backdata.Rem(collID)
+			backdata.Remove(collID)
 
 			return nil
 		},
@@ -1002,8 +1014,21 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
+		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
+		if err != nil {
+			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
+			// have validated the block payload. And that validation includes checking the guarantors are correct.
+			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
+			// should be treated as fatal error
+			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+				guarantee.ID(),
+				executableBlock.ID(),
+				executableBlock.Height(),
+			)
+			return fmt.Errorf("could not find guarantors: %w", err)
+		}
 		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
 		actualRequested++
 	}
 
@@ -1022,6 +1047,12 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for scripts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()
@@ -1047,7 +1078,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
 }
 
-func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1056,9 +1087,9 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, ke
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(controller), string(key))
+	data, err := blockView.Get(string(owner), string(key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
 	}
 
 	return data, nil
@@ -1068,6 +1099,12 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for get accounts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to get account at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block.", blockID.String(), hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()
@@ -1087,7 +1124,7 @@ func (e *Engine) handleComputationResult(
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
-	defer span.Finish()
+	defer span.End()
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -1119,7 +1156,7 @@ func (e *Engine) saveExecutionResults(
 ) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	originalState := startState
 
@@ -1142,7 +1179,13 @@ func (e *Engine) saveExecutionResults(
 			Msg("service event emitted")
 	}
 
-	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
+	executionReceipt, err := GenerateExecutionReceipt(
+		e.me,
+		e.receiptHasher,
+		e.spockHasher,
+		executionResult,
+		result.StateSnapshots)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
@@ -1198,16 +1241,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-func (e *Engine) generateExecutionReceipt(
-	ctx context.Context,
+func GenerateExecutionReceipt(
+	me module.Local,
+	receiptHasher hash.Hasher,
+	spockHasher hash.Hasher,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.SpockSnapshot,
-) (*flow.ExecutionReceipt, error) {
-
+	stateInteractions []*delta.SpockSnapshot) (*flow.ExecutionReceipt, error) {
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
 	for i, stateInteraction := range stateInteractions {
-		spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
+		spock, err := me.SignFunc(stateInteraction.SpockSecret, spockHasher, crypto.SPOCKProve)
 
 		if err != nil {
 			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
@@ -1219,12 +1262,12 @@ func (e *Engine) generateExecutionReceipt(
 		ExecutionResult:   *result,
 		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        e.me.NodeID(),
+		ExecutorID:        me.NodeID(),
 	}
 
 	// generates a signature over the execution result
 	id := receipt.ID()
-	sig, err := e.me.Sign(id[:], e.receiptHasher)
+	sig, err := me.Sign(id[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}

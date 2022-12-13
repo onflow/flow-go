@@ -24,11 +24,11 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
-	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage/badger"
@@ -44,7 +44,7 @@ type DKGSuite struct {
 	hub                    *stub.Hub // in-mem test network
 	env                    templates.Environment
 	blockchain             *emulator.Blockchain
-	adminEmulatorClient    *emulatormod.EmulatorClient
+	adminEmulatorClient    *utils.EmulatorClient
 	adminDKGContractClient *dkg.Client
 	dkgAddress             sdk.Address
 	dkgAccountKey          *sdk.AccountKey
@@ -114,7 +114,7 @@ func (s *DKGSuite) initEmulator() {
 
 	s.blockchain = blockchain
 
-	s.adminEmulatorClient = emulatormod.NewEmulatorClient(blockchain)
+	s.adminEmulatorClient = utils.NewEmulatorClient(blockchain)
 
 	s.hub = stub.NewNetworkHub()
 }
@@ -162,9 +162,11 @@ func (s *DKGSuite) setupDKGAdmin() {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
-	_, err := s.prepareAndSubmit(setUpAdminTx,
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+	_, err = s.prepareAndSubmit(setUpAdminTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 }
@@ -178,7 +180,8 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 	accountID := netID.NodeID.String()
-	accountSigner := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
+	accountSigner, err := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
+	require.NoError(s.T(), err)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create Flow account
@@ -231,10 +234,11 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	require.NoError(s.T(), err)
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(fundAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
+		[]sdkcrypto.Signer{signer},
 	)
 	require.NoError(s.T(), err)
 
@@ -264,7 +268,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 // createNode creates a DKG test node from an account and initializes its DKG
 // smart-contract client
 func (s *DKGSuite) createNode(account *nodeAccount) *node {
-	emulatorClient := emulatormod.NewEmulatorClient(s.blockchain)
+	emulatorClient := utils.NewEmulatorClient(s.blockchain)
 	contractClient := dkg.NewClient(
 		zerolog.Nop(),
 		emulatorClient,
@@ -303,10 +307,11 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(startDKGTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 
@@ -334,10 +339,11 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 	require.NoError(s.T(), err)
 	err = createParticipantTx.AddArgument(nodeID)
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(createParticipantTx,
 		[]sdk.Address{node.account.accountAddress, s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{node.account.accountSigner, s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{node.account.accountSigner, signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 
@@ -354,19 +360,25 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
 	// we are using an account-creation transaction but it doesnt matter; we
 	// could be using anything other transaction
-	createAccountTx := sdktemplates.CreateAccount(
+	createAccountTx, err := sdktemplates.CreateAccount(
 		[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
 		[]sdktemplates.Contract{},
-		s.blockchain.ServiceKey().Address).
+		s.blockchain.ServiceKey().Address)
+	if err != nil {
+		return nil, err
+	}
+	createAccountTx.
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	block, err := s.prepareAndSubmit(createAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
+		[]sdkcrypto.Signer{signer},
 	)
 	return block, err
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +16,8 @@ import (
 func TestAccounts_Create(t *testing.T) {
 	t.Run("Sets registers", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 
 		address := flow.HexToAddress("01")
@@ -23,13 +25,14 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		// storage_used + exists + key count
-		require.Equal(t, len(view.Ledger.RegisterTouches), 3)
+		// account status
+		require.Equal(t, len(view.Ledger.RegisterTouches), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -44,7 +47,8 @@ func TestAccounts_Create(t *testing.T) {
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	view := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(view))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 
@@ -67,12 +71,14 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			view := utils.NewSimpleView()
 
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_0",
+				string(address.Bytes()),
+				"public_key_0",
 				ledgerValue,
 			)
 			require.NoError(t, err)
 
-			sth := state.NewStateHolder(state.NewState(view))
+			meter := meter.NewMeter(meter.DefaultParameters())
+			sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 			accounts := state.NewAccounts(sth)
 
 			err = accounts.Create(nil, address)
@@ -94,12 +100,14 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				string(address.Bytes()),
+				"public_key_count",
 				ledgerValue,
 			)
 			require.NoError(t, err)
 
-			sth := state.NewStateHolder(state.NewState(view))
+			meter := meter.NewMeter(meter.DefaultParameters())
+			sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 			accounts := state.NewAccounts(sth)
 
 			err = accounts.Create(nil, address)
@@ -122,12 +130,14 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				string(address.Bytes()),
+				"public_key_count",
 				ledgerValue,
 			)
 			require.NoError(t, err)
 
-			sth := state.NewStateHolder(state.NewState(view))
+			meter := meter.NewMeter(meter.DefaultParameters())
+			sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 			accounts := state.NewAccounts(sth)
 
 			err = accounts.Create(nil, address)
@@ -145,7 +155,8 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	view := utils.NewSimpleView()
 
-	sth := state.NewStateHolder(state.NewState(view))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 
@@ -153,7 +164,6 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	require.NoError(t, err)
 
 	err = view.Delete(
-		string(address.Bytes()),
 		string(address.Bytes()),
 		"public_key_count")
 
@@ -170,7 +180,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		a := state.NewAccounts(sth)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -186,7 +197,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		a := state.NewAccounts(sth)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -205,7 +217,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		a := state.NewAccounts(sth)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -229,7 +242,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		a := state.NewAccounts(sth)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -239,7 +253,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		a := state.NewAccounts(sth)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -261,7 +276,8 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -270,12 +286,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55), storageUsed)
+		require.Equal(t, uint64(40), storageUsed)
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -287,12 +304,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+34), storageUsed)
+		require.Equal(t, uint64(40+32), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -306,12 +324,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+34), storageUsed)
+		require.Equal(t, uint64(40+32), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -325,12 +344,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+35), storageUsed)
+		require.Equal(t, uint64(40+33), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -344,12 +364,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+33), storageUsed)
+		require.Equal(t, uint64(40+31), storageUsed)
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -363,12 +384,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+0), storageUsed)
+		require.Equal(t, uint64(40+0), storageUsed)
 	})
 
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
 		view := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(view))
+		meter := meter.NewMeter(meter.DefaultParameters())
+		sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 		accounts := state.NewAccounts(sth)
 		address := flow.HexToAddress("01")
 
@@ -392,7 +414,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+33+46), storageUsed)
+		require.Equal(t, uint64(40+33+42), storageUsed)
 	})
 }
 
@@ -406,8 +428,9 @@ func createByteArray(size int) []byte {
 
 func TestAccounts_AllocateStorageIndex(t *testing.T) {
 	view := utils.NewSimpleView()
+	meter := meter.NewMeter(meter.DefaultParameters())
 
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 

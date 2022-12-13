@@ -52,7 +52,7 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 	}
 
 	s.mockedCollectors = make(map[flow.Identifier]*mockedCollectorWrapper)
-	s.collectorTree = approvals.NewAssignmentCollectorTree(&s.ParentBlock, s.Headers, s.factoryMethod)
+	s.collectorTree = approvals.NewAssignmentCollectorTree(s.ParentBlock, s.Headers, s.factoryMethod)
 
 	s.prepareMockedCollector(s.IncorporatedResult.Result)
 }
@@ -96,7 +96,7 @@ func requireStateTransition(wrapper *mockedCollectorWrapper, oldState, newState 
 func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
 	numberOfWorkers := 10
 	batchSize := 10
-	chain := unittest.ChainFixtureFrom(numberOfWorkers*batchSize, &s.IncorporatedBlock)
+	chain := unittest.ChainFixtureFrom(numberOfWorkers*batchSize, s.IncorporatedBlock)
 	result0 := unittest.ExecutionResultFixture()
 	receipts := unittest.ReceiptChainFor(chain, result0)
 	for _, block := range chain {
@@ -144,7 +144,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
 // TestGetCollectorsByInterval tests that GetCollectorsByInterval returns a slice
 // with the AssignmentCollectors from the requested interval
 func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
-	chain := unittest.ChainFixtureFrom(10, &s.ParentBlock)
+	chain := unittest.ChainFixtureFrom(10, s.ParentBlock)
 	receipts := unittest.ReceiptChainFor(chain, s.IncorporatedResult.Result)
 	for _, block := range chain {
 		s.Blocks[block.ID()] = block.Header
@@ -225,7 +225,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 // TestGetOrCreateCollector_AddingSealedCollector tests a case when we are trying to add collector which is already sealed.
 // Leveled forest doesn't accept vertexes lower than the lowest height.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedCollector() {
-	block := unittest.BlockWithParentFixture(&s.ParentBlock)
+	block := unittest.BlockWithParentFixture(s.ParentBlock)
 	s.Blocks[block.ID()] = block.Header
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 	s.prepareMockedCollector(result)
@@ -234,8 +234,8 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedColl
 	prevSealedBlock := block.Header
 	for i := 0; i < 5; i++ {
 		sealedBlock := unittest.BlockHeaderWithParentFixture(prevSealedBlock)
-		s.MarkFinalized(&sealedBlock)
-		_ = s.collectorTree.FinalizeForkAtLevel(&sealedBlock, &sealedBlock)
+		s.MarkFinalized(sealedBlock)
+		_ = s.collectorTree.FinalizeForkAtLevel(sealedBlock, sealedBlock)
 	}
 
 	// now adding a collector which is lower than sealed height should result in error
@@ -268,7 +268,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 		unittest.WithExecutionResultBlockID(s.IncorporatedBlock.ID()))
 	s.prepareMockedCollector(firstResult)
 	for i := 0; i < len(forks); i++ {
-		fork := unittest.ChainFixtureFrom(3, &s.IncorporatedBlock)
+		fork := unittest.ChainFixtureFrom(3, s.IncorporatedBlock)
 		forks[i] = fork
 		prevResult := firstResult
 		// create execution results for all blocks except last one, since it won't be valid by definition
@@ -302,7 +302,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 
 	finalized := forks[0][0].Header
 
-	s.MarkFinalized(&s.IncorporatedBlock)
+	s.MarkFinalized(s.IncorporatedBlock)
 	s.MarkFinalized(finalized)
 
 	// at this point collectors for forks[0] should be processable and for forks[1] not
@@ -322,7 +322,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 	}
 
 	// A becomes sealed, B becomes finalized
-	err := s.collectorTree.FinalizeForkAtLevel(finalized, &s.Block)
+	err := s.collectorTree.FinalizeForkAtLevel(finalized, s.Block)
 	require.NoError(s.T(), err)
 
 	for forkIndex := range forks {

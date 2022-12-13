@@ -334,7 +334,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.SealsDB = &storage.Seals{}
-	bc.SealsDB.On("ByBlockID", mock.Anything).Return(
+	bc.SealsDB.On("HighestInFork", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Seal {
 			seal, found := bc.SealsIndex[blockID]
 			if !found {

@@ -14,11 +14,13 @@ import (
 	"strings"
 	"time"
 
+	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -32,18 +34,20 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
@@ -56,9 +60,13 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	sutil "github.com/onflow/flow-go/storage/util"
-	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/logging"
+)
+
+const (
+	NetworkComponent        = "network"
+	ConduitFactoryComponent = "conduit-factory"
 )
 
 type Metrics struct {
@@ -80,6 +88,8 @@ type namedModuleFunc struct {
 type namedComponentFunc struct {
 	fn   ReadyDoneFactory
 	name string
+
+	errorHandler component.OnError
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -119,6 +129,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
+	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled,
+		"whether to enable automatic profile upload to Google Cloud Profiler. "+
+			"For autoupload to work forllowing should be true: "+
+			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
+			"2) node is running in GCE. "+
+			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
 		"the interval between auto-profiler runs")
@@ -140,11 +156,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
+	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
-	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
-		"pairwise edge probability between nodes in topology")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
@@ -238,95 +252,92 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		codec := cborcodec.NewCodec()
+	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
-		}
-
-		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
-			fnb.Logger,
-			myAddr,
-			fnb.NetworkKey,
-			fnb.SporkID,
-			fnb.IdentityProvider,
-			fnb.Metrics.Network,
-			fnb.Resolver,
-			fnb.BaseConfig.NodeRole,
-		)
-
-		var mwOpts []p2p.MiddlewareOption
-		if len(fnb.MsgValidators) > 0 {
-			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
-		}
-
-		// run peer manager with the specified interval and let is also prune connections
-		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
-		mwOpts = append(mwOpts,
-			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
-		)
-
-		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger,
-			libP2PNodeFactory,
-			fnb.Me.NodeID(),
-			fnb.Metrics.Network,
-			fnb.SporkID,
-			fnb.BaseConfig.UnicastMessageTimeout,
-			fnb.IDTranslator,
-			mwOpts...,
-		)
-
-		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topologyProtocolName, err)
-		}
-		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.topologyEdgeProbability)
-		if err != nil {
-			return nil, fmt.Errorf("could not create topology: %w", err)
-		}
-		topologyCache := topology.NewCache(fnb.Logger, top)
-
-		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if fnb.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
-		}
-		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
-			fnb.Logger,
-			heroCacheCollector)
-
-		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
-		if err != nil {
-			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-		}
-
-		// creates network instance
-		net, err := p2p.NewNetwork(fnb.Logger,
-			codec,
-			fnb.Me,
-			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			topologyCache,
-			subscriptionManager,
-			fnb.Metrics.Network,
-			fnb.IdentityProvider,
-			receiveCache,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize network: %w", err)
-		}
-
-		fnb.Network = net
-
-		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
-		fnb.ProtocolEvents.AddConsumer(idEvents)
-
-		return net, nil
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
 	})
+}
+
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
+	myAddr := fnb.NodeConfig.Me.Address()
+	if fnb.BaseConfig.BindAddr != NotSet {
+		myAddr = fnb.BaseConfig.BindAddr
+	}
+
+	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+		fnb.Logger,
+		myAddr,
+		fnb.NetworkKey,
+		fnb.SporkID,
+		fnb.IdentityProvider,
+		fnb.Metrics.Network,
+		fnb.Resolver,
+		fnb.BaseConfig.NodeRole,
+	)
+
+	var mwOpts []p2p.MiddlewareOption
+	if len(fnb.MsgValidators) > 0 {
+		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+	}
+
+	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
+	mwOpts = append(mwOpts,
+		p2p.WithPeerManager(peerManagerFactory),
+		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+	)
+
+	fnb.Middleware = p2p.NewMiddleware(
+		fnb.Logger,
+		libP2PNodeFactory,
+		fnb.Me.NodeID(),
+		fnb.Metrics.Network,
+		fnb.SporkID,
+		fnb.BaseConfig.UnicastMessageTimeout,
+		fnb.IDTranslator,
+		fnb.CodecFactory(),
+		mwOpts...,
+	)
+
+	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if fnb.HeroCacheMetricsEnable {
+		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+	}
+
+	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+		fnb.Logger,
+		heroCacheCollector)
+
+	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+	}
+
+	// creates network instance
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              fnb.Logger,
+		Codec:               fnb.CodecFactory(),
+		Me:                  fnb.Me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
+		Topology:            topology.NewFullyConnectedTopology(),
+		SubscriptionManager: subscriptionManager,
+		Metrics:             fnb.Metrics.Network,
+		IdentityProvider:    fnb.IdentityProvider,
+		ReceiveCache:        receiveCache,
+		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize network: %w", err)
+	}
+
+	fnb.Network = net
+
+	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+	fnb.ProtocolEvents.AddConsumer(idEvents)
+
+	return net, nil
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
@@ -464,7 +475,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+
+		nodeIdHex := fnb.NodeID.String()
+		if len(nodeIdHex) > 8 {
+			nodeIdHex = nodeIdHex[:8]
+		}
+		serviceName := fnb.BaseConfig.NodeRole + "-" + nodeIdHex
 		tracer, err := trace.NewTracer(fnb.Logger,
 			serviceName,
 			fnb.RootChainID.String(),
@@ -505,12 +521,59 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 }
 
+func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
+	projectID, err := client.ProjectID()
+	if err != nil {
+		return &profiler.NoopUploader{}, fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	instance, err := client.InstanceID()
+	if err != nil {
+		return &profiler.NoopUploader{}, fmt.Errorf("failed to get instance ID: %w", err)
+	}
+
+	chainID := fnb.RootChainID.String()
+	if chainID == "" {
+		fnb.Logger.Warn().Msg("RootChainID is not set, using default value")
+		chainID = "unknown"
+	}
+
+	params := profiler.Params{
+		ProjectID: projectID,
+		ChainID:   chainID,
+		Role:      fnb.NodeConfig.NodeRole,
+		Version:   build.Semver(),
+		Commit:    build.Commit(),
+		Instance:  instance,
+	}
+	fnb.Logger.Info().Msgf("creating pprof profile uploader with params: %+v", params)
+
+	return profiler.NewUploader(fnb.Logger, params, opts...)
+}
+
+func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
+	switch {
+	case fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE():
+		return fnb.createGCEProfileUploader(gcemd.NewClient(nil))
+	default:
+		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
+		return &profiler.NoopUploader{}, nil
+	}
+}
+
 func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 
-	profiler, err := debug.NewAutoProfiler(
+	uploader, err := fnb.createProfileUploader()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
+		uploader = &profiler.NoopUploader{}
+	}
+
+	profiler, err := profiler.New(
 		fnb.Logger,
+		uploader,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
@@ -832,20 +895,17 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
+		fvm.WithTransactionFeesEnabled(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
-	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
-		vmOpts = append(vmOpts,
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithContractDeploymentRestricted(false),
 		)
 	}
 	fnb.FvmOptions = vmOpts
 }
 
+// handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
@@ -853,6 +913,17 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	}
 
 	fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	return nil
+}
+
+// handleModules initializes all modules that have been enqueued on this node builder.
+func (fnb *FlowNodeBuilder) handleModules() error {
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -870,13 +941,21 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	parent := make(chan struct{})
 	close(parent)
 
+	var err error
 	// Run all components
 	for _, f := range fnb.components {
 		started := make(chan struct{})
-		err := fnb.handleComponent(f, parent, func() { close(started) })
+
+		if f.errorHandler != nil {
+			err = fnb.handleRestartableComponent(f, parent, func() { close(started) })
+		} else {
+			err = fnb.handleComponent(f, parent, func() { close(started) })
+		}
+
 		if err != nil {
 			return err
 		}
+
 		parent = started
 	}
 	return nil
@@ -891,9 +970,9 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // to close before starting, and then call the started callback after they are ready(). The started
 // callback closes the parentReady channel of the next component, and so on.
 //
-// TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
+// TODO: Instead of this serial startup, components should wait for their dependencies to be ready
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
-// ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
+// ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
 func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
@@ -952,6 +1031,63 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 	return nil
 }
 
+// handleRestartableComponent constructs a component using the provided ReadyDoneFactory, and
+// registers a worker with the ComponentManager to be run when the node is started.
+//
+// Restartable Components are components that can be restarted after successfully handling
+// an irrecoverable error.
+//
+// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
+	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// wait for the previous component to be ready before starting
+		if err := util.WaitClosed(ctx, parentReady); err != nil {
+			return
+		}
+
+		// Note: we're marking the worker routine ready before we even attempt to start the
+		// component. the idea behind a restartable component is that the node should not depend
+		// on it for safe operation, so the node does not need to wait for it to be ready.
+		ready()
+
+		// do not block serial startup. started can only be called once, so it cannot be called
+		// from within the componentFactory
+		started()
+
+		log := fnb.Logger.With().Str("component", v.name).Logger()
+
+		// This may be called multiple times if the component is restarted
+		componentFactory := func() (component.Component, error) {
+			c, err := v.fn(fnb.NodeConfig)
+			if err != nil {
+				return nil, err
+			}
+			log.Info().Msg("component initialization complete")
+
+			go func() {
+				if err := util.WaitClosed(ctx, c.Ready()); err != nil {
+					log.Info().Msg("component startup aborted")
+				} else {
+					log.Info().Msg("component startup complete")
+				}
+
+				<-ctx.Done()
+				log.Info().Msg("component shutdown started")
+			}()
+			return c.(component.Component), nil
+		}
+
+		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
+		if err != nil && !errors.Is(err, ctx.Err()) {
+			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.name, err))
+		}
+
+		log.Info().Msg("component shutdown complete")
+	})
+
+	return nil
+}
+
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
 func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
 	f(fnb.flags)
@@ -1003,6 +1139,66 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 	return fnb
 }
 
+// OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
+	for i := 0; i < len(fnb.components); i++ {
+		if fnb.components[i].name == name {
+			// found component with the name, override it.
+			fnb.components[i] = namedComponentFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no component found with the same name, hence just adding it.
+	return fnb.Component(name, f)
+}
+
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no module found with the same name, hence just adding it.
+	return fnb.Module(name, f)
+}
+
+// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
+// interface, and calls the provided error handler when an irrecoverable error is encountered.
+// Use RestartableComponent if the component is not critical to the node's safe operation and
+// can/should be independently restarted when an irrecoverable error is encountered.
+//
+// IMPORTANT: Since a RestartableComponent can be restarted independently of the node, the node and
+// other components must not rely on it for safe operation, and failures must be handled gracefully.
+// As such, RestartableComponents do not block the node from becoming ready, and do not block
+// subsequent components from starting serially. They do start in serial order.
+//
+// Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
+//
+// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:           f,
+		name:         name,
+		errorHandler: errorHandler,
+	})
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
 	fnb.preInitFns = append(fnb.preInitFns, f)
 	return fnb
@@ -1050,6 +1246,12 @@ func WithMetricsEnabled(enabled bool) Option {
 func WithSyncCoreConfig(syncConfig chainsync.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
+	}
+}
+
+func WithComplianceConfig(complianceConfig compliance.Config) Option {
+	return func(config *BaseConfig) {
+		config.ComplianceConfig = complianceConfig
 	}
 }
 
@@ -1190,10 +1392,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	fnb.EnqueueAdminServerInit()
 
 	// run all modules
-	for _, f := range fnb.modules {
-		if err := fnb.handleModule(f); err != nil {
-			return err
-		}
+	if err := fnb.handleModules(); err != nil {
+		return fmt.Errorf("could not handle modules: %w", err)
 	}
 
 	// run all components

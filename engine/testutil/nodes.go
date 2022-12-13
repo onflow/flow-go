@@ -4,23 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
 
-	mockprovider "github.com/onflow/flow-go/module/executiondatasync/provider/mock"
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -57,6 +59,10 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	chainsync "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -68,8 +74,11 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -259,7 +268,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.ProvideCollections, selector, retrieve)
 	require.NoError(t, err)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
@@ -278,6 +287,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Tracer,
 		node.Metrics,
 		pusherEngine,
+		node.Log,
 	)
 	require.NoError(t, err)
 
@@ -376,15 +386,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
+	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
-
-	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
@@ -403,7 +411,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Seals,
 		assigner,
 		seals,
-		sealingConfig)
+		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
+	)
 	require.NoError(t, err)
 
 	matchingConfig := matching.DefaultConfig()
@@ -500,11 +509,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+	const (
+		capacity           = 100
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(t, err)
 
-	ls, err := completeLedger.NewLedger(diskWal, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
+	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	require.NoError(t, err)
+
+	<-compactor.Ready() // Need to start compactor here because BootstrapLedger() updates ledger state.
 
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
@@ -526,15 +545,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
-		engine.RequestCollections,
+		channels.RequestCollections,
 		filter.HasRole(flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
 	)
 	require.NoError(t, err)
 
-	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkAuthorizedAtBlock, 10, 10,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -551,13 +569,19 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
-	//eds := new(state_synchronization.ExecutionDataService)
-	//eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-	//
-	//edCache := new(state_synchronization.ExecutionDataCIDCache)
-	//edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
 
-	edProvider := new(mockprovider.Provider)
+	prov := exedataprovider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -572,7 +596,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultScriptLogThreshold,
 		computation.DefaultScriptExecutionTimeLimit,
 		nil,
-		edProvider,
+		prov,
 	)
 	require.NoError(t, err)
 
@@ -580,7 +604,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector())
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)
@@ -612,7 +636,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		false,
-		nil, // nil ok?
+		nil,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -670,7 +694,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Collections:         collectionsStorage,
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
-		DiskWAL:             diskWal,
+		Compactor:           compactor,
 	}
 }
 
@@ -682,12 +706,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
+	require.NoError(t, err)
 
 	rootQC := &flow.QuorumCertificate{
-		View:      rootHead.View,
-		BlockID:   rootHead.ID(),
-		SignerIDs: signerIDs,
-		SigData:   unittest.SignatureFixture(),
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 
 	return rootHead, rootQC
@@ -698,8 +724,8 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

@@ -12,14 +12,14 @@ import (
 
 func TestIsSporkRootSnapshot(t *testing.T) {
 	t.Run("spork root", func(t *testing.T) {
-		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
+		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
 		isSporkRoot, err := protocol.IsSporkRootSnapshot(snapshot)
 		require.NoError(t, err)
 		assert.True(t, isSporkRoot)
 	})
 
 	t.Run("other snapshot", func(t *testing.T) {
-		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
+		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
 		snapshot.Encodable().SealingSegment.Blocks = unittest.BlockFixtures(5)
 		isSporkRoot, err := protocol.IsSporkRootSnapshot(snapshot)
 		require.NoError(t, err)

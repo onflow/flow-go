@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -141,8 +141,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, opentracing.StartTime(startTime))
-	defer span.Finish()
+	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	defer span.End()
 
 	err = b.state.Extend(ctx, proposal)
 	if err != nil {
@@ -167,7 +167,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// Get the latest sealed block on this fork, i.e. the highest
 	// block for which there is a finalized seal.
-	latestSeal, err := b.seals.ByBlockID(finalizedID)
+	latestSeal, err := b.seals.HighestInFork(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest seal in fork with head %x: %w", finalizedID, err)
 	}
@@ -356,7 +356,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
 	// Note: the last seal might not be included in a finalized block yet
-	lastSeal, err := b.seals.ByBlockID(parentID)
+	lastSeal, err := b.seals.HighestInFork(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve latest seal in the fork, which we are extending: %w", err)
 	}
@@ -503,7 +503,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
-	latestSeal, err := b.seals.ByBlockID(parentID)
+	latestSeal, err := b.seals.HighestInFork(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
@@ -627,15 +627,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
 		PayloadHash: payload.Hash(),
-
-		// the following fields should be set by the custom function as needed
-		// NOTE: we could abstract all of this away into an interface{} field,
-		// but that would be over the top as we will probably always use hotstuff
-		View:               0,
-		ParentVoterIDs:     nil,
-		ParentVoterSigData: nil,
-		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
 	}
 
 	// apply the custom fields setter of the consensus algorithm

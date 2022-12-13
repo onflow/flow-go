@@ -233,8 +233,8 @@ func (p *Pool) claimFreeHead() EIndex {
 	return oldFreeHeadIndex
 }
 
-// Rem removes entity corresponding to given getSliceIndex from the list.
-func (p *Pool) Rem(sliceIndex EIndex) {
+// Remove removes entity corresponding to given getSliceIndex from the list.
+func (p *Pool) Remove(sliceIndex EIndex) {
 	p.invalidateEntityAtIndex(sliceIndex)
 }
 

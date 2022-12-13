@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -80,7 +80,7 @@ func NewRequestHandler(
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandler) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := r.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -202,6 +202,13 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 	maxHeight := req.FromHeight + uint64(maxSize)
 	if maxHeight < req.ToHeight {
+		r.log.Warn().
+			Uint64("from", req.FromHeight).
+			Uint64("to", req.FromHeight).
+			Uint64("size", (req.ToHeight-req.FromHeight)+1).
+			Uint("max_size", maxSize).
+			Msg("range request is too large")
+
 		req.ToHeight = maxHeight
 	}
 
@@ -254,6 +261,13 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		maxSize = core.Config.MaxSize
 	} else {
 		maxSize = chainsync.DefaultConfig().MaxSize
+	}
+
+	if len(req.BlockIDs) > int(maxSize) {
+		r.log.Warn().
+			Int("size", len(req.BlockIDs)).
+			Uint("max_size", maxSize).
+			Msg("batch request is too large")
 	}
 
 	// deduplicate the block IDs in the batch request

@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/noop"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,36 +21,58 @@ const (
 )
 
 type mapKey struct {
-	owner, controller, key string
+	owner, key string
 }
 
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	view                  View
-	meter                 meter.Meter
-	updatedAddresses      map[flow.Address]struct{}
-	updateSize            map[mapKey]uint64
+	view             View
+	meter            meter.Meter
+	updatedAddresses map[flow.Address]struct{}
+	updateSize       map[mapKey]uint64
+	StateParameters
+	ReadCounter       uint64
+	WriteCounter      uint64
+	TotalBytesRead    uint64
+	TotalBytesWritten uint64
+}
+
+type StateParameters struct {
+	// TODO(patrick): nest meter parameters into this
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
-	ReadCounter           uint64
-	WriteCounter          uint64
-	TotalBytesRead        uint64
-	TotalBytesWritten     uint64
 }
 
-func defaultState(view View) *State {
-	return &State{
-		view:                  view,
-		meter:                 noop.NewMeter(),
-		updatedAddresses:      make(map[flow.Address]struct{}),
-		updateSize:            make(map[mapKey]uint64),
+func DefaultParameters() StateParameters {
+	return StateParameters{
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
 	}
+}
+
+// WithMaxKeySizeAllowed sets limit on max key size
+func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxKeySizeAllowed = limit
+	return newParams
+}
+
+// WithMaxValueSizeAllowed sets limit on max value size
+func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxValueSizeAllowed = limit
+	return newParams
+}
+
+// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
+func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxInteractionAllowed = limit
+	return newParams
 }
 
 func (s *State) View() View {
@@ -64,44 +85,15 @@ func (s *State) Meter() meter.Meter {
 
 type StateOption func(st *State) *State
 
+// TODO(patrick): stop passing in meter.  Create meter internally.
 // NewState constructs a new state
-func NewState(view View, opts ...StateOption) *State {
-	ctx := defaultState(view)
-	for _, applyOption := range opts {
-		ctx = applyOption(ctx)
-	}
-	return ctx
-}
-
-// WithMaxKeySizeAllowed sets limit on max key size
-func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxKeySizeAllowed = limit
-		return st
-	}
-}
-
-// WithMaxValueSizeAllowed sets limit on max value size
-func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxValueSizeAllowed = limit
-		return st
-	}
-}
-
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxInteractionAllowed = limit
-		return st
-	}
-}
-
-// WithMeter sets the meter
-func WithMeter(m meter.Meter) func(st *State) *State {
-	return func(st *State) *State {
-		st.meter = m
-		return st
+func NewState(view View, meter meter.Meter, params StateParameters) *State {
+	return &State{
+		view:             view,
+		meter:            meter,
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		StateParameters:  params,
 	}
 }
 
@@ -110,18 +102,18 @@ func (s *State) InteractionUsed() uint64 {
 	return s.TotalBytesRead + s.TotalBytesWritten
 }
 
-// Get returns a register value given owner, controller and key
-func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.RegisterValue, error) {
+// Get returns a register value given owner and key
+func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
 	var value []byte
 	var err error
 
 	if enforceLimit {
-		if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
+		if err = s.checkSize(owner, key, []byte{}); err != nil {
 			return nil, err
 		}
 	}
 
-	if value, err = s.view.Get(owner, controller, key); err != nil {
+	if value, err = s.view.Get(owner, key); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -129,10 +121,9 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 	}
 
 	// if not part of recent updates count them as read
-	if _, ok := s.updateSize[mapKey{owner, controller, key}]; !ok {
+	if _, ok := s.updateSize[mapKey{owner, key}]; !ok {
 		s.ReadCounter++
-		s.TotalBytesRead += uint64(len(owner) +
-			len(controller) + len(key) + len(value))
+		s.TotalBytesRead += uint64(len(owner) + len(key) + len(value))
 	}
 
 	if enforceLimit {
@@ -143,14 +134,14 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enforceLimit bool) error {
+func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
 	if enforceLimit {
-		if err := s.checkSize(owner, controller, key, value); err != nil {
+		if err := s.checkSize(owner, key, value); err != nil {
 			return err
 		}
 	}
 
-	if err := s.view.Set(owner, controller, key, value); err != nil {
+	if err := s.view.Set(owner, key, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -167,13 +158,13 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 		s.updatedAddresses[address] = struct{}{}
 	}
 
-	mapKey := mapKey{owner, controller, key}
+	mapKey := mapKey{owner, key}
 	if old, ok := s.updateSize[mapKey]; ok {
 		s.WriteCounter--
 		s.TotalBytesWritten -= old
 	}
 
-	updateSize := uint64(len(owner) + len(controller) + len(key) + len(value))
+	updateSize := uint64(len(owner) + len(key) + len(value))
 	s.WriteCounter++
 	s.TotalBytesWritten += updateSize
 	s.updateSize[mapKey] = updateSize
@@ -182,13 +173,13 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 }
 
 // Delete deletes a register
-func (s *State) Delete(owner, controller, key string, enforceLimit bool) error {
-	return s.Set(owner, controller, key, nil, enforceLimit)
+func (s *State) Delete(owner, key string, enforceLimit bool) error {
+	return s.Set(owner, key, nil, enforceLimit)
 }
 
 // Touch touches a register
-func (s *State) Touch(owner, controller, key string) error {
-	return s.view.Touch(owner, controller, key)
+func (s *State) Touch(owner, key string) error {
+	return s.view.Touch(owner, key)
 }
 
 // MeterComputation meters computation usage
@@ -202,7 +193,7 @@ func (s *State) TotalComputationUsed() uint {
 }
 
 // ComputationIntensities returns computation intensities
-func (s *State) ComputationIntensities() meter.MeteredIntensities {
+func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
 	return s.meter.ComputationIntensities()
 }
 
@@ -212,18 +203,18 @@ func (s *State) TotalComputationLimit() uint {
 }
 
 // MeterMemory meters memory usage
-func (s *State) MeterMemory(kind common.ComputationKind, intensity uint) error {
+func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
 }
 
 // MemoryIntensities returns computation intensities
-func (s *State) MemoryIntensities() meter.MeteredIntensities {
+func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.meter.MemoryIntensities()
 }
 
-// TotalMemoryUsed returns total memory used
-func (s *State) TotalMemoryUsed() uint {
-	return s.meter.TotalMemoryUsed()
+// TotalMemoryEstimate returns total memory used
+func (s *State) TotalMemoryEstimate() uint {
+	return s.meter.TotalMemoryEstimate()
 }
 
 // TotalMemoryLimit returns total memory limit
@@ -233,11 +224,10 @@ func (s *State) TotalMemoryLimit() uint {
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.view.NewChild(),
-		WithMeter(s.meter.NewChild()),
-		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
-		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
-		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+	return NewState(
+		s.view.NewChild(),
+		s.meter.NewChild(),
+		s.StateParameters,
 	)
 }
 
@@ -299,16 +289,16 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
+		return errors.NewLedgerInteractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
 	}
 	return nil
 }
 
-func (s *State) checkSize(owner, controller, key string, value flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(controller) + len(key))
+func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
+	keySize := uint64(len(owner) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.maxKeySizeAllowed)
+		return errors.NewStateKeySizeLimitError(owner, key, keySize, s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
 		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
@@ -329,52 +319,33 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 // IsFVMStateKey returns true if the
 // key is controlled by the fvm env and
 // return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner, controller, key string) bool {
+func IsFVMStateKey(owner, key string) bool {
 
-	// check if is a service level key (owner and controller is empty)
+	// check if is a service level key (owner is empty)
 	// cases:
-	// 		- "", "", "uuid"
-	// 		- "", "", "account_address_state"
-	if len(owner) == 0 && len(controller) == 0 {
+	// 		- "", "uuid"
+	// 		- "", "account_address_state"
+	if len(owner) == 0 {
 		return true
 	}
 	// check account level keys
 	// cases:
-	// 		- address, address, "public_key_count"
-	// 		- address, address, "public_key_%d" (index)
-	// 		- address, address, "contract_names"
-	// 		- address, address, "code.%s" (contract name)
-	// 		- address, "", exists
-	// 		- address, "", "storage_used"
-	// 		- address, "", "frozen"
-	if owner == controller {
-		if key == KeyPublicKeyCount {
-			return true
-		}
-		if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
-			return true
-		}
-		if key == KeyContractNames {
-			return true
-		}
-		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
-			return true
-		}
-	}
+	// 		- address, "contract_names"
+	// 		- address, "code.%s" (contract name)
+	// 		- address, "public_key_%d" (index)
+	// 		- address, "a.s" (account status)
 
-	if len(controller) == 0 {
-		if key == KeyExists {
-			return true
-		}
-		if key == KeyStorageUsed {
-			return true
-		}
-		if key == KeyStorageIndex {
-			return true
-		}
-		if key == KeyAccountFrozen {
-			return true
-		}
+	if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
+		return true
+	}
+	if key == KeyContractNames {
+		return true
+	}
+	if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
+		return true
+	}
+	if key == KeyAccountStatus {
+		return true
 	}
 
 	return false

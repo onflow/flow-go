@@ -196,9 +196,8 @@ func (e InvalidProposalSeqNumberError) Code() ErrorCode {
 // InvalidPayloadSignatureError indicates that signature verification for a key in this transaction has failed.
 // this error is the result of failure in any of the following conditions:
 // - provided hashing method is not supported
-// - signature size is wrong
+// - signature size or format is invalid
 // - signature verification failed
-// - public key doesn't match the one in the signature
 type InvalidPayloadSignatureError struct {
 	address  flow.Address
 	keyIndex uint64
@@ -233,9 +232,8 @@ func (e InvalidPayloadSignatureError) Unwrap() error {
 // InvalidEnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
 // this error is the result of failure in any of the following conditions:
 // - provided hashing method is not supported
-// - signature size is wrong
+// - signature size or format is invalid
 // - signature verification failed
-// - public key doesn't match the one in the signature
 type InvalidEnvelopeSignatureError struct {
 	address  flow.Address
 	keyIndex uint64

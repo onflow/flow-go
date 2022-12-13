@@ -8,8 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -37,12 +35,7 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	assert.Equal(t, messageHeader, decodedHeader)
 }
 
-func TestRoundTripHeaderViaJSON(t *testing.T) {
-	codec := jsoncodec.NewCodec()
-	roundTripHeaderViaCodec(t, codec)
-}
-
 func TestRoundTripHeaderViaCBOR(t *testing.T) {
-	codec := cborcodec.NewCodec()
+	codec := unittest.NetworkCodec()
 	roundTripHeaderViaCodec(t, codec)
 }

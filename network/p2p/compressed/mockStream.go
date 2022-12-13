@@ -69,12 +69,18 @@ func (m *mockStream) Protocol() protocol.ID {
 	return ""
 }
 
-func (m *mockStream) SetProtocol(_ protocol.ID) {}
+func (m *mockStream) SetProtocol(_ protocol.ID) error {
+	return nil
+}
 
-func (m *mockStream) Stat() network.Stat {
-	return network.Stat{}
+func (m *mockStream) Stat() network.Stats {
+	return network.Stats{}
 }
 
 func (m *mockStream) Conn() network.Conn {
+	return nil
+}
+
+func (m *mockStream) Scope() network.StreamScope {
 	return nil
 }

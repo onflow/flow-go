@@ -205,7 +205,8 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, invalidInputsErrorf("input has incorrect %s key size", a.algo)
+		return nil, invalidInputsErrorf("input has incorrect %s key size, got %d, expects %d",
+			a.algo, len(der), 2*plen)
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])

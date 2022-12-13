@@ -16,7 +16,7 @@ on:
       - 'v[0-9]+.[0-9]+'
 
 env:
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   golangci:
@@ -32,13 +32,15 @@ jobs:
     - name: Build relic
       run: make crypto_setup_gopath
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2
+      uses: golangci/golangci-lint-action@v3
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.45
+        version: v1.46
         args: -v --build-tags relic
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
+        # Make sure we get accurate results
+        # Some of these may be needed if observer code is integrated: only-new-issues: true, skip-build-cache: true
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
       with:
@@ -65,7 +67,7 @@ jobs:
         max_attempts: 3
         command: make ci
     - name: Upload coverage report
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v2
       with:
         file: ./coverage.txt
         flags: unittests
@@ -77,6 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network
@@ -110,3 +113,38 @@ jobs:
         timeout_minutes: 15
         max_attempts: 2
         command: ./tools/test_monitor/run-tests.sh
+  localnet-test:
+    name: Localnet Compatibility Tests With Flow-CLI Client and Observer
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build relic and other tools
+      run: make install-tools
+    - name: Install Flow Client In Docker
+      # This proved to be more reliable than installing it locally.
+      run: cd integration/localnet && sh client/client.sh
+    - name: Set up Localnet
+      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 init && make start'
+    - name: Ensure Observer is started
+      run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
+    - name: Get Client Version ensuring the client is provisioned
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
+    - name: Wait for a default waiting period until a clean state
+      # This will not cause flakiness.
+      # The waiting time is a reasonable time to expect an observer to be responsive
+      run: sleep 10
+    - name: Get Status ensuring the access endpoint is online
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access status
+    - name: Wait for finalized blocks and check them
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
+    - name: Wait for finalized blocks and check them with Observer
+      run: sleep 5 && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access blocks get latest && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
+    - name: Stop localnet
+      run: bash -c 'cd integration/localnet/ && make stop'

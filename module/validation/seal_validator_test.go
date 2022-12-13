@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,18 +31,8 @@ func (s *SealValidationSuite) SetupTest() {
 	s.publicKey = &module.PublicKey{}
 	s.metrics = &module.ConsensusMetrics{}
 
-	var err error
-	s.sealValidator, err = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, 2, 2, s.metrics)
-	s.Require().NoError(err)
-}
-
-// TestConsistencyCheckOnApprovals verifies that SealValidator instantiation fails if
-// required number of approvals for seal construction is smaller than for seal verification
-func (s *SealValidationSuite) TestConsistencyCheckOnApprovals() {
-	_, err := NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, 2, 3, s.metrics)
-	s.Require().Error(err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, unittest.NewSealingConfigs(2), s.metrics)
 }
 
 // TestSealValid tests that a candidate block with a valid seal passes validation.
@@ -121,7 +112,12 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 //   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
-func (s *SealValidationSuite) TestSealEmergencySeal() {
+func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalEmergencyNotTriggered() {
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3, false)
+	require.NoError(s.T(), err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, instance, s.metrics)
+
 	_, b2, _, receipt, _ := s.generateBasicTestFork()
 
 	// requiredApprovalsForSealConstruction = 2
@@ -132,29 +128,46 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 		s.T().Errorf("happy path sealing should not be counted as emmergency sealed")
 	}).Return()
 	s.sealValidator.metrics = metrics
-	//
-	_, err := s.sealValidator.Validate(newBlock)
+
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
+}
+
+func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1ApprovalReceive1Approval() {
+	instance, err := updatable_configs.NewSealingConfigs(2, 1, 3, false)
+	require.NoError(s.T(), err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, instance, s.metrics)
+
+	_, b2, _, receipt, _ := s.generateBasicTestFork()
 
 	// requiredApprovalsForSealConstruction = 2
 	// requiredApprovalsForSealVerification = 1
 	// receive seal with 1 approval => emergency sealed
-	s.sealValidator.requiredApprovalsForSealVerification = 1
-	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
-	metrics = &module.ConsensusMetrics{}
+
+	newBlock := s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
+	metrics := &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//
 	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 	metrics.AssertExpectations(s.T())
+}
+
+func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1ApprovalReceiveEmergencyNotTriggered() {
+	instance, err := updatable_configs.NewSealingConfigs(1, 1, 3, false)
+	require.NoError(s.T(), err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, instance, s.metrics)
+
+	_, b2, _, receipt, _ := s.generateBasicTestFork()
 
 	// requiredApprovalsForSealConstruction = 2
 	// requiredApprovalsForSealVerification = 1
 	// receive seal with 0 approval => invalid
-	s.sealValidator.requiredApprovalsForSealVerification = 1
-	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
-	metrics = &module.ConsensusMetrics{}
+	newBlock := s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
+	metrics := &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
 		s.T().Errorf("invaid seal should not be counted as emmergency sealed")
 	}).Return()
@@ -163,26 +176,43 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalReceiveEmergencyTriggered() {
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3, false)
+	require.NoError(s.T(), err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, instance, s.metrics)
+
+	_, b2, _, receipt, _ := s.generateBasicTestFork()
 
 	// requiredApprovalsForSealConstruction = 2
 	// requiredApprovalsForSealVerification = 0
 	// receive seal with 1 approval => emergency sealed
-	s.sealValidator.requiredApprovalsForSealVerification = 0
-	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
-	metrics = &module.ConsensusMetrics{}
+
+	newBlock := s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
+	metrics := &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//
 	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 	metrics.AssertExpectations(s.T())
+}
+
+func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalReceive0ApprovalEmergencyTriggered() {
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3, false)
+	require.NoError(s.T(), err)
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, instance, s.metrics)
+
+	_, b2, _, receipt, _ := s.generateBasicTestFork()
 
 	// requiredApprovalsForSealConstruction = 2
 	// requiredApprovalsForSealVerification = 0
 	// receive seal with 0 approval => emergency sealed
-	s.sealValidator.requiredApprovalsForSealVerification = 0
-	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
-	metrics = &module.ConsensusMetrics{}
+	newBlock := s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
+	metrics := &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//

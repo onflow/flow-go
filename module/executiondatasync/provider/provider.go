@@ -3,18 +3,20 @@ package provider
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 )
 
 type ProviderOption func(*ExecutionDataProvider)
@@ -25,7 +27,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 	}
 }
 
-// Provider is used to provide execution data blobs over the blob service.
+// Provider is used to provide execution data blobs over the network via a blob service.
 type Provider interface {
 	Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error)
 }
@@ -80,16 +82,19 @@ func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight u
 			totalSize += uint64(len(blob.RawData()))
 		}
 
-		cidArr := zerolog.Arr()
-		for _, cid := range cids {
-			cidArr = cidArr.Str(cid.String())
+		if p.logger.Debug().Enabled() {
+			cidArr := zerolog.Arr()
+			for _, cid := range cids {
+				cidArr = cidArr.Str(cid.String())
+			}
+			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 		}
-		p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 
 		err := p.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
 
+			// track new blobs so that they can be pruned later
 			if err := trackBlobs(blockHeight, cids...); err != nil {
 				return fmt.Errorf("failed to track blobs: %w", err)
 			}
@@ -115,6 +120,8 @@ func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight u
 
 // Provide adds the block execution data for a newly executed (generally not sealed or finalized) block to the blob store for distribution using Bitswap.
 // It computes and returns the root CID of the execution data blob tree.
+// This function returns once the root CID has been computed, and all blobs are successfully stored
+// in the Bitswap Blobstore.
 func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
 	rootID, rootData, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
@@ -200,6 +207,10 @@ func (p *ExecutionDataCIDProvider) AddExecutionDataRoot(
 	buf := new(bytes.Buffer)
 	if err := p.serializer.Serialize(buf, edRoot); err != nil {
 		return flow.ZeroID, fmt.Errorf("failed to serialize execution data root: %w", err)
+	}
+
+	if buf.Len() > p.maxBlobSize {
+		return flow.ZeroID, errors.New("execution data root blob exceeds maximum allowed size")
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())

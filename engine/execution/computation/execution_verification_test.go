@@ -25,16 +25,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-var chain = flow.Mainnet.Chain()
+var chain = flow.Emulator.Chain()
+
+// In the following tests the system transaction is expected to fail, as the epoch related things are not set up properly.
+// This is not relevant to the test, as only the non-system transactions are tested.
 
 func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("empty block", func(t *testing.T) {
@@ -157,7 +170,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00008164")
+		minimumStorage, err := cadence.NewUFix64("0.00008312")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -215,12 +228,24 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 		require.NoError(t, err)
 
-		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
 				spamTx,
 			},
-		}, fvm.DefaultTransactionFees, fvm.DefaultMinimumStorageReservation)
+		},
+			[]fvm.Option{
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				// make sure we don't run out of memory first.
+				fvm.WithMemoryLimit(20_000_000_000),
+			}, []fvm.BootstrapProcedureOption{
+				fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			})
 
 		// no error
 		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
@@ -258,8 +283,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, cr *execution.ComputationResult)
 	}
 
-	txFees := uint64(1_0000)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(1_000)
+	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
 
 	testCases := []testCase{
@@ -612,6 +637,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
+	opts = append(opts, fvm.WithBlocks(&fvm.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(
@@ -627,6 +653,13 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+	defer func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}()
+
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
 	initialCommit, err := bootstrapper.BootstrapLedger(
@@ -640,12 +673,26 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter)
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := exedataprovider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter, prov)
 	require.NoError(t, err)
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
 
-	executableBlock := unittest.ExecutableBlockFromTransactions(txs)
+	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
 	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())

@@ -29,7 +29,7 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentityList) *cluster.B
 		PayloadHash:        rootBlockPayloadHash,
 		Timestamp:          flow.GenesisTime,
 		View:               0,
-		ParentVoterIDs:     nil,
+		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 		ProposerSigData:    nil,

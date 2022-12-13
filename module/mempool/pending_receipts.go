@@ -12,7 +12,7 @@ type PendingReceipts interface {
 	Add(receipt *flow.ExecutionReceipt) bool
 
 	// Remove a pending receipt by ID
-	Rem(receiptID flow.Identifier) bool
+	Remove(receiptID flow.Identifier) bool
 
 	// ByPreviousResultID returns all the pending receipts whose previous result id
 	// matches the given result id

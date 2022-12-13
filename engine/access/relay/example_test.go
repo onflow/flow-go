@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/relay"
 	splitterNetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
@@ -28,7 +28,7 @@ func Example() {
 
 	// create engines
 	engineProcessFunc := func(engineName string) testnet.EngineProcessFunc {
-		return func(channel network.Channel, originID flow.Identifier, event interface{}) error {
+		return func(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 			fmt.Printf("Engine %v received message: channel=%v, originID=%v, event=%v\n", engineName, channel, originID, event)
 			return nil
 		}
@@ -37,8 +37,8 @@ func Example() {
 	barEngine := testnet.NewEngine().OnProcess(engineProcessFunc("Bar"))
 
 	// register engines on the splitter network
-	fooChannel := network.Channel("foo-channel")
-	barChannel := network.Channel("bar-channel")
+	fooChannel := channels.Channel("foo-channel")
+	barChannel := channels.Channel("bar-channel")
 	_, err := splitterNet.Register(fooChannel, fooEngine)
 	if err != nil {
 		fmt.Println(err)
@@ -49,13 +49,13 @@ func Example() {
 	}
 
 	// create another network that messages will be relayed to
-	relayNet := testnet.NewNetwork().OnPublish(func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+	relayNet := testnet.NewNetwork().OnPublish(func(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 		fmt.Printf("Message published to relay network: channel=%v, event=%v, targetIDs=%v\n", channel, event, targetIDs)
 		return nil
 	})
 
 	// create relay engine
-	channels := network.ChannelList{fooChannel, barChannel}
+	channels := channels.ChannelList{fooChannel, barChannel}
 	_, err = relay.New(logger, channels, splitterNet, relayNet)
 	if err != nil {
 		fmt.Println(err)

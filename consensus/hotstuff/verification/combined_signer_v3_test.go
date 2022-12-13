@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -73,10 +74,10 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconSig)
+	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
@@ -142,10 +143,10 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig)
+	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
 
 	// check the signature only has staking sig
 	require.Equal(t, expectedSig, proposal.SigData)
@@ -154,11 +155,11 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid
 func Test_VerifyQCV3(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(&header, header.View-1)
+	block := model.BlockFromFlow(header, header.View-1)
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
-	privGroupKey, beaconSig := generateSignature(t, msg, encoding.RandomBeaconTag)
+	privGroupKey, beaconSig := generateSignature(t, msg, msig.RandomBeaconTag)
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
@@ -166,9 +167,9 @@ func Test_VerifyQCV3(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
-	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, encoding.ConsensusVoteTag)
+	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, msig.ConsensusVoteTag)
 	// generate 11 BLS keys as stubs for individual random beacon key shares and use them to generate an aggregated rand beacon sig
-	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, encoding.RandomBeaconTag)
+	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, msig.RandomBeaconTag)
 
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)
 	rbSigners := generateIdentitiesForPrivateKeys(t, privRbKeyShares)
@@ -187,7 +188,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	// first, we check that our testing setup works for a correct QC
 	t.Run("valid QC", func(t *testing.T) {
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&unpackedSigData, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
@@ -205,7 +206,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.AggregatedStakingSig = []byte{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.NoError(t, err)
@@ -220,10 +221,10 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.StakingSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
 	// Modify the correct QC: empty list of random beacon signers.
@@ -233,10 +234,10 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.RandomBeaconSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
 	// Modify the correct QC: too few random beacon signers.
@@ -246,15 +247,35 @@ func Test_VerifyQCV3(t *testing.T) {
 		// beacon sig shares. But we only supply 5 aggregated key shares.
 		sd := unpackedSigData // copy correct QC
 		sd.RandomBeaconSigners = rbSigners[:5].NodeIDs()
-		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, encoding.RandomBeaconTag)
+		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, msig.RandomBeaconTag)
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
+}
+
+// Test_VerifyQC_EmptySignersV3 checks that Verifier returns an `model.InsufficientSignaturesError`
+// if `signers` input is empty or nil. This check should happen _before_ the Verifier calls into
+// any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
+// sentinel errors to distinguish between internal problems and external byzantine inputs.
+func Test_VerifyQC_EmptySignersV3(t *testing.T) {
+	committee := &mocks.Committee{}
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifier(committee, packer)
+
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(header, header.View-1)
+	sigData := unittest.QCSigDataFixture()
+
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	require.True(t, model.IsInsufficientSignaturesError(err))
+
+	err = verifier.VerifyQC(nil, sigData, block)
+	require.True(t, model.IsInsufficientSignaturesError(err))
 }
 
 func generateIdentitiesForPrivateKeys(t *testing.T, pivKeys []crypto.PrivateKey) flow.IdentityList {
@@ -295,13 +316,13 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
 	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
-	sig, err := priv.Sign(message, crypto.NewBLSKMAC(tag))
+	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig
 }
 
 func aggregatedSignature(t *testing.T, pivKeys []crypto.PrivateKey, message []byte, tag string) crypto.Signature {
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 	sigs := make([]crypto.Signature, 0, len(pivKeys))
 	for _, k := range pivKeys {
 		sig, err := k.Sign(message, hasher)

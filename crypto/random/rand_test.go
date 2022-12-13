@@ -2,10 +2,10 @@ package random
 
 import (
 	"bytes"
-	crand "crypto/rand"
 	"fmt"
-	mrand "math/rand"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,6 +82,12 @@ func TestChacha20Compliance(t *testing.T) {
 	})
 }
 
+func seedMathRand(t *testing.T) {
+	r := time.Now().UnixNano()
+	rand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+}
+
 // The tests are targeting the PRG implementations in the package.
 // For now, the tests are only used for Chacha20 PRG, but can be ported
 // to test another PRG implementation.
@@ -89,11 +95,12 @@ func TestChacha20Compliance(t *testing.T) {
 // Simple unit testing of Uint using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestUint(t *testing.T) {
+	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	crand.Read(seed)
+	rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	rand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -101,7 +108,7 @@ func TestUint(t *testing.T) {
 	t.Run("basic randomness", func(t *testing.T) {
 		sampleSize := 80000
 		tolerance := 0.05
-		sampleSpace := uint64(10 + mrand.Intn(100))
+		sampleSpace := uint64(10 + rand.Intn(100))
 		distribution := make([]float64, sampleSpace)
 
 		for i := 0; i < sampleSize; i++ {
@@ -126,11 +133,12 @@ func TestUint(t *testing.T) {
 //
 // SubPermutation tests cover Permutation as well.
 func TestSubPermutation(t *testing.T) {
+	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	crand.Read(seed)
+	rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	rand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -141,13 +149,13 @@ func TestSubPermutation(t *testing.T) {
 		subsetSize := 20
 
 		// statictics parameters
-		sampleSize := 80000
+		sampleSize := 85000
 		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
 		orderingDistribution := make([]float64, subsetSize)
-		testElement := mrand.Intn(listSize)
+		testElement := rand.Intn(listSize)
 
 		for i := 0; i < sampleSize; i++ {
 			shuffledlist, err := rng.SubPermutation(listSize, subsetSize)
@@ -208,11 +216,12 @@ func TestSubPermutation(t *testing.T) {
 // Simple unit testing of Shuffle using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestShuffle(t *testing.T) {
+	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	crand.Read(seed)
+	rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	rand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -224,7 +233,7 @@ func TestShuffle(t *testing.T) {
 		tolerance := 0.05
 		// the distribution of a particular element of the list, testElement
 		distribution := make([]float64, listSize)
-		testElement := mrand.Intn(listSize)
+		testElement := rand.Intn(listSize)
 		// Slice to shuffle
 		list := make([]int, 0, listSize)
 		for i := 0; i < listSize; i++ {
@@ -290,11 +299,12 @@ func TestShuffle(t *testing.T) {
 }
 
 func TestSamples(t *testing.T) {
+	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	crand.Read(seed)
+	rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	rand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -311,7 +321,7 @@ func TestSamples(t *testing.T) {
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
 		orderingDistribution := make([]float64, samplesSize)
-		testElement := mrand.Intn(listSize)
+		testElement := rand.Intn(listSize)
 		// Slice to shuffle
 		list := make([]int, 0, listSize)
 		for i := 0; i < listSize; i++ {
@@ -380,11 +390,13 @@ func TestSamples(t *testing.T) {
 // TestStateRestore tests the serilaization and deserialization functions
 // Store and Restore
 func TestStateRestore(t *testing.T) {
+	seedMathRand(t)
+
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
-	crand.Read(seed)
+	rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	rand.Read(customizer)
 	t.Logf("seed is %x, customizer is %x\n", seed, customizer)
 
 	// create an rng
@@ -392,7 +404,7 @@ func TestStateRestore(t *testing.T) {
 	require.NoError(t, err)
 
 	// evolve the internal state of the rng
-	iterations := mrand.Intn(1000)
+	iterations := rand.Intn(1000)
 	for i := 0; i < iterations; i++ {
 		_ = rng.UintN(1024)
 	}
@@ -409,7 +421,7 @@ func TestStateRestore(t *testing.T) {
 	assert.True(t, bytes.Equal(state, secondRng.Store()), "Store o Restore is not identity")
 
 	// check the 2 PRGs are generating identical outputs
-	iterations = mrand.Intn(1000)
+	iterations = rand.Intn(1000)
 	for i := 0; i < iterations; i++ {
 		rand1 := rng.UintN(1024)
 		rand2 := secondRng.UintN(1024)

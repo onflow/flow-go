@@ -27,6 +27,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func doneChan() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
+}
+
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(ComplianceCoreSuite))
 }
@@ -149,7 +155,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
-	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
+	cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Return(nil)
 	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
@@ -188,7 +194,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -230,7 +236,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -313,10 +319,10 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal)
@@ -378,7 +384,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	for _, block := range proposals {
 
 		// check that we request the ancestor block each time
-		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
+		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
 				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
@@ -414,7 +420,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 			index++
 			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
 		},
-	)
+	).Return(doneChan())
 
 	missingProposal := &messages.ClusterBlockProposal{
 		Header:  missing.Header,

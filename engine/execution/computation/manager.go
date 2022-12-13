@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -23,7 +24,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -58,6 +61,7 @@ const MaxScriptErrorMessageSize = 1000 // 1000 chars
 // Manager manages computation and execution
 type Manager struct {
 	log                      zerolog.Logger
+	tracer                   module.Tracer
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
@@ -68,6 +72,8 @@ type Manager struct {
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
 	uploaders                []uploader.Uploader
+	rngLock                  *sync.Mutex
+	rng                      *rand.Rand
 }
 
 func New(
@@ -108,6 +114,7 @@ func New(
 
 	e := Manager{
 		log:                      log,
+		tracer:                   tracer,
 		metrics:                  metrics,
 		me:                       me,
 		protoState:               protoState,
@@ -118,6 +125,8 @@ func New(
 		scriptLogThreshold:       scriptLogThreshold,
 		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
 		uploaders:                uploaders,
+		rngLock:                  &sync.Mutex{},
+		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -140,16 +149,22 @@ func (e *Manager) ExecuteScript(
 ) ([]byte, error) {
 
 	startedAt := time.Now()
+	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
-	trackerID := rand.Uint32()
-	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	if e.log.Debug().Enabled() {
+		e.rngLock.Lock()
+		trackerID := e.rng.Uint32()
+		e.rngLock.Unlock()
 
-	defer func() {
-		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
-	}()
+		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
+		trackedLogger.Debug().Msg("script is sent for execution")
+		defer func() {
+			trackedLogger.Debug().Msg("script execution is complete")
+		}()
+	}
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
 	defer cancel()
@@ -166,13 +181,13 @@ func (e *Manager) ExecuteScript(
 
 			prepareLog := func() *zerolog.Event {
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
 				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
+					Str("args", strings.Join(args, ","))
 			}
 
 			elapsed := time.Since(start)
@@ -217,7 +232,8 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
+	memAllocAfter := debug.GetHeapAllocsBytes()
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
 	return encodedValue, nil
 }
@@ -250,6 +266,8 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
+
 	toInsert := blockPrograms
 
 	// if we have item from cache and there were no changes
@@ -259,6 +277,7 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.programsCache.Set(block.ID(), toInsert)
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
 	if uploadEnabled {
 		var group errgroup.Group
@@ -267,6 +286,9 @@ func (e *Manager) ComputeBlock(
 			uploader := uploader
 
 			group.Go(func() error {
+				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
+				defer span.End()
+
 				return uploader.Upload(result)
 			})
 		}

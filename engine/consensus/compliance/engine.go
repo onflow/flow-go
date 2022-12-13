@@ -21,10 +21,14 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+// defaultRangeResponseQueueCapacity maximum capacity of block range responses queue
+const defaultRangeResponseQueueCapacity = 100
 
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
@@ -48,6 +52,7 @@ type Engine struct {
 	prov                       network.Engine
 	core                       *Core
 	pendingBlocks              engine.MessageStore
+	pendingRangeResponses      engine.MessageStore
 	pendingVotes               engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
@@ -63,6 +68,19 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 
+	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for block responses: %w", err)
+	}
+
+	pendingRangeResponses := &engine.FifoMessageStore{
+		FifoQueue: rangeResponseQueue,
+	}
+
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
@@ -71,6 +89,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
+
 	pendingBlocks := &engine.FifoMessageStore{
 		FifoQueue: blocksQueue,
 	}
@@ -89,6 +108,16 @@ func NewEngine(
 	handler := engine.NewMessageHandler(
 		log.With().Str("compliance", "engine").Logger(),
 		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.BlockResponse)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
+				}
+				return ok
+			},
+			Store: pendingRangeResponses,
+		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
@@ -141,6 +170,7 @@ func NewEngine(
 		metrics:                    core.metrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
+		pendingRangeResponses:      pendingRangeResponses,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		state:                      core.state,
@@ -152,7 +182,7 @@ func NewEngine(
 	}
 
 	// register the core with the network layer and store the conduit
-	eng.con, err = net.Register(engine.ConsensusCommittee, eng)
+	eng.con, err = net.Register(channels.ConsensusCommittee, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}
@@ -179,8 +209,15 @@ func (e *Engine) Ready() <-chan struct{} {
 		e.unit.Launch(e.finalizationProcessingLoop)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
 		e.stopHotstuff = cancel
+
+		// TODO: this workaround for handling fatal HotStuff errors is required only
+		//  because this engine and epochmgr do not use the Component pattern yet
+		e.unit.Launch(func() {
+			e.handleHotStuffError(hotstuffErrChan)
+		})
+
 		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
 
@@ -213,7 +250,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -227,7 +264,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.messageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -258,9 +295,26 @@ func (e *Engine) processAvailableMessages() error {
 	for {
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
-		msg, ok := e.pendingBlocks.Get()
+		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
-			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			blockResponse := msg.Payload.(*messages.BlockResponse)
+			for _, block := range blockResponse.Blocks {
+				// process each block and indicate it's from a range of blocks
+				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
+					Header:  block.Header,
+					Payload: block.Payload,
+				}, true)
+
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
+			}
+			continue
+		}
+
+		msg, ok = e.pendingBlocks.Get()
+		if ok {
+			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal), true)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -351,8 +405,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("signers", header.ParentVoterIndices).
 		Dur("delay", delay).
 		Logger()
 
@@ -425,6 +478,24 @@ func (e *Engine) finalizationProcessingLoop() {
 			return
 		case <-finalizationNotifier:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
+}
+
+// handleHotStuffError accepts the error channel from the HotStuff component and
+// crashes the node if any error is detected.
+// TODO: this function should be removed in favour of refactoring this engine and
+//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//  can be bubbled all the way to the node scaffold
+func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case err := <-hotstuffErrs:
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+			}
 		}
 	}
 }
