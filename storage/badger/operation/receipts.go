@@ -43,7 +43,9 @@ func RemoveOwnExecutionReceipt(blockID flow.Identifier) func(*badger.Txn) error 
 	return remove(makePrefix(codeOwnBlockReceipt, blockID))
 }
 
-// BatchRemoveOwnExecutionReceipt batch removes own execution receipt index by blockID
+// BatchRemoveOwnExecutionReceipt removes blockID-to-my-receiptID index entries keyed by a blockID in a provided batch.
+// No errors are expected during normal operation, but it may return generic error
+// if badger fails to process request
 func BatchRemoveOwnExecutionReceipt(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
 	return batchRemove(makePrefix(codeOwnBlockReceipt, blockID))
 }

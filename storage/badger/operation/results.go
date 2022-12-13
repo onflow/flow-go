@@ -46,7 +46,9 @@ func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error
 	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }
 
-// BatchRemoveExecutionResultIndex removes execution result indexed by the given blockID
+// BatchRemoveExecutionResultIndex removes blockID-to-resultID index entries keyed by a blockID in a provided batch.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func BatchRemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.WriteBatch) error {
 	return batchRemove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }

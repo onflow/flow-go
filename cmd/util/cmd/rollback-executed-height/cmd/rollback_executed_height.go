@@ -188,6 +188,7 @@ func removeExecutionResultsFromHeight(
 
 // removeForBlockID remove block execution related data for a given block.
 // All data to be removed will be removed in a batch write.
+// It bubbles up any error encountered
 func removeForBlockID(
 	writeBatch *badger.Batch,
 	headers *badger.Headers,

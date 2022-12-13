@@ -86,7 +86,9 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn
 	}
 }
 
-// BatchRemoveTransactionResultsByBlockID batch removes the transaction results for the given blockID
+// BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
+// No errors are expected during normal operation, but it may return generic error
+// if badger fails to process request
 func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 
