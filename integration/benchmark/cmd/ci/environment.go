@@ -17,18 +17,21 @@ type Environment struct {
 	EnvironmentKernelVersion string
 }
 
-func defaultEnvironment() Environment {
-	kernelFull, _ := io.ReadFile("/proc/version")
-	kernelFields := strings.Fields(string(kernelFull))
+func MustGetDefaultEnvironment() Environment {
+	kernelFull, err := io.ReadFile("/proc/version")
+	if err != nil {
+		panic(err)
+	}
 
-	var kernelVersion = ""
+	var kernelVersion = "unknown"
+	kernelFields := strings.Fields(string(kernelFull))
 	if len(kernelFields) >= 3 {
 		kernelVersion = kernelFields[2]
 	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = ""
+		panic(err)
 	}
 
 	return Environment{

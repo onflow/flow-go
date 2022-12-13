@@ -272,7 +272,7 @@ func mustUploadData(
 		recorder.BenchmarkResults,
 		*repoInfo,
 		BenchmarkInfo{BenchmarkType: loadType},
-		defaultEnvironment(),
+		MustGetDefaultEnvironment(),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to send data to bigquery")
