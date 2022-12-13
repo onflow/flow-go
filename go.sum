@@ -1223,8 +1223,8 @@ github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXW
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/atree v0.4.0 h1:+TbNisavAkukAKhgQ4plWnvR9o5+SkwPIsi3jaeAqKs=
 github.com/onflow/atree v0.4.0/go.mod h1:7Qe1xaW0YewvouLXrugzMFUYXNoRQ8MT/UsVAWx1Ndo=
-github.com/onflow/cadence v0.30.0 h1:LzxvMLwGeRlUVFvGgprnBTE+En5DZ2NxRIB8wB9/d8U=
-github.com/onflow/cadence v0.30.0/go.mod h1:oRgWkvau1RH15m3NuDlZCPHFQzwvC72jEstCGu8OJ98=
+github.com/onflow/cadence v0.30.0-attachments h1:tADgT2YJoPlZ08VHxazYn6bz0EtfXq9pIbqLJMF9Hmw=
+github.com/onflow/cadence v0.30.0-attachments/go.mod h1:oRgWkvau1RH15m3NuDlZCPHFQzwvC72jEstCGu8OJ98=
 github.com/onflow/flow v0.3.2 h1:z3IuKOjM9Tvf0pXfloTbrLxM5nTunI47cklsDd+wxBE=
 github.com/onflow/flow v0.3.2/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221205150827-c68044a2505c h1:dA5dG9BxHVjPYx+aWFlKRBOtzHoNcx1OCNX2q0PspNg=
@@ -1233,8 +1233,8 @@ github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221205150827-
 github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221205150827-c68044a2505c/go.mod h1:WMmeggH/H9Xb/SsT+4QFMtGYf+p1S2LXzbZAIaQQWAk=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0 h1:Cg4gHGVblxcejfNNG5Mfj98Wf4zbY76O0Y28QB0766A=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWKerUyf0gciw+e6tAEt0Ks3JE=
-github.com/onflow/flow-go-sdk v0.30.0 h1:Cb1kYW5DXZe7L6zblFvPItTdzGhmzVvCvFSyJWr8Nao=
-github.com/onflow/flow-go-sdk v0.30.0/go.mod h1:KXw/XIsq8g6EdR0AEa+bq3QYNLAx/NNkzWFFJua5ARc=
+github.com/onflow/flow-go-sdk v0.29.1 h1:IufoMjQmmxdwF0WNi/NlHO0Gcdh5+1n2moQ/YMU1yY4=
+github.com/onflow/flow-go-sdk v0.29.1/go.mod h1:58y6+IddssbrUnrCdYXJuAh64cMHvxy+InUfBA3e8v0=
 github.com/onflow/flow-go/crypto v0.24.4 h1:SwEtoVS2TidCIHYCZMgQ7U2YsqhI9upnw94fhdHTubM=
 github.com/onflow/flow-go/crypto v0.24.4/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQd00FKgt1reV90w=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221130185733-92eb85ead310 h1:fOxDpxEi4XbOql9eMc2wBFil21TOdbnjuDjePgnI3Uc=
