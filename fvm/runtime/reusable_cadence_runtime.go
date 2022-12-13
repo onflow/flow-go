@@ -186,6 +186,9 @@ func newReusableCadenceRuntimePool(
 		pool = make(chan *ReusableCadenceRuntime, poolSize)
 	}
 
+	// Force account linking to be enabled on the feature/cadence-attachments feature branch
+	config.AccountLinkingEnabled = true
+
 	return ReusableCadenceRuntimePool{
 		pool:             pool,
 		config:           config,
