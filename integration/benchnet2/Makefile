@@ -58,8 +58,8 @@ clean-bootstrap:
 	rm -rf ./bootstrap
 
 clean-gen-helm:
-	rm values.yml
-	rm template-data.json
+	rm -f values.yml
+	rm -f template-data.json
 
 k8s-secrets-create:
 	bash ./create-secrets.sh
