@@ -284,7 +284,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 
 func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID))
 		builder.SyncCore = syncCore
 
 		return err
