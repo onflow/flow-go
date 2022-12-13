@@ -202,6 +202,20 @@ func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
 }
 
+// BatchRemoveChunkBlockIndexByChunkID mocks base method
+func (m *MockHeaders) BatchRemoveChunkBlockIndexByChunkID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchRemoveChunkBlockIndexByChunkID", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchRemoveChunkBlockIndexByChunkID indicates an expected call of BatchRemoveChunkBlockIndexByChunkID
+func (mr *MockHeadersMockRecorder) BatchRemoveChunkBlockIndexByChunkID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveChunkBlockIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchRemoveChunkBlockIndexByChunkID), arg0, arg1)
+}
+
 // ByBlockID mocks base method
 func (m *MockHeaders) ByBlockID(arg0 flow.Identifier) (*flow.Header, error) {
 	m.ctrl.T.Helper()
@@ -489,6 +503,20 @@ func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 	return m.recorder
 }
 
+// BatchRemoveByBlockID mocks base method
+func (m *MockCommits) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchRemoveByBlockID", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchRemoveByBlockID indicates an expected call of BatchRemoveByBlockID
+func (mr *MockCommitsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveByBlockID", reflect.TypeOf((*MockCommits)(nil).BatchRemoveByBlockID), arg0, arg1)
+}
+
 // BatchStore mocks base method
 func (m *MockCommits) BatchStore(arg0 flow.Identifier, arg1 flow.StateCommitment, arg2 storage.BatchStorage) error {
 	m.ctrl.T.Helper()
@@ -553,6 +581,20 @@ func NewMockEvents(ctrl *gomock.Controller) *MockEvents {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockEvents) EXPECT() *MockEventsMockRecorder {
 	return m.recorder
+}
+
+// BatchRemoveByBlockID mocks base method
+func (m *MockEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchRemoveByBlockID", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchRemoveByBlockID indicates an expected call of BatchRemoveByBlockID
+func (mr *MockEventsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveByBlockID", reflect.TypeOf((*MockEvents)(nil).BatchRemoveByBlockID), arg0, arg1)
 }
 
 // BatchStore mocks base method
@@ -650,6 +692,20 @@ func NewMockServiceEvents(ctrl *gomock.Controller) *MockServiceEvents {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockServiceEvents) EXPECT() *MockServiceEventsMockRecorder {
 	return m.recorder
+}
+
+// BatchRemoveByBlockID mocks base method
+func (m *MockServiceEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchRemoveByBlockID", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchRemoveByBlockID indicates an expected call of BatchRemoveByBlockID
+func (mr *MockServiceEventsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveByBlockID", reflect.TypeOf((*MockServiceEvents)(nil).BatchRemoveByBlockID), arg0, arg1)
 }
 
 // BatchStore mocks base method
