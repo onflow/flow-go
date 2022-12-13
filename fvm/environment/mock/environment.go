@@ -42,13 +42,13 @@ type Environment struct {
 	mock.Mock
 }
 
-// AccountsStorageCapacity provides a mock function with given fields: addresses
-func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error) {
-	ret := _m.Called(addresses)
+// AccountsStorageCapacity provides a mock function with given fields: addresses, payer, maxTxFees
+func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer common.Address, maxTxFees uint64) (cadence.Value, error) {
+	ret := _m.Called(addresses, payer, maxTxFees)
 
 	var r0 cadence.Value
-	if rf, ok := ret.Get(0).(func([]common.Address) cadence.Value); ok {
-		r0 = rf(addresses)
+	if rf, ok := ret.Get(0).(func([]common.Address, common.Address, uint64) cadence.Value); ok {
+		r0 = rf(addresses, payer, maxTxFees)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(cadence.Value)
@@ -56,8 +56,8 @@ func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cade
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]common.Address) error); ok {
-		r1 = rf(addresses)
+	if rf, ok := ret.Get(1).(func([]common.Address, common.Address, uint64) error); ok {
+		r1 = rf(addresses, payer, maxTxFees)
 	} else {
 		r1 = ret.Error(1)
 	}
