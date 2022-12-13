@@ -25,7 +25,10 @@ func NewSyncCoreFactory(
 }
 
 func (f *SyncCoreFactory) Create(chainID flow.ChainID) (*chainsync.Core, error) {
-	core, err := chainsync.New(f.log, f.conf, metrics.NewChainSyncCollector(chainID))
+	core, err := chainsync.New(
+		f.log.With().Str("sync_chain_id", chainID.String()).Logger(),
+		f.conf,
+		metrics.NewChainSyncCollector(chainID))
 	if err != nil {
 		return nil, err
 	}

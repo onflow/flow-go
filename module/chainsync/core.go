@@ -1,6 +1,7 @@
 package chainsync
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -78,10 +79,16 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics) (*C
 // true if the block should be processed by the compliance layer and false
 // if it should be ignored.
 func (c *Core) HandleBlock(header *flow.Header) bool {
+	log := c.log
+	if c.log.Debug().Enabled() {
+		log = c.log.With().Str("block_id", header.ID().String()).Uint64("block_height", header.Height).Logger()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	status := c.getRequestStatus(header.Height, header.ID())
+	log.Debug().Uint("attempts", status.Attempts).Str("status", status.StatusString()).Msg("handling block")
+
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
 		return false
@@ -106,8 +113,11 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 // If the height difference between local and the reported height, we do nothing.
 // Otherwise, we queue each missing height.
 func (c *Core) HandleHeight(final *flow.Header, height uint64) {
+	log := c.log.With().Uint64("final_height", final.Height).Uint64("recv_height", height).Logger()
+	log.Debug().Msg("received height")
 	// don't bother queueing anything if we're within tolerance
 	if c.WithinTolerance(final, height) {
+		log.Debug().Msg("height within tolerance - discarding")
 		return
 	}
 
@@ -127,10 +137,12 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 		for h := final.Height + 1; h <= height; h++ {
 			c.requeueHeight(h)
 		}
+		log.Debug().Msgf("requeued heights [%d-%d]", final.Height+1, height)
 	}
 }
 
 func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
+	log := c.log.With().Str("block_id", blockID.String()).Uint64("height", height).Logger()
 	// requesting a block by its ID storing the height to prune more efficiently
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -138,11 +150,13 @@ func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.blockIDs[blockID]
 	if status.WasReceived() {
+		log.Debug().Msgf("requested block was already received")
 		delete(c.blockIDs, status.Header.ID())
 		delete(c.heights, status.Header.Height)
 	}
 
 	c.queueByBlockID(blockID, height)
+	log.Debug().Msgf("enqueued requested block")
 }
 
 func (c *Core) RequestHeight(height uint64) {
@@ -150,6 +164,7 @@ func (c *Core) RequestHeight(height uint64) {
 	defer c.mu.Unlock()
 
 	c.requeueHeight(height)
+	c.log.Debug().Uint64("height", height).Msg("enqueued requested height")
 }
 
 // requeueHeight queues the given height, ignoring any previously received
@@ -172,15 +187,19 @@ func (c *Core) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.B
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	log := c.log.With().Uint64("final_height", final.Height).Logger()
+
 	// prune if the current height is less than the new height
 	c.prune(final)
 
 	// get all items that are eligible for initial or re-requesting
 	heights, blockIDs := c.getRequestableItems()
+	c.log.Debug().Msgf("scan found %d requestable heights, %d requestable block IDs", len(heights), len(blockIDs))
 
 	// convert to valid range and batch requests
 	ranges := c.getRanges(heights)
 	batches := c.getBatches(blockIDs)
+	log.Debug().Str("ranges", fmt.Sprintf("%v", ranges)).Str("batches", fmt.Sprintf("%v", batches)).Msg("compiled range and batch requests")
 
 	return c.selectRequests(ranges, batches)
 }

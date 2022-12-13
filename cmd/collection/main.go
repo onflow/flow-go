@@ -212,7 +212,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			log := node.Logger.With().Str("chain_id", node.RootChainID.String()).Logger()
+			log := node.Logger.With().Str("sync_chain_id", node.RootChainID.String()).Logger()
 			mainChainSyncCore, err = chainsync.New(log, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID))
 			return err
 		}).
