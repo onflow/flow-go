@@ -32,7 +32,7 @@ type ComputationResult struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
-	ExecutionDataRoot  flow.BlockExecutionDataRoot
+	ExecutionDataRoot      *flow.BlockExecutionDataRoot
 }
 
 func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {

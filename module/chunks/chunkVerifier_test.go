@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,10 +144,10 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch, chunkEvents := GetBaselineVerifiableChunk(s.T(), "wrongEndState", false)
 	assert.NotNil(s.T(), vch)
 
-	id1 := flow.NewRegisterID("00", "", "")
+	id1 := flow.NewRegisterID("00", "")
 	value1 := []byte{'F'}
 
-	id2 := flow.NewRegisterID("05", "", "")
+	id2 := flow.NewRegisterID("05", "")
 	value2 := []byte{'B'}
 
 	ids := make([]flow.RegisterID, 0)
@@ -333,13 +333,13 @@ func updateExecutionData(t *testing.T, collection *flow.Collection, chunkEvents 
 	cedCID, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), ced, nil)
 	require.NoError(t, err)
 
-	bedr := flow.BlockExecutionDataRoot{
+	bedr := &flow.BlockExecutionDataRoot{
 		BlockID:               blockID,
 		ChunkExecutionDataIDs: []cid.Cid{cedCID},
 	}
 	vch.ChunkDataPack.ExecutionDataRoot = bedr
 
-	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &bedr, nil)
+	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), bedr, nil)
 	require.NoError(t, err)
 }
 
@@ -464,12 +464,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 	chunkCid, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), &chunkExecutionData, nil)
 	require.NoError(t, err)
 
-	executionDataRoot := flow.BlockExecutionDataRoot{
+	executionDataRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               blockID,
 		ChunkExecutionDataIDs: []cid.Cid{chunkCid},
 	}
 
-	executionDataID, err := ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &executionDataRoot, nil)
+	executionDataID, err := ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), executionDataRoot, nil)
 	require.NoError(t, err)
 
 	// Chunk setup

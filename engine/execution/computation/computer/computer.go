@@ -253,7 +253,7 @@ func (e *blockComputer) executeBlock(
 		Hex("block_id", logging.Entity(block)).
 		Msg("all views committed")
 
-	executionDataID, err := e.executionDataProvider.Provide(
+	executionDataID, executionDataRoot, err := e.executionDataProvider.Provide(
 		ctx,
 		block.Height(),
 		generateExecutionData(res, collections))
@@ -261,7 +261,7 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	res.ExecutionDataRoot = *executionDataRoot
+	res.ExecutionDataRoot = executionDataRoot
 	res.ExecutionDataID = executionDataID
 
 	return res, nil

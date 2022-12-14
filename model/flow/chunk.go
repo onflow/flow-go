@@ -46,7 +46,7 @@ type ChunkDataPack struct {
 	StartState        StateCommitment
 	Proof             StorageProof
 	Collection        *Collection
-	ExecutionDataRoot BlockExecutionDataRoot
+	ExecutionDataRoot *BlockExecutionDataRoot
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of

@@ -1,6 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/model/flow"

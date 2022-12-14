@@ -122,7 +122,7 @@ func GenerateChunkDataPack(
 	startState flow.StateCommitment,
 	collection *flow.Collection,
 	proof flow.StorageProof,
-	executionDataRoot flow.BlockExecutionDataRoot,
+	executionDataRoot *flow.BlockExecutionDataRoot,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
 		ChunkID:           chunkID,

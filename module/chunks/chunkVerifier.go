@@ -342,7 +342,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		), nil
 	}
 
-	executionDataID, err := cidProvider.AddExecutionDataRoot(nil, &chunkDataPack.ExecutionDataRoot, nil)
+	executionDataID, err := cidProvider.AddExecutionDataRoot(nil, chunkDataPack.ExecutionDataRoot, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}

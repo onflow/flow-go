@@ -128,7 +128,7 @@ func (d *downloader) getExecutionDataRoot(
 	ctx context.Context,
 	rootID flow.Identifier,
 	blobGetter network.BlobGetter,
-) (*BlockExecutionDataRoot, error) {
+) (*flow.BlockExecutionDataRoot, error) {
 	rootCid := flow.IdToCid(rootID)
 
 	blob, err := blobGetter.GetBlob(ctx, rootCid)
@@ -151,7 +151,7 @@ func (d *downloader) getExecutionDataRoot(
 		return nil, NewMalformedDataError(err)
 	}
 
-	edRoot, ok := v.(*BlockExecutionDataRoot)
+	edRoot, ok := v.(*flow.BlockExecutionDataRoot)
 	if !ok {
 		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", v))
 	}
