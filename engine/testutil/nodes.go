@@ -339,6 +339,8 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Me,
 		node.PublicDB,
 		node.State,
+		node.Metrics,
+		node.Metrics,
 		createMetrics,
 	)
 	require.NoError(t, err)
@@ -347,6 +349,7 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Log,
 		node.Net,
 		node.Me,
+		node.Metrics,
 		node.State,
 	)
 
@@ -629,7 +632,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		prov,
 		computation.ComputationConfig{
-			ProgramsCacheSize:        programs.DefaultProgramsCacheSize,
+			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
 		},

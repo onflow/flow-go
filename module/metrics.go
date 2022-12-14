@@ -18,7 +18,7 @@ type ResolverMetrics interface {
 	// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
 	OnDNSCacheMiss()
 
-	// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
+	// OnDNSCacheHit tracks the total number of dns requests resolved through the cache without
 	// looking up the network.
 	OnDNSCacheHit()
 
@@ -38,10 +38,51 @@ type NetworkSecurityMetrics interface {
 	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
 }
 
+// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
+// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
+type GossipSubRouterMetrics interface {
+	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
+	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
+	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
+	OnIncomingRpcAcceptedFully()
+
+	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
+	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
+	// included in the RPC are not accepted.
+	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
+	// validation.
+	OnIncomingRpcAcceptedOnlyForControlMessages()
+
+	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
+	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
+	OnIncomingRpcRejected()
+
+	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
+	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
+	OnIWantReceived(count int)
+
+	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
+	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
+	OnIHaveReceived(count int)
+
+	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
+	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
+	OnGraftReceived(count int)
+
+	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
+	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
+	OnPruneReceived(count int)
+
+	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
+	// RPC message.
+	OnPublishedGossipMessagesReceived(count int)
+}
+
 type NetworkMetrics interface {
 	ResolverMetrics
 	DHTMetrics
 	NetworkSecurityMetrics
+	GossipSubRouterMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
@@ -51,7 +92,6 @@ type NetworkMetrics interface {
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string, messageType string)
 
-	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
 
@@ -78,10 +118,24 @@ type NetworkMetrics interface {
 	InboundConnections(connectionCount uint)
 }
 
+// EngineMetrics is a generic metrics consumer for node-internal data processing
+// components (aka engines). Implementations must be non-blocking and concurrency safe.
 type EngineMetrics interface {
+	// MessageSent reports that the engine transmitted the message over the network.
+	// Unicasts, broadcasts, and multicasts are all reported once.
 	MessageSent(engine string, message string)
+	// MessageReceived reports that the engine received the message over the network.
 	MessageReceived(engine string, message string)
+	// MessageHandled reports that the engine has finished processing the message.
+	// Both invalid and valid messages should be reported.
+	// A message must be reported as either handled or dropped, not both.
 	MessageHandled(engine string, messages string)
+	// InboundMessageDropped reports that the engine has dropped inbound message without processing it.
+	// Inbound messages must be reported as either handled or dropped, not both.
+	InboundMessageDropped(engine string, messages string)
+	// OutboundMessageDropped reports that the engine has dropped outbound message without processing it.
+	// Outbound messages must be reported as either sent or dropped, not both.
+	OutboundMessageDropped(engine string, messages string)
 }
 
 type ComplianceMetrics interface {
@@ -90,7 +144,6 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
-	BlockProposalDuration(duration time.Duration)
 	CurrentEpochCounter(counter uint64)
 	CurrentEpochPhase(phase flow.EpochPhase)
 	CurrentEpochFinalView(view uint64)
@@ -127,26 +180,42 @@ type HotstuffMetrics interface {
 	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
 
-	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration - the time between receiving and
+	// enqueueing a message to beginning to process that message.
 	HotStuffWaitDuration(duration time.Duration, event string)
 
-	// SetCurView reports Metrics C8: Current View
+	// SetCurView reports Metrics C8: Current View maintained by Pacemaker.
 	SetCurView(view uint64)
 
-	// SetQCView reports Metrics C9: View of Newest Known QC
+	// SetQCView reports Metrics C9: View of the newest QC known to Pacemaker.
 	SetQCView(view uint64)
 
-	// CountSkipped reports the number of times we skipped ahead.
+	// SetTCView reports last TC known to Pacemaker.
+	SetTCView(view uint64)
+
+	// CountSkipped counts the number of skips we did.
 	CountSkipped()
 
-	// CountTimeout reports the number of times we timed out.
+	// CountTimeout tracks the number of views that this replica left due to observing a TC.
 	CountTimeout()
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
 
+	// BlockProcessingDuration measures the time which the compliance engine
+	// spends to process one block proposal.
+	BlockProcessingDuration(duration time.Duration)
+
+	// VoteProcessingDuration measures the time which the hotstuff.VoteAggregator
+	// spends to process one vote.
+	VoteProcessingDuration(duration time.Duration)
+
+	// TimeoutObjectProcessingDuration measures the time which the hotstuff.TimeoutAggregator
+	// spends to process one timeout object.
+	TimeoutObjectProcessingDuration(duration time.Duration)
+
 	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
-	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// spends in the hotstuff.Replicas component, i.e. the time determining consensus
 	// committee relations.
 	CommitteeProcessingDuration(duration time.Duration)
 

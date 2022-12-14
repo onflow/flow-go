@@ -11,7 +11,10 @@ import (
 
 type NoopCollector struct{}
 
+var _ module.HotstuffMetrics = (*NoopCollector)(nil)
+var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
+var _ module.NetworkMetrics = (*NoopCollector)(nil)
 
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
@@ -40,6 +43,8 @@ func (nc *NoopCollector) DirectMessageFinished(topic string)                    
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
+func (nc *NoopCollector) InboundMessageDropped(engine string, message string)                    {}
+func (nc *NoopCollector) OutboundMessageDropped(engine string, messages string)                  {}
 func (nc *NoopCollector) OutboundConnections(_ uint)                                             {}
 func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
 func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)                               {}
@@ -62,10 +67,8 @@ func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                          
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                                          {}
 func (nc *NoopCollector) FinalizedHeight(height uint64)                                          {}
 func (nc *NoopCollector) SealedHeight(height uint64)                                             {}
-func (nc *NoopCollector) BlockProposed(*flow.Block)                                              {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
-func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
 func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
 func (nc *NoopCollector) CurrentEpochCounter(counter uint64)                                     {}
 func (nc *NoopCollector) CurrentEpochPhase(phase flow.EpochPhase)                                {}
@@ -85,8 +88,12 @@ func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)           
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string)              {}
 func (nc *NoopCollector) SetCurView(view uint64)                                                 {}
 func (nc *NoopCollector) SetQCView(view uint64)                                                  {}
+func (nc *NoopCollector) SetTCView(uint64)                                                       {}
 func (nc *NoopCollector) CountSkipped()                                                          {}
 func (nc *NoopCollector) CountTimeout()                                                          {}
+func (nc *NoopCollector) BlockProcessingDuration(time.Duration)                                  {}
+func (nc *NoopCollector) VoteProcessingDuration(time.Duration)                                   {}
+func (nc *NoopCollector) TimeoutObjectProcessingDuration(time.Duration)                          {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                                      {}
 func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
@@ -106,34 +113,33 @@ func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)           
 func (nc *NoopCollector) OnExecutionResultReceivedAtAssignerEngine()                             {}
 func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()                             {}
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
-func (nc *NoopCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
-}
-func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                      {}
-func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                          {}
-func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                  {}
-func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                    {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                {}
-func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                 {}
-func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                           {}
-func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                     {}
-func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                        {}
-func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                     {}
-func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()               {}
-func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {}
-func (nc *NoopCollector) ConnectionFromPoolReused()                                            {}
-func (nc *NoopCollector) ConnectionAddedToPool()                                               {}
-func (nc *NoopCollector) NewConnectionEstablished()                                            {}
-func (nc *NoopCollector) ConnectionFromPoolInvalidated()                                       {}
-func (nc *NoopCollector) ConnectionFromPoolUpdated()                                           {}
-func (nc *NoopCollector) ConnectionFromPoolEvicted()                                           {}
-func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
-func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
-func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
-func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}
-func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                       {}
-func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _ uint64, _, _, _, _ int)  {}
+func (nc *NoopCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(uint64)     {}
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
+func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
+func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                  {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                   {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                             {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()                 {}
+func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)   {}
+func (nc *NoopCollector) ConnectionFromPoolReused()                                              {}
+func (nc *NoopCollector) ConnectionAddedToPool()                                                 {}
+func (nc *NoopCollector) NewConnectionEstablished()                                              {}
+func (nc *NoopCollector) ConnectionFromPoolInvalidated()                                         {}
+func (nc *NoopCollector) ConnectionFromPoolUpdated()                                             {}
+func (nc *NoopCollector) ConnectionFromPoolEvicted()                                             {}
+func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
+func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
+func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}
+func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                         {}
+func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _ uint64, _, _, _, _ int)    {}
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _ uint64, _, _, _, _, _ int) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
@@ -213,3 +219,11 @@ func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                    
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
 func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}
+func (nc *NoopCollector) OnIWantReceived(int)                                                   {}
+func (nc *NoopCollector) OnIHaveReceived(int)                                                   {}
+func (nc *NoopCollector) OnGraftReceived(int)                                                   {}
+func (nc *NoopCollector) OnPruneReceived(int)                                                   {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                           {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                          {}
+func (nc *NoopCollector) OnIncomingRpcRejected()                                                {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                           {}

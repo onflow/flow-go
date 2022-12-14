@@ -384,16 +384,6 @@ func NewMeter(params MeterParameters) *Meter {
 	return m
 }
 
-// NewChild construct a new Meter instance with the same limits as parent
-func (m *Meter) NewChild() *Meter {
-	return &Meter{
-		MeterParameters:        m.MeterParameters,
-		computationIntensities: make(MeteredComputationIntensities),
-		memoryIntensities:      make(MeteredMemoryIntensities),
-		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
-	}
-}
-
 // MergeMeter merges the input meter into the current meter and checks for the limits
 func (m *Meter) MergeMeter(child *Meter) {
 	if child == nil {

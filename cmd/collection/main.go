@@ -501,6 +501,8 @@ func main() {
 				node.Me,
 				node.DB,
 				node.State,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				createMetrics,
 				opts...,
 			)
@@ -528,6 +530,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				node.Metrics.Engine,
 				node.State,
 			)
 

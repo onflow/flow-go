@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -51,10 +50,12 @@ func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	}
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return errors.New("wrong input format")
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	data := &getIdentityRequestData{}
@@ -72,8 +73,7 @@ func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
 				}
 			}
 		}
-
-		return fmt.Errorf("invalid value for \"flow_id\": %v", flowID)
+		return admin.NewInvalidAdminReqParameterError("flow_id", "must be 64-char hex string", flowID)
 	} else if peerID, ok := input["peer_id"]; ok {
 		data.requestType = PeerID
 
@@ -83,11 +83,9 @@ func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
 				return nil
 			}
 		}
-
-		return fmt.Errorf("invalid value for \"peer_id\": %v", peerID)
-	} else {
-		return errors.New("either \"flow_id\" or \"peer_id\" field is required")
+		return admin.NewInvalidAdminReqParameterError("peer_id", "must be valid peer id string", peerID)
 	}
+	return admin.NewInvalidAdminReqErrorf("either \"flow_id\" or \"peer_id\" field is required")
 }
 
 func NewGetIdentityCommand(idProvider module.IdentityProvider) commands.AdminCommand {

@@ -106,7 +106,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
 		case *messages.BlockProposal:
-			return m.Header.View == 5, 0 // drop proposals only for view 5
+			return m.Block.Header.View == 5, 0 // drop proposals only for view 5
 		case *messages.TimeoutObject:
 			// drop first timeout object for every sender for every view
 			lock.Lock()

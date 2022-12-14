@@ -135,7 +135,7 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
-func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) {
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) bool {
 	done := make(chan struct{})
 
 	go func() {
@@ -148,8 +148,9 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndA
 		t.Log("function did not return in time")
 		assert.Fail(t, "function did not close in time", msgAndArgs...)
 	case <-done:
-		return
+		return true
 	}
+	return false
 }
 
 // ClosedChannel returns a closed channel.

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -43,7 +44,17 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 
 	s.lowestRetainedView = 100
 
-	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.collectors)
+	metricsCollector := metrics.NewNoopCollector()
+
+	s.aggregator, err = NewTimeoutAggregator(
+		unittest.Logger(),
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		s.consumer,
+		s.lowestRetainedView,
+		s.collectors,
+	)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())

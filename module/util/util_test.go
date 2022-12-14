@@ -292,3 +292,14 @@ func TestWaitError(t *testing.T) {
 		}
 	})
 }
+
+// TestDetypeSlice tests that DetypeSlice returns a slice which is identical
+// besides the element type information.
+func TestDetypeSlice(t *testing.T) {
+	slice := []int{1, 2, 5, 3, 53, 1234}
+	detyped := util.DetypeSlice(slice)
+	assert.Equal(t, len(slice), len(detyped))
+	for i := range slice {
+		assert.Equal(t, slice[i], detyped[i].(int))
+	}
+}

@@ -55,7 +55,7 @@ func NewEngine(
 
 	// Inbound FIFO queue for `messages.BlockProposal`s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -122,6 +122,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		if ok {
 			inBlock := msg.(flow.Slashable[messages.BlockProposal])
 			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
+			e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -151,6 +152,8 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	}
 }
 
@@ -160,6 +163,8 @@ func (e *Engine) OnSyncedBlock(syncedBlock flow.Slashable[messages.BlockProposal
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	}
 }
 

@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/util"
@@ -432,8 +433,18 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
+	metricsCollector := metrics.NewNoopCollector()
+
 	// initialize the vote aggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(
+		log,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		notifier,
+		livenessData.CurrentView,
+		voteCollectors,
+	)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
@@ -458,14 +469,16 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				}, nil,
 			).Maybe()
 			aggregator.On("Aggregate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-				[]flow.Identifier(in.participants.NodeIDs()),
-				func() []uint64 {
-					newestQCViews := make([]uint64, 0, len(in.participants))
+				func() []hotstuff.TimeoutSignerInfo {
+					signersData := make([]hotstuff.TimeoutSignerInfo, 0, len(in.participants))
 					newestQCView := newestView.Value()
-					for range in.participants {
-						newestQCViews = append(newestQCViews, newestQCView)
+					for _, signer := range in.participants.NodeIDs() {
+						signersData = append(signersData, hotstuff.TimeoutSignerInfo{
+							NewestQCView: newestQCView,
+							Signer:       signer,
+						})
 					}
-					return newestQCViews
+					return signersData
 				},
 				unittest.SignatureFixture(),
 				nil,
@@ -479,7 +492,15 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(
+		log,
+		metricsCollector,
+		metricsCollector,
+		metricsCollector,
+		notifier,
+		livenessData.CurrentView,
+		timeoutCollectors,
+	)
 	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{
@@ -575,12 +596,17 @@ func (in *Instance) Run() error {
 			case *flow.QuorumCertificate:
 				err := in.handler.OnReceiveQc(m)
 				if err != nil {
-					return fmt.Errorf("could not process received qc: %w", err)
+					return fmt.Errorf("could not process received QC: %w", err)
 				}
 			case *flow.TimeoutCertificate:
 				err := in.handler.OnReceiveTc(m)
 				if err != nil {
-					return fmt.Errorf("could not process received tc: %w", err)
+					return fmt.Errorf("could not process received TC: %w", err)
+				}
+			case *hotstuff.PartialTcCreated:
+				err := in.handler.OnPartialTcCreated(m)
+				if err != nil {
+					return fmt.Errorf("could not process partial TC: %w", err)
 				}
 			}
 		}
@@ -612,7 +638,11 @@ func (in *Instance) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 }
 
 func (in *Instance) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
-	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+	in.queue <- &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
 }
 
 func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {

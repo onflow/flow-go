@@ -4,7 +4,6 @@ import (
 	"context"
 
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -43,7 +42,7 @@ type LibP2PNode interface {
 	// ListPeers returns list of peer IDs for peers subscribed to the topic.
 	ListPeers(topic string) []peer.ID
 	// Subscribe subscribes the node to the given topic and returns the subscription
-	Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error)
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
 	// UnSubscribe cancels the subscriber and closes the topic.
 	UnSubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
@@ -68,8 +67,10 @@ type LibP2PNode interface {
 	Routing() routing.Routing
 	// SetPubSub sets the node's pubsub implementation.
 	// SetPubSub may be called at most once.
-	SetPubSub(ps *pubsub.PubSub)
+	SetPubSub(ps PubSubAdapter)
 	// SetComponentManager sets the component manager for the node.
 	// SetComponentManager may be called at most once.
 	SetComponentManager(cm *component.ComponentManager)
+	// HasSubscription returns true if the node currently has an active subscription to the topic.
+	HasSubscription(topic channels.Topic) bool
 }

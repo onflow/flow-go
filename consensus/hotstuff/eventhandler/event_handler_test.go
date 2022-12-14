@@ -183,7 +183,7 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 	}
 
 	f.On("AddProposal", mock.Anything).Return(func(proposal *model.Proposal) error {
-		log.Info().Msgf("forks.AddProposal received Proposal for view: %v, qc: %v\n", proposal.Block.View, proposal.Block.QC.View)
+		log.Info().Msgf("forks.AddProposal received Proposal for view: %v, QC: %v\n", proposal.Block.View, proposal.Block.QC.View)
 		return f.addProposal(proposal)
 	}).Maybe()
 

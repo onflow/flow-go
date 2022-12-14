@@ -40,6 +40,7 @@ type Core struct {
 	config            compliance.Config
 	engineMetrics     module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
+	hotstuffMetrics   module.HotstuffMetrics
 	complianceMetrics module.ComplianceMetrics
 	tracer            module.Tracer
 	cleaner           storage.Cleaner
@@ -61,9 +62,10 @@ type Core struct {
 func NewCore(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
-	tracer module.Tracer,
 	mempool module.MempoolMetrics,
+	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
+	tracer module.Tracer,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -88,6 +90,7 @@ func NewCore(
 		engineMetrics:     collector,
 		tracer:            tracer,
 		mempoolMetrics:    mempool,
+		hotstuffMetrics:   hotstuffMetrics,
 		complianceMetrics: complianceMetrics,
 		cleaner:           cleaner,
 		headers:           headers,
@@ -117,10 +120,24 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
+
+	var traceID string
+
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	if isSampled {
+		span.SetAttributes(
+			attribute.Int64("view", int64(header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", header.ProposerID.String()),
+		)
+		traceID = span.SpanContext().TraceID().String()
+	}
+	defer span.End()
 
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
@@ -133,22 +150,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Uint64("finalized_height", finalHeight).
 		Uint64("finalized_view", finalView).
 		Logger()
 	log.Info().Msg("block proposal received")
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), blockID, trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(proposal.Header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
-		)
-		traceID := span.SpanContext().TraceID().String()
-		log = log.With().Str("traceID", traceID).Logger() // traceID is used to connect logs to traces
-	}
-	defer span.End()
 
 	// drop proposals below the finalized threshold
 	if header.Height <= finalHeight || header.View <= finalView {
@@ -202,7 +208,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -213,7 +219,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// and request the parent
 	parent, err := c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -230,7 +236,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal, parent)
+	err = c.processBlockAndDescendants(block, parent)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -251,7 +257,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, parent *flow.Header) error {
+func (c *Core) processBlockAndDescendants(proposal *flow.Block, parent *flow.Header) error {
 	blockID := proposal.Header.ID()
 
 	log := c.log.With().
@@ -267,8 +273,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 		if checkForAndLogOutdatedInputError(err, log) {
 			return nil
 		}
-		if checkForAndLogInvalidInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
-			// in both cases, notify VoteAggregator about the invalid block
+		if checkForAndLogInvalidInputError(err, log) {
+			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
@@ -291,11 +297,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		cpr := c.processBlockAndDescendants(childProposal, proposal.Header)
+		cpr := c.processBlockAndDescendants(child.Message, proposal.Header)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -313,10 +315,11 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, pare
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
-//   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *flow.Header) error {
+func (c *Core) processBlockProposal(proposal *flow.Block, parent *flow.Header) error {
 	startTime := time.Now()
-	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
+	defer func() {
+		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
+	}()
 
 	header := proposal.Header
 	blockID := header.ID()
@@ -345,8 +348,8 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, parent *fl
 			//    2. no blocks have been finalized within  the epoch commitment deadline, and the epoch ended
 			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, however we cannot prove Case 1, therefore we can discard this proposal
-			return engine.NewUnverifiableInputError("cannot validate proposal with view from unknown epoch: %w", err)
+			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
+			return engine.NewInvalidInputErrorf("invalid proposal with view from unknown epoch: %w", err)
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
@@ -429,19 +432,6 @@ func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
 	if engine.IsInvalidInputError(err) {
 		// the block is invalid; log as error as we desire honest participation
 		log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
-		return true
-	}
-	return false
-}
-
-// checkForAndLogUnverifiableInputError checks whether error is an `engine.UnverifiableInputError`.
-// If this is the case, we emit a log message and return true.
-// For any error other than `engine.UnverifiableInputError`, this function is a no-op
-// and returns false.
-func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
-	if engine.IsUnverifiableInputError(err) {
-		// the block cannot be validated
-		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of an invalid (slashable) proposal or an epoch failure")
 		return true
 	}
 	return false

@@ -57,11 +57,19 @@ func (b Block) Checksum() Identifier {
 	return b.Header.Checksum()
 }
 
-// PendingBlock is a wrapper type representing a block that cannot yet be
-// processed. The block header, payload, and sender ID are stored together
-// while waiting for the block to become processable.
-type PendingBlock struct {
-	OriginID Identifier
-	Header   *Header
-	Payload  *Payload
+// BlockStatus represents the status of a block.
+type BlockStatus int
+
+const (
+	// BlockStatusUnknown indicates that the block status is not known.
+	BlockStatusUnknown BlockStatus = iota
+	// BlockStatusFinalized is the status of a finalized block.
+	BlockStatusFinalized
+	// BlockStatusSealed is the status of a sealed block.
+	BlockStatusSealed
+)
+
+// String returns the string representation of a transaction status.
+func (s BlockStatus) String() string {
+	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }

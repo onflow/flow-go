@@ -14,8 +14,10 @@ func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, tracer m
 ) *pubsub.Distributor {
 	telemetryConsumer := notifications.NewTelemetryConsumer(log, chain)
 	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
+	logsConsumer := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(telemetryConsumer)
 	dis.AddConsumer(metricsConsumer)
+	dis.AddConsumer(logsConsumer)
 	return dis
 }

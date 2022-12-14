@@ -98,9 +98,7 @@ func New(
 	opts ...Option,
 ) (*Engine, error) {
 	// FIFO queue for block proposals
-	pendingBlocks, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-	)
+	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
 	}
@@ -234,11 +232,12 @@ func (e *Engine) onBlockProposal(proposal flow.Slashable[messages.BlockProposal]
 // processBlockProposal handles incoming block proposals.
 // No errors are expected during normal operations.
 func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
-	defer span.End()
-
-	header := proposal.Header
+	block := proposal.Block.ToInternal()
+	header := block.Header
 	blockID := header.ID()
+
+	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), blockID, trace.FollowerOnBlockProposal)
+	defer span.End()
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -305,32 +304,17 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if we can connect the proposal to an ancestor in the cache, it means
-	// there is a missing link; we cache it and request the missing link
-	ancestor, found := e.pending.ByID(header.ParentID)
+	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
+	// we don't have to request its parent block or its ancestor again, because as a
+	// pending block, its parent block must have been requested.
+	// if there was problem requesting its parent or ancestors, the sync engine's forward
+	// syncing with range requests for finalized blocks will request for the blocks.
+	_, found := e.pending.ByID(header.ParentID)
 	if found {
 
 		// add the block to the cache
-		_ = e.pending.Add(originID, proposal)
-
-		// go to the first missing ancestor
-		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height - 1
-		for {
-			ancestor, found = e.pending.ByID(ancestorID)
-			if !found {
-				break
-			}
-			ancestorID = ancestor.Header.ParentID
-			ancestorHeight = ancestor.Header.Height - 1
-		}
-
-		log.Debug().
-			Uint64("ancestor_height", ancestorHeight).
-			Hex("ancestor_id", ancestorID[:]).
-			Msg("requesting missing ancestor for proposal")
-
-		e.sync.RequestBlock(ancestorID, ancestorHeight)
+		_ = e.pending.Add(originID, block)
+		e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
 		return nil
 	}
@@ -341,7 +325,7 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	_, err = e.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 
-		_ = e.pending.Add(originID, proposal)
+		_ = e.pending.Add(originID, block)
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
@@ -355,7 +339,7 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockAndDescendants(ctx, proposal)
+	err = e.processBlockAndDescendants(ctx, block)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal (id=%x, height=%d, view=%d): %w", blockID, header.Height, header.View, err)
 	}
@@ -373,12 +357,10 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
-func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal) error {
-
+func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *flow.Block) error {
+	header := proposal.Header
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.End()
-
-	header := proposal.Header
 
 	log := e.log.With().
 		Str("chain_id", header.ChainID.String()).
@@ -418,17 +400,11 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
 
-	// see if the block is a valid extension of the protocol state
-	block := &flow.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
-
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
 	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
-	err = e.state.Extend(ctx, block)
+	err = e.state.Extend(ctx, proposal)
 	if err != nil {
 		// block is outdated by the time we started processing it
 		// => some other node generating the proposal is probably behind is catching up.
@@ -441,7 +417,6 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		if state.IsInvalidExtensionError(err) {
 			log.Warn().
 				Err(err).
-				Bool(logging.KeySuspicious, true).
 				Msg("received invalid block from other node (potential slashing evidence?)")
 			return nil
 		}
@@ -482,11 +457,7 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 	// then try to process children only this once
 	var result *multierror.Error
 	for _, child := range children {
-		proposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		err := e.processBlockAndDescendants(ctx, proposal)
+		err := e.processBlockAndDescendants(ctx, child.Message)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}

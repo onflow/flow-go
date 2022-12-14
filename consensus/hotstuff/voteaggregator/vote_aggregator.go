@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -12,9 +13,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -32,6 +35,8 @@ const defaultBlockQueueCapacity = 1000
 type VoteAggregator struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
+	hotstuffMetrics            module.HotstuffMetrics
+	engineMetrics              module.EngineMetrics
 	notifier                   hotstuff.Consumer
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
@@ -50,23 +55,29 @@ var _ component.Component = (*VoteAggregator)(nil)
 // different voting formats of main Consensus vs Collector consensus.
 func NewVoteAggregator(
 	log zerolog.Logger,
+	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
-	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	queuedVotes, err := fifoqueue.NewFifoQueue(defaultVoteQueueCapacity,
+		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
 
-	queuedBlocks, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultBlockQueueCapacity))
+	queuedBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity) // TODO metrics
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize blocks queue")
 	}
 
 	aggregator := &VoteAggregator{
 		log:                        log,
+		hotstuffMetrics:            hotstuffMetrics,
+		engineMetrics:              engineMetrics,
 		notifier:                   notifier,
 		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
 		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
@@ -157,7 +168,12 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 		msg, ok = va.queuedVotes.Pop()
 		if ok {
 			vote := msg.(*model.Vote)
+			startTime := time.Now()
 			err := va.processQueuedVote(vote)
+			// report duration of processing one vote
+			va.hotstuffMetrics.VoteProcessingDuration(time.Since(startTime))
+			va.engineMetrics.MessageHandled(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+
 			if err != nil {
 				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
 			}
@@ -250,16 +266,14 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
+	log := va.log.With().Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("voter", vote.SignerID[:]).
+		Str("vote_id", vote.ID().String()).Logger()
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
-
-		va.log.Info().
-			Uint64("block_view", vote.View).
-			Hex("block_id", vote.BlockID[:]).
-			Hex("voter", vote.SignerID[:]).
-			Str("vote_id", vote.ID().String()).
-			Msg("drop stale votes")
-
+		log.Debug().Msg("drop stale votes")
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 		return
 	}
 
@@ -267,6 +281,9 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// It means that we are probably catching up.
 	if ok := va.queuedVotes.Push(vote); ok {
 		va.queuedMessagesNotifier.Notify()
+	} else {
+		log.Info().Msg("no queue capacity, dropping vote")
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
 	}
 }
 

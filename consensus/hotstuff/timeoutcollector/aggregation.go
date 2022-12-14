@@ -163,21 +163,22 @@ func (a *TimeoutSignatureAggregator) View() uint64 {
 //   - model.InsufficientSignaturesError if no signatures have been added yet
 //
 // This function is thread-safe
-func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, crypto.Signature, error) {
+func (a *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, crypto.Signature, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
 	sharesNum := len(a.idToSignature)
 	if sharesNum == 0 {
-		return nil, nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
+		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
 	}
 	signatures := make([]crypto.Signature, 0, sharesNum)
-	signers := make([]flow.Identifier, 0, sharesNum)
-	newestQCViews := make([]uint64, 0, sharesNum)
+	signersData := make([]hotstuff.TimeoutSignerInfo, 0, sharesNum)
 	for id, info := range a.idToSignature {
 		signatures = append(signatures, info.sig)
-		signers = append(signers, id)
-		newestQCViews = append(newestQCViews, info.newestQCView)
+		signersData = append(signersData, hotstuff.TimeoutSignerInfo{
+			NewestQCView: info.newestQCView,
+			Signer:       id,
+		})
 	}
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
@@ -186,8 +187,8 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
 		//  * if some signature(s) could not be decoded, which should be impossible since we check all signatures before adding them
 		// Hence, any error here is a symptom of an internal bug
-		return nil, nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
+		return nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
-	return signers, newestQCViews, aggSignature, nil
+	return signersData, aggSignature, nil
 }

@@ -30,12 +30,14 @@ import (
 type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 
 type HotStuffFactory struct {
-	log           zerolog.Logger
-	me            module.Local
-	db            *badger.DB
-	protoState    protocol.State
-	createMetrics HotStuffMetricsFunc
-	opts          []consensus.Option
+	log            zerolog.Logger
+	me             module.Local
+	db             *badger.DB
+	protoState     protocol.State
+	engineMetrics  module.EngineMetrics
+	mempoolMetrics module.MempoolMetrics
+	createMetrics  HotStuffMetricsFunc
+	opts           []consensus.Option
 }
 
 func NewHotStuffFactory(
@@ -43,17 +45,21 @@ func NewHotStuffFactory(
 	me module.Local,
 	db *badger.DB,
 	protoState protocol.State,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	createMetrics HotStuffMetricsFunc,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:           log,
-		me:            me,
-		db:            db,
-		protoState:    protoState,
-		createMetrics: createMetrics,
-		opts:          opts,
+		log:            log,
+		me:             me,
+		db:             db,
+		protoState:     protoState,
+		engineMetrics:  engineMetrics,
+		mempoolMetrics: mempoolMetrics,
+		createMetrics:  createMetrics,
+		opts:           opts,
 	}
 	return factory, nil
 }
@@ -114,6 +120,9 @@ func (f *HotStuffFactory) CreateModules(
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	voteAggregator, err := consensus.NewVoteAggregator(
 		f.log,
+		metrics,
+		f.engineMetrics,
+		f.mempoolMetrics,
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
@@ -130,10 +139,13 @@ func (f *HotStuffFactory) CreateModules(
 
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		f.log,
-		finalizedBlock.View+1,
+		metrics,
+		f.engineMetrics,
+		f.mempoolMetrics,
 		notifier,
 		timeoutProcessorFactory,
 		timeoutCollectorDistributor,
+		finalizedBlock.View+1,
 	)
 	if err != nil {
 		return nil, nil, err

@@ -124,12 +124,12 @@ func (s *Suite) TestHandlePendingBlock() {
 	block.Header.Height = 12
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
 	s.snapshot.On("Head").Return(head.Header, nil)
-	s.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -158,8 +158,8 @@ func (s *Suite) TestHandleProposal() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -201,7 +201,7 @@ func (s *Suite) TestHandleProposalSkipProposalThreshold() {
 	done := make(chan struct{})
 
 	// not in cache or storage
-	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return(nil, realstorage.ErrNotFound).Once()
@@ -235,7 +235,7 @@ func (s *Suite) TestHandleProposalWithPendingChildren() {
 	// the parent is the last finalized state
 	s.snapshot.On("Head").Return(parent.Header, nil)
 
-	s.cache.On("ByID", mock.Anything).Return(nil, false)
+	s.cache.On("ByID", mock.Anything).Return(flow.Slashable[flow.Block]{}, false)
 	// first time calling, assume it's not there
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// both blocks pass HotStuff validation
@@ -253,11 +253,10 @@ func (s *Suite) TestHandleProposalWithPendingChildren() {
 	}).Once()
 
 	// we have one pending child cached
-	pending := []*flow.PendingBlock{
+	pending := []flow.Slashable[flow.Block]{
 		{
 			OriginID: originID,
-			Header:   child.Header,
-			Payload:  child.Payload,
+			Message:  child,
 		},
 	}
 	s.cache.On("ByParentID", block.ID()).Return(pending, true).Once()
@@ -282,8 +281,8 @@ func (s *Suite) TestProcessSyncedBlock() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -306,10 +305,7 @@ func (s *Suite) TestProcessSyncedBlock() {
 
 	s.engine.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message: &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		},
+		Message:  messages.NewBlockProposal(&block),
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }

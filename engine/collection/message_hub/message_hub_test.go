@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"
@@ -149,8 +150,10 @@ func (s *MessageHubSuite) SetupTest() {
 		nil,
 	)
 
+	engineMetrics := metrics.NewNoopCollector()
 	hub, err := NewMessageHub(
 		unittest.Logger(),
+		engineMetrics,
 		s.net,
 		s.me,
 		s.compliance,
@@ -189,10 +192,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
 
-		blockProposalMsg := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		blockProposalMsg := messages.NewClusterBlockProposal(&block)
 		expectedComplianceMsg := flow.Slashable[messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -255,8 +255,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		header.ProposerID = s.myID
 	})
 
-	// should fail with changed (missing) parent
-	// TODO(active-pacemaker): will be not relevant after merging flow.Header change
+	// should fail since we can't query payload
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
@@ -275,10 +274,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
@@ -345,10 +341,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := &messages.ClusterBlockProposal{
-			Header:  proposal.Header,
-			Payload: proposal.Payload,
-		}
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)

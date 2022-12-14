@@ -35,6 +35,6 @@ func NewTransientErrorf(msg string, args ...interface{}) TransientError {
 }
 
 func IsTransientError(err error) bool {
-	var errClusterVotingFailed TransientError
-	return errors.As(err, &errClusterVotingFailed)
+	var errTransient TransientError
+	return errors.As(err, &errTransient)
 }

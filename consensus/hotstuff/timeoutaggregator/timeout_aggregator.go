@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -13,9 +14,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
@@ -30,6 +33,8 @@ type TimeoutAggregator struct {
 	*component.ComponentManager
 	notifications.NoopConsumer
 	log                    zerolog.Logger
+	hotstuffMetrics        module.HotstuffMetrics
+	engineMetrics          module.EngineMetrics
 	notifier               hotstuff.Consumer
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
@@ -44,18 +49,23 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // NewTimeoutAggregator creates an instance of timeout aggregator.
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
+	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
-	// TODO(active-pacemaker): add metrics to track size of timeouts queue
-	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity))
+	queuedTimeouts, err := fifoqueue.NewFifoQueue(defaultTimeoutQueueCapacity,
+		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceTimeoutObjectQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}
 
 	aggregator := &TimeoutAggregator{
 		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
+		hotstuffMetrics:        hotstuffMetrics,
+		engineMetrics:          engineMetrics,
 		notifier:               notifier,
 		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:             collectors,
@@ -119,7 +129,13 @@ func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) err
 		}
 
 		timeoutObject := msg.(*model.TimeoutObject)
+		startTime := time.Now()
+
 		err := t.processQueuedTimeout(timeoutObject)
+		// report duration of processing one timeout object
+		t.hotstuffMetrics.TimeoutObjectProcessingDuration(time.Since(startTime))
+		t.engineMetrics.MessageHandled(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
+
 		if err != nil {
 			return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
 		}
@@ -160,7 +176,6 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 		return fmt.Errorf("could not process TO for view %d: %w",
 			timeoutObject.View, err)
 	}
-
 	return nil
 }
 
@@ -173,17 +188,18 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("drop stale timeouts")
-
+		t.engineMetrics.InboundMessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 
 	placedInQueue := t.queuedTimeouts.Push(timeoutObject)
 	if !placedInQueue { // processing pipeline `queuedTimeouts` is full
 		// It's ok to silently drop timeouts, because we are probably catching up.
-		t.log.Debug().
+		t.log.Info().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
 			Msg("no queue capacity, dropping timeout")
+		t.engineMetrics.InboundMessageDropped(metrics.EngineTimeoutAggregator, metrics.MessageTimeoutObject)
 		return
 	}
 	t.queuedTimeoutsNotifier.Notify()

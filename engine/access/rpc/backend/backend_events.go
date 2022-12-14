@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -68,7 +69,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	for i := startHeight; i <= endHeight; i++ {
 		header, err := b.headers.ByHeight(i)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)
@@ -93,7 +94,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)

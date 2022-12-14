@@ -190,26 +190,25 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.BlockPrograms,
+	derivedBlockData *programs.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, view, programs, privateKeys, chain)
+	return CreateAccountsWithSimpleAddresses(vm, view, derivedBlockData, privateKeys, chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *programs.BlockPrograms,
+	derivedBlockData *programs.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
-		fvm.WithBlockPrograms(programs),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithDerivedBlockData(derivedBlockData),
 	)
 
 	var accounts []flow.Address
@@ -252,7 +251,9 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(
+			txBody,
+			derivedBlockData.NextTxIndexForTestingOnly())
 		err := vm.Run(ctx, tx, view)
 		if err != nil {
 			return nil, err

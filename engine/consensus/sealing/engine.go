@@ -43,6 +43,9 @@ const defaultAssignmentCollectorsWorkerPoolCapacity = 4
 // defaultIncorporatedBlockQueueCapacity maximum capacity of block incorporated events queue
 const defaultIncorporatedBlockQueueCapacity = 1000
 
+// defaultIncorporatedResultQueueCapacity maximum capacity of result incorporated events queue
+const defaultIncorporatedResultQueueCapacity = 1000
+
 type (
 	EventSink chan *Event // Channel to push pending events
 )
@@ -159,12 +162,11 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	e.finalizationEventsNotifier = engine.NewNotifier()
 	e.blockIncorporatedNotifier = engine.NewNotifier()
 	var err error
-	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
+	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue(defaultIncorporatedResultQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
-	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(defaultIncorporatedBlockQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
@@ -175,7 +177,7 @@ func (e *Engine) setupTrustedInboundQueues() error {
 func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGetter) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
+		defaultApprovalQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -187,7 +189,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 
 	// FiFo queue for requested approvals
 	pendingRequestedApprovalsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultApprovalResponseQueueCapacity),
+		defaultApprovalResponseQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
 	)
 	if err != nil {

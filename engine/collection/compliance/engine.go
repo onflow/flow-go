@@ -54,7 +54,7 @@ func NewEngine(
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) {
 			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockProposalQueue, uint(len))
 		}),
@@ -120,6 +120,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		if ok {
 			inBlock := msg.(flow.Slashable[messages.ClusterBlockProposal])
 			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
+			e.core.engineMetrics.MessageHandled(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -146,9 +147,11 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.ClusterBlockProposal]) {
-	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 	}
 }
 
@@ -158,6 +161,8 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.Cluste
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()
+	} else {
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 	}
 }
 
