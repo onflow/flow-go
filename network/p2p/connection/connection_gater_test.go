@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/control"
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/control"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
@@ -108,7 +108,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	defer cancel()
 
-	count := 5
+	count := 3
 	nodes := make([]p2p.LibP2PNode, 0, count)
 	inbounds := make([]chan string, 0, count)
 
@@ -141,29 +141,34 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 		inbounds = append(inbounds, inbound)
 	}
 
+	// adds first node to disallowed list
+	fmt.Println("adding first node to disallowed list: ", nodes[0].Host().ID())
+	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
+
 	connectionGater.On("InterceptSecured", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ network.Direction, p peer.ID, _ network.ConnMultiaddrs) bool {
 			_, ok := disallowedPeerIds[p]
+			if ok {
+				fmt.Println("intercept secure disallowing peer", p)
+			}
 			return !ok
-		})
+		}).Maybe()
 
 	connectionGater.On("InterceptPeerDial", mock.Anything).Return(func(p peer.ID) bool {
 		_, ok := disallowedPeerIds[p]
+		if ok {
+			fmt.Println("intercept dial disallowing peer", p)
+		}
 		return !ok
 	})
 
 	// we don't inspect connections during "accept" and "dial" phases as the peer IDs are not available at those phases.
-	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true)
-	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
-
-	// adds first node to disallowed list
-	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
+	connectionGater.On("InterceptAddrDial", mock.Anything, mock.Anything).Return(true).Maybe()
+	connectionGater.On("InterceptAccept", mock.Anything).Return(true).Maybe()
 
 	// starts the nodes
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
-
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
 
 	// Checks that only the allowed nodes can establish an upgradable connection.
 	// We intentionally mock this after checking for communication silence.
@@ -174,13 +179,14 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 
 		remote := conn.RemotePeer()
 		_, disallowed := disallowedPeerIds[remote]
-		require.False(t, disallowed)
+		require.False(t, disallowed, "disallowed peer %s upgraded the connection", remote.String())
 
 		local := conn.LocalPeer()
 		_, disallowed = disallowedPeerIds[local]
-		require.False(t, disallowed)
-	}).Return(true, control.DisconnectReason(0))
+		require.False(t, disallowed, "local peer %s is disallowed", local.String())
+	}).Return(true, control.DisconnectReason(0)).Maybe()
 
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
 }
 
