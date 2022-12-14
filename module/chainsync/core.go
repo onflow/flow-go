@@ -138,29 +138,6 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 			c.requeueHeight(h)
 		}
 		log.Debug().Msgf("requeued heights [%d-%d]", final.Height+1, height)
-
-		// TODO remove
-		{
-			cnt := 0
-			for h := final.Height + 1; h <= height; h++ {
-				status, ok := c.heights[h]
-				if !ok {
-					c.log.Warn().Msgf("could not find just-enqueued height %d", h)
-				}
-				c.log.Trace().
-					Uint64("height", h).
-					Uint("attempts", status.Attempts).
-					Time("queued", status.Queued).
-					Time("requested", status.Requested).
-					Time("received", status.Received).
-					Msgf("re-enqueued height")
-
-				cnt++
-				if cnt > 100 {
-					return
-				}
-			}
-		}
 	}
 }
 
@@ -246,19 +223,11 @@ func (c *Core) queueByHeight(height uint64) {
 	// do not queue the block if the height is lower or the same as the local finalized height
 	// the check != 0 is necessary or we will never queue blocks at height 0
 	if height <= c.localFinalizedHeight && c.localFinalizedHeight != 0 {
-		c.log.Debug().Uint64("height", height).Uint64("loc_final_height", c.localFinalizedHeight).Msg("skipping queueing by height")
 		return
 	}
 
 	// only queue the request if have never queued it before
 	if c.heights[height].WasQueued() {
-		c.log.Debug().
-			Uint64("height", height).
-			Str("status", c.heights[height].StatusString()).
-			Uint("attemtps", c.heights[height].Attempts).
-			Time("queued_at", c.heights[height].Queued).
-			Time("requested_at", c.heights[height].Requested).
-			Msg("skipping queueing by height")
 		return
 	}
 
@@ -361,24 +330,20 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 	// create a list of all height requests that should be sent
 	var heights []uint64
 	for height, status := range c.heights {
-		log := c.log.With().Uint64("height", height).Uint("attempts", status.Attempts).Logger()
 
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(c.Config.RetryInterval << status.Attempts)
 		if now.Before(retryAfter) {
-			log.Trace().Msgf("omitting because before %s", retryAfter.String())
 			continue
 		}
 
 		// if we've already received this block, skip
 		if status.WasReceived() {
-			log.Trace().Msg("omitting because was received")
 			continue
 		}
 
 		// if we reached maximum number of attempts, delete
 		if status.Attempts >= c.Config.MaxAttempts {
-			log.Trace().Msgf("omitting+deleting because attempts >= %d", c.Config.MaxAttempts)
 			delete(c.heights, height)
 			continue
 		}
@@ -390,29 +355,20 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 	// create list of all the block IDs blocks that are missing
 	var blockIDs []flow.Identifier
 	for blockID, status := range c.blockIDs {
-		log := c.log.With().
-			Uint64("height", status.BlockHeight).
-			Uint("attempts", status.Attempts).
-			Str("status", status.StatusString()).
-			Str("block_id", blockID.String()).
-			Logger()
 
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(c.Config.RetryInterval << status.Attempts)
 		if now.Before(retryAfter) {
-			log.Trace().Msgf("omitting because before %s", retryAfter.String())
 			continue
 		}
 
 		// if we've already received this block, skip
 		if status.WasReceived() {
-			log.Trace().Msg("omitting because was received")
 			continue
 		}
 
 		// if we reached the maximum number of attempts for a queue item, drop
 		if status.Attempts >= c.Config.MaxAttempts {
-			log.Trace().Msgf("omitting+deleting because attempts >= %d", c.Config.MaxAttempts)
 			delete(c.blockIDs, blockID)
 			continue
 		}
