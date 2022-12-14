@@ -91,10 +91,12 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
+		log.Debug().Msgf("discarding block we never queued")
 		return false
 	}
 	// if we have already received this block, exit
 	if status.WasReceived() {
+		log.Debug().Msg("discarding block we have already received")
 		return false
 	}
 
@@ -141,23 +143,23 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 
 		// TODO remove
 		{
-			cnt := 0
 			for h := final.Height + 1; h <= height; h++ {
 				status, ok := c.heights[h]
 				if !ok {
 					c.log.Warn().Msgf("could not find just-enqueued height %d", h)
 				}
-				c.log.Trace().
+				evt := c.log.With().
 					Uint64("height", h).
+					Str("status", status.StatusString()).
 					Uint("attempts", status.Attempts).
 					Time("queued", status.Queued).
 					Time("requested", status.Requested).
 					Time("received", status.Received).
-					Msgf("re-enqueued height")
-
-				cnt++
-				if cnt > 100 {
-					return
+					Logger()
+				if h < 20 {
+					evt.Debug().Msgf("re-enqueued height")
+				} else {
+					evt.Trace().Msgf("re-enqueued height")
 				}
 			}
 		}
@@ -195,7 +197,27 @@ func (c *Core) RequestHeight(height uint64) {
 func (c *Core) requeueHeight(height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.heights[height]
+	// TODO remove
+	evt := c.log.With().
+		Uint64("height", height).
+		Str("status", status.StatusString()).
+		Uint("attempts", status.Attempts).
+		Time("queued", status.Queued).
+		Time("requested", status.Requested).
+		Time("received", status.Received).
+		Bool("was_received", status.WasReceived()).
+		Logger()
+	if height < 20 {
+		evt.Debug().Msgf("requeueHeight()")
+	} else {
+		evt.Trace().Msgf("requeueHeight()")
+	}
 	if status.WasReceived() {
+		if height < 20 {
+			evt.Debug().Uint64("status_height", status.Header.Height).Str("status_id", status.Header.ID().String()).Msg("status was received - deleting...")
+		} else {
+			evt.Trace().Uint64("status_height", status.Header.Height).Str("status_id", status.Header.ID().String()).Msg("status was received - deleting...")
+		}
 		delete(c.blockIDs, status.Header.ID())
 		delete(c.heights, status.Header.Height)
 	}
@@ -252,13 +274,19 @@ func (c *Core) queueByHeight(height uint64) {
 
 	// only queue the request if have never queued it before
 	if c.heights[height].WasQueued() {
-		c.log.Debug().
+		evt := c.log.With().
 			Uint64("height", height).
 			Str("status", c.heights[height].StatusString()).
-			Uint("attemtps", c.heights[height].Attempts).
+			Uint("attempts", c.heights[height].Attempts).
 			Time("queued_at", c.heights[height].Queued).
+			Time("received_at", c.heights[height].Received).
 			Time("requested_at", c.heights[height].Requested).
-			Msg("skipping queueing by height")
+			Logger()
+		if height < 20 {
+			evt.Debug().Msg("skipping queueing by height")
+		} else {
+			evt.Trace().Msgf("skipping queueing by height")
+		}
 		return
 	}
 

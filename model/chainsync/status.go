@@ -47,6 +47,7 @@ func (s *Status) StatusString() string {
 }
 
 func NewQueuedStatus(height uint64) *Status {
+	// TODO(jord): why is height not used here ??
 	return &Status{
 		Queued: time.Now(),
 	}
