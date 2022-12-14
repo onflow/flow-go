@@ -156,13 +156,13 @@ func TestConnGater(t *testing.T) {
 
 	sporkID := unittest.IdentifierFixture()
 
-	node1Peers := make(map[peer.ID]struct{})
+	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
-			if _, ok := node1Peers[pid]; !ok {
+			if !node1Peers.Has(pid) {
 				return fmt.Errorf("peer id not found: %s", pid.String())
 			}
 			return nil
@@ -174,12 +174,12 @@ func TestConnGater(t *testing.T) {
 	node1Info, err := utils.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
-	node2Peers := make(map[peer.ID]struct{})
+	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node2, identity2 := p2ptest.NodeFixture(
 		t,
 		sporkID, t.Name(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
-			if _, ok := node2Peers[pid]; !ok {
+			if !node2Peers.Has(pid) {
 				return fmt.Errorf("id not found: %s", pid.String())
 			}
 			return nil
@@ -199,11 +199,11 @@ func TestConnGater(t *testing.T) {
 	_, err = node2.CreateStream(ctx, node1Info.ID)
 	assert.Error(t, err, "connection should not be possible")
 
-	node1Peers[node2Info.ID] = struct{}{}
+	node1Peers.Add(node2Info.ID, struct{}{})
 	_, err = node1.CreateStream(ctx, node2Info.ID)
 	assert.Error(t, err, "connection should not be possible")
 
-	node2Peers[node1Info.ID] = struct{}{}
+	node2Peers.Add(node1Info.ID, struct{}{})
 	_, err = node1.CreateStream(ctx, node2Info.ID)
 	assert.NoError(t, err, "connection should not be blocked")
 }

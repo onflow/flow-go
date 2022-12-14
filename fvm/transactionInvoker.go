@@ -255,11 +255,11 @@ func (executor *transactionExecutor) normalExecution() (
 	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
-	// TODO:  max transaction fees returned from this function should be used in the storage check
-	_, err = executor.CheckPayerBalanceAndReturnMaxFees(
+	maxTxFees, err := executor.CheckPayerBalanceAndReturnMaxFees(
 		executor.proc,
 		executor.txnState,
 		executor.env)
+
 	if err != nil {
 		return
 	}
@@ -287,7 +287,7 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// Before checking storage limits, we must applying all pending changes
+	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
 	invalidator, err = executor.env.FlushPendingUpdates()
 	if err != nil {
@@ -298,27 +298,33 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// log the execution intensities here, so that they do not contain data
-	// from storage limit checks and transaction deduction, because the payer
-	// is not charged for those.
-	executor.logExecutionIntensities()
-
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.deductTransactionFees()
-	})
-	if err != nil {
-		return
-	}
-
 	// Check if all account storage limits are ok
 	//
 	// disable the computation/memory limit checks on storage checks,
 	// so we don't error from computation/memory limits on this part.
-	// We cannot charge the user for this part, since fee deduction already happened.
+	//
+	// The storage limit check is performed for all accounts that were touched during the transaction.
+	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
+	// The payer account is special cased in this check and its balance is considered max_fees lower than its
+	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState.UpdatedAddresses())
+			executor.txnState.UpdatedAddresses(),
+			executor.proc.Transaction.Payer,
+			maxTxFees)
+	})
+
+	if err != nil {
+		return
+	}
+
+	// log the execution intensities here, so that they do not contain data
+	// from transaction fee deduction, because the payer is not charged for that.
+	executor.logExecutionIntensities()
+
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.deductTransactionFees()
 	})
 
 	return

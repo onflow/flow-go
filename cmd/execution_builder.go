@@ -664,10 +664,6 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
-	if exeNode.exeConf.outputCheckpointV5 {
-		exeNode.diskWAL.UseCheckpointVersion5()
-	}
-
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
 		"ledger").Logger(), ledger.DefaultPathFinderVersion)
 	return exeNode.ledgerStorage, err
