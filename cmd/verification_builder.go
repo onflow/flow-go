@@ -193,7 +193,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID))
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {

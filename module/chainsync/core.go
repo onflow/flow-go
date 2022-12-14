@@ -63,9 +63,9 @@ type Core struct {
 	localFinalizedHeight uint64
 }
 
-func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics) (*Core, error) {
+func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, chainID flow.ChainID) (*Core, error) {
 	core := &Core{
-		log:                  log.With().Str("module", "synchronization").Logger(),
+		log:                  log.With().Str("sync_core", chainID.String()).Logger(),
 		Config:               config,
 		heights:              make(map[uint64]*chainsync.Status),
 		blockIDs:             make(map[flow.Identifier]*chainsync.Status),

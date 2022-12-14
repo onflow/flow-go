@@ -251,7 +251,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID))
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 		builder.SyncCore = syncCore
 
 		return err

@@ -458,7 +458,7 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)
+	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()

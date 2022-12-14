@@ -261,7 +261,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 	var err error
-	exeNode.syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID))
+	exeNode.syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 	return err
 }
 

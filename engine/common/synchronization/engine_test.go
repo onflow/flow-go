@@ -354,7 +354,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		var err error
 		config := synccore.DefaultConfig()
 		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
+		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
 
 		err = ss.e.requestHandler.onRangeRequest(originID, req)
@@ -431,7 +431,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		var err error
 		config := synccore.DefaultConfig()
 		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
+		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
 
 		err = ss.e.requestHandler.onBatchRequest(originID, req)
