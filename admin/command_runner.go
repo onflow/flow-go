@@ -293,7 +293,13 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 
 	if validator := r.getValidator(command); validator != nil {
 		if validationErr := validator(req); validationErr != nil {
-			return nil, status.Error(codes.InvalidArgument, validationErr.Error())
+			// for expected validation errors, return code InvalidArgument and the error text
+			if IsInvalidAdminParameterError(validationErr) {
+				return nil, status.Error(codes.InvalidArgument, validationErr.Error())
+			}
+			// for unexpected errors, return code Internal and log a warning
+			r.logger.Err(validationErr).Msg("unexpected error validating admin request")
+			return nil, status.Error(codes.Internal, validationErr.Error())
 		}
 	}
 
@@ -307,6 +313,7 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 			} else if errors.Is(handleErr, context.DeadlineExceeded) {
 				return nil, status.Error(codes.DeadlineExceeded, "request timed out")
 			} else {
+				r.logger.Err(handleErr).Msg("unexpected error handling admin request")
 				s, _ := status.FromError(handleErr)
 				return nil, s.Err()
 			}

@@ -37,7 +37,47 @@ type NetworkSecurityMetrics interface {
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
 	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic string)
+	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+}
+
+// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
+// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
+type GossipSubRouterMetrics interface {
+	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
+	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
+	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
+	OnIncomingRpcAcceptedFully()
+
+	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
+	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
+	// included in the RPC are not accepted.
+	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
+	// validation.
+	OnIncomingRpcAcceptedOnlyForControlMessages()
+
+	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
+	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
+	OnIncomingRpcRejected()
+
+	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
+	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
+	OnIWantReceived(count int)
+
+	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
+	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
+	OnIHaveReceived(count int)
+
+	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
+	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
+	OnGraftReceived(count int)
+
+	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
+	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
+	OnPruneReceived(count int)
+
+	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
+	// RPC message.
+	OnPublishedGossipMessagesReceived(count int)
 }
 
 type LibP2PMetrics interface {
@@ -49,6 +89,7 @@ type LibP2PMetrics interface {
 type NetworkMetrics interface {
 	LibP2PMetrics
 	NetworkSecurityMetrics
+	GossipSubRouterMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
@@ -539,14 +580,25 @@ type HeroCacheMetrics interface {
 	// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
 	BucketAvailableSlots(uint64, uint64)
 
-	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
-	OnKeyPutSuccess()
+	// OnKeyPutAttempt is called whenever a new (key, value) pair is attempted to be put in cache.
+	// It does not reflect whether the put was successful or not.
+	// A (key, value) pair put attempt may fail if the cache is full, or the key already exists.
+	OnKeyPutAttempt(size uint32)
 
-	// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
+	OnKeyPutSuccess(size uint32)
+
+	// OnKeyPutDrop is called whenever a new (key, entity) pair is dropped from the cache due to full cache.
+	OnKeyPutDrop()
+
+	// OnKeyPutDeduplicated is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
 	// A duplicate key is dropped by the cache when it is written to the cache.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 	// a duplicate entity.
-	OnKeyPutFailure()
+	OnKeyPutDeduplicated()
+
+	// OnKeyRemoved is called whenever a (key, entity) pair is removed from the cache.
+	OnKeyRemoved(size uint32)
 
 	// OnKeyGetSuccess tracks total number of successful read queries.
 	// A read query is successful if the entity corresponding to its key is available in the cache.

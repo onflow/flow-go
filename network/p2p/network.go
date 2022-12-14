@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -383,20 +382,16 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
 	//defer binstat.Leave(bs)
 
-	eventId, err := EventId(channel, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate event id for message: %x", err)
-	}
-
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
 		tempID := targetID // avoid capturing loop variable
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID
-	selfID := n.me.NodeID()
-	originID := selfID[:]
+	eventID, err := EventId(channel, payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate event id for message: %x", err)
+	}
 
 	// get message type from event type and remove the asterisk prefix if present
 	msgType := MessageType(event)
@@ -407,10 +402,9 @@ func (n *Network) genNetworkMessage(channel channels.Channel, event interface{},
 		TargetIDs: emTargets,
 		Payload:   payload,
 
-		// TODO: these fields should be derived by the receiver and removed from the message
-		EventID:  eventId,
-		OriginID: originID,
-		Type:     msgType,
+		// TODO: these fields are unused and here for backwards compatibility
+		EventID: eventID,
+		Type:    msgType,
 	}
 
 	return msg, nil
@@ -521,10 +515,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
-		// This means the message was received on a channel that the node has not registered an engine for
-		lg.Err(err).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to submit message")
+		// This means the message was received on a channel that the node has not registered an
+		// engine for. This may be because the message was received during startup and the node
+		// hasn't subscribed to the channel yet, or there is a bug.
+		lg.Err(err).Msg("failed to submit message")
 		return
 	}
 
