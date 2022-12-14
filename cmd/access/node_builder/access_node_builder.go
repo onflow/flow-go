@@ -189,7 +189,6 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 p2p.LibP2PNode
 	FollowerState              protocol.MutableState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
@@ -995,9 +994,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 	var libp2pNode p2p.LibP2PNode
 	builder.
+		Module("public network metrics", func(node *cmd.NodeConfig) error {
+			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(builder.Logger, metrics.WithNetworkPrefix("public"))
+			return nil
+		}).
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey, builder.PublicNetworkConfig.BindAddress, builder.PublicNetworkConfig.Metrics)
 
 			var err error
 			libp2pNode, err = libP2PFactory()
@@ -1008,8 +1011,6 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(builder.Logger, metrics.WithNetworkPrefix("public"))
-
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
 			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
@@ -1053,14 +1054,14 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.NetworkMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+		connManager := connection.NewConnManager(builder.Logger, networkMetrics)
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
-			builder.Metrics.Network,
-			builder.PublicNetworkConfig.BindAddress,
+			networkMetrics,
+			bindAddress,
 			networkKey,
 			builder.SporkID).
 			SetBasicResolver(builder.Resolver).
@@ -1076,7 +1077,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 					h,
 					unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
-					builder.PublicNetworkConfig.Metrics,
+					networkMetrics,
 					dht.AsServer(),
 				)
 			}).
@@ -1088,9 +1089,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
 
-		builder.LibP2PNode = libp2pNode
-
-		return builder.LibP2PNode, nil
+		return libp2pNode, nil
 	}
 }
 
@@ -1103,7 +1102,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
 
 	builder.Middleware = middleware.NewMiddleware(
 		logger,
