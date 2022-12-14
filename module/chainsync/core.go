@@ -201,12 +201,18 @@ func (c *Core) requeueHeight(height uint64) {
 	evt := c.log.With().
 		Uint64("height", height).
 		Str("status", status.StatusString()).
-		Uint("attempts", status.Attempts).
-		Time("queued", status.Queued).
-		Time("requested", status.Requested).
-		Time("received", status.Received).
 		Bool("was_received", status.WasReceived()).
 		Logger()
+	if status != nil {
+		evt = evt.With().
+			Uint("attempts", status.Attempts).
+			Time("queued", status.Queued).
+			Time("requested", status.Requested).
+			Time("received", status.Received).
+			Logger()
+	} else {
+		evt = evt.With().Str("note", "status=nil").Logger()
+	}
 	if height < 20 {
 		evt.Debug().Msgf("requeueHeight()")
 	} else {
