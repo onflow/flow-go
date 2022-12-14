@@ -7,6 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module"
 )
 
@@ -18,6 +20,7 @@ const (
 )
 
 type NetworkCollector struct {
+	*LibP2PResourceManagerMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -64,12 +67,14 @@ func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	}
 }
 
-func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
 	nc := &NetworkCollector{}
 
 	for _, opt := range opts {
 		opt(nc)
 	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{

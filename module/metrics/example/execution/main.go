@@ -27,7 +27,7 @@ func main() {
 		}{
 			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
 			ExecutionCollector: metrics.NewExecutionCollector(tracer),
-			NetworkCollector:   metrics.NewNetworkCollector(),
+			NetworkCollector:   metrics.NewNetworkCollector(unittest.Logger()),
 		}
 		diskTotal := rand.Int63n(1024 * 1024 * 1024)
 		for i := 0; i < 1000; i++ {

@@ -3,6 +3,8 @@ package module
 import (
 	"time"
 
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -78,9 +80,14 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
-type NetworkMetrics interface {
+type LibP2PMetrics interface {
 	ResolverMetrics
 	DHTMetrics
+	rcmgr.MetricsReporter
+}
+
+type NetworkMetrics interface {
+	LibP2PMetrics
 	NetworkSecurityMetrics
 	GossipSubRouterMetrics
 	// NetworkMessageSent size in bytes and count of the network message sent
@@ -92,7 +99,6 @@ type NetworkMetrics interface {
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string, messageType string)
 
-	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
 

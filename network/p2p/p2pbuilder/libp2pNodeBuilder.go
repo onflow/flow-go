@@ -7,6 +7,8 @@ import (
 	"net"
 	"time"
 
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -219,6 +221,18 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	if builder.resourceManager != nil {
 		opts = append(opts, libp2p.ResourceManager(builder.resourceManager))
+		builder.logger.Warn().
+			Msg("libp2p resource manager is overridden by the node builder, metrics may not be available")
+	} else {
+		// setting up default resource manager, by hooking in the resource manager metrics reporter.
+		limits := rcmgr.DefaultLimits
+		libp2p.SetDefaultServiceLimits(&limits)
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.AutoScale()), rcmgr.WithMetrics(builder.metrics))
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
+		}
+		opts = append(opts, libp2p.ResourceManager(mgr))
+		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
 	}
 
 	if builder.connManager != nil {
