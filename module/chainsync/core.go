@@ -87,14 +87,15 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	defer c.mu.Unlock()
 
 	status := c.getRequestStatus(header.Height, header.ID())
-	log.Debug().Uint("attempts", status.Attempts).Str("status", status.StatusString()).Msg("handling block")
 
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
+		log.Debug().Msg("discarding not queued block")
 		return false
 	}
 	// if we have already received this block, exit
 	if status.WasReceived() {
+		log.Debug().Msg("discarding not received block")
 		return false
 	}
 
@@ -106,6 +107,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	c.blockIDs[header.ID()] = status
 	c.heights[header.Height] = status
 
+	log.Debug().Msg("handled block")
 	return true
 }
 
