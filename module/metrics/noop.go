@@ -209,7 +209,6 @@ func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, 
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
-func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic string)               {}
 func (nc *NoopCollector) AllowConn(dir network.Direction, usefd bool)                           {}
 func (nc *NoopCollector) BlockConn(dir network.Direction, usefd bool)                           {}
 func (nc *NoopCollector) AllowStream(p peer.ID, dir network.Direction)                          {}
