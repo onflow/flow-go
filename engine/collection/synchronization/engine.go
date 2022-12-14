@@ -3,6 +3,7 @@
 package synchronization
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -298,7 +299,8 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(&block.Header) {
+		header := block.Header
+		if !e.core.HandleBlock(&header) {
 			continue
 		}
 		synced := flow.Slashable[messages.ClusterBlockProposal]{
@@ -308,8 +310,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 			},
 		}
 		// forward the block to the compliance engine for validation and processing
-		// we use the network.MessageProcessor interface here because the block is un-validated
-		// NOTE: although we set originID=me, this message is untrusted
 		e.comp.OnSyncedClusterBlock(synced)
 	}
 }
@@ -367,7 +367,7 @@ func (e *Engine) pollHeight() {
 		Height: head.Height,
 	}
 	err = e.con.Multicast(req, synccore.DefaultPollNodes, e.participants.NodeIDs()...)
-	if err != nil {
+	if err != nil && !errors.Is(err, network.EmptyTargetList) {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
 	}

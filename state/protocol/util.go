@@ -136,7 +136,7 @@ func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal,
 	for i, seal := range payload.Seals {
 		header, err := headers.ByBlockID(seal.BlockID)
 		if err != nil {
-			return nil, err // storage.ErrNotFound or exception
+			return nil, fmt.Errorf("could not get block (id=%x) for seal: %w", seal.BlockID, err) // storage.ErrNotFound or exception
 		}
 		heights[i] = header.Height
 		if header.Height < minHeight {

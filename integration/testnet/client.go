@@ -223,7 +223,8 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	return result, err
 }
 
-// GetLatestProtocolSnapshot ...
+// GetLatestProtocolSnapshot returns the latest protocol state snapshot.
+// The snapshot head is latest finalized - tail of sealing segment is latest sealed.
 func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot, error) {
 	b, err := c.client.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
@@ -253,6 +254,16 @@ func (c *Client) GetLatestBlockID(ctx context.Context) (flow.Identifier, error) 
 // GetLatestSealedBlockHeader returns full block header for the latest sealed block
 func (c *Client) GetLatestSealedBlockHeader(ctx context.Context) (*sdk.BlockHeader, error) {
 	header, err := c.client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
+	}
+
+	return header, nil
+}
+
+// GetLatestFinalizedBlockHeader returns full block header for the latest finalized block
+func (c *Client) GetLatestFinalizedBlockHeader(ctx context.Context) (*sdk.BlockHeader, error) {
+	header, err := c.client.GetLatestBlockHeader(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
 	}

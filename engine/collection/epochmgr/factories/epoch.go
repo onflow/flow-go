@@ -152,7 +152,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	syncCore, err := factory.syncCore.Create()
+	syncCore, err := factory.syncCore.Create(cluster.ChainID())
 	if err != nil {
 		err = fmt.Errorf("could not create sync core: %w", err)
 		return
