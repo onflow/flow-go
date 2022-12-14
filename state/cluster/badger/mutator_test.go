@@ -331,15 +331,25 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 
 // an unknown reference block is unverifiable
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
-	block := suite.Block()
-	tx := suite.Tx()
-	payload := suite.Payload(&tx)
-	// set a random reference block ID
-	payload.ReferenceBlockID = unittest.IdentifierFixture()
-	block.SetPayload(payload)
-	err := suite.state.Extend(&block)
-	suite.Assert().Error(err)
-	suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	suite.Run("empty collection", func() {
+		block := suite.Block()
+		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
+		block.SetPayload(*block.Payload)
+		err := suite.state.Extend(&block)
+		suite.Assert().Error(err)
+		suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	})
+	suite.Run("non-empty collection", func() {
+		block := suite.Block()
+		tx := suite.Tx()
+		payload := suite.Payload(&tx)
+		// set a random reference block ID
+		payload.ReferenceBlockID = unittest.IdentifierFixture()
+		block.SetPayload(payload)
+		err := suite.state.Extend(&block)
+		suite.Assert().Error(err)
+		suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	})
 }
 
 // a collection with an expired reference block is a VALID extension of chain state
