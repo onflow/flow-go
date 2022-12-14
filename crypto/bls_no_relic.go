@@ -56,18 +56,6 @@ func IdentityBLSPublicKey() PublicKey {
 	panic(relic_panic)
 }
 
-func IsBLSAggregateEmptyListError(err error) bool {
-	panic(relic_panic)
-}
-
-func IsInvalidSignatureError(err error) bool {
-	panic(relic_panic)
-}
-
-func IsNotBLSKeyError(err error) bool {
-	panic(relic_panic)
-}
-
 func IsBLSSignatureIdentity(s Signature) bool {
 	panic(relic_panic)
 }
