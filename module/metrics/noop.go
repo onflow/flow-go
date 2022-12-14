@@ -11,11 +11,6 @@ import (
 
 type NoopCollector struct{}
 
-func NewNoopCollector() *NoopCollector {
-	nc := &NoopCollector{}
-	return nc
-}
-
 func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
 func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
 func (nc *NoopCollector) BlobsReceived(prefix string, n uint64)                                  {}
@@ -189,12 +184,15 @@ func (nc *NoopCollector) ResponseDropped()                                      
 func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)                          {}
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
-func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
+func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
 func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
 func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
-func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
+func (nc *NoopCollector) OnKeyPutAttempt(uint32)                                                {}
+func (nc *NoopCollector) OnKeyPutDrop()                                                         {}
+func (nc *NoopCollector) OnKeyPutDeduplicated()                                                 {}
+func (nc *NoopCollector) OnKeyRemoved(uint32)                                                   {}
 func (nc *NoopCollector) ExecutionDataFetchStarted()                                            {}
 func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)          {}
 func (nc *NoopCollector) NotificationSent(height uint64)                                        {}
@@ -207,4 +205,20 @@ func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, 
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
-func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic string)               {}
+func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}
+func (nc *NoopCollector) OnIWantReceived(int)                                                   {}
+func (nc *NoopCollector) OnIHaveReceived(int)                                                   {}
+func (nc *NoopCollector) OnGraftReceived(int)                                                   {}
+func (nc *NoopCollector) OnPruneReceived(int)                                                   {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                           {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                          {}
+func (nc *NoopCollector) OnIncomingRpcRejected()                                                {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                           {}
+
+var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
+var _ module.NetworkMetrics = (*NoopCollector)(nil)
+
+func NewNoopCollector() *NoopCollector {
+	nc := &NoopCollector{}
+	return nc
+}
