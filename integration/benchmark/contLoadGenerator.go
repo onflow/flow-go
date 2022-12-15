@@ -279,7 +279,7 @@ func (lg *ContLoadGenerator) startWorkers(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) stopWorkers(num int) error {
+func (lg *ContLoadGenerator) stopWorkers(num int, blocking bool) error {
 	if num > len(lg.workers) {
 		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
 	}
@@ -298,7 +298,9 @@ func (lg *ContLoadGenerator) stopWorkers(num int) error {
 			w.Stop()
 		}(w)
 	}
-	wg.Wait()
+	if blocking {
+		wg.Wait()
+	}
 	lg.workerStatsTracker.AddWorkers(-num)
 
 	return nil
@@ -328,7 +330,7 @@ func (lg *ContLoadGenerator) unsafeSetTPS(desired uint) error {
 	case diff > 0:
 		err = lg.startWorkers(diff)
 	case diff < 0:
-		err = lg.stopWorkers(-diff)
+		err = lg.stopWorkers(-diff, false)
 	}
 
 	if err == nil {
