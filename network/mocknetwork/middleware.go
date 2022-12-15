@@ -130,13 +130,13 @@ func (_m *Middleware) Ready() <-chan struct{} {
 	return r0
 }
 
-// SendDirect provides a mock function with given fields: msg, targetID
-func (_m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	ret := _m.Called(msg, targetID)
+// SendDirect provides a mock function with given fields: msg
+func (_m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
+	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, flow.Identifier) error); ok {
-		r0 = rf(msg, targetID)
+	if rf, ok := ret.Get(0).(func(*network.OutgoingMessageScope) error); ok {
+		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
 	}
