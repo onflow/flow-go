@@ -36,9 +36,8 @@ const lostTransactionThreshold = 90 * time.Second
 var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
 
 const (
-	// flow testnets only have 10e6 total supply, so we choose a small amounts here
 	tokensPerTransfer = 0.000001
-	tokensPerAccount  = 10
+	tokensPerAccount  = 1000
 )
 
 // ConstExecParam hosts all parameters for const-exec load type
