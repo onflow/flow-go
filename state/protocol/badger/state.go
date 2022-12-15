@@ -170,21 +170,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
-
-			// SealingSegment might not have all the blocks referenced by results.
-			// If the block is missing we skip it while indexing, and that's OK because
-			// we are bootstrapping and service event index before the segment shouldn't matter
-			block, has := blocksById[result.BlockID]
-			if !has {
-				continue
-			}
-
-			for _, serviceEvent := range result.ServiceEvents {
-				err := transaction.WithTx(operation.IndexExecutionResultByServiceEventTypeAndHeight(result.ID(), serviceEvent.Type, block.Header.Height))(tx)
-				if err != nil {
-					return fmt.Errorf("could not index results by service event type (type=%s) and height (=%d): %w", serviceEvent.Type, block.Header.Height, err)
-				}
-			}
 		}
 
 		// insert the first seal (in case the segment's first block contains no seal)
@@ -194,6 +179,8 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
 		}
+
+		resultsByID := segment.ExecutionResults.Lookup()
 
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
@@ -228,11 +215,37 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
-			// for all but the first block in the segment, index the parent->child relationship
+			// add results to a lookup map for service events index
+			for _, result := range block.Payload.Results {
+				resultsByID[result.ID()] = result
+			}
+
+			// for all but the first block in the segment, index the parent->child relationship and search for service events to index
 			if i > 0 {
 				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
+				}
+
+				// by sealingSegment definition blocks are in ascending height order
+				parent := segment.Blocks[i-1]
+
+				for _, seal := range parent.Payload.Seals {
+					// check if results is outside the segment, since its cheaper in-memory check
+					resultID := seal.ResultID
+					result, has := resultsByID[resultID]
+
+					if !has {
+						return fmt.Errorf("blocks (id=%s) from sealing segment references seal (id=%s) for results (id=%s) which does not exist in other blocks or segment ExecutionResults", parent.ID(), seal, resultID)
+					}
+
+					for _, serviceEvent := range result.ServiceEvents {
+						err = transaction.WithTx(operation.IndexExecutionResultByServiceEventTypeAndHeight(result.ID(), serviceEvent.Type, block.Header.Height))(tx)
+						if err != nil {
+							return fmt.Errorf("could not index results by service event type (type=%s) and height (=%d): %w", serviceEvent.Type, block.Header.Height, err)
+						}
+
+					}
 				}
 			}
 		}

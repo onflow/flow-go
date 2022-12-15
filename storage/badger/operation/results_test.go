@@ -57,7 +57,6 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("retrieve exact height match", func(t *testing.T) {
-			//t.Parallel()
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height1, eventType, &actualResult))
 			require.NoError(t, err)
@@ -73,14 +72,12 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		})
 
 		t.Run("different event type retrieve nothing", func(t *testing.T) {
-			t.Parallel()
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("finds highest but not higher than given", func(t *testing.T) {
-			t.Parallel()
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height3-1, eventType, &actualResult))
 			require.NoError(t, err)
@@ -88,7 +85,6 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		})
 
 		t.Run("finds highest", func(t *testing.T) {
-			t.Parallel()
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height3+1, eventType, &actualResult))
 			require.NoError(t, err)
@@ -96,7 +92,6 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		})
 
 		t.Run("height below lowest entry returns nothing", func(t *testing.T) {
-			t.Parallel()
 			var actualResult flow.Identifier
 			err := db.View(LookupLastExecutionResultForServiceEventType(height1-1, flow.ServiceEventSetup, &actualResult))
 			require.ErrorIs(t, err, storage.ErrNotFound)
