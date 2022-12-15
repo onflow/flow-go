@@ -1,8 +1,9 @@
 package messageutils
 
 import (
-	"github.com/onflow/flow-go/network"
 	"testing"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/stretchr/testify/require"
 

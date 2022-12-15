@@ -2,10 +2,11 @@ package netcache_test
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
