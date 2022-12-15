@@ -581,7 +581,8 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.Metrics.Network,
 			builder.BaseConfig.BindAddr,
 			networkKey,
-			builder.SporkID).
+			builder.SporkID,
+			builder.LibP2PResourceManagerConfig).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					subscription.UnstakedRole, builder.IdentityProvider,
