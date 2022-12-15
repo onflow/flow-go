@@ -360,8 +360,8 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
-	// translates identifier to peer id
-	peerID, err := m.idTranslator.GetPeerID(msg.TargetId())
+	// since it is a unicast, we only need to get the first peer ID.
+	peerID, err := m.idTranslator.GetPeerID(msg.TargetIds()[0])
 	if err != nil {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
@@ -395,7 +395,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", msg.TargetId(), err)
+		return fmt.Errorf("failed to create stream for %s: %w", msg.TargetIds()[0], err)
 	}
 
 	success := false
@@ -405,7 +405,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 			// close the stream immediately
 			err = stream.Close()
 			if err != nil {
-				err = fmt.Errorf("failed to close the stream for %s: %w", msg.TargetId(), err)
+				err = fmt.Errorf("failed to close the stream for %s: %w", msg.TargetIds()[0], err)
 			}
 		} else {
 			resetErr := stream.Reset()
@@ -427,13 +427,13 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 	err = writer.WriteMsg(msg.Proto())
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", msg.TargetId(), err)
+		return fmt.Errorf("failed to send message to %s: %w", msg.TargetIds()[0], err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", msg.TargetId(), err)
+		return fmt.Errorf("failed to flush stream for %s: %w", msg.TargetIds()[0], err)
 	}
 
 	success = true

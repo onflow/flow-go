@@ -89,7 +89,7 @@ func (m IncomingMessageScope) PayloadType() string {
 }
 
 type OutgoingMessageScope struct {
-	targetId  flow.Identifier                   // the target node IDs.
+	targetIds flow.IdentifierList               // the target node IDs.
 	channelId string                            // the channel ID.
 	payload   interface{}                       // the payload to be sent.
 	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
@@ -98,18 +98,26 @@ type OutgoingMessageScope struct {
 }
 
 func NewOutgoingScope(
-	targetId flow.Identifier,
+	targetIds flow.IdentifierList,
 	channelId string,
 	payload interface{},
 	encoder func(interface{}) ([]byte, error),
 	protocolType ProtocolType) (*OutgoingMessageScope, error) {
 	scope := &OutgoingMessageScope{
-		targetId:  targetId,
+		targetIds: targetIds,
 		channelId: channelId,
 		payload:   payload,
 		encoder:   encoder,
 		protocol:  protocolType,
 	}
+
+	if protocolType == ProtocolTypeUnicast {
+		// for unicast messages, we should have exactly one target.
+		if len(targetIds) != 1 {
+			return nil, fmt.Errorf("expected exactly one target id for unicast message, got: %d", len(targetIds))
+		}
+	}
+
 	msg, err := scope.buildMessage()
 	if err != nil {
 		return nil, fmt.Errorf("could not build message: %v", err)
@@ -118,8 +126,8 @@ func NewOutgoingScope(
 	return scope, nil
 }
 
-func (o OutgoingMessageScope) TargetId() flow.Identifier {
-	return o.targetId
+func (o OutgoingMessageScope) TargetIds() flow.IdentifierList {
+	return o.targetIds
 }
 
 func (o OutgoingMessageScope) Size() int {
@@ -140,14 +148,14 @@ func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
 		return nil, fmt.Errorf("could not encode payload: %w", err)
 	}
 
-	//var emTargets [][]byte = [][]byte{o.targetId[:]}
-	//for _, targetId := range o.targetIds {
-	//	tempID := targetId // avoid capturing loop variable
-	//	emTargets = append(emTargets, tempID[:])
-	//}
+	emTargets := make([][]byte, len(o.targetIds))
+	for _, targetId := range o.targetIds {
+		tempID := targetId // avoid capturing loop variable
+		emTargets = append(emTargets, tempID[:])
+	}
 
 	return &message.Message{
-		TargetIDs: [][]byte{o.targetId[:]},
+		TargetIDs: emTargets,
 		ChannelID: o.channelId,
 		Payload:   payload,
 	}, nil

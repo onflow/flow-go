@@ -372,9 +372,14 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return nil
 	}
 
-	msg, err := network.NewOutgoingScope(targetID, channel.String(), payload, n.codec.Encode, network.ProtocolTypeUnicast)
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{targetID},
+		channel.String(),
+		payload,
+		n.codec.Encode,
+		network.ProtocolTypeUnicast)
 	if err != nil {
-		return fmt.Errorf("unicast could not generate network message: %w", err)
+		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
 	err = n.mw.SendDirect(msg)
@@ -443,14 +448,14 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
+	msg, err := network.NewOutgoingScope(targetIDs, channel.String(), message, n.codec.Encode, network.ProtocolTypePubSub)
 	if err != nil {
-		return fmt.Errorf("failed to generate network message for channel %s: %w", channel, err)
+		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg, channel)
+	err = n.mw.Publish(msg.Proto(), channel)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
