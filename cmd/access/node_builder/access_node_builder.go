@@ -1063,7 +1063,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			networkMetrics,
 			bindAddress,
 			networkKey,
-			builder.SporkID).
+			builder.SporkID,
+			builder.LibP2PResourceManagerConfig).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(

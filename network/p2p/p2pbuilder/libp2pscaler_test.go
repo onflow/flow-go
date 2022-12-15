@@ -46,7 +46,7 @@ func TestAllowedMemoryScale(t *testing.T) {
 	s, err = allowedMemory(0.001)
 	require.NoError(t, err)
 	require.Equal(t, int64(m/1000), s)
-	
+
 	// scaling with factor of 0.0001 should return 0.01% of the total memory.
 	s, err = allowedMemory(0.0001)
 	require.NoError(t, err)
