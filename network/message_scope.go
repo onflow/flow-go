@@ -2,11 +2,12 @@ package network
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"strings"
 )
 
 const (
@@ -96,13 +97,18 @@ type OutgoingMessageScope struct {
 	protocol  ProtocolType                      // the type of protocol used to send the message.
 }
 
-func NewOutgoingScope(targetId flow.Identifier, channelId string, payload interface{}, encoder func(interface{}) ([]byte, error)) (*OutgoingMessageScope, error) {
+func NewOutgoingScope(
+	targetId flow.Identifier,
+	channelId string,
+	payload interface{},
+	encoder func(interface{}) ([]byte, error),
+	protocolType ProtocolType) (*OutgoingMessageScope, error) {
 	scope := &OutgoingMessageScope{
 		targetId:  targetId,
 		channelId: channelId,
 		payload:   payload,
 		encoder:   encoder,
-		protocol:  ProtocolTypeUnicast,
+		protocol:  protocolType,
 	}
 	msg, err := scope.buildMessage()
 	if err != nil {
