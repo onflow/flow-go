@@ -65,8 +65,6 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		txInvoker := fvm.NewTransactionInvoker()
-
 		code := fmt.Sprintf(`
 			transaction {
 				prepare(auth: AuthAccount) {
@@ -89,7 +87,7 @@ func TestAccountFreezing(t *testing.T) {
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, st, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, st, derivedTxnData))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -520,15 +518,13 @@ func TestAccountFreezing(t *testing.T) {
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		txInvoker := fvm.NewTransactionInvoker()
-		err = txInvoker.Process(
+		err = fvm.Run(proc.NewExecutor(
 			fvm.NewContextFromParent(
 				context,
 				fvm.WithAuthorizationChecksEnabled(false),
 			),
-			proc,
 			st,
-			derivedTxnData)
+			derivedTxnData))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 

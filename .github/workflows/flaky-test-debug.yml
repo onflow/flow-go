@@ -212,7 +212,7 @@ jobs:
         run: make docker-build-flow
       - name: Run tests
         if: github.actor != 'bors[bot]'
-        run: ${{ matrix.make }}
+        run: VERBOSE=1 ${{ matrix.make }}
         # TODO(rbtz): re-enable when we fix existing races.
         #env:
         #  RACE_DETECTOR: 1

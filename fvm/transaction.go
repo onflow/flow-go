@@ -57,12 +57,12 @@ func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
 	return trace.NoopSpan
 }
 
-func (proc *TransactionProcedure) Run(
+func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
 	derivedTxnData *derived.DerivedTransactionData,
-) error {
-	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
+) ProcedureExecutor {
+	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {

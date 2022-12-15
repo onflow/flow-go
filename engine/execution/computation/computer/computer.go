@@ -244,7 +244,10 @@ func (e *blockComputer) executeBlock(
 		}
 	}
 
-	res := collector.Finalize()
+	res, err := collector.Finalize()
+	if err != nil {
+		return nil, fmt.Errorf("cannot finalize computation result: %w", err)
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
@@ -351,14 +354,7 @@ func (e *blockComputer) executeCollection(
 		collection,
 		collectionView)
 
-	// TODO(patrick): refactor
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
-		stats.ComputationUsed, stats.MemoryUsed,
-		stats.EventCounts, stats.EventSize,
-		stats.NumberOfRegistersTouched,
-		stats.NumberOfBytesWrittenToRegisters,
-		stats.NumberOfTransactions,
-	)
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), stats)
 	return txIndex, nil
 }
 

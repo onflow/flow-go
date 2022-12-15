@@ -72,8 +72,8 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	testutils.StopNetworks(suite.T(), suite.nets, 3*time.Second)
-	testutils.StopMiddlewares(suite.T(), suite.mws, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestUnknownChannel evaluates that registering an engine with an unknown channel returns an error.

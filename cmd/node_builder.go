@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -139,6 +142,7 @@ type BaseConfig struct {
 	AdminCert                   string
 	AdminKey                    string
 	AdminClientCAs              string
+	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
 	DynamicStartupANAddress     string
@@ -151,6 +155,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
@@ -188,10 +193,11 @@ type NetworkConfig struct {
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	PeerUpdateInterval         time.Duration
-	UnicastMessageTimeout      time.Duration
-	DNSCacheTTL                time.Duration
+	UnicastBandwidthBurstLimit  int
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -268,18 +274,21 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
 			DNSCacheTTL:                     dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
+		debugLogLimit:    2000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,

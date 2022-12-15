@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -18,7 +16,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -141,7 +138,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
 
-		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
+		identities[i].Address = unittest.IPPort(port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
 
@@ -333,6 +330,17 @@ func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.Lib
 	}
 }
 
+// StopComponents stops ReadyDoneAware instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration time.Duration) {
+	comps := make([]module.ReadyDoneAware, 0, len(rda))
+	for _, c := range rda {
+		comps = append(comps, c)
+	}
+
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
+}
+
 type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
@@ -361,7 +369,13 @@ func generateLibP2PNode(t *testing.T,
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), "0.0.0.0:0", key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		metrics.NewNoopCollector(),
+		unittest.DefaultAddress,
+		key,
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 
@@ -401,28 +415,6 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 	return sms
 }
 
-// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
-// duration.
-func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
-	// casts nets instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(nets))
-	for _, net := range nets {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
-}
-
-func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
-	// casts mws instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(mws))
-	for _, net := range mws {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
-}
-
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
 // The primary goal of utilizing this helper function is to apply stress tests on the network layer by
 // sending large messages to transmit.
@@ -460,19 +452,9 @@ func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	return payload
 }
 
-// NewResourceManager creates a new resource manager for testing with huge limits.
+// NewResourceManager creates a new resource manager for testing with no limits.
 func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
-	// Sadly we can not use:
-	//    rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
-	// Since it is broken due to numeric overflow in the resource manager:
-	// https://github.com/libp2p/go-libp2p/issues/1721
-	scalingLimits := rcmgr.DefaultLimits
-	libp2p.SetDefaultServiceLimits(&scalingLimits)
-	limiter := rcmgr.NewFixedLimiter(scalingLimits.Scale(16<<30, 1048575))
-	rm, err := rcmgr.NewResourceManager(limiter)
-	require.NoError(t, err)
-
-	return rm
+	return p2pNetwork.NullResourceManager
 }
 
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.

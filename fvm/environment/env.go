@@ -38,7 +38,22 @@ type Environment interface {
 	ServiceEvents() []flow.Event
 
 	// SystemContracts
-	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
+	AccountsStorageCapacity(
+		addresses []common.Address,
+		payer common.Address,
+		maxTxFees uint64,
+	) (
+		cadence.Value,
+		error,
+	)
+	CheckPayerBalanceAndGetMaxTxFees(
+		payer flow.Address,
+		inclusionEffort uint64,
+		executionEffort uint64,
+	) (
+		cadence.Value,
+		error,
+	)
 	DeductTransactionFees(
 		payer flow.Address,
 		inclusionEffort uint64,

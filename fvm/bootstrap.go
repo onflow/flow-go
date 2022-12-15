@@ -240,14 +240,6 @@ func (b *BootstrapProcedure) NewExecutor(
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
 
-func (b *BootstrapProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
-) error {
-	return run(b.NewExecutor(ctx, txnState, derivedTxnData))
-}
-
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
@@ -318,8 +310,8 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
-	b.deployStorageFees(service, fungibleToken, flowToken)
+	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
+	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
@@ -423,7 +415,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 	return flowToken
 }
 
-func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken, storageFees flow.Address) flow.Address {
 	flowFees := b.createAccount(b.accountKeys.FlowFeesAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
@@ -433,6 +425,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 				service,
 				fungibleToken,
 				flowToken,
+				storageFees,
 				flowFees,
 			),
 			0),
@@ -441,7 +434,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 	return flowFees
 }
 
-func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) {
+func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) flow.Address {
 	contract := contracts.FlowStorageFees(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
@@ -457,6 +450,7 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+	return service
 }
 
 // deployContractAuditVouchers deploys audit vouchers contract to the service account
@@ -891,8 +885,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	errors.CodedError,
 	error,
 ) {
-	invoker := NewTransactionInvoker()
-
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,
 		WithAccountStorageLimit(false),
@@ -910,7 +902,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		return nil, err
 	}
 
-	err = invoker.Process(ctx, tx, b.txnState, prog)
+	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 
 	return txErr, fatalErr

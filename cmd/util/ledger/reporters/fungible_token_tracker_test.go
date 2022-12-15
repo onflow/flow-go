@@ -12,10 +12,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,7 +26,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	// bootstrap ledger
 	payloads := []ledger.Payload{}
 	chain := flow.Testnet.Chain()
-	view := migrations.NewView(payloads)
+	view := utils.NewSimpleViewFromPayloads(payloads)
 
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
