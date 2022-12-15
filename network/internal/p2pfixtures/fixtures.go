@@ -100,7 +100,8 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		metrics.NewNoopCollector(),
 		unittest.DefaultAddress,
 		networkKey,
-		sporkID).
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).

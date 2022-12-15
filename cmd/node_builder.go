@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -191,10 +193,11 @@ type NetworkConfig struct {
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	PeerUpdateInterval         time.Duration
-	UnicastMessageTimeout      time.Duration
-	DNSCacheTTL                time.Duration
+	UnicastBandwidthBurstLimit  int
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -272,6 +275,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
 			DNSCacheTTL:                     dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
