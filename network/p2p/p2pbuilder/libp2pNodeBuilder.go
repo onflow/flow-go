@@ -109,7 +109,7 @@ type NodeBuilder interface {
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
 	MemoryLimitRatio     float64 // maximum allowed fraction of memory to be allocated by the libp2p resources (in bytes)
-	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources
+	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
