@@ -310,7 +310,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		msg, err := network.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel.String(),
-			fmt.Sprintf("hello-%s", testtime.Now().String()),
+			&libp2pmessage.TestMessage{
+				Text: fmt.Sprintf("hello-%s", testtime.Now().String()),
+			},
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
