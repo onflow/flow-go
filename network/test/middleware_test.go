@@ -303,6 +303,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// rate limited.
 	start := testtime.Now()
 	end := start.Add(time.Second)
+
 	for testtime.Now().Before(end) {
 		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
 		testtime.Advance(168 * time.Millisecond)
@@ -316,8 +317,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-
 		err = m.mws[0].SendDirect(msg)
+
 		require.NoError(m.T(), err)
 	}
 
@@ -372,7 +373,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// create middleware
 	opts := testutils.WithUnicastRateLimiters(rateLimiters)
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer, opts)
+	mws, providers := testutils.GenerateMiddlewares(m.T(),
+		m.logger,
+		ids,
+		libP2PNodes,
+		unittest.NetworkCodec(),
+		m.slashingViolationsConsumer, opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -409,7 +415,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{newId.NodeID},
 		testChannel.String(),
-		b,
+		&libp2pmessage.TestMessage{
+			Text: string(b),
+		},
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
