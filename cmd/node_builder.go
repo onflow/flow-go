@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"

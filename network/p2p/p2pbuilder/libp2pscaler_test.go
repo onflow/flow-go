@@ -1,9 +1,10 @@
 package p2pbuilder
 
 import (
+	"testing"
+
 	"github.com/pbnjay/memory"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAllowedMemoryScale(t *testing.T) {

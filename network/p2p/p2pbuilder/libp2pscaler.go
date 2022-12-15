@@ -2,9 +2,10 @@ package p2pbuilder
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/pbnjay/memory"
 	"golang.org/x/sys/unix"
-	"math"
 )
 
 func getNumFDs() (int, error) {
