@@ -288,6 +288,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
+	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
+
 	//limiter limit will be set up to 1000 bytes/sec
 	limit := rate.Limit(1000)
 
