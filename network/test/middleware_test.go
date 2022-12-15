@@ -708,37 +708,6 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //	m.ov[targetIndex].AssertExpectations(m.T())
 //}
 //
-//// TestMessageFieldsOverriden_SendDirect asserts that OriginID, EventID and Type fields are
-//// overridden in the message received over unicast
-//func (m *MiddlewareTestSuite) TestMessageFieldsOverriden_SendDirect() {
-//	first := 0
-//	last := m.size - 1
-//	firstNode := m.ids[first].NodeID
-//	lastNode := m.ids[last].NodeID
-//
-//	msg, expected, event := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "test message")
-//
-//	fakeID := unittest.IdentifierFixture()
-//	msg.OriginID = fakeID[:]
-//	msg.EventID = fakeID[:]
-//	msg.Type = "messages.ChunkDataResponse"
-//
-//	// should receive the expected message, not msg
-//	ch := make(chan struct{})
-//	m.ov[last].On("Receive", firstNode, expected, event).Return(nil).Once().
-//		Run(func(args mockery.Arguments) {
-//			close(ch)
-//		})
-//
-//	// sends a direct message from first node to the last node with the modified fields
-//	err := m.mws[first].SendDirect(msg, lastNode)
-//	assert.NoError(m.Suite.T(), err)
-//
-//	// check message reception on target
-//	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send overridden message to target")
-//
-//	m.ov[last].AssertExpectations(m.T())
-//}
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
