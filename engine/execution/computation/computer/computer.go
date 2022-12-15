@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -50,7 +50,7 @@ type BlockComputer interface {
 		context.Context,
 		*entity.ExecutableBlock,
 		state.View,
-		*programs.DerivedBlockData,
+		*derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -114,7 +114,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 ) (*execution.ComputationResult, error) {
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
@@ -135,7 +135,7 @@ func (e *blockComputer) ExecuteBlock(
 
 func (e *blockComputer) getCollections(
 	block *entity.ExecutableBlock,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 ) (
 	[]collectionItem,
 	error,
@@ -190,7 +190,7 @@ func (e *blockComputer) executeBlock(
 	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 ) (*execution.ComputationResult, error) {
 
 	// check the start state is set
@@ -244,7 +244,10 @@ func (e *blockComputer) executeBlock(
 		}
 	}
 
-	res := collector.Finalize()
+	res, err := collector.Finalize()
+	if err != nil {
+		return nil, fmt.Errorf("cannot finalize computation result: %w", err)
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
@@ -351,14 +354,7 @@ func (e *blockComputer) executeCollection(
 		collection,
 		collectionView)
 
-	// TODO(patrick): refactor
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt),
-		stats.ComputationUsed, stats.MemoryUsed,
-		stats.EventCounts, stats.EventSize,
-		stats.NumberOfRegistersTouched,
-		stats.NumberOfBytesWrittenToRegisters,
-		stats.NumberOfTransactions,
-	)
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), stats)
 	return txIndex, nil
 }
 

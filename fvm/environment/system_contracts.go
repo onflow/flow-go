@@ -92,6 +92,38 @@ func ServiceAddress(chain flow.Chain) flow.Address {
 	return chain.ServiceAddress()
 }
 
+var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
+	AddressFromChain: FlowFeesAddress,
+	LocationName:     systemcontracts.ContractNameFlowFees,
+	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
+	ArgumentTypes: []sema.Type{
+		sema.AuthAccountType,
+		sema.UInt64Type,
+		sema.UInt64Type,
+	},
+}
+
+// CheckPayerBalanceAndGetMaxTxFees executes the verifyPayersBalanceForTransactionExecution
+// on the FlowFees account.
+// It checks whether the given payer has enough balance to cover inclusion fee and max execution
+// fee.
+// It returns (maxTransactionFee, ErrCodeInsufficientPayerBalance) if the payer doesn't have enough balance
+// It returns (maxTransactionFee, nil) if the payer has enough balance
+func (sys *SystemContracts) CheckPayerBalanceAndGetMaxTxFees(
+	payer flow.Address,
+	inclusionEffort uint64,
+	maxExecutionEffort uint64,
+) (cadence.Value, error) {
+	return sys.Invoke(
+		verifyPayersBalanceForTransactionExecutionSpec,
+		[]cadence.Value{
+			cadence.BytesToAddress(payer.Bytes()),
+			cadence.UFix64(inclusionEffort),
+			cadence.UFix64(maxExecutionEffort),
+		},
+	)
+}
+
 var deductTransactionFeeSpec = ContractFunctionSpec{
 	AddressFromChain: FlowFeesAddress,
 	LocationName:     systemcontracts.ContractNameFlowFees,
@@ -103,8 +135,8 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	},
 }
 
-// DeductTransactionFees executes the fee deduction contract on the service
-// account.
+// DeductTransactionFees executes the fee deduction function
+// on the FlowFees account.
 func (sys *SystemContracts) DeductTransactionFees(
 	payer flow.Address,
 	inclusionEffort uint64,
@@ -215,6 +247,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
 	addresses []common.Address,
+	payer common.Address,
+	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
 	for i, address := range addresses {
@@ -225,17 +259,21 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		ContractFunctionSpec{
 			AddressFromChain: ServiceAddress,
 			LocationName:     systemcontracts.ContractStorageFees,
-			FunctionName:     systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
+			FunctionName:     systemcontracts.ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck,
 			ArgumentTypes: []sema.Type{
 				sema.NewConstantSizedType(
 					nil,
 					&sema.AddressType{},
 					int64(len(arrayValues)),
 				),
+				&sema.AddressType{},
+				sema.UFix64Type,
 			},
 		},
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
+			cadence.BytesToAddress(payer.Bytes()),
+			cadence.UFix64(maxTxFees),
 		},
 	)
 }

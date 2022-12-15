@@ -139,6 +139,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -164,6 +165,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminCert, "admin-cert", defaultConfig.AdminCert, "admin cert file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
+	fnb.flags.UintVar(&fnb.BaseConfig.AdminMaxMsgSize, "admin-max-response-size", defaultConfig.AdminMaxMsgSize, "admin server max response size in bytes")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
@@ -468,50 +470,57 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
-	if fnb.AdminAddr != NotSet {
-		if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
-			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
-			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
-		}
-		// create the updatable config manager
-		fnb.RegisterDefaultAdminCommands()
-		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			// set up all admin commands
-			for commandName, commandFunc := range fnb.adminCommands {
-				command := commandFunc(fnb.NodeConfig)
-				fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-			}
-
-			var opts []admin.CommandRunnerOption
-
-			if node.AdminCert != NotSet {
-				serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
-				if err != nil {
-					return nil, err
-				}
-				clientCAs, err := os.ReadFile(node.AdminClientCAs)
-				if err != nil {
-					return nil, err
-				}
-				certPool := x509.NewCertPool()
-				certPool.AppendCertsFromPEM(clientCAs)
-				config := &tls.Config{
-					MinVersion:   tls.VersionTLS13,
-					Certificates: []tls.Certificate{serverCert},
-					ClientAuth:   tls.RequireAndVerifyClientCert,
-					ClientCAs:    certPool,
-				}
-
-				opts = append(opts, admin.WithTLS(config))
-			}
-
-			command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
-
-			return command_runner, nil
-		})
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
+	if fnb.AdminAddr == NotSet {
+		return nil
 	}
+
+	if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
+		!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
+		return fmt.Errorf("admin cert / key and client certs must all be provided to enable mutual TLS")
+	}
+
+	// create the updatable config manager
+	fnb.RegisterDefaultAdminCommands()
+	fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// set up all admin commands
+		for commandName, commandFunc := range fnb.adminCommands {
+			command := commandFunc(fnb.NodeConfig)
+			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+		}
+
+		opts := []admin.CommandRunnerOption{
+			admin.WithMaxMsgSize(int(fnb.AdminMaxMsgSize)),
+		}
+
+		if node.AdminCert != NotSet {
+			serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
+			if err != nil {
+				return nil, err
+			}
+			clientCAs, err := os.ReadFile(node.AdminClientCAs)
+			if err != nil {
+				return nil, err
+			}
+			certPool := x509.NewCertPool()
+			certPool.AppendCertsFromPEM(clientCAs)
+			config := &tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				Certificates: []tls.Certificate{serverCert},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				ClientCAs:    certPool,
+			}
+
+			opts = append(opts, admin.WithTLS(config))
+		}
+
+		runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
+
+		return runner, nil
+	})
+
+	return nil
 }
 
 func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
@@ -549,66 +558,84 @@ func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
 
-func (fnb *FlowNodeBuilder) initNodeInfo() {
+func (fnb *FlowNodeBuilder) initNodeInfo() error {
 	if fnb.BaseConfig.nodeIDHex == NotSet {
-		fnb.Logger.Fatal().Msg("cannot start without node ID")
+		return fmt.Errorf("cannot start without node ID")
 	}
 
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	if err != nil {
-		fnb.Logger.Fatal().Err(err).Msgf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex)
+		return fmt.Errorf("could not parse node ID from string (id: %v): %w", fnb.BaseConfig.nodeIDHex, err)
 	}
 
 	info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("failed to load private node info")
+		return fmt.Errorf("failed to load private node info: %w", err)
 	}
 
 	fnb.NodeID = nodeID
 	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 	fnb.StakingKey = info.StakingPrivKey.PrivateKey
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initLogger() {
+func (fnb *FlowNodeBuilder) initLogger() error {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+
+	// Drop all log events that exceed this rate limit
+	throttledSampler := logging.BurstSampler(fnb.BaseConfig.debugLogLimit, time.Second)
+
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
 		Str("node_id", fnb.NodeID.String()).
-		Logger()
+		Logger().
+		Sample(zerolog.LevelSampler{
+			TraceSampler: throttledSampler,
+			DebugSampler: throttledSampler,
+		})
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
 
 	// parse config log level and apply to logger
 	lvl, err := zerolog.ParseLevel(strings.ToLower(fnb.BaseConfig.level))
 	if err != nil {
-		log.Fatal().Err(err).Msg("invalid log level")
+		return fmt.Errorf("invalid log level: %w", err)
 	}
-	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
-	// modify the level during runtime
-	log = log.Level(zerolog.DebugLevel)
+
+	// Minimum log level is set to trace, then overridden by SetGlobalLevel.
+	// this allows admin commands to modify the level to any value during runtime
+	log = log.Level(zerolog.TraceLevel)
 	zerolog.SetGlobalLevel(lvl)
 
 	fnb.Logger = log
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initMetrics() {
+func (fnb *FlowNodeBuilder) initMetrics() error {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-
 		nodeIdHex := fnb.NodeID.String()
 		if len(nodeIdHex) > 8 {
 			nodeIdHex = nodeIdHex[:8]
 		}
+
 		serviceName := fnb.BaseConfig.NodeRole + "-" + nodeIdHex
-		tracer, err := trace.NewTracer(fnb.Logger,
+		tracer, err := trace.NewTracer(
+			fnb.Logger,
 			serviceName,
 			fnb.RootChainID.String(),
-			fnb.tracerSensitivity)
-		fnb.MustNot(err).Msg("could not initialize tracer")
+			fnb.tracerSensitivity,
+		)
+		if err != nil {
+			return fmt.Errorf("could not initialize tracer: %w", err)
+		}
+
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
 	}
@@ -628,7 +655,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:    metrics.NewNetworkCollector(),
+			Network:    metrics.NewNetworkCollector(fnb.Logger),
 			Engine:     metrics.NewEngineCollector(),
 			Compliance: metrics.NewComplianceCollector(),
 			// CacheControl metrics has been causing memory abuse, disable for now
@@ -644,6 +671,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 			return mempools, nil
 		})
 	}
+	return nil
 }
 
 func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
@@ -686,7 +714,7 @@ func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) initProfiler() {
+func (fnb *FlowNodeBuilder) initProfiler() error {
 	uploader, err := fnb.createProfileUploader()
 	if err != nil {
 		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
@@ -694,56 +722,76 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	}
 
 	profiler, err := profiler.New(fnb.Logger, uploader, fnb.BaseConfig.profilerConfig)
-	fnb.MustNot(err).Msg("could not initialize profiler")
+	if err != nil {
+		return fmt.Errorf("could not initialize profiler: %w", err)
+	}
 
 	// register the enabled state of the profiler for dynamic configuring
 	err = fnb.ConfigManager.RegisterBoolConfig("profiler-enabled", profiler.Enabled, profiler.SetEnabled)
-	fnb.MustNot(err).Msg("could not register profiler-enabled config")
+	if err != nil {
+		return fmt.Errorf("could not register profiler-enabled config: %w", err)
+	}
+
 	err = fnb.ConfigManager.RegisterDurationConfig(
 		"profiler-trigger",
 		func() time.Duration { return fnb.BaseConfig.profilerConfig.Duration },
-		func(d time.Duration) error { return profiler.TriggerRun(d) })
-	fnb.MustNot(err).Msg("could not register profiler-trigger config")
+		func(d time.Duration) error { return profiler.TriggerRun(d) },
+	)
+	if err != nil {
+		return fmt.Errorf("could not register profiler-trigger config: %w", err)
+	}
 
-	fnb.MustNot(
-		fnb.ConfigManager.RegisterUintConfig(
-			"profiler-set-mem-profile-rate",
-			func() uint { return uint(runtime.MemProfileRate) },
-			func(r uint) error { runtime.MemProfileRate = int(r); return nil }),
-	).Msg("could not register profiler setting")
+	err = fnb.ConfigManager.RegisterUintConfig(
+		"profiler-set-mem-profile-rate",
+		func() uint { return uint(runtime.MemProfileRate) },
+		func(r uint) error { runtime.MemProfileRate = int(r); return nil },
+	)
+	if err != nil {
+		return fmt.Errorf("could not register profiler-set-mem-profile-rate setting: %w", err)
+	}
+
 	// There is no way to get the current block profile rate so we keep track of it ourselves.
 	currentRate := new(uint)
-	fnb.MustNot(
-		fnb.ConfigManager.RegisterUintConfig(
-			"profiler-set-block-profile-rate",
-			func() uint { return *currentRate },
-			func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil }),
-	).Msg("could not register profiler setting")
-	fnb.MustNot(
-		fnb.ConfigManager.RegisterUintConfig(
-			"profiler-set-mutex-profile-fraction",
-			func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
-			func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil }),
-	).Msg("could not register profiler setting")
+	err = fnb.ConfigManager.RegisterUintConfig(
+		"profiler-set-block-profile-rate",
+		func() uint { return *currentRate },
+		func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil },
+	)
+	if err != nil {
+		return fmt.Errorf("could not register profiler-set-block-profile-rate setting: %w", err)
+	}
+
+	err = fnb.ConfigManager.RegisterUintConfig(
+		"profiler-set-mutex-profile-fraction",
+		func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
+		func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil },
+	)
+	if err != nil {
+		return fmt.Errorf("could not register profiler-set-mutex-profile-fraction setting: %w", err)
+	}
 
 	// registering as a DependableComponent with no dependencies so that it's started immediately on startup
 	// without being blocked by other component's Ready()
 	fnb.DependableComponent("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	}, NewDependencyList())
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() {
+func (fnb *FlowNodeBuilder) initDB() error {
 
 	// if a db has been passed in, use that instead of creating one
 	if fnb.BaseConfig.db != nil {
 		fnb.DB = fnb.BaseConfig.db
-		return
+		return nil
 	}
 
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
-	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
+	if err != nil {
+		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
+	}
 
 	log := sutil.NewLogger(fnb.Logger)
 
@@ -766,7 +814,9 @@ func (fnb *FlowNodeBuilder) initDB() {
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
 	publicDB, err := bstorage.InitPublic(opts)
-	fnb.MustNot(err).Msg("could not open public db")
+	if err != nil {
+		return fmt.Errorf("could not open public db: %w", err)
+	}
 	fnb.DB = publicDB
 
 	fnb.ShutdownFunc(func() error {
@@ -775,22 +825,26 @@ func (fnb *FlowNodeBuilder) initDB() {
 		}
 		return nil
 	})
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initSecretsDB() {
+func (fnb *FlowNodeBuilder) initSecretsDB() error {
 
 	// if the secrets DB is disabled (only applicable for Consensus Follower,
 	// which makes use of this same logic), skip this initialization
 	if !fnb.BaseConfig.secretsDBEnabled {
-		return
+		return nil
 	}
 
 	if fnb.BaseConfig.secretsdir == NotSet {
-		fnb.Logger.Fatal().Msgf("missing required flag '--secretsdir'")
+		return fmt.Errorf("missing required flag '--secretsdir'")
 	}
 
 	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
-	fnb.MustNot(err).Str("dir", fnb.BaseConfig.secretsdir).Msg("could not create secrets db dir")
+	if err != nil {
+		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
+	}
 
 	log := sutil.NewLogger(fnb.Logger)
 
@@ -805,19 +859,20 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 		if errors.Is(err, os.ErrNotExist) {
 			if fnb.NodeRole == flow.RoleConsensus.String() {
 				// missing key is a fatal error for SN nodes
-				fnb.Logger.Fatal().Err(err).Msg("secrets db encryption key not found")
-			} else {
-				fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
+				return fmt.Errorf("secrets db encryption key not found: %w", err)
 			}
+			fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
 		} else if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+			return fmt.Errorf("failed to read secrets db encryption key: %w", err)
 		} else {
 			opts = opts.WithEncryptionKey(encryptionKey)
 		}
 	}
 
 	secretsDB, err := bstorage.InitSecret(opts)
-	fnb.MustNot(err).Msg("could not open secrets db")
+	if err != nil {
+		return fmt.Errorf("could not open secrets db: %w", err)
+	}
 	fnb.SecretsDB = secretsDB
 
 	fnb.ShutdownFunc(func() error {
@@ -826,9 +881,11 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 		}
 		return nil
 	})
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initStorage() {
+func (fnb *FlowNodeBuilder) initStorage() error {
 
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
@@ -836,7 +893,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	err := operation.RetryOnConflict(fnb.DB.Update, func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})
-	fnb.MustNot(err).Msg("could not initialize max tracker")
+	if err != nil {
+		return fmt.Errorf("could not initialize max tracker: %w", err)
+	}
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
@@ -869,6 +928,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Statuses:     statuses,
 		Commits:      commits,
 	}
+
+	return nil
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
@@ -906,11 +967,13 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) initState() {
+func (fnb *FlowNodeBuilder) initState() error {
 	fnb.ProtocolEvents = events.NewDistributor()
 
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
-	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
+	if err != nil {
+		return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+	}
 
 	if isBootStrapped {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
@@ -925,14 +988,21 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 		)
-		fnb.MustNot(err).Msg("could not open protocol state")
+		if err != nil {
+			return fmt.Errorf("could not open protocol state: %w", err)
+		}
 		fnb.State = state
 
 		// set root snapshot field
 		rootBlock, err := state.Params().Root()
-		fnb.MustNot(err).Msg("could not get root block from protocol state")
+		if err != nil {
+			return fmt.Errorf("could not get root block from protocol state: %w", err)
+		}
+
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
-		fnb.setRootSnapshot(rootSnapshot)
+		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+			return err
+		}
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
@@ -942,10 +1012,14 @@ func (fnb *FlowNodeBuilder) initState() {
 		if rootSnapshot == nil {
 			fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
 			rootSnapshot, err = loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
-			fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
+			if err != nil {
+				return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+			}
 		}
 		// set root snapshot fields
-		fnb.setRootSnapshot(rootSnapshot)
+		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+			return err
+		}
 
 		// generate bootstrap config options as per NodeConfig
 		var options []badgerState.BootstrapConfigOptions
@@ -966,7 +1040,9 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.RootSnapshot,
 			options...,
 		)
-		fnb.MustNot(err).Msg("could not bootstrap protocol state")
+		if err != nil {
+			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
 
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
@@ -978,79 +1054,113 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	// initialize local if it hasn't been initialized yet
 	if fnb.Me == nil {
-		fnb.initLocal()
+		if err := fnb.initLocal(); err != nil {
+			return err
+		}
 	}
 
 	lastFinalized, err := fnb.State.Final().Head()
-	fnb.MustNot(err).Msg("could not get last finalized block header")
+	if err != nil {
+		return fmt.Errorf("could not get last finalized block header: %w", err)
+	}
+
 	fnb.Logger.Info().
 		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
 		Uint64("root_block_height", fnb.RootBlock.Header.Height).
 		Hex("finalized_block_id", logging.Entity(lastFinalized)).
 		Uint64("finalized_block_height", lastFinalized.Height).
 		Msg("successfully opened protocol state")
+
+	return nil
 }
 
 // setRootSnapshot sets the root snapshot field and all related fields in the NodeConfig.
-func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
+func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) error {
 	var err error
 
 	// validate the root snapshot QCs
 	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
-	fnb.MustNot(err).Msg("failed to validate root snapshot QCs")
+	if err != nil {
+		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
+	}
 
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
 	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
-	fnb.MustNot(err).Msg("failed to read root sealed result")
+	if err != nil {
+		return fmt.Errorf("failed to read root sealed result: %w", err)
+	}
+
 	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
-	fnb.MustNot(err).Msg("failed to read root sealing segment")
+	if err != nil {
+		return fmt.Errorf("failed to read root sealing segment: %w", err)
+	}
+
 	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
-	fnb.MustNot(err).Msg("failed to read root qc")
+	if err != nil {
+		return fmt.Errorf("failed to read root QC: %w", err)
+	}
+
 	fnb.RootChainID = fnb.RootBlock.Header.ChainID
 	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	fnb.MustNot(err)
+	if err != nil {
+		return fmt.Errorf("failed to read spork ID: %w", err)
+	}
+
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) initLocal() {
+func (fnb *FlowNodeBuilder) initLocal() error {
 	// Verify that my ID (as given in the configuration) is known to the network
 	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
 	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	fnb.MustNot(err).Msg("could not parse node identifier")
+	if err != nil {
+		return fmt.Errorf("could not parse node identifier: %w", err)
+	}
 
 	self, err := fnb.State.Final().Identity(myID)
-	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
+	if err != nil {
+		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v): %w", myID, err)
+	}
 
 	// Verify that my role (as given in the configuration) is consistent with the protocol state.
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
 		rootBlockHeader, err := fnb.State.Params().Root()
-		fnb.MustNot(err).Msg("could not get root block from protocol state")
-		if rootBlockHeader.ChainID == flow.Mainnet {
-			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
-				self.Role.String(),
-				fnb.BaseConfig.NodeRole)
-		} else {
-			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
-				self.Role.String(),
-				fnb.BaseConfig.NodeRole)
+		if err != nil {
+			return fmt.Errorf("could not get root block from protocol state: %w", err)
 		}
+
+		if rootBlockHeader.ChainID == flow.Mainnet {
+			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
+				self.Role.String(),
+				fnb.BaseConfig.NodeRole,
+			)
+		}
+
+		fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
+			self.Role.String(),
+			fnb.BaseConfig.NodeRole)
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
 	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+		return fmt.Errorf("configured networking key does not match protocol state")
 	}
 	if !self.StakingPubKey.Equals(fnb.StakingKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+		return fmt.Errorf("configured staking key does not match protocol state")
 	}
 
 	fnb.Me, err = local.New(self, fnb.StakingKey)
-	fnb.MustNot(err).Msg("could not initialize local")
+	if err != nil {
+		return fmt.Errorf("could not initialize local: %w", err)
+	}
+
+	return nil
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
@@ -1299,17 +1409,6 @@ func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
 func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
 	fnb.adminCommands[command] = f
 	return fnb
-}
-
-// MustNot asserts that the given error must not occur.
-//
-// If the error is nil, returns a nil log event (which acts as a no-op).
-// If the error is not nil, returns a fatal log event containing the error.
-func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
-	if err != nil {
-		return fnb.Logger.Fatal().Err(err)
-	}
-	return nil
 }
 
 // Component adds a new component to the node that conforms to the ReadyDoneAware
@@ -1576,17 +1675,30 @@ func (fnb *FlowNodeBuilder) onStart() error {
 
 	// init nodeinfo by reading the private bootstrap file if not already set
 	if fnb.NodeID == flow.ZeroID {
-		fnb.initNodeInfo()
+		if err := fnb.initNodeInfo(); err != nil {
+			return err
+		}
 	}
 
-	fnb.initLogger()
+	if err := fnb.initLogger(); err != nil {
+		return err
+	}
 
-	fnb.initDB()
-	fnb.initSecretsDB()
+	if err := fnb.initDB(); err != nil {
+		return err
+	}
 
-	fnb.initMetrics()
+	if err := fnb.initSecretsDB(); err != nil {
+		return err
+	}
 
-	fnb.initStorage()
+	if err := fnb.initMetrics(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorage(); err != nil {
+		return err
+	}
 
 	for _, f := range fnb.preInitFns {
 		if err := fnb.handlePreInit(f); err != nil {
@@ -1594,9 +1706,13 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	fnb.initState()
+	if err := fnb.initState(); err != nil {
+		return err
+	}
 
-	fnb.initProfiler()
+	if err := fnb.initProfiler(); err != nil {
+		return err
+	}
 
 	fnb.initFvmOptions()
 
@@ -1606,7 +1722,9 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	fnb.EnqueueAdminServerInit()
+	if err := fnb.EnqueueAdminServerInit(); err != nil {
+		return err
+	}
 
 	// run all modules
 	if err := fnb.handleModules(); err != nil {

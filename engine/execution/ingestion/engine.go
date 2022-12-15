@@ -675,14 +675,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	compUsed, memUsed := computationResult.BlockComputationAndMemoryUsed()
-	eventCounts, eventSize := computationResult.BlockEventCountsAndSize()
-	e.metrics.ExecutionBlockExecuted(time.Since(startedAt),
-		compUsed, memUsed,
-		eventCounts, eventSize,
-		len(computationResult.TransactionResults),
-		len(computationResult.ExecutableBlock.CompleteCollections),
-	)
+	e.metrics.ExecutionBlockExecuted(
+		time.Since(startedAt),
+		computationResult.BlockStats())
 
 	for computationKind, intensity := range computationResult.ComputationIntensities {
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)

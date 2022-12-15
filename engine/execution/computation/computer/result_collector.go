@@ -1,8 +1,10 @@
 package computer
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -37,13 +39,16 @@ type resultCollector struct {
 	metrics module.ExecutionMetrics
 
 	closeOnce sync.Once
-	wg        sync.WaitGroup
 
-	committer ViewCommitter
-	state     flow.StateCommitment
-	viewChan  chan state.View
+	committer          ViewCommitter
+	state              flow.StateCommitment
+	committerInputChan chan state.View
+	committerDoneChan  chan struct{}
+	committerError     error
 
-	eventsListChan chan flow.EventsList
+	hasherInputChan chan flow.EventsList
+	hasherDoneChan  chan struct{}
+	hasherError     error
 
 	result *execution.ComputationResult
 }
@@ -54,30 +59,31 @@ func newResultCollector(
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
 	block *entity.ExecutableBlock,
-	numChunks int,
+	numCollections int,
 ) *resultCollector {
 	collector := &resultCollector{
-		tracer:         tracer,
-		blockSpan:      blockSpan,
-		metrics:        metrics,
-		committer:      committer,
-		state:          *block.StartState,
-		viewChan:       make(chan state.View, numChunks),
-		eventsListChan: make(chan flow.EventsList, numChunks),
-		result:         execution.NewEmptyComputationResult(block),
+		tracer:             tracer,
+		blockSpan:          blockSpan,
+		metrics:            metrics,
+		committer:          committer,
+		state:              *block.StartState,
+		committerInputChan: make(chan state.View, numCollections),
+		committerDoneChan:  make(chan struct{}),
+		hasherInputChan:    make(chan flow.EventsList, numCollections),
+		hasherDoneChan:     make(chan struct{}),
+		result:             execution.NewEmptyComputationResult(block),
 	}
 
-	collector.wg.Add(2)
-	go collector.runChunkCommitter()
-	go collector.runChunkHasher()
+	go collector.runCollectionCommitter()
+	go collector.runCollectionHasher()
 
 	return collector
 }
 
-func (collector *resultCollector) runChunkCommitter() {
-	defer collector.wg.Done()
+func (collector *resultCollector) runCollectionCommitter() {
+	defer close(collector.committerDoneChan)
 
-	for view := range collector.viewChan {
+	for view := range collector.committerInputChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXECommitDelta)
@@ -86,7 +92,8 @@ func (collector *resultCollector) runChunkCommitter() {
 			view,
 			collector.state)
 		if err != nil {
-			panic(err)
+			collector.committerError = fmt.Errorf("committer failed: %w", err)
+			return
 		}
 
 		collector.result.StateCommitments = append(
@@ -102,17 +109,18 @@ func (collector *resultCollector) runChunkCommitter() {
 	}
 }
 
-func (collector *resultCollector) runChunkHasher() {
-	defer collector.wg.Done()
+func (collector *resultCollector) runCollectionHasher() {
+	defer close(collector.hasherDoneChan)
 
-	for data := range collector.eventsListChan {
+	for data := range collector.hasherInputChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXEHashEvents)
 
 		rootHash, err := flow.EventsMerkleRootHash(data)
 		if err != nil {
-			panic(err)
+			collector.hasherError = fmt.Errorf("hasher failed: %w", err)
+			return
 		}
 
 		collector.result.EventsHashes = append(
@@ -130,54 +138,58 @@ func (collector *resultCollector) AddTransactionResult(
 	collector.result.AddTransactionResult(collectionIndex, txn)
 }
 
-type ExecutionStats struct {
-	ComputationUsed                 uint64
-	MemoryUsed                      uint64
-	EventCounts                     int
-	EventSize                       int
-	NumberOfRegistersTouched        int
-	NumberOfBytesWrittenToRegisters int
-	NumberOfTransactions            int
-}
-
 func (collector *resultCollector) CommitCollection(
 	collectionIndex int,
 	collection collectionItem,
 	collectionView state.View,
-) ExecutionStats {
+) module.ExecutionResultStats {
 
-	collector.viewChan <- collectionView
-	collector.eventsListChan <- collector.result.Events[collectionIndex]
-
-	viewSnapshot := collectionView.(*delta.View).Interactions()
-	collector.result.AddStateSnapshot(viewSnapshot)
-	collector.result.UpdateTransactionResultIndex(len(collection.Transactions))
-
-	compUsed, memUsed := collector.result.ChunkComputationAndMemoryUsed(
-		collectionIndex)
-	eventCounts, eventSize := collector.result.ChunkEventCountsAndSize(
-		collectionIndex)
-
-	return ExecutionStats{
-		ComputationUsed:                 compUsed,
-		MemoryUsed:                      memUsed,
-		EventCounts:                     eventCounts,
-		EventSize:                       eventSize,
-		NumberOfRegistersTouched:        viewSnapshot.NumberOfRegistersTouched,
-		NumberOfBytesWrittenToRegisters: viewSnapshot.NumberOfBytesWrittenToRegisters,
-		NumberOfTransactions:            len(collection.Transactions),
+	select {
+	case collector.committerInputChan <- collectionView:
+		// Do nothing
+	case <-collector.committerDoneChan:
+		// Committer exited (probably due to an error)
 	}
+
+	select {
+	case collector.hasherInputChan <- collector.result.Events[collectionIndex]:
+		// Do nothing
+	case <-collector.hasherDoneChan:
+		// Hasher exited (probably due to an error)
+	}
+
+	collector.result.AddCollection(collectionView.(*delta.View).Interactions())
+	return collector.result.CollectionStats(collectionIndex)
 }
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
-		close(collector.viewChan)
-		close(collector.eventsListChan)
+		close(collector.committerInputChan)
+		close(collector.hasherInputChan)
 	})
 }
 
-func (collector *resultCollector) Finalize() *execution.ComputationResult {
+func (collector *resultCollector) Finalize() (
+	*execution.ComputationResult,
+	error,
+) {
 	collector.Stop()
-	collector.wg.Wait()
-	return collector.result
+
+	<-collector.committerDoneChan
+	<-collector.hasherDoneChan
+
+	var err error
+	if collector.committerError != nil {
+		err = multierror.Append(err, collector.committerError)
+	}
+
+	if collector.hasherError != nil {
+		err = multierror.Append(err, collector.hasherError)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return collector.result, nil
 }
