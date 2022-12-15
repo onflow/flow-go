@@ -108,7 +108,7 @@ type NodeBuilder interface {
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	MemoryLimitRatio     float64 // maximum allowed fraction of memory to be allocated by the libp2p resources (in bytes)
+	MemoryLimitRatio     float64 // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
 	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
