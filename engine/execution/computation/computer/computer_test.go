@@ -1,3 +1,6 @@
+//go:build relic
+// +build relic
+
 package computer_test
 
 import (

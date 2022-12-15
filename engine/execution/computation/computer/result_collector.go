@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -155,7 +154,7 @@ func (collector *resultCollector) runSpockHasher() {
 		spock, err := collector.signer.SignFunc(
 			snapshot.SpockSecret,
 			collector.spockHasher,
-			crypto.SPOCKProve)
+			spockProveWrapper)
 		if err != nil {
 			collector.spockHasherError = fmt.Errorf(
 				"spock hasher failed: %w",
