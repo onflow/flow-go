@@ -1,1 +1,48 @@
 package p2pbuilder
+
+import (
+	"github.com/pbnjay/memory"
+	"github.com/stretchr/testify/require"
+	"testing"
+)
+
+func TestAllowedMemoryScale(t *testing.T) {
+	m := memory.TotalMemory()
+	require.True(t, m > 0)
+
+	// scaling with factor of 1 should return the total memory.
+	s, err := allowedMemory(1)
+	require.NoError(t, err)
+	require.Equal(t, int64(m), s)
+
+	// scaling with factor of 0 should return an error.
+	_, err = allowedMemory(0)
+	require.Error(t, err)
+
+	// scaling with factor of -1 should return an error.
+	_, err = allowedMemory(-1)
+	require.Error(t, err)
+
+	// scaling with factor of 2 should return an error.
+	_, err = allowedMemory(2)
+	require.Error(t, err)
+
+	// scaling with factor of 0.5 should return half the total memory.
+	s, err = allowedMemory(0.5)
+	require.NoError(t, err)
+	require.Equal(t, int64(m/2), s)
+
+	// scaling with factor of 0.1 should return 10% of the total memory.
+	s, err = allowedMemory(0.1)
+	require.NoError(t, err)
+	require.Equal(t, int64(m/10), s)
+
+	// scaling with factor of 0.01 should return 1% of the total memory.
+	s, err = allowedMemory(0.01)
+	require.NoError(t, err)
+	require.Equal(t, int64(m/100), s)
+
+	// scaling with factor of 0.001 should return 0.1% of the total memory.
+	s, err = allowedMemory(0.001)
+	require.NoError(t, err)
+}
