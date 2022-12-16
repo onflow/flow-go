@@ -1018,7 +1018,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 			EventCounts:                     expectedNumberOfEvents,
 			EventSize:                       expectedEventSize,
 			NumberOfRegistersTouched:        50,
-			NumberOfBytesWrittenToRegisters: 3404,
+			NumberOfBytesWrittenToRegisters: 3403,
 			NumberOfCollections:             1,
 			NumberOfTransactions:            1,
 		},
