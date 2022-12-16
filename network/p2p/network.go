@@ -3,9 +3,10 @@ package p2p
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/utils/logging"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"

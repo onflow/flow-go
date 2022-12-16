@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"regexp"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p/middleware"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
