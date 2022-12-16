@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -500,18 +501,18 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //	m.Ping(msg, m.ids[0].NodeID, expectedMsg, decodedPayload)
 //}
 
-//// TestMultiPing tests the middleware against type of received payload
-//// of distinct messages that are sent concurrently from a node to another
-//func (m *MiddlewareTestSuite) TestMultiPing() {
-//	// one distinct message
-//	m.MultiPing(1)
-//
-//	// two distinct messages
-//	m.MultiPing(2)
-//
-//	// 10 distinct messages
-//	m.MultiPing(10)
-//}
+// TestMultiPing tests the middleware against type of received payload
+// of distinct messages that are sent concurrently from a node to another
+func (m *MiddlewareTestSuite) TestMultiPing() {
+	// one distinct message
+	m.MultiPing(1)
+
+	// two distinct messages
+	m.MultiPing(2)
+
+	// 10 distinct messages
+	m.MultiPing(10)
+}
 
 //// Ping sends a message from the first middleware of the test suit to the last one
 //// expectID and expectPayload are what we expect the receiver side to evaluate the
@@ -546,53 +547,77 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //
 //}
 
-//// Ping sends count-many distinct messages concurrently from the first middleware of the test suit to the last one
-//// It evaluates the correctness of reception of the content of the messages, as well as the sender ID
-//func (m *MiddlewareTestSuite) MultiPing(count int) {
-//	receiveWG := sync.WaitGroup{}
-//	sendWG := sync.WaitGroup{}
-//	// extracts sender id based on the mock option
-//	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-//	firstNode := 0
-//	lastNode := m.size - 1
-//	for i := 0; i < count; i++ {
-//		receiveWG.Add(1)
-//		sendWG.Add(1)
-//
-//		expectedPayloadText := fmt.Sprintf("hello from: %d", i)
-//		msg, err := network.NewOutgoingScope(
-//			flow.IdentifierList{m.ids[firstNode].NodeID},
-//			testChannel.String(),
-//			&libp2pmessage.TestMessage{
-//				Text: expectedPayloadText,
-//			},
-//			unittest.NetworkCodec().Encode,
-//			network.ProtocolTypeUnicast)
-//		require.NoError(m.T(), err)
-//
-//		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, expectedMsg, mockery.Anything).Return(nil).Once().
-//			Run(func(args mockery.Arguments) {
-//				payload := args.Get(2).(*libp2pmessage.TestMessage)
-//				require.Equal(m.T(), expectedPayloadText, payload.Text)
-//				receiveWG.Done()
-//			})
-//		go func() {
-//			// sends a direct message from first node to the last node
-//			err := m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
-//			require.NoError(m.Suite.T(), err)
-//
-//			sendWG.Done()
-//		}()
-//	}
-//
-//	unittest.RequireReturnsBefore(m.T(), sendWG.Wait, 1*time.Second, "could not send unicasts on time")
-//	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "could not receive unicasts on time")
-//
-//	// evaluates the mock calls
-//	for i := 1; i < m.size; i++ {
-//		m.ov[i].AssertExpectations(m.T())
-//	}
-//}
+// MultiPing sends count-many distinct messages concurrently from the first middleware of the test suit to the last one.
+// It evaluates the correctness of reception of the content of the messages. Each message must be received by the
+// last middleware of the test suit exactly once.
+func (m *MiddlewareTestSuite) MultiPing(count int) {
+	receiveWG := sync.WaitGroup{}
+	sendWG := sync.WaitGroup{}
+	// extracts sender id based on the mock option
+	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+	firstNodeIndex := 0
+	lastNodeIndex := m.size - 1
+
+	receivedPayloads := make(map[string]struct{}) // keep track of unique payloads received.
+
+	// regex to extract the payload from the message
+	regex := regexp.MustCompile(`^hello from: \d`)
+
+	for i := 0; i < count; i++ {
+		receiveWG.Add(1)
+		sendWG.Add(1)
+
+		expectedPayloadText := fmt.Sprintf("hello from: %d", i)
+		msg, err := network.NewOutgoingScope(
+			flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
+			testChannel.String(),
+			&libp2pmessage.TestMessage{
+				Text: expectedPayloadText,
+			},
+			unittest.NetworkCodec().Encode,
+			network.ProtocolTypeUnicast)
+		require.NoError(m.T(), err)
+
+		mu := sync.Mutex{} // protects overlay.Receive
+		m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
+			Run(func(args mockery.Arguments) {
+				receiveWG.Done()
+
+				msg, ok := args[0].(*network.IncomingMessageScope)
+				require.True(m.T(), ok)
+
+				require.Equal(m.T(), testChannel.String(), msg.Channel())             // channel
+				require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())    // sender id
+				require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0]) // target id
+				require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())     // protocol
+
+				mu.Lock() // protects receivedPayloads
+				defer mu.Unlock()
+
+				// payload
+				decodedPayload := msg.DecodedPayload().(*libp2pmessage.TestMessage).Text
+				require.True(m.T(), regex.MatchString(decodedPayload))
+				_, seen := receivedPayloads[decodedPayload]
+				require.False(m.T(), seen) // payload is unique
+				receivedPayloads[decodedPayload] = struct{}{}
+			})
+		go func() {
+			// sends a direct message from first node to the last node
+			err := m.mws[firstNodeIndex].SendDirect(msg)
+			require.NoError(m.Suite.T(), err)
+
+			sendWG.Done()
+		}()
+	}
+
+	unittest.RequireReturnsBefore(m.T(), sendWG.Wait, 1*time.Second, "could not send unicasts on time")
+	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "could not receive unicasts on time")
+
+	// evaluates the mock calls
+	for i := 1; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+}
 
 // TestEcho sends an echo message from first middleware to the last middleware
 // the last middleware echos back the message. The test evaluates the correctness
