@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	module "github.com/onflow/flow-go/module"
+
 	time "time"
 )
 
@@ -29,9 +31,9 @@ func (_m *ExecutionMetrics) ExecutionBlockDataUploadStarted() {
 	_m.Called()
 }
 
-// ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, eventCounts, eventSize, txCounts, colCounts
-func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, txCounts int, colCounts int) {
-	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, txCounts, colCounts)
+// ExecutionBlockExecuted provides a mock function with given fields: dur, stats
+func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+	_m.Called(dur, stats)
 }
 
 // ExecutionBlockExecutionEffortVectorComponent provides a mock function with given fields: _a0, _a1
@@ -44,9 +46,9 @@ func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(proofSize int, numbe
 	_m.Called(proofSize, numberOfTransactions)
 }
 
-// ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, eventCounts, eventSize, numberOfRegistersTouched, totalBytesWrittenToRegisters, txCounts
-func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, numberOfRegistersTouched int, totalBytesWrittenToRegisters int, txCounts int) {
-	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, numberOfRegistersTouched, totalBytesWrittenToRegisters, txCounts)
+// ExecutionCollectionExecuted provides a mock function with given fields: dur, stats
+func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+	_m.Called(dur, stats)
 }
 
 // ExecutionCollectionRequestRetried provides a mock function with given fields:

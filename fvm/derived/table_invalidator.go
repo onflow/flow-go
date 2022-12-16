@@ -1,4 +1,4 @@
-package programs
+package derived
 
 import (
 	"github.com/onflow/flow-go/fvm/state"
