@@ -2,9 +2,11 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -33,89 +35,90 @@ type ComputationResult struct {
 }
 
 func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
-	numberOfChunks := len(block.CompleteCollections) + 1
+	numCollections := len(block.CompleteCollections) + 1
 	return &ComputationResult{
 		ExecutableBlock:        block,
-		Events:                 make([]flow.EventsList, numberOfChunks),
+		Events:                 make([]flow.EventsList, numCollections),
 		ServiceEvents:          make(flow.EventsList, 0),
 		TransactionResults:     make([]flow.TransactionResult, 0),
 		TransactionResultIndex: make([]int, 0),
-		StateCommitments:       make([]flow.StateCommitment, 0, numberOfChunks),
-		Proofs:                 make([][]byte, 0, numberOfChunks),
-		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numberOfChunks),
-		EventsHashes:           make([]flow.Identifier, 0, numberOfChunks),
+		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
+		Proofs:                 make([][]byte, 0, numCollections),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numCollections),
+		EventsHashes:           make([]flow.Identifier, 0, numCollections),
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
 
-func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
-	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], inp...)
-}
+func (cr *ComputationResult) AddTransactionResult(
+	collectionIndex int,
+	txn *fvm.TransactionProcedure,
+) {
+	cr.Events[collectionIndex] = append(
+		cr.Events[collectionIndex],
+		txn.Events...)
+	cr.ServiceEvents = append(cr.ServiceEvents, txn.ServiceEvents...)
 
-func (cr *ComputationResult) AddServiceEvents(inp []flow.Event) {
-	cr.ServiceEvents = append(cr.ServiceEvents, inp...)
-}
-
-// Update this
-func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
-	cr.TransactionResults = append(cr.TransactionResults, *inp)
-}
-
-func (cr *ComputationResult) UpdateTransactionResultIndex(txCounts int) {
-	lastIndex := 0
-	if len(cr.TransactionResultIndex) > 0 {
-		lastIndex = cr.TransactionResultIndex[len(cr.TransactionResultIndex)-1]
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: txn.ComputationUsed,
+		MemoryUsed:      txn.MemoryEstimate,
 	}
-	cr.TransactionResultIndex = append(cr.TransactionResultIndex, lastIndex+txCounts)
-}
+	if txn.Err != nil {
+		txnResult.ErrorMessage = txn.Err.Error()
+	}
 
-func (cr *ComputationResult) MergeComputationEffortVector(
-	computationIntensities meter.MeteredComputationIntensities) {
-	for computationKind, intensity := range computationIntensities {
-		cr.ComputationIntensities[computationKind] += intensity
+	cr.TransactionResults = append(cr.TransactionResults, txnResult)
+
+	if txn.IsSampled() {
+		for computationKind, intensity := range txn.ComputationIntensities {
+			cr.ComputationIntensities[computationKind] += intensity
+		}
 	}
 }
 
-func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
-	cr.StateSnapshots = append(cr.StateSnapshots, inp)
+func (cr *ComputationResult) AddCollection(snapshot *delta.SpockSnapshot) {
+	cr.TransactionResultIndex = append(
+		cr.TransactionResultIndex,
+		len(cr.TransactionResults))
+	cr.StateSnapshots = append(cr.StateSnapshots, snapshot)
 }
 
-func (cr *ComputationResult) ChunkEventCountsAndSize(chunkIndex int) (int, int) {
-	return len(cr.Events[chunkIndex]), cr.Events[chunkIndex].ByteSize()
+func (cr *ComputationResult) CollectionStats(
+	collectionIndex int,
+) module.ExecutionResultStats {
+	var startTxnIndex int
+	if collectionIndex > 0 {
+		startTxnIndex = cr.TransactionResultIndex[collectionIndex-1]
+	}
+	endTxnIndex := cr.TransactionResultIndex[collectionIndex]
+
+	var computationUsed uint64
+	var memoryUsed uint64
+	for _, txn := range cr.TransactionResults[startTxnIndex:endTxnIndex] {
+		computationUsed += txn.ComputationUsed
+		memoryUsed += txn.MemoryUsed
+	}
+
+	events := cr.Events[collectionIndex]
+	snapshot := cr.StateSnapshots[collectionIndex]
+	return module.ExecutionResultStats{
+		ComputationUsed:                 computationUsed,
+		MemoryUsed:                      memoryUsed,
+		EventCounts:                     len(events),
+		EventSize:                       events.ByteSize(),
+		NumberOfRegistersTouched:        snapshot.NumberOfRegistersTouched,
+		NumberOfBytesWrittenToRegisters: snapshot.NumberOfBytesWrittenToRegisters,
+		NumberOfCollections:             1,
+		NumberOfTransactions:            endTxnIndex - startTxnIndex,
+	}
 }
 
-func (cr *ComputationResult) BlockEventCountsAndSize() (int, int) {
-	totalSize := cr.ServiceEvents.ByteSize()
-	totalCounts := len(cr.ServiceEvents)
-	for _, events := range cr.Events {
-		totalSize += events.ByteSize()
-		totalCounts += len(events)
+func (cr *ComputationResult) BlockStats() module.ExecutionResultStats {
+	stats := module.ExecutionResultStats{}
+	for idx := 0; idx < len(cr.StateCommitments); idx++ {
+		stats.Merge(cr.CollectionStats(idx))
 	}
-	return totalCounts, totalSize
-}
 
-func (cr *ComputationResult) ChunkComputationAndMemoryUsed(chunkIndex int) (uint64, uint64) {
-	var startTxIndex int
-	if chunkIndex > 0 {
-		startTxIndex = cr.TransactionResultIndex[chunkIndex-1]
-	}
-	endTxIndex := cr.TransactionResultIndex[chunkIndex]
-
-	var totalComputationUsed uint64
-	var totalMemoryUsed uint64
-	for i := startTxIndex; i < endTxIndex; i++ {
-		totalComputationUsed += cr.TransactionResults[i].ComputationUsed
-		totalMemoryUsed += cr.TransactionResults[i].MemoryUsed
-	}
-	return totalComputationUsed, totalMemoryUsed
-}
-
-func (cr *ComputationResult) BlockComputationAndMemoryUsed() (uint64, uint64) {
-	var totalComputationUsed uint64
-	var totalMemoryUsed uint64
-	for i := 0; i < len(cr.TransactionResults); i++ {
-		totalComputationUsed += cr.TransactionResults[i].ComputationUsed
-		totalMemoryUsed += cr.TransactionResults[i].MemoryUsed
-	}
-	return totalComputationUsed, totalMemoryUsed
+	return stats
 }

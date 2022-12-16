@@ -416,7 +416,7 @@ type node struct {
 
 func (n *node) setupNode(t *testing.T) {
 	n.server = grpc.NewServer()
-	listener, err := net.Listen("tcp4", ":0")
+	listener, err := net.Listen("tcp4", unittest.DefaultAddress)
 	assert.NoError(t, err)
 	n.listener = listener
 	assert.Eventually(t, func() bool {

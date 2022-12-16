@@ -2,18 +2,15 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -102,9 +99,7 @@ func New(
 		retry.Activate()
 	}
 
-	var err error
-
-	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
@@ -239,7 +234,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
-		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -262,21 +257,6 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	}
 
 	return convert.SnapshotToBytes(validSnapshot)
-}
-
-func convertStorageError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if status.Code(err) == codes.NotFound {
-		// Already converted
-		return err
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	}
-
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }
 
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities

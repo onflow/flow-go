@@ -674,37 +674,32 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 // ExecutionBlockExecuted reports execution meta data after executing a block
 func (ec *ExecutionCollector) ExecutionBlockExecuted(
 	dur time.Duration,
-	compUsed, memoryUsed uint64,
-	eventCounts, eventSize int,
-	txCounts, colCounts int,
+	stats module.ExecutionResultStats,
 ) {
 	ec.totalExecutedBlocksCounter.Inc()
 	ec.blockExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.blockComputationUsed.Observe(float64(compUsed))
-	ec.blockMemoryUsed.Observe(float64(memoryUsed))
-	ec.blockEventCounts.Observe(float64(eventCounts))
-	ec.blockEventSize.Observe(float64(eventSize))
-	ec.blockTransactionCounts.Observe(float64(txCounts))
-	ec.blockCollectionCounts.Observe(float64(colCounts))
+	ec.blockComputationUsed.Observe(float64(stats.ComputationUsed))
+	ec.blockMemoryUsed.Observe(float64(stats.MemoryUsed))
+	ec.blockEventCounts.Observe(float64(stats.EventCounts))
+	ec.blockEventSize.Observe(float64(stats.EventSize))
+	ec.blockTransactionCounts.Observe(float64(stats.NumberOfTransactions))
+	ec.blockCollectionCounts.Observe(float64(stats.NumberOfCollections))
 }
 
 // ExecutionCollectionExecuted reports stats for executing a collection
 func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	dur time.Duration,
-	compUsed, memoryUsed uint64,
-	eventCounts, eventSize int,
-	numberOfRegistersTouched, totalBytesWrittenToRegisters int,
-	txCounts int,
+	stats module.ExecutionResultStats,
 ) {
 	ec.totalExecutedCollectionsCounter.Inc()
 	ec.collectionExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.collectionComputationUsed.Observe(float64(compUsed))
-	ec.collectionMemoryUsed.Observe(float64(memoryUsed))
-	ec.collectionEventCounts.Observe(float64(eventCounts))
-	ec.collectionEventSize.Observe(float64(eventSize))
-	ec.collectionNumberOfRegistersTouched.Observe(float64(numberOfRegistersTouched))
-	ec.collectionTotalBytesWrittenToRegisters.Observe(float64(totalBytesWrittenToRegisters))
-	ec.collectionTransactionCounts.Observe(float64(txCounts))
+	ec.collectionComputationUsed.Observe(float64(stats.ComputationUsed))
+	ec.collectionMemoryUsed.Observe(float64(stats.MemoryUsed))
+	ec.collectionEventCounts.Observe(float64(stats.EventCounts))
+	ec.collectionEventSize.Observe(float64(stats.EventSize))
+	ec.collectionNumberOfRegistersTouched.Observe(float64(stats.NumberOfRegistersTouched))
+	ec.collectionTotalBytesWrittenToRegisters.Observe(float64(stats.NumberOfBytesWrittenToRegisters))
+	ec.collectionTransactionCounts.Observe(float64(stats.NumberOfTransactions))
 }
 
 func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {

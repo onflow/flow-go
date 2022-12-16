@@ -8,10 +8,10 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -235,17 +235,9 @@ func Bootstrap(
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	_ *programs.DerivedTransactionData,
+	_ *derived.DerivedTransactionData,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
-}
-
-func (b *BootstrapProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
-) error {
-	return run(b.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
@@ -264,11 +256,11 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) InitialSnapshotTime() programs.LogicalTime {
+func (proc *BootstrapProcedure) InitialSnapshotTime() derived.LogicalTime {
 	return 0
 }
 
-func (proc *BootstrapProcedure) ExecutionTime() programs.LogicalTime {
+func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
 	return 0
 }
 
@@ -318,8 +310,8 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
-	b.deployStorageFees(service, fungibleToken, flowToken)
+	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
+	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
@@ -425,7 +417,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 	return flowToken
 }
 
-func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken, storageFees flow.Address) flow.Address {
 	flowFees := b.createAccount(b.accountKeys.FlowFeesAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
@@ -435,6 +427,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 				service,
 				fungibleToken,
 				flowToken,
+				storageFees,
 				flowFees,
 			),
 			0),
@@ -443,7 +436,7 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flo
 	return flowFees
 }
 
-func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) {
+func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) flow.Address {
 	contract := contracts.FlowStorageFees(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
@@ -459,6 +452,7 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+	return service
 }
 
 // deployContractAuditVouchers deploys audit vouchers contract to the service account
@@ -905,8 +899,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	errors.CodedError,
 	error,
 ) {
-	invoker := NewTransactionInvoker()
-
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,
 		WithAccountStorageLimit(false),
@@ -917,15 +909,14 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 
 	// use new derived transaction data for each meta transaction.
 	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
-	prog, err := programs.
-		NewEmptyDerivedBlockData().
+	prog, err := derived.NewEmptyDerivedBlockData().
 		NewDerivedTransactionData(0, 0)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = invoker.Process(ctx, tx, b.txnState, prog)
+	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 
 	return txErr, fatalErr

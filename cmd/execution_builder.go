@@ -76,7 +76,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 const (
@@ -191,9 +193,10 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
-		Component("provider engine", exeNode.LoadProviderEngine).
+		Component("blob service", exeNode.LoadBlobService).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -234,6 +237,22 @@ func (exeNode *ExecutionNode) LoadSystemSpecs(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	exeNode.collector = metrics.NewExecutionCollector(node.Tracer)
+
+	// report the highest executed block height as soon as possible
+	// this is guaranteed to exist because LoadBootstrapper has inserted
+	// the root block as executed block
+	var height uint64
+	var blockID flow.Identifier
+	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	if err != nil {
+		// database has not been bootstrapped yet
+		if errors.Is(err, storageerr.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 	return nil
 }
 
@@ -254,6 +273,70 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 func (exeNode *ExecutionNode) LoadPendingBlockCache(node *NodeConfig) error {
 	exeNode.pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlobService(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// build list of Access nodes that are allowed to request execution data from this node
+	var allowedANs map[flow.Identifier]bool
+	if exeNode.exeConf.executionDataAllowedPeers != "" {
+		ids := strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",")
+		allowedANs = make(map[flow.Identifier]bool, len(ids))
+		for _, idHex := range ids {
+			anID, err := flow.HexStringToIdentifier(idHex)
+			if err != nil {
+				return nil, fmt.Errorf("invalid node ID %s: %w", idHex, err)
+			}
+
+			id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
+			if !ok {
+				return nil, fmt.Errorf("allowed node ID %s is not in identity list", idHex)
+			}
+
+			if id.Role != flow.RoleAccess {
+				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
+			}
+
+			if id.Ejected {
+				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+			}
+
+			allowedANs[anID] = true
+		}
+	}
+
+	opts := []network.BlobServiceOption{
+		blob.WithBitswapOptions(
+			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
+			bitswap.WithPeerBlockRequestFilter(
+				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
+			),
+			bitswap.WithTracer(
+				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+			),
+		),
+	}
+
+	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
+		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
+	}
+
+	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register blob service: %w", err)
+	}
+	exeNode.blobService = bs
+
+	// add blobservice into ReadyDoneAware dependency passed to peer manager
+	// this configures peer manager to wait for the blobservice to be ready before starting
+	exeNode.blobserviceDependable.Init(bs)
+
+	// blob service's lifecycle is managed by the network layer
+	return &module.NoopReadyDoneAware{}, nil
 }
 
 func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
@@ -359,59 +442,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// build list of Access nodes that are allowed to request execution data from this node
-	var allowedANs map[flow.Identifier]bool
-	if exeNode.exeConf.executionDataAllowedPeers != "" {
-		ids := strings.Split(exeNode.exeConf.executionDataAllowedPeers, ",")
-		allowedANs = make(map[flow.Identifier]bool, len(ids))
-		for _, idHex := range ids {
-			anID, err := flow.HexStringToIdentifier(idHex)
-			if err != nil {
-				return nil, fmt.Errorf("invalid node ID %s: %w", idHex, err)
-			}
-
-			id, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
-			if !ok {
-				return nil, fmt.Errorf("allowed node ID %s is not in identity list", idHex)
-			}
-
-			if id.Role != flow.RoleAccess {
-				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
-			}
-
-			if id.Ejected {
-				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
-			}
-
-			allowedANs[anID] = true
-		}
+	if exeNode.blobService == nil {
+		return nil, errors.New("blob service is not initialized")
 	}
-
-	opts := []network.BlobServiceOption{
-		blob.WithBitswapOptions(
-			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
-			bitswap.WithPeerBlockRequestFilter(
-				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
-			),
-			bitswap.WithTracer(
-				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
-			),
-		),
-	}
-
-	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
-		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
-	}
-
-	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register blob service: %w", err)
-	}
-	exeNode.blobService = bs
-
-	// add blobservice into ReadyDoneAware dependency passed to peer manager
-	// this configures peer manager to wait for the blobservice to be ready before starting
-	exeNode.blobserviceDependable.Init(bs)
 
 	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 	if node.MetricsEnabled {
@@ -422,7 +455,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.Logger,
 		providerMetrics,
 		execution_data.DefaultSerializer,
-		bs,
+		exeNode.blobService,
 		exeNode.executionDataTracker,
 	)
 
@@ -631,10 +664,6 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
-	if exeNode.exeConf.outputCheckpointV5 {
-		exeNode.diskWAL.UseCheckpointVersion5()
-	}
-
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
 		"ledger").Logger(), ledger.DefaultPathFinderVersion)
 	return exeNode.ledgerStorage, err
@@ -747,7 +776,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	if err == nil {
 		node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 		preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-	} else if err != nil && exeNode.exeConf.preferredExeNodeIDStr != "" {
+	} else if exeNode.exeConf.preferredExeNodeIDStr != "" {
 		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 	}
 

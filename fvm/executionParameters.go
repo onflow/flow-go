@@ -10,14 +10,17 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+// getBasicMeterParameters returns the set of meter parameters used for
+// general procedure execution.  Subparts of the procedure execution may
+// specify custom meter parameters via nested transactions.
 func getBasicMeterParameters(
 	ctx Context,
 	proc Procedure,
@@ -38,28 +41,22 @@ func getBasicMeterParameters(
 	return params
 }
 
-func getMeterParameters(
+// getBodyMeterParameters returns the set of meter parameters used for
+// transaction/script body execution.
+func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	view state.View,
-	derivedTxnData *programs.DerivedTransactionData,
+	txnState *state.TransactionState,
+	derivedTxnData *derived.DerivedTransactionData,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
 	procParams := getBasicMeterParameters(ctx, proc)
 
-	txnState := state.NewTransactionState(
-		view,
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(procParams))
-
-	// TODO(patrick): cache meter param overrides
 	overrides, err := derivedTxnData.GetMeterParamOverrides(
 		txnState,
-		meterParamOverridesComputer{ctx, derivedTxnData})
+		NewMeterParamOverridesComputer(ctx, derivedTxnData))
 	if err != nil {
 		return procParams, err
 	}
@@ -87,19 +84,26 @@ func getMeterParameters(
 	return procParams, nil
 }
 
-type meterParamOverridesComputer struct {
+type MeterParamOverridesComputer struct {
 	ctx            Context
-	derivedTxnData *programs.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 }
 
-func (computer meterParamOverridesComputer) Compute(
+func NewMeterParamOverridesComputer(
+	ctx Context,
+	derivedTxnData *derived.DerivedTransactionData,
+) MeterParamOverridesComputer {
+	return MeterParamOverridesComputer{ctx, derivedTxnData}
+}
+
+func (computer MeterParamOverridesComputer) Compute(
 	txnState *state.TransactionState,
 	_ struct{},
 ) (
-	programs.MeterParamOverrides,
+	derived.MeterParamOverrides,
 	error,
 ) {
-	var overrides programs.MeterParamOverrides
+	var overrides derived.MeterParamOverrides
 	var err error
 	txnState.RunWithAllLimitsDisabled(func() {
 		overrides, err = computer.getMeterParamOverrides(txnState)
@@ -114,10 +118,10 @@ func (computer meterParamOverridesComputer) Compute(
 	return overrides, nil
 }
 
-func (computer meterParamOverridesComputer) getMeterParamOverrides(
+func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 	txnState *state.TransactionState,
 ) (
-	programs.MeterParamOverrides,
+	derived.MeterParamOverrides,
 	error,
 ) {
 	// Check that the service account exists because all the settings are
@@ -131,7 +135,7 @@ func (computer meterParamOverridesComputer) getMeterParamOverrides(
 		txnState,
 		computer.derivedTxnData)
 
-	overrides := programs.MeterParamOverrides{}
+	overrides := derived.MeterParamOverrides{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it

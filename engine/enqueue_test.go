@@ -43,16 +43,12 @@ type messageC struct {
 }
 
 func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
-	fifoQueueA, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(capacity),
-	)
+	fifoQueueA, err := fifoqueue.NewFifoQueue(capacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue A: %w", err)
 	}
 
-	fifoQueueB, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(capacity),
-	)
+	fifoQueueB, err := fifoqueue.NewFifoQueue(capacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue B: %w", err)
 	}

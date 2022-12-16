@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
@@ -76,17 +76,9 @@ func NewScriptWithContextAndArgs(
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (proc *ScriptProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
-) error {
-	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -117,19 +109,19 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) InitialSnapshotTime() derived.LogicalTime {
+	return derived.EndOfBlockExecutionTime
 }
 
-func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
+	return derived.EndOfBlockExecutionTime
 }
 
 type scriptExecutor struct {
-	proc *ScriptProcedure
-
+	ctx            Context
+	proc           *ScriptProcedure
 	txnState       *state.TransactionState
-	derivedTxnData *programs.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 
 	env environment.Environment
 }
@@ -138,9 +130,10 @@ func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *scriptExecutor {
 	return &scriptExecutor{
+		ctx:            ctx,
 		proc:           proc,
 		txnState:       txnState,
 		derivedTxnData: derivedTxnData,
@@ -182,6 +175,21 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState,
+		executor.derivedTxnData)
+	if err != nil {
+		return fmt.Errorf("error gettng meter parameters: %w", err)
+	}
+
+	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
+	if err != nil {
+		return err
+	}
+
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
@@ -201,5 +209,7 @@ func (executor *scriptExecutor) execute() error {
 	executor.proc.Events = executor.env.Events()
 	executor.proc.GasUsed = executor.env.ComputationUsed()
 	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
-	return nil
+
+	_, err = executor.txnState.Commit(txnId)
+	return err
 }

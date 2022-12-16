@@ -10,42 +10,20 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	programsCache "github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): rm.  call proc.Run directly.
+// TODO(patrick): rm once emulator is updated.
 type TransactionInvoker struct {
 }
 
 func NewTransactionInvoker() *TransactionInvoker {
 	return &TransactionInvoker{}
-}
-
-func (i TransactionInvoker) NewExecutor(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) *transactionExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (i TransactionInvoker) Process(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) error {
-	// TODO(patrick): switch to run(i.NewExecutor(...))
-	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
-	defer executor.Cleanup()
-	return executor.Execute()
 }
 
 type TransactionExecutorParams struct {
@@ -78,13 +56,12 @@ type transactionExecutor struct {
 	TransactionVerifier
 	TransactionSequenceNumberChecker
 	TransactionStorageLimiter
+	TransactionPayerBalanceChecker
 
-	tracer module.Tracer
-	logger zerolog.Logger
-
+	ctx            Context
 	proc           *TransactionProcedure
 	txnState       *state.TransactionState
-	derivedTxnData *programsCache.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -101,7 +78,7 @@ func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
 	span := proc.StartSpanFromProcTraceSpan(
 		ctx.Tracer,
@@ -120,8 +97,7 @@ func newTransactionExecutor(
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
-		tracer:                    ctx.Tracer,
-		logger:                    ctx.Logger,
+		ctx:                       ctx,
 		proc:                      proc,
 		txnState:                  txnState,
 		derivedTxnData:            derivedTxnData,
@@ -147,7 +123,8 @@ func (executor *transactionExecutor) Execute() error {
 	txErr, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
 		// log the full error path
-		executor.logger.Err(err).Msg("fatal error when execution a transaction")
+		executor.ctx.Logger.Err(err).
+			Msg("fatal error when executing a transaction")
 		return failure
 	}
 
@@ -161,7 +138,7 @@ func (executor *transactionExecutor) Execute() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.tracer,
+			executor.ctx.Tracer,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -172,7 +149,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.tracer,
+			executor.ctx.Tracer,
 			executor.proc,
 			executor.txnState)
 		if err != nil {
@@ -191,28 +168,38 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState,
+		executor.derivedTxnData)
+	if err != nil {
+		return fmt.Errorf("error gettng meter parameters: %w", err)
+	}
+
 	var beginErr error
-	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransaction()
+	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
 	if beginErr != nil {
 		return beginErr
 	}
 
-	var modifiedSets programsCache.ModifiedSetsInvalidator
+	var invalidator derived.TransactionInvalidator
 	var txError error
-	modifiedSets, txError = executor.normalExecution()
+	invalidator, txError = executor.normalExecution()
 	if executor.errs.Collect(txError).CollectedFailure() {
 		return executor.errs.ErrorOrNil()
 	}
 
 	if executor.errs.CollectedError() {
-		modifiedSets = programsCache.ModifiedSetsInvalidator{}
+		invalidator = nil
 		executor.errorExecution()
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
 	}
 
-	executor.errs.Collect(executor.commit(modifiedSets))
+	executor.errs.Collect(executor.commit(invalidator))
 
 	return executor.errs.ErrorOrNil()
 }
@@ -265,9 +252,18 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 }
 
 func (executor *transactionExecutor) normalExecution() (
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
+	maxTxFees, err := executor.CheckPayerBalanceAndReturnMaxFees(
+		executor.proc,
+		executor.txnState,
+		executor.env)
+
+	if err != nil {
+		return
+	}
+
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
@@ -291,9 +287,9 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// Before checking storage limits, we must applying all pending changes
+	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
-	modifiedSets, err = executor.env.FlushPendingUpdates()
+	invalidator, err = executor.env.FlushPendingUpdates()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -302,27 +298,33 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// log the execution intensities here, so that they do not contain data
-	// from storage limit checks and transaction deduction, because the payer
-	// is not charged for those.
-	executor.logExecutionIntensities()
-
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.deductTransactionFees()
-	})
-	if err != nil {
-		return
-	}
-
 	// Check if all account storage limits are ok
 	//
 	// disable the computation/memory limit checks on storage checks,
 	// so we don't error from computation/memory limits on this part.
-	// We cannot charge the user for this part, since fee deduction already happened.
+	//
+	// The storage limit check is performed for all accounts that were touched during the transaction.
+	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
+	// The payer account is special cased in this check and its balance is considered max_fees lower than its
+	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState.UpdatedAddresses())
+			executor.txnState.UpdatedAddresses(),
+			executor.proc.Transaction.Payer,
+			maxTxFees)
+	})
+
+	if err != nil {
+		return
+	}
+
+	// log the execution intensities here, so that they do not contain data
+	// from transaction fee deduction, because the payer is not charged for that.
+	executor.logExecutionIntensities()
+
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.deductTransactionFees()
 	})
 
 	return
@@ -366,7 +368,7 @@ func (executor *transactionExecutor) errorExecution() {
 }
 
 func (executor *transactionExecutor) commit(
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 ) error {
 	if executor.txnState.NumNestedTransactions() > 1 {
 		// This is a fvm internal programming error.  We forgot to call Commit
@@ -393,7 +395,7 @@ func (executor *transactionExecutor) commit(
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
-	executor.derivedTxnData.AddInvalidator(modifiedSets)
+	executor.derivedTxnData.AddInvalidator(invalidator)
 
 	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
 	if commitErr != nil {

@@ -580,8 +580,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 				resultID flow.Identifier
 				event    flow.ServiceEvent
 			}{
-				height:   parent.Header.Height,
-				resultID: result.ID(),
+				height:   header.Height,
+				resultID: seal.ResultID,
 				event:    event})
 
 			// skip updating epoch-related metrics if EECC is triggered
