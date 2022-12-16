@@ -784,7 +784,10 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	}
 	message1, _, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello1")
 
-	m.ov[last].On("Receive", firstNode, mockery.Anything, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
+	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
+		msg, ok := args[0].(*network.IncomingMessageScope)
+		require.True(m.T(), ok)
+		require.Equal(m.T(), firstNode, msg.OriginId())
 		msgRcvd <- struct{}{}
 	})
 
