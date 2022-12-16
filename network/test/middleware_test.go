@@ -469,38 +469,6 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 	return overlay
 }
 
-//// TestPingRawReception tests the middleware for solely the
-//// reception of a single ping message by a node that is sent from another node
-//// it does not evaluate the type and content of the message
-//func (m *MiddlewareTestSuite) TestPingRawReception() {
-//	msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "TestPingRawReception")
-//	m.Ping(msg, mockery.Anything, mockery.Anything, mockery.Anything)
-//}
-//
-//// TestPingTypeReception tests the middleware against type of received payload
-//// upon reception at the receiver side
-//// it does not evaluate content of the payload
-//// it does not evaluate anything related to the sender id
-//func (m *MiddlewareTestSuite) TestPingTypeReception() {
-//	msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "TestPingTypeReception")
-//	m.Ping(msg, mockery.Anything, mockery.AnythingOfType("*message.Message"), mockery.Anything)
-//}
-//
-//// TestPingIDType tests the middleware against both the type of sender id
-//// and content of the payload of the event upon reception at the receiver side
-//// it does not evaluate the actual value of the sender ID
-//func (m *MiddlewareTestSuite) TestPingIDType() {
-//	msg, expectedMsg, decodedPayload := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "TestPingIDType")
-//	m.Ping(msg, mockery.AnythingOfType("flow.Identifier"), expectedMsg, decodedPayload)
-//}
-//
-//// TestPingContentReception tests the middleware against both
-//// the payload and sender ID of the event upon reception at the receiver side
-//func (m *MiddlewareTestSuite) TestPingContentReception() {
-//	msg, expectedMsg, decodedPayload := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, m.ids[1].NodeID, testChannel, "TestPingContentReception")
-//	m.Ping(msg, m.ids[0].NodeID, expectedMsg, decodedPayload)
-//}
-
 // TestMultiPing tests the middleware against type of received payload
 // of distinct messages that are sent concurrently from a node to another
 func (m *MiddlewareTestSuite) TestMultiPing() {
@@ -514,38 +482,55 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 	m.MultiPing(10)
 }
 
-//// Ping sends a message from the first middleware of the test suit to the last one
-//// expectID and expectPayload are what we expect the receiver side to evaluate the
-//// incoming ping against, it can be mocked or typed data
-//func (m *MiddlewareTestSuite) Ping(msg *message.Message, expectID, expectedMessage, expectedPayload interface{}) {
-//
-//	ch := make(chan struct{})
-//	// extracts sender id based on the mock option
-//	var err error
-//	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
-//	firstNode := 0
-//	lastNode := m.size - 1
-//	m.ov[lastNode].On("Receive", expectID, expectedMessage, expectedPayload).Return(nil).Once().
-//		Run(func(args mockery.Arguments) {
-//			ch <- struct{}{}
-//		})
-//
-//	// sends a direct message from first node to the last node
-//	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
-//	require.NoError(m.Suite.T(), err)
-//
-//	select {
-//	case <-ch:
-//	case <-time.After(3 * time.Second):
-//		assert.Fail(m.T(), "peer 1 failed to send a message to peer 2")
-//	}
-//
-//	// evaluates the mock calls
-//	for i := 1; i < m.size; i++ {
-//		m.ov[i].AssertExpectations(m.T())
-//	}
-//
-//}
+// TestPing sends a message from the first middleware of the test suit to the last one and checks that the
+// last middleware receives the message and that the message is correctly decoded.
+func (m *MiddlewareTestSuite) TestPing() {
+	receiveWG := sync.WaitGroup{}
+	receiveWG.Add(1)
+	// extracts sender id based on the mock option
+	var err error
+
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
+	firstNodeIndex := 0
+	lastNodeIndex := m.size - 1
+
+	expectedPayload := "TestPingContentReception"
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: expectedPayload,
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
+
+	m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			receiveWG.Done()
+
+			msg, ok := args[0].(*network.IncomingMessageScope)
+			require.True(m.T(), ok)
+
+			require.Equal(m.T(), testChannel.String(), msg.Channel())                                     // channel
+			require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())                            // sender id
+			require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0])                         // target id
+			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(m.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
+		})
+
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNodeIndex].SendDirect(msg)
+	require.NoError(m.Suite.T(), err)
+
+	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1000*time.Millisecond, "did not receive message")
+
+	// evaluates the mock calls
+	for i := 1; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+
+}
 
 // MultiPing sends count-many distinct messages concurrently from the first middleware of the test suit to the last one.
 // It evaluates the correctness of reception of the content of the messages. Each message must be received by the
