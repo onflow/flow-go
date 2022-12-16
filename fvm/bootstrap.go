@@ -900,6 +900,11 @@ func FlowTokenAddress(chain flow.Chain) flow.Address {
 	return address
 }
 
+func FlowFeesAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(environment.FlowFeesAccountIndex)
+	return address
+}
+
 // invokeMetaTransaction invokes a meta transaction inside the context of an
 // outer transaction.
 //
