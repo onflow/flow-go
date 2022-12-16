@@ -659,7 +659,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
 			require.Equal(m.T(), expectedSendMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
-			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 
@@ -682,7 +682,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                              // protocol
 			require.Equal(m.T(), expectedReplyMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
-			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 		})
@@ -764,7 +764,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 			require.Equal(m.T(), targetNode, msg.TargetIDs()[0])
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())
 
-			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 			close(ch)

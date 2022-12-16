@@ -366,7 +366,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	maxMsgSize := unicastMaxMsgSize(msg.MessageType())
+	maxMsgSize := unicastMaxMsgSize(msg.PayloadType())
 	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
@@ -374,7 +374,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
-	maxTimeout := m.unicastMaxMsgDuration(msg.MessageType())
+	maxTimeout := m.unicastMaxMsgDuration(msg.PayloadType())
 
 	m.metrics.DirectMessageStarted(msg.Channel())
 	defer m.metrics.DirectMessageFinished(msg.Channel())
@@ -385,7 +385,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.MessageType())
+	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.PayloadType())
 	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 

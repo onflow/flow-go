@@ -63,7 +63,7 @@ func (m IncomingMessageScope) OriginId() flow.Identifier {
 	return m.originId
 }
 
-func (m IncomingMessageScope) Message() *message.Message {
+func (m IncomingMessageScope) Proto() *message.Message {
 	return m.msg
 }
 
@@ -141,7 +141,7 @@ func (o OutgoingMessageScope) Size() int {
 	return o.msg.Size()
 }
 
-func (o OutgoingMessageScope) MessageType() string {
+func (o OutgoingMessageScope) PayloadType() string {
 	return MessageType(o.payload)
 }
 
