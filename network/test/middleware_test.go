@@ -1,8 +1,10 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/p2p/middleware"
 	"sync"
 	"testing"
 	"time"
@@ -647,67 +649,83 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //	}
 //}
 
-//// TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
-//// size beyond the permissible unicast message size returns an error.
-//func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
-//	first := 0
-//	last := m.size - 1
-//	firstNode := m.ids[first].NodeID
-//	lastNode := m.ids[last].NodeID
+// // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
+// // size beyond the permissible unicast message size returns an error.
 //
-//	// creates a network payload beyond the maximum message size
-//	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
-//	// so the generated payload is 1000 bytes below the maximum unicast message size.
-//	// We hence add up 1000 bytes to the input of network payload fixture to make
-//	// sure that payload is beyond the permissible size.
-//	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
-//	event := &libp2pmessage.TestMessage{
-//		Text: string(payload),
+//	func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
+//		first := 0
+//		last := m.size - 1
+//		firstNode := m.ids[first].NodeID
+//		lastNode := m.ids[last].NodeID
+//
+//		// creates a network payload beyond the maximum message size
+//		// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+//		// so the generated payload is 1000 bytes below the maximum unicast message size.
+//		// We hence add up 1000 bytes to the input of network payload fixture to make
+//		// sure that payload is beyond the permissible size.
+//		payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
+//		event := &libp2pmessage.TestMessage{
+//			Text: string(payload),
+//		}
+//
+//		msg, _, _ := messageutils.CreateMessageWithPayload(m.T(), firstNode, lastNode, testChannel, event)
+//
+//		// sends a direct message from first node to the last node
+//		err := m.mws[first].SendDirect(msg, lastNode)
+//		require.Error(m.Suite.T(), err)
 //	}
 //
-//	msg, _, _ := messageutils.CreateMessageWithPayload(m.T(), firstNode, lastNode, testChannel, event)
-//
-//	// sends a direct message from first node to the last node
-//	err := m.mws[first].SendDirect(msg, lastNode)
-//	require.Error(m.Suite.T(), err)
-//}
-//
-//// TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
-//// successfully even though it's size is greater than the default message size.
-//func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
-//	sourceIndex := 0
-//	targetIndex := m.size - 1
-//	sourceNode := m.ids[sourceIndex].NodeID
-//	targetNode := m.ids[targetIndex].NodeID
-//	targetMW := m.mws[targetIndex]
-//
-//	// subscribe to channels.ProvideChunks so that the message is not dropped
-//	require.NoError(m.T(), targetMW.Subscribe(channels.ProvideChunks))
-//
-//	// creates a network payload with a size greater than the default max size using a known large message type
-//	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
-//	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
-//
-//	msg, expectedMsg, _ := messageutils.CreateMessageWithPayload(m.T(), sourceNode, targetNode, channels.ProvideChunks, event)
-//
-//	// expect one message to be received by the target
-//	ch := make(chan struct{})
-//	m.ov[targetIndex].On("Receive", sourceNode, expectedMsg, event).Return(nil).Once().
-//		Run(func(args mockery.Arguments) {
-//			close(ch)
-//		})
-//
-//	// sends a direct message from source node to the target node
-//	err := m.mws[sourceIndex].SendDirect(msg, targetNode)
-//	// SendDirect should not error since this is a known large message
-//	require.NoError(m.Suite.T(), err)
-//
-//	// check message reception on target
-//	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send large message to target")
-//
-//	m.ov[targetIndex].AssertExpectations(m.T())
-//}
-//
+// TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
+// successfully even though it's size is greater than the default message size.
+func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
+	sourceIndex := 0
+	targetIndex := m.size - 1
+	targetNode := m.ids[targetIndex].NodeID
+	targetMW := m.mws[targetIndex]
+
+	// subscribe to channels.ProvideChunks so that the message is not dropped
+	require.NoError(m.T(), targetMW.Subscribe(channels.ProvideChunks))
+
+	// creates a network payload with a size greater than the default max size using a known large message type
+	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
+	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
+
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{targetNode},
+		channels.ProvideChunks.String(),
+		event,
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
+
+	// expect one message to be received by the target
+	ch := make(chan struct{})
+	m.ov[targetIndex].On("Receive", mockery.Anything).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			msg, ok := args[0].(*network.IncomingMessageScope)
+			require.True(m.T(), ok)
+
+			require.Equal(m.T(), channels.ProvideChunks.String(), msg.Channel())
+			require.Equal(m.T(), m.ids[sourceIndex].NodeID, msg.OriginId())
+			require.Equal(m.T(), targetNode, msg.TargetIDs()[0])
+			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())
+
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			require.NoError(m.T(), err)
+			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
+			close(ch)
+		})
+
+	// sends a direct message from source node to the target node
+	err = m.mws[sourceIndex].SendDirect(msg)
+	// SendDirect should not error since this is a known large message
+	require.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send large message to target")
+
+	m.ov[targetIndex].AssertExpectations(m.T())
+}
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
