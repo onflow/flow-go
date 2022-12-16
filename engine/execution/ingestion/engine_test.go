@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
+
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -306,19 +307,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 			spocks := receipt.Spocks
 
 			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
-
-			for i, stateSnapshot := range computationResult.StateSnapshots {
-
-				valid, err := crypto.SPOCKVerifyAgainstData(
-					ctx.identity.StakingPubKey,
-					spocks[i],
-					stateSnapshot.SpockSecret,
-					ctx.engine.spockHasher,
-				)
-
-				assert.NoError(ctx.t, err)
-				assert.True(ctx.t, valid)
-			}
 
 			assert.Equal(ctx.t, len(computationResult.ServiceEvents), len(receipt.ExecutionResult.ServiceEvents))
 
@@ -1159,7 +1147,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	// mock execution state conversion and signing of
 
-	me.EXPECT().SignFunc(gomock.Any(), gomock.Any(), gomock.Any())
 	me.EXPECT().NodeID()
 	me.EXPECT().Sign(gomock.Any(), gomock.Any())
 
@@ -1256,48 +1243,6 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		})
 	})
 
-}
-
-func Test_SPOCKGeneration(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-
-		snapshots := []*delta.SpockSnapshot{
-			{
-				SpockSecret: []byte{1, 2, 3},
-			},
-			{
-				SpockSecret: []byte{3, 2, 1},
-			},
-			{
-				SpockSecret: []byte{},
-			},
-			{
-				SpockSecret: unittest.RandomBytes(100),
-			},
-		}
-
-		executionReceipt, err := GenerateExecutionReceipt(
-			ctx.engine.me,
-			ctx.engine.receiptHasher,
-			ctx.engine.spockHasher,
-			&flow.ExecutionResult{},
-			snapshots,
-		)
-		require.NoError(t, err)
-
-		for i, snapshot := range snapshots {
-			valid, err := crypto.SPOCKVerifyAgainstData(
-				ctx.identity.StakingPubKey,
-				executionReceipt.Spocks[i],
-				snapshot.SpockSecret,
-				ctx.engine.spockHasher,
-			)
-
-			require.NoError(t, err)
-			require.True(t, valid)
-		}
-
-	})
 }
 
 func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
