@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -61,7 +60,6 @@ type Engine struct {
 	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
-	spockHasher            hash.Hasher
 	syncThreshold          int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
 	syncFilter             flow.IdentityFilter // specify the filter to sync state from
 	syncConduit            network.Conduit     // sending state syncing requests
@@ -110,7 +108,6 @@ func New(
 		request:                request,
 		state:                  state,
 		receiptHasher:          utils.NewExecutionReceiptHasher(),
-		spockHasher:            utils.NewSPOCKHasher(),
 		blocks:                 blocks,
 		collections:            collections,
 		events:                 events,
@@ -1201,9 +1198,8 @@ func (e *Engine) saveExecutionResults(
 	executionReceipt, err := GenerateExecutionReceipt(
 		e.me,
 		e.receiptHasher,
-		e.spockHasher,
 		executionResult,
-		result.StateSnapshots)
+		result.SpockSignatures)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
@@ -1273,23 +1269,15 @@ func (e *Engine) retryUpload() (err error) {
 func GenerateExecutionReceipt(
 	me module.Local,
 	receiptHasher hash.Hasher,
-	spockHasher hash.Hasher,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.SpockSnapshot) (*flow.ExecutionReceipt, error) {
-	spocks := make([]crypto.Signature, len(stateInteractions))
-
-	for i, stateInteraction := range stateInteractions {
-		spock, err := me.SignFunc(stateInteraction.SpockSecret, spockHasher, crypto.SPOCKProve)
-
-		if err != nil {
-			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
-		}
-		spocks[i] = spock
-	}
-
+	spockSignatures []crypto.Signature,
+) (
+	*flow.ExecutionReceipt,
+	error,
+) {
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult:   *result,
-		Spocks:            spocks,
+		Spocks:            spockSignatures,
 		ExecutorSignature: crypto.Signature{},
 		ExecutorID:        me.NodeID(),
 	}
