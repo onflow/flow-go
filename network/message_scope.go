@@ -36,6 +36,7 @@ type IncomingMessageScope struct {
 	msg            *message.Message // the message received.
 	decodedPayload interface{}      // decoded payload of the message.
 	protocol       ProtocolType     // the type of protocol used to receive the message.
+	targetIds      flow.IdentifierList
 }
 
 func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
@@ -43,12 +44,18 @@ func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *mess
 	if err != nil {
 		return nil, fmt.Errorf("could not compute event id: %w", err)
 	}
+
+	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert target ids: %w", err)
+	}
 	return &IncomingMessageScope{
 		eventId:        eventId,
 		originId:       originId,
 		msg:            msg,
 		decodedPayload: decodedPayload,
 		protocol:       protocol,
+		targetIds:      targetIds,
 	}, nil
 }
 
@@ -76,8 +83,8 @@ func (m IncomingMessageScope) Size() int {
 	return m.msg.Size()
 }
 
-func (m IncomingMessageScope) TargetIDs() [][]byte {
-	return m.msg.TargetIDs
+func (m IncomingMessageScope) TargetIDs() flow.IdentifierList {
+	return m.targetIds
 }
 
 func (m IncomingMessageScope) EventID() []byte {
@@ -148,7 +155,7 @@ func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
 		return nil, fmt.Errorf("could not encode payload: %w", err)
 	}
 
-	emTargets := make([][]byte, len(o.targetIds))
+	emTargets := make([][]byte, 0)
 	for _, targetId := range o.targetIds {
 		tempID := targetId // avoid capturing loop variable
 		emTargets = append(emTargets, tempID[:])
