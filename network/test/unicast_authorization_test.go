@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -361,65 +362,77 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
 }
 
-//
-//// TestUnicastAuthorization_WrongMsgCode tests that messages sent via unicast with a message code that does not match the underlying message type are correctly rejected.
-//func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() {
-//	// setup mock slashing violations consumer and middlewares
-//	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-//	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
-//
-//	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
-//	require.NoError(u.T(), err)
-//
-//	modifiedMessageCode := codec.CodeDKGMessage
-//
-//	var nilID *flow.Identity
-//	expectedViolation := &slashing.Violation{
-//		Identity: nilID,
-//		PeerID:   expectedSenderPeerID.String(),
-//		MsgType:  "",
-//		Channel:  channels.TestNetworkChannel,
-//		Protocol: message.ProtocolUnicast,
-//		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
-//		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
-//	}
-//
-//	slashingViolationsConsumer.On(
-//		"OnInvalidMsgError",
-//		expectedViolation,
-//	).Once().Run(func(args mockery.Arguments) {
-//		close(u.waitCh)
-//	})
-//
-//	overlay := mocknetwork.NewOverlay(u.T())
-//	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	})
-//	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	}, nil)
-//	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
-//
-//	// message will be rejected so assert overlay never receives it
-//	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
-//
-//	u.startMiddlewares(overlay)
-//
-//	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-//	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
-//
-//	msg, _, _ := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
-//
-//	// manipulate message code byte
-//	msg.Payload[0] = modifiedMessageCode
-//
-//	// send message via unicast
-//	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
-//	require.NoError(u.T(), err)
-//
-//	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
-//	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
-//}
+// TestUnicastAuthorization_WrongMsgCode tests that messages sent via unicast with a message code that does not match the underlying message type are correctly rejected.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
+	require.NoError(u.T(), err)
+
+	modifiedMessageCode := codec.CodeDKGMessage
+
+	var nilID *flow.Identity
+	expectedViolation := &slashing.Violation{
+		Identity: nilID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "",
+		Channel:  channels.TestNetworkChannel,
+		Protocol: message.ProtocolUnicast,
+		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
+		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
+	}
+
+	slashingViolationsConsumer.On(
+		"OnInvalidMsgError",
+		expectedViolation,
+	).Once().Run(func(args mockery.Arguments) {
+		close(u.waitCh)
+	})
+
+	overlay := mocknetwork.NewOverlay(u.T())
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
+
+	// message will be rejected so assert overlay never receives it
+	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+
+	u.startMiddlewares(overlay)
+
+	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{u.receiverID.NodeID},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: "hello",
+		},
+		// we use a custom encoder that encodes the message with an invalid message code.
+		func(msg interface{}) ([]byte, error) {
+			e, err := unittest.NetworkCodec().Encode(msg)
+			require.NoError(u.T(), err)
+			// manipulate message code byte
+			e[0] = modifiedMessageCode
+			return e, nil
+		},
+		network.ProtocolTypeUnicast)
+	require.NoError(u.T(), err)
+
+	// send message via unicast
+	err = u.senderMW.SendDirect(msg)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
 //
 //// TestUnicastAuthorization_PublicChannel tests that messages sent via unicast on a public channel are not rejected for any reason.
 //func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel() {
