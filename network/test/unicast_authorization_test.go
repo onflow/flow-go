@@ -488,64 +488,71 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
 }
 
-//// TestUnicastAuthorization_UnauthorizedUnicastOnChannel tests that messages sent via unicast that are not authorized for unicast are rejected.
-//func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
-//	// setup mock slashing violations consumer and middlewares
-//	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-//	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
-//
-//	// set sender id role to RoleConsensus to avoid unauthorized sender validation error
-//	u.senderID.Role = flow.RoleConsensus
-//
-//	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
-//	require.NoError(u.T(), err)
-//
-//	expectedViolation := &slashing.Violation{
-//		Identity: u.senderID,
-//		PeerID:   expectedSenderPeerID.String(),
-//		MsgType:  "BlockProposal",
-//		Channel:  channels.ConsensusCommittee,
-//		Protocol: message.ProtocolUnicast,
-//		Err:      message.ErrUnauthorizedUnicastOnChannel,
-//	}
-//
-//	slashingViolationsConsumer.On(
-//		"OnUnauthorizedUnicastOnChannel",
-//		expectedViolation,
-//	).Once().Run(func(args mockery.Arguments) {
-//		close(u.waitCh)
-//	})
-//
-//	overlay := mocknetwork.NewOverlay(u.T())
-//	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	})
-//	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	}, nil)
-//	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
-//
-//	// message will be rejected so assert overlay never receives it
-//	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
-//
-//	u.startMiddlewares(overlay)
-//
-//	channel := channels.ConsensusCommittee
-//	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
-//	require.NoError(u.T(), u.senderMW.Subscribe(channel))
-//
-//	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
-//	payload := unittest.ProposalFixture()
-//
-//	msg, _, _ := messageutils.CreateMessageWithPayload(u.T(), u.senderID.NodeID, u.receiverID.NodeID, channel, payload)
-//
-//	// send message via unicast
-//	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
-//	require.NoError(u.T(), err)
-//
-//	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
-//	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
-//}
+// TestUnicastAuthorization_UnauthorizedUnicastOnChannel tests that messages sent via unicast that are not authorized for unicast are rejected.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	// set sender id role to RoleConsensus to avoid unauthorized sender validation error
+	u.senderID.Role = flow.RoleConsensus
+
+	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
+	require.NoError(u.T(), err)
+
+	expectedViolation := &slashing.Violation{
+		Identity: u.senderID,
+		PeerID:   expectedSenderPeerID.String(),
+		MsgType:  "BlockProposal",
+		Channel:  channels.ConsensusCommittee,
+		Protocol: message.ProtocolUnicast,
+		Err:      message.ErrUnauthorizedUnicastOnChannel,
+	}
+
+	slashingViolationsConsumer.On(
+		"OnUnauthorizedUnicastOnChannel",
+		expectedViolation,
+	).Once().Run(func(args mockery.Arguments) {
+		close(u.waitCh)
+	})
+
+	overlay := mocknetwork.NewOverlay(u.T())
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
+
+	// message will be rejected so assert overlay never receives it
+	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+
+	u.startMiddlewares(overlay)
+
+	channel := channels.ConsensusCommittee
+	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channel))
+
+	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
+	payload := unittest.ProposalFixture()
+
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{u.receiverID.NodeID},
+		channel.String(),
+		payload,
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(u.T(), err)
+
+	// send message via unicast
+	err = u.senderMW.SendDirect(msg)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
 //
 //// TestUnicastAuthorization_ReceiverHasNoSubscription tests that messages sent via unicast are rejected on the receiver end if the receiver does not have a subscription
 //// to the channel of the message.
