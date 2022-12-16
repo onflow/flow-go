@@ -594,60 +594,99 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //	}
 //}
 
-//// TestEcho sends an echo message from first middleware to the last middleware
-//// the last middleware echos back the message. The test evaluates the correctness
-//// of the message reception as well as its content
-//func (m *MiddlewareTestSuite) TestEcho() {
-//
-//	wg := sync.WaitGroup{}
-//	// extracts sender id based on the mock option
-//	var err error
-//
-//	wg.Add(2)
-//	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
-//	first := 0
-//	last := m.size - 1
-//	firstNode := m.ids[first].NodeID
-//	lastNode := m.ids[last].NodeID
-//
-//	sendMsg, expectedSendMsg, sendPayload := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "TestEcho")
-//	expectedSendPayload := sendPayload.(*libp2pmessage.TestMessage)
-//
-//	replyMsg, expectedReplyMsg, replyPayload := messageutils.CreateMessage(m.T(), lastNode, firstNode, testChannel, "TestEcho response")
-//
-//	expectedReplyPayload := replyPayload.(*libp2pmessage.TestMessage)
-//
-//	// last node
-//	m.ov[last].On("Receive", firstNode, expectedSendMsg, sendPayload).Return(nil).Once().
-//		Run(func(args mockery.Arguments) {
-//			wg.Done()
-//			// echos back the same message back to the sender
-//			err := m.mws[last].SendDirect(replyMsg, firstNode)
-//			assert.NoError(m.T(), err)
-//
-//			payload := args.Get(2).(*libp2pmessage.TestMessage)
-//			require.Equal(m.T(), expectedSendPayload, payload)
-//		})
-//
-//	// first node
-//	m.ov[first].On("Receive", lastNode, expectedReplyMsg, replyPayload).Return(nil).Once().
-//		Run(func(args mockery.Arguments) {
-//			wg.Done()
-//			payload := args.Get(2).(*libp2pmessage.TestMessage)
-//			require.Equal(m.T(), expectedReplyPayload, payload)
-//		})
-//
-//	// sends a direct message from first node to the last node
-//	err = m.mws[first].SendDirect(sendMsg, m.ids[last].NodeID)
-//	require.NoError(m.Suite.T(), err)
-//
-//	unittest.RequireReturnsBefore(m.T(), wg.Wait, 100*time.Second, "could not receive unicast on time")
-//
-//	// evaluates the mock calls
-//	for i := 1; i < m.size; i++ {
-//		m.ov[i].AssertExpectations(m.T())
-//	}
-//}
+// TestEcho sends an echo message from first middleware to the last middleware
+// the last middleware echos back the message. The test evaluates the correctness
+// of the message reception as well as its content
+func (m *MiddlewareTestSuite) TestEcho() {
+	wg := sync.WaitGroup{}
+	// extracts sender id based on the mock option
+	var err error
+
+	wg.Add(2)
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	// message sent from first node to the last node.
+	expectedSendMsg := "TestEcho"
+	sendMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{lastNode},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: expectedSendMsg,
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
+
+	// reply from last node to the first node.
+	expectedReplyMsg := "TestEcho response"
+	replyMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{firstNode},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: expectedReplyMsg,
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
+
+	// last node
+	m.ov[last].On("Receive", mockery.Anything).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			wg.Done()
+
+			// sanity checks the message content.
+			msg, ok := args[0].(*network.IncomingMessageScope)
+			require.True(m.T(), ok)
+
+			require.Equal(m.T(), testChannel.String(), msg.Channel())                                     // channel
+			require.Equal(m.T(), m.ids[first].NodeID, msg.OriginId())                                     // sender id
+			require.Equal(m.T(), lastNode, msg.TargetIDs()[0])                                            // target id
+			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(m.T(), expectedSendMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
+			// event id
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			require.NoError(m.T(), err)
+			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
+
+			// echos back the same message back to the sender
+			err = m.mws[last].SendDirect(replyMsg)
+			assert.NoError(m.T(), err)
+		})
+
+	// first node
+	m.ov[first].On("Receive", mockery.Anything).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			wg.Done()
+			// sanity checks the message content.
+			msg, ok := args[0].(*network.IncomingMessageScope)
+			require.True(m.T(), ok)
+
+			require.Equal(m.T(), testChannel.String(), msg.Channel())                                      // channel
+			require.Equal(m.T(), m.ids[last].NodeID, msg.OriginId())                                       // sender id
+			require.Equal(m.T(), firstNode, msg.TargetIDs()[0])                                            // target id
+			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                              // protocol
+			require.Equal(m.T(), expectedReplyMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
+			// event id
+			eventId, err := network.EventId(channels.Channel(msg.Channel()), msg.Message().Payload)
+			require.NoError(m.T(), err)
+			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
+		})
+
+	// sends a direct message from first node to the last node
+	err = m.mws[first].SendDirect(sendMsg)
+	require.NoError(m.Suite.T(), err)
+
+	unittest.RequireReturnsBefore(m.T(), wg.Wait, 100*time.Second, "could not receive unicast on time")
+
+	// evaluates the mock calls
+	for i := 1; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+}
 
 // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
 // size beyond the permissible unicast message size returns an error.
