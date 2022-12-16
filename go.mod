@@ -87,14 +87,14 @@ require (
 	go.uber.org/multierr v1.8.0
 	golang.org/x/crypto v0.1.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.2.0
 	golang.org/x/text v0.4.0
-	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 	golang.org/x/tools v0.2.0
-	google.golang.org/api v0.81.0
-	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd
-	google.golang.org/grpc v1.46.2
+	google.golang.org/api v0.102.0
+	google.golang.org/genproto v0.0.0-20221024183307-1bc688fe9f3e
+	google.golang.org/grpc v1.50.1
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.28.1
 	gotest.tools v2.2.0+incompatible
@@ -106,8 +106,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pkg/profile v1.7.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11
-	golang.org/x/mod v0.6.0-dev.0.20220818022119-ed83ed61efb9
+	golang.org/x/mod v0.6.0
 )
 
 require (
@@ -282,9 +281,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.8.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
-	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b // indirect
+	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/term v0.1.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.8.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
