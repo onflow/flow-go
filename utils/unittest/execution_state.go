@@ -24,12 +24,12 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "58934da9e4e8d15dae050a07a840f57d569a0c51c8060e41db66b48bfe67d559"
+const GenesisStateCommitmentHex = "df704d89284a02d171a7fdfaad10597ddd10efe47c7e788ce8c5c811ef515062"
 
 var GenesisStateCommitment flow.StateCommitment
 
 var GenesisTokenSupply = func() cadence.UFix64 {
-	//value, err := cadence.NewUFix64("10000000000.0") // 10 billion
+	// value, err := cadence.NewUFix64("10000000000.0") // 10 billion
 	value, err := cadence.NewUFix64("1000000000.0") // 1 billion
 	if err != nil {
 		panic(fmt.Errorf("invalid genesis token supply: %w", err))

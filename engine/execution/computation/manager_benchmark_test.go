@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -51,7 +51,12 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	addresses, err := testutil.CreateAccounts(
+		vm,
+		ledger,
+		derived.NewEmptyDerivedBlockData(),
+		privateKeys,
+		chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -73,7 +78,7 @@ func mustFundAccounts(
 	execCtx fvm.Context,
 	accs *testAccounts,
 ) {
-	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	execCtx = fvm.NewContextFromParent(
 		execCtx,
 		fvm.WithDerivedBlockData(derivedBlockData))
@@ -126,6 +131,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
@@ -142,11 +149,19 @@ func BenchmarkComputeBlock(b *testing.B) {
 	)
 
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		tracer,
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(b, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(
-		programs.DefaultDerivedDataCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{

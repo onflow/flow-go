@@ -31,7 +31,7 @@ func main() {
 		}{
 			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
 			ConsensusCollector:  metrics.NewConsensusCollector(tracer, prometheus.DefaultRegisterer),
-			NetworkCollector:    metrics.NewNetworkCollector(),
+			NetworkCollector:    metrics.NewNetworkCollector(unittest.Logger()),
 			ComplianceCollector: metrics.NewComplianceCollector(),
 			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
 		}
