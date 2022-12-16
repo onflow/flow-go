@@ -433,44 +433,61 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
 }
 
-//
-//// TestUnicastAuthorization_PublicChannel tests that messages sent via unicast on a public channel are not rejected for any reason.
-//func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel() {
-//	// setup mock slashing violations consumer and middlewares
-//	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-//	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
-//
-//	msg, expectedMsg, payload := messageutils.CreateMessage(u.T(), u.senderID.NodeID, u.receiverID.NodeID, testChannel, "hello")
-//
-//	overlay := mocknetwork.NewOverlay(u.T())
-//	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	})
-//	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-//		return u.providers[0].Identities(filter.Any)
-//	}, nil)
-//	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
-//
-//	// we should receive the message on our overlay, at this point close the waitCh
-//	overlay.On("Receive", u.senderID.NodeID, expectedMsg, payload).Return(nil).
-//		Once().
-//		Run(func(args mockery.Arguments) {
-//			close(u.waitCh)
-//		})
-//
-//	u.startMiddlewares(overlay)
-//
-//	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-//	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
-//
-//	// send message via unicast
-//	err := u.senderMW.SendDirect(msg, u.receiverID.NodeID)
-//	require.NoError(u.T(), err)
-//
-//	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
-//	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
-//}
-//
+// TestUnicastAuthorization_PublicChannel tests that messages sent via unicast on a public channel are not rejected for any reason.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	expectedPayload := "hello"
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{u.receiverID.NodeID},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: expectedPayload,
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(u.T(), err)
+
+	overlay := mocknetwork.NewOverlay(u.T())
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
+
+	// we should receive the message on our overlay, at this point close the waitCh
+	overlay.On("Receive", mockery.Anything).Return(nil).
+		Once().
+		Run(func(args mockery.Arguments) {
+			close(u.waitCh)
+
+			msg, ok := args[0].(*network.IncomingMessageScope)
+			require.True(u.T(), ok)
+
+			require.Equal(u.T(), testChannel.String(), msg.Channel())                                     // channel
+			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
+			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
+			require.Equal(u.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(u.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
+		})
+
+	u.startMiddlewares(overlay)
+
+	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+
+	// send message via unicast
+	err = u.senderMW.SendDirect(msg)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
 //// TestUnicastAuthorization_UnauthorizedUnicastOnChannel tests that messages sent via unicast that are not authorized for unicast are rejected.
 //func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
 //	// setup mock slashing violations consumer and middlewares
