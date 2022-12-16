@@ -2,12 +2,22 @@ package computation
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -15,6 +25,8 @@ import (
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -35,15 +47,6 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 var chain = flow.Emulator.Chain()
@@ -688,7 +691,26 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter, prov)
+	// generates signing identity including staking key for signing
+	myIdentity := unittest.IdentityFixture()
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(t, err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+	myIdentity.StakingPubKey = sk.PublicKey()
+	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommiter,
+		me,
+		prov)
 	require.NoError(t, err)
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
@@ -702,6 +724,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		view,
 		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
+
+	spockHasher := utils.NewSPOCKHasher()
+	for i, snapshot := range computationResult.StateSnapshots {
+		valid, err := crypto.SPOCKVerifyAgainstData(
+			myIdentity.StakingPubKey,
+			computationResult.SpockSignatures[i],
+			snapshot.SpockSecret,
+			spockHasher)
+		require.NoError(t, err)
+		require.True(t, valid)
+	}
 
 	prevResultId := unittest.IdentifierFixture()
 
