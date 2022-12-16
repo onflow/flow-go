@@ -649,32 +649,36 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 //	}
 //}
 
-// // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
-// // size beyond the permissible unicast message size returns an error.
-//
-//	func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
-//		first := 0
-//		last := m.size - 1
-//		firstNode := m.ids[first].NodeID
-//		lastNode := m.ids[last].NodeID
-//
-//		// creates a network payload beyond the maximum message size
-//		// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
-//		// so the generated payload is 1000 bytes below the maximum unicast message size.
-//		// We hence add up 1000 bytes to the input of network payload fixture to make
-//		// sure that payload is beyond the permissible size.
-//		payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
-//		event := &libp2pmessage.TestMessage{
-//			Text: string(payload),
-//		}
-//
-//		msg, _, _ := messageutils.CreateMessageWithPayload(m.T(), firstNode, lastNode, testChannel, event)
-//
-//		// sends a direct message from first node to the last node
-//		err := m.mws[first].SendDirect(msg, lastNode)
-//		require.Error(m.Suite.T(), err)
-//	}
-//
+// TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
+// size beyond the permissible unicast message size returns an error.
+func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
+	first := 0
+	last := m.size - 1
+	lastNode := m.ids[last].NodeID
+
+	// creates a network payload beyond the maximum message size
+	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+	// so the generated payload is 1000 bytes below the maximum unicast message size.
+	// We hence add up 1000 bytes to the input of network payload fixture to make
+	// sure that payload is beyond the permissible size.
+	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
+	event := &libp2pmessage.TestMessage{
+		Text: string(payload),
+	}
+
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{lastNode},
+		testChannel.String(),
+		event,
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
+
+	// sends a direct message from first node to the last node
+	err = m.mws[first].SendDirect(msg)
+	require.Error(m.Suite.T(), err)
+}
+
 // TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
 // successfully even though it's size is greater than the default message size.
 func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
