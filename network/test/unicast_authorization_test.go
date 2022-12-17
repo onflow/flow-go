@@ -159,7 +159,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -220,7 +220,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -280,7 +280,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel.String(),
+		channel,
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -343,7 +343,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -414,7 +414,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -446,7 +446,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	expectedPayload := "hello"
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: expectedPayload,
 		},
@@ -543,7 +543,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel.String(),
+		channel,
 		payload,
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypeUnicast)
@@ -600,7 +600,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel.String(),
+		channel,
 		&libp2pmessage.TestMessage{
 			Text: "TestUnicastAuthorization_ReceiverHasNoSubscription",
 		},
@@ -626,7 +626,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel.String(),
+		channel,
 		&messages.EntityRequest{},
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypeUnicast)

@@ -375,7 +375,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{targetID},
-		channel.String(),
+		channel,
 		payload,
 		n.codec.Encode,
 		network.ProtocolTypeUnicast)
@@ -449,7 +449,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	msg, err := network.NewOutgoingScope(targetIDs, channel.String(), message, n.codec.Encode, network.ProtocolTypePubSub)
+	msg, err := network.NewOutgoingScope(targetIDs, channel, message, n.codec.Encode, network.ProtocolTypePubSub)
 	if err != nil {
 		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}

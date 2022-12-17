@@ -97,7 +97,7 @@ func (m IncomingMessageScope) PayloadType() string {
 
 type OutgoingMessageScope struct {
 	targetIds flow.IdentifierList               // the target node IDs.
-	channelId string                            // the channel ID.
+	channelId channels.Channel                  // the channel ID.
 	payload   interface{}                       // the payload to be sent.
 	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
 	msg       *message.Message                  // proto message sent on wire.
@@ -106,7 +106,7 @@ type OutgoingMessageScope struct {
 
 func NewOutgoingScope(
 	targetIds flow.IdentifierList,
-	channelId string,
+	channelId channels.Channel,
 	payload interface{},
 	encoder func(interface{}) ([]byte, error),
 	protocolType ProtocolType) (*OutgoingMessageScope, error) {
@@ -145,7 +145,7 @@ func (o OutgoingMessageScope) PayloadType() string {
 	return MessageType(o.payload)
 }
 
-func (o OutgoingMessageScope) Channel() string {
+func (o OutgoingMessageScope) Channel() channels.Channel {
 	return o.channelId
 }
 
@@ -163,7 +163,7 @@ func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
 
 	return &message.Message{
 		TargetIDs: emTargets,
-		ChannelID: o.channelId,
+		ChannelID: o.channelId.String(),
 		Payload:   payload,
 	}, nil
 }

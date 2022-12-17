@@ -376,8 +376,8 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 	maxTimeout := m.unicastMaxMsgDuration(msg.PayloadType())
 
-	m.metrics.DirectMessageStarted(msg.Channel())
-	defer m.metrics.DirectMessageFinished(msg.Channel())
+	m.metrics.DirectMessageStarted(msg.Channel().String())
+	defer m.metrics.DirectMessageFinished(msg.Channel().String())
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
@@ -767,7 +767,7 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 	m.log.Debug().
-		Str("channel", msg.Channel()).
+		Str("channel", msg.Channel().String()).
 		Interface("msg", msg.Proto()).
 		Str("type", msg.PayloadType()).
 		Int("msg_size", msg.Size()).

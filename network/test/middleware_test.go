@@ -191,7 +191,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	outMsg, err := network.NewOutgoingScope(
 		flow.IdentifierList{newId.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: "TestUpdateNodeAddresses",
 		},
@@ -313,7 +313,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 		msg, err := network.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
-			testChannel.String(),
+			testChannel,
 			&libp2pmessage.TestMessage{
 				Text: fmt.Sprintf("hello-%s", testtime.Now().String()),
 			},
@@ -417,7 +417,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{newId.NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: string(b),
 		},
@@ -497,7 +497,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 	expectedPayload := "TestPingContentReception"
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: expectedPayload,
 		},
@@ -555,7 +555,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 		expectedPayloadText := fmt.Sprintf("hello from: %d", i)
 		msg, err := network.NewOutgoingScope(
 			flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
-			testChannel.String(),
+			testChannel,
 			&libp2pmessage.TestMessage{
 				Text: expectedPayloadText,
 			},
@@ -623,7 +623,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	expectedSendMsg := "TestEcho"
 	sendMsg, err := network.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: expectedSendMsg,
 		},
@@ -635,7 +635,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	expectedReplyMsg := "TestEcho response"
 	replyMsg, err := network.NewOutgoingScope(
 		flow.IdentifierList{firstNode},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: expectedReplyMsg,
 		},
@@ -717,7 +717,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
-		testChannel.String(),
+		testChannel,
 		event,
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypeUnicast)
@@ -745,7 +745,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{targetNode},
-		channels.ProvideChunks.String(),
+		channels.ProvideChunks,
 		event,
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypeUnicast)
@@ -798,7 +798,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	}
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
-		testChannel.String(),
+		testChannel,
 		event,
 		unittest.NetworkCodec().Encode,
 		network.ProtocolTypePubSub)
@@ -833,7 +833,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	message1, err := network.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: string("hello1"),
 		},
@@ -861,7 +861,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	// create and send a new message on the channel from the origin node
 	message2, err := network.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
-		testChannel.String(),
+		testChannel,
 		&libp2pmessage.TestMessage{
 			Text: string("hello2"),
 		},
