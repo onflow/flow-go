@@ -153,7 +153,10 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
-//   - model.InvalidAggregatedSignatureError if the aggregated signature is invalid. It's not clear whether included
+//   - model.InvalidAggregatedSignatureError if aggregation produced the identity signature (invalid).
+//     This can happen in two distinct scenarios, which the implementation does not differentiate:
+//     1. one or many signatures added via TrustedAdd are invalid to their respective public keys.
+//     2. OR the signatures are valid but the public keys were forged to sum up to an identity public key.
 //     signatures via TrustedAdd are invalid. This case can happen even when all added signatures
 //     are individually valid.
 //   - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
