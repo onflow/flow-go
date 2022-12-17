@@ -252,7 +252,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[1]) // stand-alone verification
 		require.NoError(t, err)
 
-		// Aggregation should validate its own aggregation result and error with sentinel ErrIdentitySignature
+		// Aggregation should validate its own aggregation result and error with sentinel model.InvalidAggregatedSignatureError
 		signers, agg, err := aggregator.Aggregate()
 		assert.Error(t, err)
 		assert.True(t, model.IsInvalidAggregatedSignatureError(err))
