@@ -10,8 +10,6 @@ import (
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
-	message "github.com/onflow/flow-go/network/message"
-
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -100,13 +98,13 @@ func (_m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.
 	return r0
 }
 
-// Publish provides a mock function with given fields: msg, channel
-func (_m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
-	ret := _m.Called(msg, channel)
+// Publish provides a mock function with given fields: msg
+func (_m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
+	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, channels.Channel) error); ok {
-		r0 = rf(msg, channel)
+	if rf, ok := ret.Get(0).(func(*network.OutgoingMessageScope) error); ok {
+		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
 	}
