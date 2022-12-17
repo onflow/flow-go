@@ -221,7 +221,6 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 // keys corresponding to the input signers.
 // Aggregating the keys of the signers internally is optimized to only look at the keys delta
 // compared to the latest execution of the function. The function is therefore not thread-safe.
-// Per convention, this function rejects the identity signature as invalid.
 // Possible returns:
 //   - (true, nil): aggregate signature is valid
 //   - (false, nil): aggregate signature is cryptographically invalid (including identity signature)
