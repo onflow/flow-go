@@ -166,8 +166,8 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
-//   - ErrIdentitySignature if aggregation produced the identity signature, which is invalid
-//     by convention. This error can arise in two scenarios:
+//   - ErrIdentitySignature if aggregation produced the identity signature.
+//     This error can arise in two scenarios:
 //     1. Some signatures added via TrustedAdd were forged specifically with the goal to yield the
 //     identity signature. Here, these signatures would be invalid w.r.t to their respective public keys.
 //     2. The signatures are valid but the public keys were forged to sum up to an identity public key.
