@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
@@ -786,13 +785,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	first := 0
 	last := m.size - 1
-	firstNode := m.ids[first].NodeID
 	lastNode := m.ids[last].NodeID
-
-	msg, _, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "")
-
-	// adds another node as the target id to imitate publishing
-	msg.TargetIDs = append(msg.TargetIDs, lastNode[:])
 
 	// creates a network payload beyond the maximum message size
 	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
@@ -803,15 +796,16 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
-
-	codec := unittest.NetworkCodec()
-	encodedEvent, err := codec.Encode(event)
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{lastNode},
+		testChannel.String(),
+		event,
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypePubSub)
 	require.NoError(m.T(), err)
 
-	msg.Payload = encodedEvent
-
 	// sends a direct message from first node to the last node
-	err = m.mws[first].Publish(msg, testChannel)
+	err = m.mws[first].Publish(msg)
 	require.Error(m.Suite.T(), err)
 }
 
@@ -836,7 +830,16 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	msgRcvdFun := func() {
 		<-msgRcvd
 	}
-	message1, _, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello1")
+
+	message1, err := network.NewOutgoingScope(
+		flow.IdentifierList{lastNode},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: string("hello1"),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
 
 	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
 		msg, ok := args[0].(*network.IncomingMessageScope)
@@ -846,7 +849,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	})
 
 	// first test that when both nodes are subscribed to the channel, the target node receives the message
-	err := m.mws[first].Publish(message1, testChannel)
+	err = m.mws[first].Publish(message1)
 	assert.NoError(m.T(), err)
 
 	unittest.RequireReturnsBefore(m.T(), msgRcvdFun, 2*time.Second, "message not received")
@@ -856,9 +859,17 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// create and send a new message on the channel from the origin node
-	message2, _, _ := messageutils.CreateMessage(m.T(), firstNode, lastNode, testChannel, "hello2")
+	message2, err := network.NewOutgoingScope(
+		flow.IdentifierList{lastNode},
+		testChannel.String(),
+		&libp2pmessage.TestMessage{
+			Text: string("hello2"),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(m.T(), err)
 
-	err = m.mws[first].Publish(message2, testChannel)
+	err = m.mws[first].Publish(message2)
 	assert.NoError(m.T(), err)
 
 	// assert that the new message is not received by the target node
