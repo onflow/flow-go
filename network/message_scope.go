@@ -75,8 +75,8 @@ func (m IncomingMessageScope) Protocol() ProtocolType {
 	return m.protocol
 }
 
-func (m IncomingMessageScope) Channel() string {
-	return m.msg.ChannelID
+func (m IncomingMessageScope) Channel() channels.Channel {
+	return channels.Channel(m.msg.ChannelID)
 }
 
 func (m IncomingMessageScope) Size() int {

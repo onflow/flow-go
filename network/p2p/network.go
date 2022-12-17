@@ -323,7 +323,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 }
 
 func (n *Network) Receive(scope *network.IncomingMessageScope) error {
-	n.metrics.NetworkMessageReceived(scope.Size(), scope.Channel(), scope.Protocol().String())
+	n.metrics.NetworkMessageReceived(scope.Size(), scope.Channel().String(), scope.Protocol().String())
 
 	err := n.processNetworkMessage(scope)
 	if err != nil {
@@ -339,10 +339,10 @@ func (n *Network) processNetworkMessage(scope *network.IncomingMessageScope) err
 		n.logger.Debug().
 			Hex("sender_id", logging.ID(scope.OriginId())).
 			Hex("event_id", scope.EventID()).
-			Str("channel", scope.Channel()).
+			Str("channel", scope.Channel().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(scope.Channel(), scope.Protocol().String())
+		n.metrics.NetworkDuplicateMessagesDropped(scope.Channel().String(), scope.Protocol().String())
 
 		return nil
 	}
@@ -351,7 +351,7 @@ func (n *Network) processNetworkMessage(scope *network.IncomingMessageScope) err
 	qm := queue.QMessage{
 		Payload:  scope.DecodedPayload(),
 		Size:     scope.Size(),
-		Target:   channels.Channel(scope.Channel()),
+		Target:   scope.Channel(),
 		SenderID: scope.OriginId(),
 	}
 

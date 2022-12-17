@@ -732,7 +732,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 
 	logger := m.log.With().
-		Str("channel", scope.Channel()).
+		Str("channel", scope.Channel().String()).
 		Str("type", scope.Protocol().String()).
 		Int("msg_size", scope.Size()).
 		Hex("origin_id", logging.ID(scope.OriginId())).
