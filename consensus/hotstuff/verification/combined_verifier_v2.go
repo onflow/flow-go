@@ -117,8 +117,6 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
-	msg := MakeVoteMessage(block.View, block.BlockID)
-
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
@@ -131,6 +129,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	}
 
 	// verify the beacon signature first since it is faster to verify (no public key aggregation needed)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beaconHasher)
 	if err != nil {
 		return fmt.Errorf("internal error while verifying beacon signature: %w", err)
