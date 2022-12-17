@@ -31,6 +31,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.8.0
+	go.einride.tech/pid v0.1.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	google.golang.org/grpc v1.50.1
