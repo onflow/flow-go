@@ -765,13 +765,16 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
-	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
+func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
+	m.log.Debug().
+		Str("channel", msg.Channel()).
+		Interface("msg", msg.Proto()).
+		Str("type", msg.PayloadType()).
+		Int("msg_size", msg.Size()).
+		Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
-	data, err := msg.Marshal()
-	//binstat.LeaveVal(bs, int64(len(data)))
+	data, err := msg.Proto().Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
@@ -783,7 +786,7 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(channels.Channel(msg.Channel()), m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

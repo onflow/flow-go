@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -35,7 +34,7 @@ type Middleware interface {
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
 	// All errors returned from this function can be considered benign.
-	Publish(msg *message.Message, channel channels.Channel) error
+	Publish(msg *OutgoingMessageScope) error
 
 	// Subscribe subscribes the middleware to a channel.
 	// No errors are expected during normal operation.

@@ -456,7 +456,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg.Proto(), channel)
+	err = n.mw.Publish(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
