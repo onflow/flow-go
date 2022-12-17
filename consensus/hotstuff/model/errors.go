@@ -259,13 +259,6 @@ func IsInvalidAggregatedSignatureError(err error) bool {
 	return errors.As(err, &e)
 }
 
-//var InvalidAggregatedSignatureError = errors.New("aggregated signature is invalid (identity signature)")
-//
-//// IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
-//func IsInvalidAggregatedSignatureError(err error) bool {
-//	return errors.Is(err, InvalidAggregatedSignatureError)
-//}
-
 // InsufficientSignaturesError indicates that not enough signatures have been stored to complete the operation.
 type InsufficientSignaturesError struct {
 	err error
