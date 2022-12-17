@@ -9,7 +9,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -66,6 +68,8 @@ type blockComputer struct {
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
 	executionDataProvider *provider.Provider
+	signer                module.Local
+	spockHasher           hash.Hasher
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -90,6 +94,7 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 	committer ViewCommitter,
+	signer module.Local,
 	executionDataProvider *provider.Provider,
 ) (BlockComputer, error) {
 	systemChunkCtx := SystemChunkContext(vmCtx, logger)
@@ -106,6 +111,8 @@ func NewBlockComputer(
 		systemChunkCtx:        systemChunkCtx,
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
+		signer:                signer,
+		spockHasher:           utils.NewSPOCKHasher(),
 	}, nil
 }
 
@@ -208,6 +215,8 @@ func (e *blockComputer) executeBlock(
 		blockSpan,
 		e.metrics,
 		e.committer,
+		e.signer,
+		e.spockHasher,
 		block,
 		len(collections))
 	defer collector.Stop()
