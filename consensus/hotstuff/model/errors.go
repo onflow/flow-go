@@ -234,10 +234,6 @@ func IsInvalidSignatureIncludedError(err error) bool {
 }
 
 // InvalidAggregatedSignatureError indicates that the aggregated signature is invalid.
-// (because it is equal to an identity signature).
-// This can happen because:
-//   - one or many signatures added via TrustedAdd are invalid to their respective public keys.
-//   - OR the signatures are valid but the public keys were forged to sum up to an identity public key.
 type InvalidAggregatedSignatureError struct {
 	error
 }
