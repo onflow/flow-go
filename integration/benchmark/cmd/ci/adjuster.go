@@ -113,49 +113,35 @@ func (a *adjuster) adjustTPSForever() (err error) {
 func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjusterState, error) {
 	currentStats := a.workerStatsTracker.GetStats()
 
-	// number of timed out transactions in the last interval
-	txsTimedout := currentStats.TxsTimedout - int(lastState.timedout)
-
-	inflight := currentStats.TxsSent - currentStats.TxsExecuted
-	inflightPerWorker := inflight / int(lastState.targetTPS)
-
-	skip, currentTPS, unboundedTPS := computeTPS(
-		lastState.executed,
-		uint(currentStats.TxsExecuted),
-		lastState.timestamp,
-		nowTs,
-		lastState.tps,
-		lastState.targetTPS,
-		inflight,
+	computed := computeTPS(
+		nowTs.Sub(lastState.timestamp),
+		lastState,
+		currentStats,
 		a.params.MaxInflight,
-		txsTimedout > 0,
 	)
-
-	if skip {
+	if computed.skip {
 		a.log.Info().
 			Float64("lastTPS", lastState.tps).
-			Float64("currentTPS", currentTPS).
-			Int("inflight", inflight).
-			Int("inflightPerWorker", inflightPerWorker).
+			Float64("currentTPS", computed.currentTPS).
+			Int("inflight", computed.inflight).
 			Msg("skipped adjusting TPS")
 
 		lastState.executed = uint(currentStats.TxsExecuted)
-		lastState.tps = currentTPS
+		lastState.tps = computed.currentTPS
 		lastState.timestamp = nowTs
 
 		return lastState, nil
 	}
 
-	boundedTPS := boundTPS(unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
+	boundedTPS := boundTPS(computed.unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
 	a.log.Info().
 		Uint("lastTargetTPS", lastState.targetTPS).
 		Float64("lastTPS", lastState.tps).
-		Float64("currentTPS", currentTPS).
-		Uint("unboundedTPS", unboundedTPS).
+		Float64("currentTPS", computed.currentTPS).
+		Uint("unboundedTPS", computed.unboundedTPS).
 		Uint("targetTPS", boundedTPS).
-		Int("inflight", inflight).
-		Int("inflightPerWorker", inflightPerWorker).
-		Int("txsTimedout", txsTimedout).
+		Int("inflight", computed.inflight).
+		Int("txsTimedout", currentStats.TxsTimedout).
 		Msg("adjusting TPS")
 
 	err := a.lg.SetTPS(boundedTPS)
@@ -165,7 +151,7 @@ func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjuste
 
 	return adjusterState{
 		timestamp: nowTs,
-		tps:       currentTPS,
+		tps:       computed.currentTPS,
 		targetTPS: boundedTPS,
 
 		timedout: uint(currentStats.TxsTimedout),
@@ -173,48 +159,50 @@ func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjuste
 	}, nil
 }
 
+type computeTPSResult struct {
+	skip         bool
+	currentTPS   float64
+	unboundedTPS uint
+	inflight     int
+}
+
 func computeTPS(
-	lastTxs uint,
-	currentTxs uint,
-	lastTs time.Time,
-	nowTs time.Time,
-	lastTPS float64,
-	targetTPS uint,
-	inflight int,
+	timeDiff time.Duration,
+	lastState adjusterState,
+	currentStats benchmark.WorkerStats,
 	maxInflight uint,
-	timedout bool,
-) (bool, float64, uint) {
-	timeDiff := nowTs.Sub(lastTs).Seconds()
+) computeTPSResult {
 	if timeDiff == 0 {
-		return true, 0, 0
+		return computeTPSResult{true, 0, 0, 0}
 	}
 
-	currentTPS := float64(currentTxs-lastTxs) / timeDiff
+	currentTPS := float64(currentStats.TxsExecuted-int(lastState.executed)) / timeDiff.Seconds()
 	unboundedTPS := uint(math.Ceil(currentTPS))
 
+	inflight := currentStats.TxsSent - currentStats.TxsExecuted
 	// If there are timed out transactions we throttle regardless of anything else.
 	// We'll continue to throttle until the timed out transactions are gone.
-	if timedout {
-		return false, currentTPS, uint(float64(targetTPS) * multiplicativeDecrease)
+	if currentStats.TxsTimedout > int(lastState.timedout) {
+		return computeTPSResult{false, currentTPS, uint(float64(lastState.targetTPS) * multiplicativeDecrease), inflight}
 	}
 
 	// To avoid setting target TPS below current TPS,
 	// we decrease the former one by the multiplicativeDecrease factor.
 	//
 	// This shortcut is only applicable when current inflight is less than maxInflight.
-	if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
-		(unboundedTPS >= targetTPS) {
+	if ((float64(unboundedTPS) >= float64(lastState.targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
+		(unboundedTPS >= lastState.targetTPS) {
 
-		unboundedTPS = targetTPS + additiveIncrease
+		unboundedTPS = lastState.targetTPS + additiveIncrease
 	} else {
 		// Do not reduce the target if TPS increased since the last round.
-		if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
-			return true, currentTPS, 0
+		if (currentTPS > float64(lastState.targetTPS)) && (inflight < int(maxInflight)) {
+			return computeTPSResult{true, currentTPS, lastState.targetTPS, inflight}
 		}
 
-		unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
+		unboundedTPS = uint(float64(lastState.targetTPS) * multiplicativeDecrease)
 	}
-	return false, currentTPS, unboundedTPS
+	return computeTPSResult{false, currentTPS, unboundedTPS, inflight}
 }
 
 func boundTPS(tps, min, max uint) uint {
