@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ipfs/go-cid"
-	"github.com/onflow/go-bitswap"
 	"os"
 	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
 	"time"
+
+	"github.com/ipfs/go-cid"
+	"github.com/onflow/go-bitswap"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

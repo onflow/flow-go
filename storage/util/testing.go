@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	storage "github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/require"
+
+	storage "github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/module/metrics"
 	bstorage "github.com/onflow/flow-go/storage/badger"

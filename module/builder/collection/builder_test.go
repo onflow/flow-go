@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	storage "github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	storage "github.com/onflow/flow-go/storage"
 
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"

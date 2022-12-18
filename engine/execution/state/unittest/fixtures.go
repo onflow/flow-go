@@ -54,6 +54,6 @@ func ComputationResultForBlockFixture(
 		Events:                 events,
 		EventsHashes:           eventHashes,
 		SpockSignatures:        spockHashes,
-		ServiceEvents:    serviceEvents,
+		ServiceEvents:          serviceEvents,
 	}
 }
