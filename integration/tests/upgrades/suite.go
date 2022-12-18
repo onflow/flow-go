@@ -28,7 +28,6 @@ type Suite struct {
 	nodeIDs     []flow.Identifier
 	ghostID     flow.Identifier
 	exe1ID      flow.Identifier
-	verID       flow.Identifier
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
