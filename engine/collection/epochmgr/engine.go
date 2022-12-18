@@ -254,12 +254,13 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 // to the engine-level signaller context, which should cause the node to crash.
 // In the future, we could restart the failed epoch's components instead.
 // Must be run as a goroutine.
-func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-chan error) {
+func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-chan error, log zerolog.Logger) {
 	select {
 	case <-ctx.Done():
 		return
 	case err := <-errCh:
 		if err != nil {
+			log.Err(err).Msg("received irrecoverable error in epochmgr")
 			ctx.Throw(err)
 		}
 	}
@@ -365,14 +366,17 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 // No errors are expected during normal operation.
 func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
+	log := e.log.With().Uint64("epoch", counter).Logger()
 
 	// start component using its own context
+	log.Info().Msg("starting epoch components...")
 	components.Start(epochCtx)
-	go e.handleEpochErrors(engineCtx, errCh)
+	go e.handleEpochErrors(engineCtx, errCh, log)
 
 	select {
 	case <-components.Ready():
 		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
+		log.Info().Msg("epoch components startup completed")
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -385,11 +389,13 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 // this is a no-op and a warning is logged.
 // No errors are expected during normal operation.
 func (e *Engine) stopEpochComponents(counter uint64) error {
+	log := e.log.With().Uint64("epoch", counter).Logger()
 	components, exists := e.getEpochComponents(counter)
 	if !exists {
 		e.log.Warn().Msgf("attempted to stop non-existent epoch %d", counter)
 		return nil
 	}
+	log.Info().Msg("stopping epoch components...")
 
 	// stop individual component
 	components.cancel()
@@ -398,6 +404,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-components.Done():
 		e.removeEpoch(counter)
 		e.pools.ForEpoch(counter).Clear()
+		log.Info().Msg("epoch component shutdown completed")
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)

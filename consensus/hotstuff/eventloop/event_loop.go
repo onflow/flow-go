@@ -77,6 +77,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 		el.log.Info().Msgf("event loop will start at: %v", startTime)
 		select {
 		case <-ctx.Done():
+			log.Info().Msg("stopping event loop")
 			return
 		case <-time.After(time.Until(startTime)):
 			el.log.Info().Msgf("starting event loop")
