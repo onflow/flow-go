@@ -295,5 +295,3 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-require github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.12-0.20221110181155-60457b3ef6d5
