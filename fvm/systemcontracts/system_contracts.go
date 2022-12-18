@@ -195,7 +195,7 @@ func init() {
 		ContractNameEpoch:     stakingContractAddressTestnet,
 		ContractNameClusterQC: stakingContractAddressTestnet,
 		ContractNameDKG:       stakingContractAddressTestnet,
-		ContractNameVersion:   stakingContractAddressTestnet,
+		ContractNameVersion:   versionContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
