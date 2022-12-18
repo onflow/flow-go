@@ -774,7 +774,7 @@ func ServiceEventsFixture(n int) flow.ServiceEventList {
 		case 1:
 			sel[n-1] = EpochSetupFixture().ServiceEvent()
 		case 2:
-			sel[n-1] = VersionTableFixture(3).ServiceEvent()
+			sel[n-1] = VersionBeaconFixture(3).ServiceEvent()
 		}
 	}
 
@@ -1876,15 +1876,15 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	return commit
 }
 
-func VersionTableFixture(size uint, opts ...func(flow.VersionTable)) *flow.VersionTable {
+func VersionBeaconFixture(size uint, opts ...func(beacon flow.VersionBeacon)) *flow.VersionBeacon {
 
 	if size == 0 {
-		return &flow.VersionTable{
+		return &flow.VersionBeacon{
 			Sequence: uint64(0),
 		}
 	}
 
-	versionTable := flow.VersionTable{
+	versionTable := flow.VersionBeacon{
 		RequiredVersions: []flow.VersionControlRequirement{{Height: 23, Version: "0.21.37"}},
 		Sequence:         uint64(5),
 	}

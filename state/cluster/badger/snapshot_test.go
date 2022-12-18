@@ -55,20 +55,20 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis)
 	suite.Assert().Nil(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root := unittest.RootSnapshotFixture(participants)
 
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, root)
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, root)
 	require.NoError(suite.T(), err)
 
 	suite.Require().Nil(err)

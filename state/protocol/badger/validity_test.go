@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -57,7 +59,12 @@ func TestEpochSetupValidity(t *testing.T) {
 }
 
 func TestBootstrapInvalidEpochCommit(t *testing.T) {
+
+	t.Parallel()
+
 	t.Run("inconsistent counter", func(t *testing.T) {
+		t.Parallel()
+
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
@@ -69,6 +76,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("inconsistent cluster QCs", func(t *testing.T) {
+		t.Parallel()
+
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
@@ -81,6 +90,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("missing dkg group key", func(t *testing.T) {
+		t.Parallel()
+
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
@@ -91,6 +102,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("inconsistent DKG participants", func(t *testing.T) {
+		t.Parallel()
+
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
@@ -98,6 +111,47 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 
 		err := isValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+}
+
+func TestValidateVersionBeacon(t *testing.T) {
+
+	t.Parallel()
+
+	t.Run("no version beacon is ok", func(t *testing.T) {
+		t.Parallel()
+
+		snap := new(mock.Snapshot)
+
+		vb := &flow.VersionBeacon{}
+
+		vbHeight := uint64(0)
+
+		snap.On("VersionBeacon").Return(vb, vbHeight, state.NewNoVersionBeaconError())
+
+		err := validateVersionBeacon(snap)
+		require.NoError(t, err)
+	})
+
+	t.Run("height must be below highest block", func(t *testing.T) {
+		t.Parallel()
+
+		snap := new(mock.Snapshot)
+		block := unittest.BlockFixture()
+		block.Header.Height = 12
+		ss := &flow.SealingSegment{
+			Blocks: []*flow.Block{&block},
+		}
+
+		vb := &flow.VersionBeacon{}
+
+		vbHeight := uint64(37)
+
+		snap.On("SealingSegment").Return(ss, nil)
+		snap.On("VersionBeacon").Return(vb, vbHeight, nil)
+
+		err := validateVersionBeacon(snap)
 		require.Error(t, err)
 	})
 }

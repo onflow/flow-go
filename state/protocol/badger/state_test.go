@@ -10,8 +10,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-
+	"github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -67,12 +66,17 @@ func TestBootstrapAndOpen(t *testing.T) {
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons)
 		require.NoError(t, err)
 
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		versionBeacon, _, err := state.Final().VersionBeacon()
+
+		require.NoError(t, err)
+		require.NotNil(t, versionBeacon)
 	})
 }
 
@@ -136,7 +140,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons)
 		require.NoError(t, err)
 
 		// assert update final view was called
@@ -181,7 +185,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		spew.Dump(sealingSegment)
 
-		bootstrap(t, after, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -201,7 +205,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -221,7 +225,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -248,13 +252,15 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 
-			lastResults, err := results.HighestByServiceEventType(flow.ServiceEventCommit, math.MaxUint64)
+			lastVersionBeacon, beaconHeight, err := versionBeacons.Highest(math.MaxUint64)
+
 			require.NoError(t, err)
-			require.NotNil(t, lastResults)
+			require.NotNil(t, lastVersionBeacon)
+			require.Equal(t, rootBlock.Height, beaconHeight)
 		})
 	})
 }
@@ -266,7 +272,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeIDIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -275,7 +281,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
 		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -291,7 +297,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 			t.Run(fmt.Sprintf("no %s nodes", role), func(t *testing.T) {
 				participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
 				root := unittest.RootSnapshotFixture(participants)
-				bootstrap(t, root, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+				bootstrap(t, root, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 					assert.Error(t, err)
 				})
 			})
@@ -304,7 +310,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeAddressIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -317,7 +323,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		encodable := root.Encodable()
 		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
 		root = inmem.SnapshotFromEncodable(encodable)
-		bootstrap(t, root, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -332,7 +338,7 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -345,7 +351,7 @@ func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
 	encodable.SealingSegment.FirstSeal = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -358,7 +364,7 @@ func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
 	encodable.SealingSegment.ExecutionResults = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -370,7 +376,7 @@ func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
 	encodable.QuorumCertificate.BlockID = unittest.IdentifierFixture()
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -382,7 +388,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -393,7 +399,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -404,7 +410,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -412,15 +418,15 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 
 // bootstraps protocol state with the given snapshot and invokes the callback
 // with the result of the constructor
-func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.State, *bstorage.ExecutionResults, error)) {
+func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.State, storage.VersionBeacons, error)) {
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
-	f(state, results, err)
+	all := storutil.StorageLayer(t, db)
+	state, err := bprotocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
+	f(state, all.VersionBeacons, err)
 }
 
 // snapshotAfter bootstraps the protocol state from the root snapshot, applies
@@ -451,7 +457,7 @@ func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
 // assertSealingSegmentBlocksQueryable bootstraps the state with the given
 // snapshot, then verifies that all sealing segment blocks are queryable.
 func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
-	bootstrap(t, snapshot, func(state *bprotocol.State, results *bstorage.ExecutionResults, err error) {
+	bootstrap(t, snapshot, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 		require.NoError(t, err)
 
 		segment, err := state.Final().SealingSegment()

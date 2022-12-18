@@ -155,21 +155,6 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	return r.byBlockID(blockID)(tx)
 }
 
-// HighestByServiceEventType returns ExecutionResult for a highest block possible, but no higher than maxHeight, for given type.
-// Returns storage.ErrNotFound if no service event of the given type is indexed at or below maxHeight.
-func (r *ExecutionResults) HighestByServiceEventType(serviceEventType string, maxHeight uint64) (*flow.ExecutionResult, error) {
-	tx := r.db.NewTransaction(false)
-	defer tx.Discard()
-
-	var resultID flow.Identifier
-
-	err := operation.LookupLastExecutionResultForServiceEventType(maxHeight, serviceEventType, &resultID)(tx)
-	if err != nil {
-		return nil, err
-	}
-	return r.byID(resultID)(tx)
-}
-
 func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return r.db.Update(operation.SkipNonExist(operation.RemoveExecutionResultIndex(blockID)))
 }

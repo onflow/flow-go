@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -269,6 +270,11 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
+	err = validateVersionBeacon(snap)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -335,6 +341,28 @@ func validateRootQC(snap protocol.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
 	}
+	return nil
+}
+
+func validateVersionBeacon(snap protocol.Snapshot) error {
+
+	_, versionTableHeight, err := snap.VersionBeacon()
+	if err != nil {
+		if errors.Is(err, state.NoVersionBeaconError{}) {
+			return nil
+		}
+	}
+
+	segment, err := snap.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("could not get sealing segment: %w", err)
+	}
+	highest := segment.Highest()
+
+	if versionTableHeight > highest.Header.Height {
+		return fmt.Errorf("version table height higher than highest height")
+	}
+
 	return nil
 }
 

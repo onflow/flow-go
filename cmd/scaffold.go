@@ -990,6 +990,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
@@ -1040,6 +1041,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
 		)

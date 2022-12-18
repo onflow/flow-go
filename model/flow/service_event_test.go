@@ -20,7 +20,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
-	versionTable := unittest.VersionTableFixture(3)
+	versionBeacon := unittest.VersionBeaconFixture(3)
 
 	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
@@ -52,13 +52,13 @@ func TestEncodeDecode(t *testing.T) {
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
 			// VersionTable
-			b, err = json.Marshal(versionTable)
+			b, err = json.Marshal(versionBeacon)
 			require.NoError(t, err)
 
-			gotVersionTable := new(flow.VersionTable)
-			err = json.Unmarshal(b, gotVersionTable)
+			gotVersionBeacon := new(flow.VersionBeacon)
+			err = json.Unmarshal(b, gotVersionBeacon)
 			require.NoError(t, err)
-			assert.DeepEqual(t, versionTable, gotVersionTable)
+			assert.DeepEqual(t, versionBeacon, gotVersionBeacon)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -88,8 +88,8 @@ func TestEncodeDecode(t *testing.T) {
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
 			// VersionTable
-			t.Logf("- debug: versionTable.ServiceEvent()=%+v\n", versionTable.ServiceEvent())
-			b, err = json.Marshal(versionTable.ServiceEvent())
+			t.Logf("- debug: versionBeacon.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
+			b, err = json.Marshal(versionBeacon.ServiceEvent())
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
@@ -97,9 +97,9 @@ func TestEncodeDecode(t *testing.T) {
 			err = json.Unmarshal(b, outer)
 			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
 			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionTable)
+			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
-			assert.DeepEqual(t, versionTable, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
 		})
 	})
 
@@ -123,14 +123,14 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
-			// VersionTable
-			b, err = msgpack.Marshal(versionTable)
+			// VersionBeacon
+			b, err = msgpack.Marshal(versionBeacon)
 			require.NoError(t, err)
 
-			gotVersionTable := new(flow.VersionTable)
+			gotVersionTable := new(flow.VersionBeacon)
 			err = msgpack.Unmarshal(b, gotVersionTable)
 			require.NoError(t, err)
-			assert.DeepEqual(t, versionTable, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -160,8 +160,8 @@ func TestEncodeDecode(t *testing.T) {
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
 			// VersionTable
-			t.Logf("- debug: versionTable.ServiceEvent()=%+v\n", versionTable.ServiceEvent())
-			b, err = msgpack.Marshal(versionTable.ServiceEvent())
+			t.Logf("- debug: versionTable.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
+			b, err = msgpack.Marshal(versionBeacon.ServiceEvent())
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
@@ -169,9 +169,9 @@ func TestEncodeDecode(t *testing.T) {
 			err = msgpack.Unmarshal(b, outer)
 			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
 			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionTable)
+			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
-			assert.DeepEqual(t, versionTable, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
 		})
 	})
 
@@ -196,13 +196,13 @@ func TestEncodeDecode(t *testing.T) {
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
 			// VersionTable
-			b, err = cborcodec.EncMode.Marshal(versionTable)
+			b, err = cborcodec.EncMode.Marshal(versionBeacon)
 			require.NoError(t, err)
 
-			gotVersionTable := new(flow.VersionTable)
+			gotVersionTable := new(flow.VersionBeacon)
 			err = cbor.Unmarshal(b, gotVersionTable)
 			require.NoError(t, err)
-			assert.DeepEqual(t, versionTable, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -232,16 +232,16 @@ func TestEncodeDecode(t *testing.T) {
 			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 
 			// VersionTable
-			t.Logf("- debug: setup.ServiceEvent()=%+v\n", versionTable.ServiceEvent())
-			b, err = cborcodec.EncMode.Marshal(versionTable.ServiceEvent())
+			t.Logf("- debug: setup.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
+			b, err = cborcodec.EncMode.Marshal(versionBeacon.ServiceEvent())
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
 			err = cbor.Unmarshal(b, outer)
 			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionTable)
+			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
-			assert.DeepEqual(t, versionTable, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
 		})
 	})
 }
@@ -252,8 +252,8 @@ func TestEquality(t *testing.T) {
 	setupBevent := unittest.EpochSetupFixture()
 	commitA := unittest.EpochCommitFixture().ServiceEvent()
 	commitBevent := unittest.EpochCommitFixture()
-	versionTableA := unittest.VersionTableFixture(2).ServiceEvent()
-	versionTableBevent := unittest.VersionTableFixture(2)
+	versionTableA := unittest.VersionBeaconFixture(2).ServiceEvent()
+	versionTableBevent := unittest.VersionBeaconFixture(2)
 
 	// modify B versions
 	setupBevent.Counter += 1

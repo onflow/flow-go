@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -82,6 +83,21 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		return nil, fmt.Errorf("could not get params: %w", err)
 	}
 	snap.Params = params.enc
+
+	versionBeacon, beaconHeight, err := from.VersionBeacon()
+
+	if err != nil {
+		if errors.Is(err, state.NoVersionBeaconError{}) {
+			snap.LatestVersionBeacon = nil
+		} else {
+			return nil, fmt.Errorf("could not get version beacon: %w", err)
+		}
+	} else {
+		snap.LatestVersionBeacon = &EncodableVersionBeacon{
+			Height:        beaconHeight,
+			VersionBeacon: *versionBeacon,
+		}
+	}
 
 	return &Snapshot{snap}, nil
 }
@@ -302,6 +318,22 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 		Phase:             flow.EpochPhaseStaking,
 		Epochs:            epochs,
 		Params:            params,
+		LatestVersionBeacon: &EncodableVersionBeacon{
+			Height: root.Header.Height,
+			VersionBeacon: flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{
+						Height:  root.Header.Height - 1000,
+						Version: "v0.21.37",
+					},
+					{
+						Height:  root.Header.Height + 1000,
+						Version: "v0.21.38",
+					},
+				},
+				Sequence: 0,
+			},
+		},
 	})
 	return snap, nil
 }

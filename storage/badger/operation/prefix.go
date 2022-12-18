@@ -65,12 +65,13 @@ const (
 	codeAllBlockReceipts    = 59 // index mapping of blockID to multiple receipts
 	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
 
-	// codes related to epoch information
+	// codes related to protocol level information
 	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
+	codeVersionBeacon    = 67 // flag for storing version beacons
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
@@ -83,15 +84,15 @@ const (
 	codeJobQueuePointer      = 72
 
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                = 100
-	codeCommit                       = 101
-	codeEvent                        = 102
-	codeExecutionStateInteractions   = 103
-	codeTransactionResult            = 104
-	codeFinalizedCluster             = 105
-	codeServiceEvent                 = 106
-	codeTransactionResultIndex       = 107
-	codeServiceEventIndex            = 108
+	codeChunkDataPack              = 100
+	codeCommit                     = 101
+	codeEvent                      = 102
+	codeExecutionStateInteractions = 103
+	codeTransactionResult          = 104
+	codeFinalizedCluster           = 105
+	codeServiceEvent               = 106
+	codeTransactionResultIndex     = 107
+
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
@@ -137,4 +138,16 @@ func b(v interface{}) []byte {
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}
+}
+
+// d is a reverse of b
+func d[T uint64](bytes []byte) (ret T) {
+
+	// See https://stackoverflow.com/a/73382479
+	switch any(ret).(type) {
+	case uint64:
+		return T(binary.BigEndian.Uint64(bytes))
+	}
+
+	return
 }

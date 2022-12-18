@@ -8,15 +8,16 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	Head              *flow.Header
-	Identities        flow.IdentityList
-	LatestSeal        *flow.Seal
-	LatestResult      *flow.ExecutionResult
-	SealingSegment    *flow.SealingSegment
-	QuorumCertificate *flow.QuorumCertificate
-	Phase             flow.EpochPhase
-	Epochs            EncodableEpochs
-	Params            EncodableParams
+	Head                *flow.Header
+	Identities          flow.IdentityList
+	LatestSeal          *flow.Seal
+	LatestResult        *flow.ExecutionResult
+	SealingSegment      *flow.SealingSegment
+	QuorumCertificate   *flow.QuorumCertificate
+	Phase               flow.EpochPhase
+	Epochs              EncodableEpochs
+	Params              EncodableParams
+	LatestVersionBeacon *EncodableVersionBeacon
 }
 
 // EncodableEpochs is the encoding format for protocol.EpochQuery
@@ -67,4 +68,9 @@ type EncodableParams struct {
 	ChainID         flow.ChainID
 	SporkID         flow.Identifier
 	ProtocolVersion uint
+}
+
+type EncodableVersionBeacon struct {
+	Height        uint64
+	VersionBeacon flow.VersionBeacon
 }

@@ -80,9 +80,9 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 
 	s.Require().Len(sealed.ExecutionResult.ServiceEvents, 1)
 
-	s.Require().IsType(&flow.VersionTable{}, sealed.ExecutionResult.ServiceEvents[0].Event)
+	s.Require().IsType(&flow.VersionBeacon{}, sealed.ExecutionResult.ServiceEvents[0].Event)
 
-	versionTable := sealed.ExecutionResult.ServiceEvents[0].Event.(*flow.VersionTable)
+	versionTable := sealed.ExecutionResult.ServiceEvents[0].Event.(*flow.VersionBeacon)
 
 	s.Require().Equal(uint64(5), versionTable.Sequence)
 

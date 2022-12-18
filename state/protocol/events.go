@@ -75,4 +75,7 @@ type Consumer interface {
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
+
+	// TODO
+	// VersionBeacon
 }

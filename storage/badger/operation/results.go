@@ -26,31 +26,6 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
-// IndexExecutionResultByServiceEventTypeAndHeight indexes result ID by a service event type and a height it went into effect
-// See handleServiceEvents documentation for in-depth explanation of what height and why it's being used.
-// This index allows us to answer questions such as what is the latest EpochSetup service event up to
-// block height 1000.
-//
-// why indexing result ID rather than service events? because the service event is included in a result,
-// the indexed result id could help join the result and find the service event
-//
-// why using <service_event_type+sealed_height> as key rather than <sealed_height + service_event_type>?
-// because having service_event_type key first allows us to scan through the index and
-// filter by service event type first, and then find the result for highest height,
-// see LookupLastExecutionResultForServiceEventType
-//
-// Input eventType strings must be valid service event types, and be known to serviceEventTypeToPrefix.
-// No errors are expected during normal operation.
-func IndexExecutionResultByServiceEventTypeAndHeight(resultID flow.Identifier, eventType string, blockHeight uint64) func(*badger.Txn) error {
-	typeByte, err := serviceEventTypeToPrefix(eventType)
-	if err != nil {
-		return func(txn *badger.Txn) error {
-			return err
-		}
-	}
-	return upsert(makePrefix(codeServiceEventIndex, typeByte, blockHeight), resultID)
-}
-
 // ReindexExecutionResult updates mapping of an execution result ID keyed by block ID
 func ReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(*badger.Txn) error {
 	return update(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
@@ -69,15 +44,4 @@ func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) f
 // RemoveExecutionResultIndex removes execution result indexed by the given blockID
 func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
-}
-
-// Returns storage.ErrNotFound if no service events for the given type exist at or below the given height.
-func LookupLastExecutionResultForServiceEventType(height uint64, eventType string, resultID *flow.Identifier) func(*badger.Txn) error {
-	typeByte, err := serviceEventTypeToPrefix(eventType)
-	if err != nil {
-		return func(txn *badger.Txn) error {
-			return err
-		}
-	}
-	return findOneHighestButNoHigher(makePrefix(codeServiceEventIndex, typeByte), height, resultID)
 }

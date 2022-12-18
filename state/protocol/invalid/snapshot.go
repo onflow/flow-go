@@ -79,3 +79,7 @@ func (u *Snapshot) RandomSource() ([]byte, error) {
 func (u *Snapshot) Params() protocol.GlobalParams {
 	return &Params{u.err}
 }
+
+func (u *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
+	return nil, 0, u.err
+}

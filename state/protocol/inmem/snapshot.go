@@ -83,6 +83,10 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
+func (s Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
+	return &s.enc.LatestVersionBeacon.VersionBeacon, s.enc.LatestVersionBeacon.Height, nil
+}
+
 func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {
 	return &Snapshot{
 		enc: enc,

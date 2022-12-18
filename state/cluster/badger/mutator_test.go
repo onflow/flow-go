@@ -62,14 +62,14 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 	consumer := events.NewNoop()
 
@@ -86,10 +86,10 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.protoGenesis = genesis.Header
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 }
 

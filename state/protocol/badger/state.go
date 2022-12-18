@@ -30,6 +30,7 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	versionBeacons storage.VersionBeacons
 }
 
 type BootstrapConfig struct {
@@ -60,6 +61,7 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
@@ -77,7 +79,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses, versionBeacons)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
@@ -121,6 +123,12 @@ func Bootstrap(
 		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
+		}
+
+		// 4½) initialize version beacon
+		err = state.boostrapVersionBeacon(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		// 5) initialize spork params
@@ -221,6 +229,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship and search for service events to index
+			// It is possible, however unlikely, that sealing segment contains service events taking effect within the segment's blocks.
 			if i > 0 {
 				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
 				if err != nil {
@@ -239,12 +248,11 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 						return fmt.Errorf("blocks (id=%s) from sealing segment references seal (id=%s) for results (id=%s) which does not exist in other blocks or segment ExecutionResults", parent.ID(), seal, resultID)
 					}
 
-					for _, serviceEvent := range result.ServiceEvents {
-						err = transaction.WithTx(operation.IndexExecutionResultByServiceEventTypeAndHeight(result.ID(), serviceEvent.Type, block.Header.Height))(tx)
+					for _, versionBeacon := range flow.FilterServiceEvents[*flow.VersionBeacon](result.ServiceEvents) {
+						err = transaction.WithTx(operation.IndexVersionBeaconByHeight(versionBeacon, block.Header.Height))(tx)
 						if err != nil {
-							return fmt.Errorf("could not index results by service event type (type=%s) and height (=%d): %w", serviceEvent.Type, block.Header.Height, err)
+							return fmt.Errorf("could not insert version beacon for height=%d: %w", block.Header.Height, err)
 						}
-
 					}
 				}
 			}
@@ -444,6 +452,23 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 	}
 }
 
+// boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
+// to an index, if present.
+func (state *State) boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		versionBeacon, vbHeight, err := snapshot.VersionBeacon()
+		if err != nil {
+			// if there is no beacon, do nothing
+			if errors.Is(err, statepkg.NoVersionBeaconError{}) {
+				return nil
+			}
+			return err
+		}
+
+		return transaction.WithTx(operation.IndexVersionBeaconByHeight(versionBeacon, vbHeight))(tx)
+	}
+}
+
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
 func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
@@ -482,6 +507,7 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -490,7 +516,7 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses, versionBeacons)
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -574,6 +600,7 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
 		metrics: metrics,
@@ -591,6 +618,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
+		versionBeacons: versionBeacons,
 	}
 }
 

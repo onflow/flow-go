@@ -26,6 +26,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	collections := NewCollections(db, transactions)
 	events := NewEvents(metrics, db)
 	chunkDataPacks := NewChunkDataPacks(metrics, db, collections, 1000)
+	versionBeacons := NewVersionBeacons(metrics, db)
 
 	return &storage.All{
 		Headers:            headers,
@@ -45,5 +46,6 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		TransactionResults: transactionResults,
 		Collections:        collections,
 		Events:             events,
+		VersionBeacons:     versionBeacons,
 	}
 }

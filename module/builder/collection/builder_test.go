@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	storage "github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -26,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -43,9 +44,9 @@ type BuilderSuite struct {
 	genesis *model.Block
 	chainID flow.ChainID
 
-	headers  *storage.Headers
-	payloads *storage.ClusterPayloads
-	blocks   *storage.Blocks
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
+	blocks   storage.Blocks
 
 	state cluster.MutableState
 
@@ -73,11 +74,11 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
+	all := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
-	suite.headers = headers
-	suite.blocks = blocks
-	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+	suite.headers = all.Headers
+	suite.blocks = all.Blocks
+	suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis)
 	suite.Require().NoError(err)
@@ -98,10 +99,10 @@ func (suite *BuilderSuite) SetupTest() {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
@@ -978,10 +979,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, _, _, _, blocks, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
-		suite.headers = headers
-		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+		all := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = all.Headers
+		suite.blocks = all.Blocks
+		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis)
 

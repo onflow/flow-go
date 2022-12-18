@@ -31,7 +31,7 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	case events.VersionTable.EventType():
-		return convertServiceEventVersionTable(event)
+		return convertServiceEventVersionBeacon(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
@@ -175,9 +175,9 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	return serviceEvent, nil
 }
 
-func convertServiceEventVersionTable(event flow.Event) (*flow.ServiceEvent, error) {
+func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 
-	versionTable := new(flow.VersionTable)
+	versionTable := new(flow.VersionBeacon)
 
 	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
@@ -197,7 +197,7 @@ func convertServiceEventVersionTable(event flow.Event) (*flow.ServiceEvent, erro
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
-		Type:  flow.ServiceEventVersionControl,
+		Type:  flow.ServiceEventVersionBeacon,
 		Event: versionTable,
 	}
 

@@ -771,13 +771,13 @@ func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error)
 			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
 		}
 		event = commit
-	case flow.ServiceEventVersionControl:
-		versionControl := new(flow.VersionTable)
-		err := json.Unmarshal(rawEvent, versionControl)
+	case flow.ServiceEventVersionBeacon:
+		versionBeacon := new(flow.VersionBeacon)
+		err := json.Unmarshal(rawEvent, versionBeacon)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to VersionControlTable event: %w", err)
+			return nil, fmt.Errorf("failed to marshal to VersionBeacon event: %w", err)
 		}
-		event = versionControl
+		event = versionBeacon
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", m.Type)
 	}

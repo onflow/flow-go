@@ -358,9 +358,10 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
+	versionBeaconsDB := storage.NewVersionBeacons(metricsCollector, db)
 	consumer := events.NewDistributor()
 
-	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
+	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, versionBeaconsDB, rootSnapshot)
 	require.NoError(t, err)
 
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)

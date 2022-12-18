@@ -306,6 +306,36 @@ func (_m *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	return r0, r1
 }
 
+// VersionBeacon provides a mock function with given fields:
+func (_m *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
+	ret := _m.Called()
+
+	var r0 *flow.VersionBeacon
+	if rf, ok := ret.Get(0).(func() *flow.VersionBeacon); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.VersionBeacon)
+		}
+	}
+
+	var r1 uint64
+	if rf, ok := ret.Get(1).(func() uint64); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Get(1).(uint64)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func() error); ok {
+		r2 = rf()
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 type mockConstructorTestingTNewSnapshot interface {
 	mock.TestingT
 	Cleanup(func())

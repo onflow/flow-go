@@ -344,6 +344,16 @@ func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	return descendants, nil
 }
 
+func (s *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
+
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return s.state.versionBeacons.Highest(head.Height)
+}
+
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))

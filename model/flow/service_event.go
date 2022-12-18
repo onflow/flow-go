@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	ServiceEventSetup          = "setup"
-	ServiceEventCommit         = "commit"
-	ServiceEventVersionControl = "version-control"
+	ServiceEventSetup         = "setup"
+	ServiceEventCommit        = "commit"
+	ServiceEventVersionBeacon = "version-beacon"
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -47,6 +47,16 @@ func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func FilterServiceEvents[T *EpochSetup | *EpochCommit | *VersionBeacon](sel ServiceEventList) []T {
+	n := make([]T, 0)
+	for _, se := range sel {
+		if typed, is := se.Event.(T); is {
+			n = append(n, typed)
+		}
+	}
+	return n
 }
 
 func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
@@ -88,8 +98,8 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		event = commit
-	case ServiceEventVersionControl:
-		version := new(VersionTable)
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
 		err = json.Unmarshal(evb, version)
 		if err != nil {
 			return err
@@ -145,8 +155,8 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 			return err
 		}
 		event = commit
-	case ServiceEventVersionControl:
-		version := new(VersionTable)
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
 		err = msgpack.Unmarshal(evb, version)
 		if err != nil {
 			return err
@@ -201,8 +211,8 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 			return err
 		}
 		event = commit
-	case ServiceEventVersionControl:
-		version := new(VersionTable)
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
 		err = cbor.Unmarshal(evb, version)
 		if err != nil {
 			return err
@@ -246,14 +256,14 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 		}
 		return commit.EqualTo(otherCommit), nil
 
-	case ServiceEventVersionControl:
-		version, ok := se.Event.(*VersionTable)
+	case ServiceEventVersionBeacon:
+		version, ok := se.Event.(*VersionBeacon)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventVersionControl: %T", se.Event)
+			return false, fmt.Errorf("internal invalid type for ServiceEventVersionBeacon: %T", se.Event)
 		}
-		otherVersion, ok := other.Event.(*VersionTable)
+		otherVersion, ok := other.Event.(*VersionBeacon)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventVersionControl: %T", other.Event)
+			return false, fmt.Errorf("internal invalid type for ServiceEventVersionBeacon: %T", other.Event)
 		}
 		return version.EqualTo(otherVersion), nil
 

@@ -58,7 +58,7 @@ func TestEventConversion(t *testing.T) {
 		require.NotNil(t, event)
 
 		// cast event type to epoch commit
-		actual, ok := event.Event.(*flow.VersionTable)
+		actual, ok := event.Event.(*flow.VersionBeacon)
 		require.True(t, ok)
 
 		assert.Equal(t, expected, actual)

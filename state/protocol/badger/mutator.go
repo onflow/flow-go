@@ -557,12 +557,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 
-	// track service events to index results by event type and height
-	var serviceEvents []struct {
-		height   uint64
-		resultID flow.Identifier
-		event    flow.ServiceEvent
-	}
+	var versionBeacon *flow.VersionBeacon
 
 	for _, seal := range parent.Payload.Seals {
 
@@ -571,19 +566,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 		for _, event := range result.ServiceEvents {
-			// it is possible, however very unlikely, that there are multiple service events of the same type in a single result.
-			// This will add multiple identical entries here, but the storage layer will only keep one index entry per combination of
-			// height and event type, essentially disregarding duplicates. Since the situation is very unlikely and other layer will handle
-			// this situation gracefully we leave it like this instead of writing deduplication logic here.
-			serviceEvents = append(serviceEvents, struct {
-				height   uint64
-				resultID flow.Identifier
-				event    flow.ServiceEvent
-			}{
-				height:   header.Height,
-				resultID: seal.ResultID,
-				event:    event})
-
 			// skip updating epoch-related metrics if EECC is triggered
 			if epochFallbackTriggered {
 				continue
@@ -606,9 +588,15 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 					return fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
-			case *flow.VersionTable:
+			case *flow.VersionBeacon:
 
 				// TODO here we want to notify about this event, but that's for another PR
+
+				// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
+				// events in a single result. However, should this happen we will keep only the last one, since it's newer
+				// and takes precedence anyway
+				versionBeacon = ev
+
 				continue
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
@@ -685,11 +673,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// index sealed service events
-		for _, event := range serviceEvents {
-			err := operation.IndexExecutionResultByServiceEventTypeAndHeight(event.resultID, event.event.Type, event.height)(tx)
+		if versionBeacon != nil {
+			err := operation.IndexVersionBeaconByHeight(versionBeacon, header.Height)(tx)
 			if err != nil {
-				return fmt.Errorf("could not index resultID (%s) by service event (type=%s) for height (%d): %w", event.resultID, event.event.Type, event.height, err)
+				return fmt.Errorf("could not index version beacon or height (%d): %w", header.Height, err)
 			}
 		}
 
@@ -902,7 +889,7 @@ SealLoop:
 
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
-			case *flow.VersionTable:
+			case *flow.VersionBeacon:
 				// just skip
 				continue
 			default:

@@ -470,7 +470,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 // B 11 Z
 // calling findOneHighestButNoHigher with prefix B and height 12 will retrieve 'B 11 Z' key, while B 10 will retrieve `B 10 Y`.
 // Calling A 9 or C 2 will return storage.ErrNotFound
-func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{}) func(*badger.Txn) error {
+func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{}, actualHeight *uint64) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		if len(prefix) == 0 {
 			return fmt.Errorf("prefix must not be empty")
@@ -488,6 +488,11 @@ func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{})
 		if !it.Valid() {
 			return storage.ErrNotFound
 		}
+
+		key := it.Item().Key()
+		heightBytes := key[len(prefix):]
+
+		*actualHeight = d(heightBytes)
 
 		return it.Item().Value(func(val []byte) error {
 			err := msgpack.Unmarshal(val, entity)
