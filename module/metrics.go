@@ -87,9 +87,22 @@ type LibP2PMetrics interface {
 	rcmgr.MetricsReporter
 }
 
+// NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
+type NetworkInboundQueueMetrics interface {
+	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
+	MessageAdded(priority int)
+
+	// MessageRemoved decrements the metric tracking the number of messages in the queue with the given priority
+	MessageRemoved(priority int)
+
+	// QueueDuration tracks the time spent by a message with the given priority in the queue
+	QueueDuration(duration time.Duration, priority int)
+}
+
 type NetworkMetrics interface {
 	LibP2PMetrics
 	NetworkSecurityMetrics
+	NetworkInboundQueueMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
@@ -99,16 +112,6 @@ type NetworkMetrics interface {
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string, messageType string)
-
-	// Message receive queue metrics
-	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
-	MessageAdded(priority int)
-
-	// MessageRemoved decrements the metric tracking the number of messages in the queue with the given priority
-	MessageRemoved(priority int)
-
-	// QueueDuration tracks the time spent by a message with the given priority in the queue
-	QueueDuration(duration time.Duration, priority int)
 
 	DirectMessageStarted(topic string)
 
