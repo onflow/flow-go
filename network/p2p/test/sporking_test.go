@@ -2,11 +2,12 @@ package p2ptest_test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
-	"testing"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
