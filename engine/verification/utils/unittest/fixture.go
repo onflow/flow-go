@@ -38,6 +38,7 @@ import (
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -281,8 +282,20 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			trackerStorage,
 		)
 
+		me := new(moduleMock.Local)
+		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
+
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer, prov)
+		bc, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			log,
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)

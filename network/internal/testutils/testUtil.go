@@ -330,6 +330,17 @@ func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.Lib
 	}
 }
 
+// StopComponents stops ReadyDoneAware instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration time.Duration) {
+	comps := make([]module.ReadyDoneAware, 0, len(rda))
+	for _, c := range rda {
+		comps = append(comps, c)
+	}
+
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
+}
+
 type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
@@ -358,7 +369,13 @@ func generateLibP2PNode(t *testing.T,
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), unittest.DefaultAddress, key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		metrics.NewNoopCollector(),
+		unittest.DefaultAddress,
+		key,
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 
@@ -396,28 +413,6 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 		sms[i] = subscription.NewChannelSubscriptionManager(mw)
 	}
 	return sms
-}
-
-// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
-// duration.
-func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
-	// casts nets instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(nets))
-	for _, net := range nets {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
-}
-
-func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
-	// casts mws instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(mws))
-	for _, net := range mws {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.

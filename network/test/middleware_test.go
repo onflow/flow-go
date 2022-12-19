@@ -142,9 +142,25 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 }
 
+func (m *MiddlewareTestSuite) TearDownTest() {
+	m.mwCancel()
+
+	testutils.StopComponents(m.T(), m.mws, 100*time.Millisecond)
+	testutils.StopComponents(m.T(), m.nodes, 100*time.Millisecond)
+
+	m.mws = nil
+	m.nodes = nil
+	m.ov = nil
+	m.ids = nil
+	m.size = 0
+}
+
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
 // the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	ctx, cancel := context.WithCancel(m.mwCtx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
+
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
@@ -158,11 +174,14 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 	newMw.SetOverlay(overlay)
-	newMw.Start(m.mwCtx)
-	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	// start up nodes and peer managers
-	testutils.StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+
+	newMw.Start(irrecoverableCtx)
+	defer testutils.StopComponents(m.T(), mws, 100*time.Millisecond)
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -182,20 +201,21 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// now the message should send successfully
 	err = m.mws[0].SendDirect(msg, newId.NodeID)
 	require.NoError(m.T(), err)
+
+	cancel()
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
+	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
+
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
 	limit := rate.Limit(5)
 
 	// burst per interval
 	burst := 5
 
-	// create test time
-	testtime := unittest.NewTestTime()
-
-	// setup message rate limiter
-	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch. O
@@ -254,9 +274,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	newMw.SetOverlay(overlay)
 
 	ctx, cancel := context.WithCancel(m.mwCtx)
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+
 	newMw.Start(irrecoverableCtx)
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
@@ -270,15 +292,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 6 messages. The 6th message will be
-	// rate limited.
-	start := testtime.Now()
-	end := start.Add(time.Second)
-	for testtime.Now().Before(end) {
-		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
-		testtime.Advance(168 * time.Millisecond)
-
-		msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%s", testtime.Now().String()))
+	// send 6 unicast messages, 5 should be allowed and the 6th should be rate limited
+	for i := 0; i < 6; i++ {
+		msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%d", i))
 		err := m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 	}
@@ -296,6 +312,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
+	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
+
 	//limiter limit will be set up to 1000 bytes/sec
 	limit := rate.Limit(1000)
 
@@ -347,9 +365,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	newMw.SetOverlay(overlay)
 
 	ctx, cancel := context.WithCancel(m.mwCtx)
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+
 	newMw.Start(irrecoverableCtx)
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
@@ -389,7 +409,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
-	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
+	unittest.RequireComponentsDoneBefore(m.T(), 100*time.Millisecond, newMw)
 
 	// expect our rate limited peer callback to be invoked once
 	require.Equal(m.T(), uint64(1), rateLimits.Load())
@@ -409,10 +429,6 @@ func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvi
 	identityOpts := unittest.WithRole(flow.RoleExecution)
 	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(identityOpts), true)
 	return overlay
-}
-
-func (m *MiddlewareTestSuite) TearDownTest() {
-	m.stopMiddlewares()
 }
 
 // TestPingRawReception tests the middleware for solely the
@@ -807,19 +823,4 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	// assert that the new message is not received by the target node
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
-}
-
-func (m *MiddlewareTestSuite) stopMiddlewares() {
-	m.mwCancel()
-
-	for i := 0; i < m.size; i++ {
-		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
-		unittest.RequireCloseBefore(m.T(), m.nodes[i].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
-	}
-
-	m.mws = nil
-	m.nodes = nil
-	m.ov = nil
-	m.ids = nil
-	m.size = 0
 }

@@ -79,7 +79,8 @@ func NodeFixture(
 		metrics.NewNoopCollector(),
 		parameters.Address,
 		parameters.Key,
-		sporkID).
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,

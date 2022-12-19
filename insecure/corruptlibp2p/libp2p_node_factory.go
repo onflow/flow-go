@@ -55,7 +55,8 @@ func NewCorruptLibP2PNodeFactory(
 			onInterceptSecuredFilters,
 			peerScoringEnabled,
 			connectionPruning,
-			updateInterval)
+			updateInterval,
+			p2pbuilder.DefaultResourceManagerConfig())
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}
