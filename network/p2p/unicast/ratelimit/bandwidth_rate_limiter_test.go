@@ -1,6 +1,9 @@
 package ratelimit
 
 import (
+	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
 	"testing"
 	"time"
 
@@ -8,7 +11,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,22 +35,30 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 		b[i] = byte('X')
 	}
 
-	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string(b),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(t, err)
 
-	allowed := bandwidthRateLimiter.Allow(peerID, msg)
+	allowed := bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.True(t, allowed)
-	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.True(t, allowed)
-	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.False(t, allowed)
 
 	// wait for 1 second, the rate limiter should allow 3 messages again
 	time.Sleep(1 * time.Second)
-	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.True(t, allowed)
-	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.True(t, allowed)
-	allowed = bandwidthRateLimiter.Allow(peerID, msg)
+	allowed = bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.False(t, allowed)
 }
 
@@ -78,8 +88,17 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 
 	require.False(t, bandwidthRateLimiter.IsRateLimited(peerID))
 
-	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, string(b))
-	allowed := bandwidthRateLimiter.Allow(peerID, msg)
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string(b),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypeUnicast)
+	require.NoError(t, err)
+
+	allowed := bandwidthRateLimiter.Allow(peerID, msg.Size())
 	require.False(t, allowed)
 	require.True(t, bandwidthRateLimiter.IsRateLimited(peerID))
 
