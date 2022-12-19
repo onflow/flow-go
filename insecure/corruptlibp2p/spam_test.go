@@ -2,10 +2,11 @@ package corruptlibp2p_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
