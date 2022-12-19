@@ -17,12 +17,12 @@ type RateLimiter struct {
 }
 
 // Allow provides a mock function with given fields: peerID, msg
-func (_m *RateLimiter) Allow(peerID peer.ID, msg *message.Message) bool {
-	ret := _m.Called(peerID, msg)
+func (_m *RateLimiter) Allow(peerID peer.ID, msgSize int) bool {
+	ret := _m.Called(peerID, msgSize)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(peer.ID, *message.Message) bool); ok {
-		r0 = rf(peerID, msg)
+		r0 = rf(peerID, msgSize)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

@@ -548,7 +548,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		// check unicast bandwidth rate limiter for peer
-		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
+		if !m.unicastRateLimiters.BandwidthAllowed(
+			remotePeer,
+			role,
+			msg.Size(),
+			network.MessageType(msg.Payload),
+			channels.Topic(msg.ChannelID)) {
 			return
 		}
 
