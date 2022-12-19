@@ -322,37 +322,37 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(scope *network.IncomingMessageScope) error {
-	n.metrics.NetworkMessageReceived(scope.Size(), scope.Channel().String(), scope.Protocol().String())
+func (n *Network) Receive(msg *network.IncomingMessageScope) error {
+	n.metrics.NetworkMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String())
 
-	err := n.processNetworkMessage(scope)
+	err := n.processNetworkMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(scope *network.IncomingMessageScope) error {
+func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if !n.receiveCache.Add(scope.EventID()) {
+	if !n.receiveCache.Add(msg.EventID()) {
 		// drops duplicate message
 		n.logger.Debug().
-			Hex("sender_id", logging.ID(scope.OriginId())).
-			Hex("event_id", scope.EventID()).
-			Str("channel", scope.Channel().String()).
+			Hex("sender_id", logging.ID(msg.OriginId())).
+			Hex("event_id", msg.EventID()).
+			Str("channel", msg.Channel().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(scope.Channel().String(), scope.Protocol().String())
+		n.metrics.NetworkDuplicateMessagesDropped(msg.Channel().String(), msg.Protocol().String())
 
 		return nil
 	}
 
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  scope.DecodedPayload(),
-		Size:     scope.Size(),
-		Target:   scope.Channel(),
-		SenderID: scope.OriginId(),
+		Payload:  msg.DecodedPayload(),
+		Size:     msg.Size(),
+		Target:   msg.Channel(),
+		SenderID: msg.OriginId(),
 	}
 
 	// insert the message in the queue
