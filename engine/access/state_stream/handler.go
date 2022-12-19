@@ -4,7 +4,11 @@ import (
 	"context"
 
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -31,31 +35,96 @@ func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
 func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access.GetExecutionDataByBlockIDRequest) (*access.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
 	}
 
 	execData, err := h.api.GetExecutionDataByBlockID(ctx, blockID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertError(err)
 	}
 
-	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: execData}, nil
+	message, err := convert.BlockExecutionDataToMessage(execData)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+	}
+
+	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
 }
 
 func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataRequest, stream access.ExecutionDataAPI_SubscribeExecutionDataServer) error {
-	ctx := stream.Context()
-	sub := h.api.SubscribeExecutionData(ctx)
+	startBlockID := flow.ZeroID
+	if request.GetStartBlockId() != nil {
+		blockID, err := convert.BlockID(request.GetStartBlockId())
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
+		}
+		startBlockID = blockID
+	}
+
+	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
 
 	for {
-		// TODO: this should handle graceful shutdown from the server
-		resp, ok := <-sub.Channel()
+		v, ok := <-sub.Channel()
 		if !ok {
-			return sub.Err()
+			return rpc.ConvertError(sub.Err())
 		}
 
-		err := stream.Send(resp)
+		resp, ok := v.(*ExecutionDataResponse)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
 		if err != nil {
-			return err
+			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+		}
+
+		err = stream.Send(&executiondata.SubscribeExecutionDataResponse{
+			BlockHeight:        resp.Height,
+			BlockExecutionData: execData,
+		})
+		if err != nil {
+			return rpc.ConvertError(err)
+		}
+	}
+}
+
+func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream access.ExecutionDataAPI_SubscribeEventsServer) error {
+	startBlockID := flow.ZeroID
+	if request.GetStartBlockId() != nil {
+		blockID, err := convert.BlockID(request.GetStartBlockId())
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
+		}
+		startBlockID = blockID
+	}
+
+	filter := EventFilter{}
+	if request.GetFilter() != nil {
+		reqFilter := request.GetFilter()
+		filter = NewEventFilter(reqFilter.GetEventType(), reqFilter.GetAddress(), reqFilter.GetContract())
+	}
+
+	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			return rpc.ConvertError(sub.Err())
+		}
+
+		resp, ok := v.(*EventsResponse)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		err := stream.Send(&executiondata.SubscribeEventsResponse{
+			BlockHeight: resp.Height,
+			BlockId:     convert.IdentifierToMessage(resp.BlockID),
+			Events:      convert.EventsToMessages(resp.Events),
+		})
+		if err != nil {
+			return rpc.ConvertError(err)
 		}
 	}
 }

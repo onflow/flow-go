@@ -66,6 +66,22 @@ func ConvertStorageError(err error) error {
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }
 
+func ConvertError(err error) error {
+	// if the error has already been converted, return it as is
+	if _, ok := status.FromError(err); ok {
+		return err
+	}
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Errorf(codes.DeadlineExceeded, "deadline exceeded: %v", err)
+	case errors.Is(err, context.Canceled):
+		return status.Errorf(codes.Canceled, "context canceled: %v", err)
+	default:
+		return status.Errorf(codes.Internal, "internal error: %v", err)
+	}
+}
+
 // ConvertMultiError converts a multierror to a grpc status error.
 // If the errors have related status codes, the common code is returned, otherwise defaultCode is used.
 func ConvertMultiError(err *multierror.Error, msg string, defaultCode codes.Code) error {
