@@ -383,6 +383,8 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
+	n.metrics.DirectMessageStarted(msg.Channel().String())
+	defer n.metrics.DirectMessageFinished(msg.Channel().String())
 	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)

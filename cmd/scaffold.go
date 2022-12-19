@@ -407,19 +407,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 
-	fnb.Middleware = middleware.NewMiddleware(
-		fnb.Logger,
-		fnb.LibP2PNode,
-		fnb.Me.NodeID(),
-		fnb.Metrics.Network,
-		fnb.Metrics.Bitswap,
-		fnb.SporkID,
-		fnb.BaseConfig.UnicastMessageTimeout,
-		fnb.IDTranslator,
-		fnb.CodecFactory(),
-		slashingViolationsConsumer,
-		mwOpts...,
-	)
+	fnb.Middleware = middleware.NewMiddleware(fnb.Logger, fnb.LibP2PNode, fnb.Me.NodeID(), fnb.Metrics.Bitswap, fnb.SporkID, fnb.BaseConfig.UnicastMessageTimeout, fnb.IDTranslator, fnb.CodecFactory(), slashingViolationsConsumer, mwOpts...)
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()

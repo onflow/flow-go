@@ -707,20 +707,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = middleware.NewMiddleware(
-		builder.Logger,
-		libp2pNode,
-		nodeID,
-		networkMetrics,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
-	)
+	builder.Middleware = middleware.NewMiddleware(builder.Logger, libp2pNode, nodeID, builder.Metrics.Bitswap, builder.SporkID, middleware.DefaultUnicastTimeout, builder.IDTranslator, builder.CodecFactory(), slashingViolationsConsumer, middleware.WithMessageValidators(validators...))
 
 	return builder.Middleware
 }

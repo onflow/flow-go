@@ -88,7 +88,6 @@ type Middleware struct {
 	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
-	metrics                    module.NetworkMetrics
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
@@ -141,17 +140,7 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(log zerolog.Logger,
-	libP2PNode p2p.LibP2PNode,
-	flowID flow.Identifier,
-	met module.NetworkMetrics,
-	bitswapMet module.BitswapMetrics,
-	rootBlockID flow.Identifier,
-	unicastMessageTimeout time.Duration,
-	idTranslator p2p.IDTranslator,
-	codec network.Codec,
-	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption) *Middleware {
+func NewMiddleware(log zerolog.Logger, libP2PNode p2p.LibP2PNode, flowID flow.Identifier, bitswapMet module.BitswapMetrics, rootBlockID flow.Identifier, unicastMessageTimeout time.Duration, idTranslator p2p.IDTranslator, codec network.Codec, slashingViolationsConsumer slashing.ViolationsConsumer, opts ...MiddlewareOption) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -162,7 +151,6 @@ func NewMiddleware(log zerolog.Logger,
 		log:                        log,
 		me:                         flowID,
 		libP2PNode:                 libP2PNode,
-		metrics:                    met,
 		bitswapMetrics:             bitswapMet,
 		rootBlockID:                rootBlockID,
 		validators:                 DefaultValidators(log, flowID),
@@ -375,9 +363,6 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 	}
 
 	maxTimeout := m.unicastMaxMsgDuration(msg.PayloadType())
-
-	m.metrics.DirectMessageStarted(msg.Channel().String())
-	defer m.metrics.DirectMessageFinished(msg.Channel().String())
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
