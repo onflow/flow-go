@@ -24,26 +24,21 @@ func TestTxFollower(t *testing.T) {
 	blockID := flowsdk.Identifier{0x1}
 	client.On("GetLatestBlockHeader", mock.Anything, mock.Anything).Return(&flowsdk.BlockHeader{ID: blockID, Height: blockHeight}, nil).Once()
 
-	nextBlockID := flowsdk.Identifier{0x6}
 	nextBlockHeight := blockHeight + 1
-	client.On("GetLatestBlockHeader", mock.Anything, mock.Anything).Return(&flowsdk.BlockHeader{ID: nextBlockID, Height: nextBlockHeight}, nil)
-
-	collectionID := flowsdk.Identifier{0x3}
-	client.On("GetBlockByHeight", mock.Anything, nextBlockHeight).Return(
-		&flowsdk.Block{
-			BlockHeader: flowsdk.BlockHeader{ID: nextBlockID, Height: nextBlockHeight},
-			BlockPayload: flowsdk.BlockPayload{
-				CollectionGuarantees: []*flowsdk.CollectionGuarantee{{CollectionID: collectionID}},
-			},
-		}, nil).Once()
+	nextBlockID := flowsdk.Identifier{0x6}
+	client.On("GetBlockHeaderByHeight", mock.Anything, mock.Anything).Return(&flowsdk.BlockHeader{ID: nextBlockID, Height: nextBlockHeight}, nil).Once()
+	client.On("GetBlockHeaderByHeight", mock.Anything, mock.Anything).Return(nil, errors.New("not found"))
 
 	transactionID := flowsdk.Identifier{0x2}
-	client.On("GetCollection", mock.Anything, collectionID).Return(
-		&flowsdk.Collection{
-			TransactionIDs: []flowsdk.Identifier{{0x98}, transactionID, {0x99}},
+	client.On("GetTransactionResultsByBlockID", mock.Anything, nextBlockID).Return(
+		[]*flowsdk.TransactionResult{
+			{
+				TransactionID: transactionID,
+				Status:        flowsdk.TransactionStatusSealed,
+				BlockID:       nextBlockID,
+				BlockHeight:   nextBlockHeight,
+			},
 		}, nil).Once()
-
-	client.On("GetBlockByHeight", mock.Anything, mock.Anything).Return(nil, errors.New("not found"))
 
 	f, err := NewTxFollower(
 		context.Background(),
