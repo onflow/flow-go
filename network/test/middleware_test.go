@@ -302,22 +302,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// send 6 unicast messages, 5 should be allowed and the 6th should be rate limited
 	for i := 0; i < 6; i++ {
-		msg, _, _ := messageutils.CreateMessage(m.T(), m.ids[0].NodeID, newId.NodeID, testChannel, fmt.Sprintf("hello-%d", i))
-		err := m.mws[0].SendDirect(msg, newId.NodeID)
-	// for the duration of a simulated second we will send 6 messages. The 6th message will be
-	// rate limited.
-	start := testtime.Now()
-	end := start.Add(time.Second)
-
-	for testtime.Now().Before(end) {
-		// a message is sent every 167 milliseconds which equates to around 6 req/sec surpassing our limit
-		testtime.Advance(168 * time.Millisecond)
-
 		msg, err := network.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{
-				Text: fmt.Sprintf("hello-%s", testtime.Now().String()),
+				Text: fmt.Sprintf("hello-%d", i),
 			},
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
