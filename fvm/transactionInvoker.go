@@ -168,6 +168,8 @@ func (i TransactionInvoker) Process(
 		}
 	}
 
+	i.logExecutionIntensities(txnState, env)
+
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
@@ -272,11 +274,6 @@ func (i TransactionInvoker) normalExecution(
 			err)
 		return
 	}
-
-	// log the execution intensities here, so that they do not contain data
-	// from storage limit checks and transaction deduction, because the payer
-	// is not charged for those.
-	i.logExecutionIntensities(txnState, env)
 
 	txnState.RunWithAllLimitsDisabled(func() {
 		err = i.deductTransactionFees(proc, txnState, env)
