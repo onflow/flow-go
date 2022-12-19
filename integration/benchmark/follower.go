@@ -169,12 +169,8 @@ func (f *txFollowerImpl) run() {
 			Dur("timeSinceLastBlockInMS", time.Since(lastBlockTime)).
 			Dur("timeToParseBlockInMS", time.Since(blockResolutionStart)).
 			Dur("timeSinceBlockInMS", time.Since(hdr.Timestamp)).
-			Uint64("txsTotal", totalStats.txs).
-			Uint64("txsTotalUnknown", totalStats.unknownTxs).
-			Uint64("txsTotalErrors", totalStats.errorTxs).
-			Uint64("txsInBlock", blockStats.txs).
-			Uint64("txsInBlockUnknown", blockStats.unknownTxs).
-			Uint64("txsInBlockErrors", blockStats.errorTxs).
+			Interface("blockStats", blockStats).
+			Interface("totalStats", totalStats).
 			Int("txsInProgress", f.InProgress()).
 			Msg("new block parsed")
 
