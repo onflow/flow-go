@@ -1,6 +1,8 @@
 name: Skipped Test Tracker
 
 on:
+  schedule:
+    - cron: '0 */2 * * *' # every 2 hours
   push:
     branches:
       - master
