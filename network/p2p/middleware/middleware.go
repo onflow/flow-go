@@ -722,7 +722,6 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 
 	scope, err := network.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
 	if err != nil {
-		// this indicates there was an issue hashing, not necessarily an issue with the message itself.
 		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
