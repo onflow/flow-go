@@ -65,6 +65,10 @@ type SealingSegment struct {
 	// Blocks contain the chain segment blocks in ascending height order.
 	Blocks []*Block
 
+	// ExtraBlocks contain the chain extra blocks in ascending height order. These blocks
+	// are connecting to the Blocks[0](the lowest block of sealing segment)
+	ExtraBlocks []*Block
+
 	// ExecutionResults contain any results which are referenced by receipts
 	// or seals in the sealing segment, but not included in any segment block
 	// payloads.
@@ -204,6 +208,11 @@ type SealingSegmentBuilder struct {
 	results     []*ExecutionResult
 	latestSeals map[Identifier]Identifier
 	firstSeal   *Seal
+	extraBlocks []*Block
+}
+
+func (builder *SealingSegmentBuilder) Len() int {
+	return len(builder.blocks)
 }
 
 // AddBlock appends a block to the sealing segment under construction.
@@ -271,6 +280,23 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	}
 
 	builder.blocks = append(builder.blocks, block)
+	return nil
+}
+
+func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
+	if len(builder.extraBlocks) == 0 {
+		if len(builder.blocks) == 0 {
+			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
+		}
+		// first extra block has to match the lowest block of sealing segment
+		if (block.Header.Height + 1) != builder.blocks[0].Header.Height {
+			return fmt.Errorf("invalid extra block height (%d), doesn't connect to sealing segment: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		}
+	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
+		return fmt.Errorf("invalid extra block height (%d), doesn't connect to last extra block: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+	}
+
+	builder.extraBlocks = append(builder.extraBlocks, block)
 	return nil
 }
 

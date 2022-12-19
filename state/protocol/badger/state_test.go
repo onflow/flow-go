@@ -442,7 +442,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		require.NoError(t, err)
 
 		segment, err := state.Final().SealingSegment()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// for each block in the sealing segment we should be able to query:
 		// * Head
