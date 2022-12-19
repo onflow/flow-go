@@ -390,7 +390,6 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	// OneToOne communication metrics are reported with topic OneToOne
 	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), msg.MessageType())
 
 	return nil
