@@ -3,8 +3,14 @@ package corruptlibp2p
 import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/insecure/internal"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/stretchr/testify/require"
-	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
+
+	"sync"
 	"testing"
 )
 
@@ -13,10 +19,10 @@ type ControlMessage int
 // GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
 type GossipSubRouterSpammer struct {
-	router *pubsub.GossipSubRouter
+	router *corrupt.GossipSubRouter
 }
 
-func NewGossipSubRouterSpammer(router *pubsub.GossipSubRouter) *GossipSubRouterSpammer {
+func NewGossipSubRouterSpammer(router *corrupt.GossipSubRouter) *GossipSubRouterSpammer {
 	return &GossipSubRouterSpammer{
 		router: router,
 	}
@@ -44,6 +50,56 @@ func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount
 		iHaveCtlMsgs = append(iHaveCtlMsgs, *iHaveCtlMsg)
 	}
 	return iHaveCtlMsgs
+}
+
+func GetSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
+	router := newAtomicRouter()
+	spammerNode, spammerId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
+		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+			require.NotNil(t, r)
+			router.set(r)
+		}),
+			CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+				// here we can inspect the incoming RPC message to the spammer node
+				return nil
+			})),
+	)
+	return spammerNode, spammerId, router
+}
+
+// atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.
+// This is done to avoid race conditions when accessing the router from multiple goroutines.
+type atomicRouter struct {
+	mu     sync.Mutex
+	router *corrupt.GossipSubRouter
+}
+
+func newAtomicRouter() *atomicRouter {
+	return &atomicRouter{
+		mu: sync.Mutex{},
+	}
+}
+
+// SetRouter sets the router if it has never been set.
+func (a *atomicRouter) set(router *corrupt.GossipSubRouter) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.router == nil {
+		a.router = router
+		return true
+	}
+	return false
+}
+
+// Get returns the router.
+func (a *atomicRouter) Get() *corrupt.GossipSubRouter {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.router
 }
 
 // TODO: SpamIWant, SpamGraft, SpamPrune.

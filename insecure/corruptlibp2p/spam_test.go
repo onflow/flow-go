@@ -28,21 +28,7 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
-	router := newAtomicRouter()
-	spammerNode, spammerId := p2ptest.NodeFixture(
-		t,
-		sporkId,
-		t.Name(),
-		p2ptest.WithRole(flow.RoleConsensus),
-		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
-			require.NotNil(t, r)
-			router.set(r)
-		}),
-			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
-				// here we can inspect the incoming RPC message to the spammer node
-				return nil
-			})),
-	)
+	spammerNode, spammerId, router := corruptlibp2p.GetSpammerNode(t, sporkId)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
@@ -78,7 +64,7 @@ func TestSpam_IHave(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.
-		return router.get() != nil
+		return router.Get() != nil
 	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
 
 	// prior to the test we should ensure that spammer and victim connect and discover each other.
@@ -88,8 +74,8 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
 
-	// create new spammer
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.get())
+	// create new spammer with fully initialized gossipsub router
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.Get())
 	require.NotNil(t, router)
 
 	// prepare to spam - generate iHAVE control messages
@@ -103,35 +89,4 @@ func TestSpam_IHave(t *testing.T) {
 
 	// check contents of received messages should match what spammer sent
 	require.ElementsMatch(t, iHaveReceivedCtlMsgs, iHaveSentCtlMsgs)
-}
-
-// atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.
-// This is done to avoid race conditions when accessing the router from multiple goroutines.
-type atomicRouter struct {
-	mu     sync.Mutex
-	router *corrupt.GossipSubRouter
-}
-
-func newAtomicRouter() *atomicRouter {
-	return &atomicRouter{
-		mu: sync.Mutex{},
-	}
-}
-
-// SetRouter sets the router if it has never been set.
-func (a *atomicRouter) set(router *corrupt.GossipSubRouter) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.router == nil {
-		a.router = router
-		return true
-	}
-	return false
-}
-
-// GetRouter returns the router.
-func (a *atomicRouter) get() *corrupt.GossipSubRouter {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.router
 }
