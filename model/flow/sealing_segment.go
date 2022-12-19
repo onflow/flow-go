@@ -352,6 +352,9 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.blocks) == 0 {
 		return fmt.Errorf("root segment must have at least 1 block")
 	}
+	if len(builder.extraBlocks) > 0 {
+		return fmt.Errorf("root segment cannot have extra blocks")
+	}
 	if builder.lowest().Header.View != 0 {
 		return fmt.Errorf("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
 	}
@@ -385,6 +388,12 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
 	if len(builder.blocks) == 0 {
 		return fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but got an empty sealing segment: %w", ErrSegmentBlocksWrongLen)
+	}
+
+	if len(builder.extraBlocks) > 0 {
+		if builder.extraBlocks[0].Header.Height+1 != builder.lowest().Header.Height {
+			return fmt.Errorf("extra blocks don't connect to lowest block in segment")
+		}
 	}
 
 	// if root sealing segment, use different validation

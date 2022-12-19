@@ -422,3 +422,9 @@ func TestAddBlock_StorageError(t *testing.T) {
 		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
 	})
 }
+
+func TestAddExtraBlock(t *testing.T) {
+	t.Run("empty-segment", func(t *testing.T) {
+		
+	})
+}

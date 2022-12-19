@@ -228,6 +228,7 @@ func TestSealingSegment(t *testing.T) {
 
 			assert.Len(t, actual.ExecutionResults, 1)
 			assert.Len(t, actual.Blocks, 1)
+			assert.Empty(t, actual.ExtraBlocks)
 			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(head.ID()))
@@ -237,7 +238,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment for non-root segment where the latest seal is the
 	// root seal, but the segment contains more than the root block.
 	// ROOT <- B1
-	// Expected sealing segment: [ROOT, B1]
+	// Expected sealing segment: [ROOT, B1], extra blocks: []
 	t.Run("non-root with root seal as latest seal", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build an extra block on top of root
@@ -254,6 +255,7 @@ func TestSealingSegment(t *testing.T) {
 			// B2 is reference of snapshot, B1 is latest sealed
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Lowest(), block1}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
+			assert.Empty(t, segment.ExtraBlocks)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
 		})
 	})
@@ -261,7 +263,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment for non-root segment with simple sealing structure
 	// (no blocks in between reference block and latest sealed)
 	// ROOT <- B1 <- B2(S1)
-	// Expected sealing segment: [B1, B2]
+	// Expected sealing segment: [B1, B2], extra blocks: [ROOT]
 	t.Run("non-root", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
@@ -277,6 +279,9 @@ func TestSealingSegment(t *testing.T) {
 			segment, err := state.AtBlockID(block2.ID()).SealingSegment()
 			require.NoError(t, err)
 
+			require.Len(t, segment.ExtraBlocks, 1)
+			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
+
 			// build a valid child B3 to ensure we have a QC
 			buildBlock(t, state, unittest.BlockWithParentFixture(block2.Header))
 
@@ -291,7 +296,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment for sealing segment with a large number of blocks
 	// between the reference block and latest sealed
 	// ROOT <- B1 <- .... <- BN(S1)
-	// Expected sealing segment: [B1, ..., BN]
+	// Expected sealing segment: [B1, ..., BN], extra blocks: [ROOT]
 	t.Run("long sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
@@ -322,6 +327,8 @@ func TestSealingSegment(t *testing.T) {
 			assert.Len(t, segment.ExecutionResults, 1)
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
+			assert.Len(t, segment.ExtraBlocks, 1)
+			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
 			// first and last blocks should be B1, BN
 			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
 			assert.Equal(t, blockN.ID(), segment.Blocks[101].ID())
@@ -332,7 +339,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment where the segment blocks contain seals for
 	// ancestor blocks prior to the sealing segment
 	// ROOT <- B1 <- B2(R1) <- B3 <- B4(R2, S1) <- B5 <- B6(S2)
-	// Expected sealing segment: [B2, B3, B4]
+	// Expected sealing segment: [B2, B3, B4], Extra blocks: [ROOT, B1]
 	t.Run("overlapping sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
@@ -369,6 +376,7 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should be [B2, B3, B4, B5, B6]
 			require.Len(t, segment.Blocks, 5)
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 			require.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block6.ID()))
