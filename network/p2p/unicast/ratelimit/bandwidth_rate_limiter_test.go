@@ -1,11 +1,12 @@
 package ratelimit
 
 import (
+	"testing"
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
