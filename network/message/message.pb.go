@@ -30,7 +30,7 @@ type Message struct {
 	OriginID             []byte   `protobuf:"bytes,3,opt,name=OriginID,proto3" json:"OriginID,omitempty"` // Deprecated: Do not use.
 	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
 	Payload              []byte   `protobuf:"bytes,5,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	Type                 string   `protobuf:"bytes,6,opt,name=Protocol,proto3" json:"Protocol,omitempty"` // Deprecated: Do not use.
+	Type                 string   `protobuf:"bytes,6,opt,name=Type,proto3" json:"Type,omitempty"` // Deprecated: Do not use.
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -459,7 +459,7 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Protocol", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
