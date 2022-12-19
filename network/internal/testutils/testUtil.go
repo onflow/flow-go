@@ -91,7 +91,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *TagWatchingConnManager {
 	cm := connection.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -357,7 +357,7 @@ func generateLibP2PNode(t *testing.T,
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
+	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,

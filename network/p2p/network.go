@@ -58,7 +58,7 @@ type Network struct {
 	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
-	metrics                     module.NetworkMetrics
+	metrics                     module.NetworkCoreMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
@@ -103,7 +103,7 @@ type NetworkParameters struct {
 	MiddlewareFactory   func() (network.Middleware, error)
 	Topology            network.Topology
 	SubscriptionManager network.SubscriptionManager
-	Metrics             module.NetworkMetrics
+	Metrics             module.NetworkCoreMetrics
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
 	Options             []NetworkOptFunction

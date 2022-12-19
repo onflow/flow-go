@@ -85,6 +85,7 @@ type LibP2PMetrics interface {
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
+	LibP2PConnectionMetrics
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -99,35 +100,36 @@ type NetworkInboundQueueMetrics interface {
 	QueueDuration(duration time.Duration, priority int)
 }
 
-type NetworkMetrics interface {
-	LibP2PMetrics
-	NetworkSecurityMetrics
+type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
-
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
-
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
-
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string, messageType string)
-
 	DirectMessageStarted(topic string)
-
 	DirectMessageFinished(topic string)
-
 	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
 	MessageProcessingStarted(topic string)
-
 	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
 	MessageProcessingFinished(topic string, duration time.Duration)
+}
 
+// LibP2PConnectionMetrics encapsulates the metrics collectors for the connection manager of the libp2p node.
+type LibP2PConnectionMetrics interface {
 	// OutboundConnections updates the metric tracking the number of outbound connections of this node
 	OutboundConnections(connectionCount uint)
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+}
+
+// NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
+type NetworkMetrics interface {
+	LibP2PMetrics
+	NetworkSecurityMetrics
+	NetworkCoreMetrics
 }
 
 type EngineMetrics interface {
