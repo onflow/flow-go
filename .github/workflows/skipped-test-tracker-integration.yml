@@ -22,7 +22,7 @@ jobs:
       matrix:
         test-category:
 #          - unit
-#          - unit-crypto
+          - unit-crypto
 #          - unit-insecure
 #          - unit-integration
 #          - integration-bft
