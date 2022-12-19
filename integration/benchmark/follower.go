@@ -187,12 +187,14 @@ func (f *txFollowerImpl) getNextBlocksTransactions() (*flowsdk.BlockHeader, []*f
 	nextHeight := f.Height() + 1
 	hdr, err := f.client.GetBlockHeaderByHeight(ctx, nextHeight)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get latest block header: %w", err)
+		return nil, nil, fmt.Errorf("failed to get block header for height: %d: %w",
+			nextHeight, err)
 	}
 
 	results, err := f.client.GetTransactionResultsByBlockID(ctx, hdr.ID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get block by height: %w", err)
+		return nil, nil, fmt.Errorf("results for block are not available: %d/%s: %w",
+			hdr.Height, hdr.ID, err)
 	}
 
 	return hdr, results, nil
