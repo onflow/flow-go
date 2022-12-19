@@ -33,11 +33,63 @@ const (
 type collectionItem struct {
 	blockId string
 
+	collectionIndex int
+
 	*entity.CompleteCollection
 
 	ctx fvm.Context
 
 	isSystemCollection bool
+}
+
+func (collection collectionItem) Transactions(
+	startTxIndex uint32,
+) []transaction {
+	txns := make(
+		[]transaction,
+		0,
+		len(collection.CompleteCollection.Transactions))
+
+	logger := collection.ctx.Logger.With().
+		Str("block_id", collection.blockId).
+		Uint64("height", collection.ctx.BlockHeader.Height).
+		Bool("system_chunk", collection.isSystemCollection).
+		Bool("system_transaction", collection.isSystemCollection).
+		Logger()
+
+	for idx, txBody := range collection.CompleteCollection.Transactions {
+		txIndex := startTxIndex + uint32(idx)
+		txns = append(
+			txns,
+			transaction{
+				blockIdStr:          collection.blockId,
+				collectionIndex:     collection.collectionIndex,
+				txIndex:             txIndex,
+				isSystemTransaction: collection.isSystemCollection,
+				ctx: fvm.NewContextFromParent(
+					collection.ctx,
+					fvm.WithLogger(
+						logger.With().
+							Str("tx_id", txBody.ID().String()).
+							Uint32("tx_index", txIndex).
+							Logger())),
+				TransactionBody: txBody,
+			})
+	}
+
+	return txns
+}
+
+type transaction struct {
+	blockIdStr string
+
+	collectionIndex int
+	txIndex         uint32
+
+	isSystemTransaction bool
+
+	ctx fvm.Context
+	*flow.TransactionBody
 }
 
 // VirtualMachine runs procedures
@@ -157,11 +209,12 @@ func (e *blockComputer) getCollections(
 		fvm.WithBlockHeader(block.Block.Header),
 		fvm.WithDerivedBlockData(derivedBlockData))
 
-	for _, collection := range rawCollections {
+	for idx, collection := range rawCollections {
 		collections = append(
 			collections,
 			collectionItem{
 				blockId:            blockIdStr,
+				collectionIndex:    idx,
 				CompleteCollection: collection,
 				ctx:                blockCtx,
 				isSystemCollection: false,
@@ -178,7 +231,8 @@ func (e *blockComputer) getCollections(
 	collections = append(
 		collections,
 		collectionItem{
-			blockId: blockIdStr,
+			blockId:         blockIdStr,
+			collectionIndex: len(collections),
 			CompleteCollection: &entity.CompleteCollection{
 				Transactions: []*flow.TransactionBody{systemTxn},
 			},
@@ -222,11 +276,10 @@ func (e *blockComputer) executeBlock(
 	defer collector.Stop()
 
 	var txIndex uint32
-	for collectionIndex, collection := range collections {
+	for _, collection := range collections {
 		colView := stateView.NewChild()
 		txIndex, err = e.executeCollection(
 			blockSpan,
-			collectionIndex,
 			txIndex,
 			colView,
 			collection,
@@ -301,8 +354,7 @@ func generateExecutionData(
 
 func (e *blockComputer) executeCollection(
 	blockSpan otelTrace.Span,
-	collectionIndex int,
-	txIndex uint32,
+	startTxIndex uint32,
 	collectionView state.View,
 	collection collectionItem,
 	collector *resultCollector,
@@ -310,6 +362,8 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
+
+	txns := collection.Transactions(startTxIndex)
 
 	var colSpan otelTrace.Span
 	if collection.isSystemCollection {
@@ -326,7 +380,7 @@ func (e *blockComputer) executeCollection(
 			trace.EXEComputeCollection)
 
 		colSpan.SetAttributes(
-			attribute.Int("collection.txCount", len(collection.Transactions)),
+			attribute.Int("collection.txCount", len(txns)),
 			attribute.String(
 				"collection.hash",
 				collection.Guarantee.CollectionID.String()))
@@ -339,11 +393,10 @@ func (e *blockComputer) executeCollection(
 
 	defer colSpan.End()
 
-	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(collection.blockId, txBody, colSpan, collectionView, collection.ctx, collectionIndex, txIndex, collector, collection.isSystemCollection)
-		txIndex++
+	for _, txn := range txns {
+		err := e.executeTransaction(colSpan, txn, collectionView, collector)
 		if err != nil {
-			return txIndex, err
+			return txn.txIndex, err
 		}
 	}
 
@@ -353,41 +406,35 @@ func (e *blockComputer) executeCollection(
 			Str("referenceBlockID",
 				collection.Guarantee.ReferenceBlockID.String()).
 			Str("block_id", collection.blockId).
-			Int("numberOfTransactions", len(collection.Transactions)).
+			Int("numberOfTransactions", len(txns)).
 			Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 			Msg("collection executed")
 	}
 
 	stats := collector.CommitCollection(
-		collectionIndex,
 		collection,
 		collectionView)
 
 	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), stats)
-	return txIndex, nil
+	return startTxIndex + uint32(len(txns)), nil
 }
 
 func (e *blockComputer) executeTransaction(
-	blockIdStr string,
-	txBody *flow.TransactionBody,
-	colSpan otelTrace.Span,
+	parentSpan otelTrace.Span,
+	txn transaction,
 	collectionView state.View,
-	ctx fvm.Context,
-	collectionIndex int,
-	txIndex uint32,
 	collector *resultCollector,
-	isSystemTransaction bool,
 ) error {
 	startedAt := time.Now()
 	memAllocBefore := debug.GetHeapAllocsBytes()
-	txID := txBody.ID()
+	txID := txn.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
-	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+	txSpan := e.tracer.StartSpanFromParent(parentSpan, trace.EXEComputeTransaction)
 	txSpan.SetAttributes(
 		attribute.String("tx_id", txID.String()),
-		attribute.Int64("tx_index", int64(txIndex)),
-		attribute.Int("col_index", collectionIndex),
+		attribute.Int64("tx_index", int64(txn.txIndex)),
+		attribute.Int("col_index", txn.collectionIndex),
 	)
 	defer txSpan.End()
 
@@ -401,35 +448,25 @@ func (e *blockComputer) executeTransaction(
 
 	e.log.Info().
 		Str("tx_id", txID.String()).
-		Uint32("tx_index", txIndex).
-		Str("block_id", blockIdStr).
-		Uint64("height", ctx.BlockHeader.Height).
-		Bool("system_chunk", isSystemTransaction).
-		Bool("system_transaction", isSystemTransaction).
+		Uint32("tx_index", txn.txIndex).
+		Str("block_id", txn.blockIdStr).
+		Uint64("height", txn.ctx.BlockHeader.Height).
+		Bool("system_chunk", txn.isSystemTransaction).
+		Bool("system_transaction", txn.isSystemTransaction).
 		Msg("executing transaction in fvm")
 
-	tx := fvm.Transaction(txBody, txIndex)
+	proc := fvm.Transaction(txn.TransactionBody, txn.txIndex)
 	if isSampled {
-		tx.SetTraceSpan(txInternalSpan)
+		proc.SetTraceSpan(txInternalSpan)
 	}
 
 	txView := collectionView.NewChild()
-	childCtx := fvm.NewContextFromParent(ctx,
-		fvm.WithLogger(ctx.Logger.With().
-			Str("tx_id", txID.String()).
-			Uint32("tx_index", txIndex).
-			Str("block_id", blockIdStr).
-			Uint64("height", ctx.BlockHeader.Height).
-			Bool("system_chunk", isSystemTransaction).
-			Bool("system_transaction", isSystemTransaction).
-			Logger()),
-	)
-	err := e.vm.Run(childCtx, tx, txView)
+	err := e.vm.Run(txn.ctx, proc, txView)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %s at height %v: %w",
 			txID.String(),
-			blockIdStr,
-			ctx.BlockHeader.Height,
+			txn.blockIdStr,
+			txn.ctx.BlockHeader.Height,
 			err)
 	}
 
@@ -445,36 +482,36 @@ func (e *blockComputer) executeTransaction(
 			txID.String(), err)
 	}
 
-	collector.AddTransactionResult(collectionIndex, tx)
+	collector.AddTransactionResult(txn.collectionIndex, proc)
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
 	lg := e.log.With().
 		Str("tx_id", txID.String()).
-		Str("block_id", blockIdStr).
+		Str("block_id", txn.blockIdStr).
 		Str("traceID", traceID).
-		Uint64("computation_used", tx.ComputationUsed).
-		Uint64("memory_used", tx.MemoryEstimate).
+		Uint64("computation_used", proc.ComputationUsed).
+		Uint64("memory_used", proc.MemoryEstimate).
 		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Logger()
 
-	if tx.Err != nil {
-		errMsg := tx.Err.Error()
+	if proc.Err != nil {
+		errMsg := proc.Err.Error()
 
 		lg.Info().
 			Str("error_message", errMsg).
-			Uint16("error_code", uint16(tx.Err.Code())).
+			Uint16("error_code", uint16(proc.Err.Code())).
 			Msg("transaction execution failed")
 
-		if isSystemTransaction {
+		if txn.isSystemTransaction {
 			// This log is used as the data source for an alert on grafana.
 			// The system_chunk_error field must not be changed without adding
 			// the corresponding changes in grafana.
 			// https://github.com/dapperlabs/flow-internal/issues/1546
 			e.log.Error().
 				Str("error_message", errMsg).
-				Hex("block_id", logging.Entity(ctx.BlockHeader)).
+				Hex("block_id", logging.Entity(txn.ctx.BlockHeader)).
 				Bool("system_chunk_error", true).
 				Bool("system_transaction_error", true).
 				Bool("critical_error", true).
@@ -486,12 +523,12 @@ func (e *blockComputer) executeTransaction(
 
 	e.metrics.ExecutionTransactionExecuted(
 		time.Since(startedAt),
-		tx.ComputationUsed,
-		tx.MemoryEstimate,
+		proc.ComputationUsed,
+		proc.MemoryEstimate,
 		memAllocAfter-memAllocBefore,
-		len(tx.Events),
-		flow.EventsList(tx.Events).ByteSize(),
-		tx.Err != nil,
+		len(proc.Events),
+		flow.EventsList(proc.Events).ByteSize(),
+		proc.Err != nil,
 	)
 	return nil
 }
