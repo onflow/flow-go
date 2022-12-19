@@ -10,6 +10,7 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
+  BIGQUERY_TABLE2: test_results
   GO_VERSION: 1.19
 
 concurrency: 
@@ -42,6 +43,7 @@ jobs:
       COMMIT_SHA: ${{ github.sha }}
       RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
+      RESULTS_FILE: test-results
     runs-on: ubuntu-latest
     steps:
     - name: Get job run date
@@ -75,9 +77,15 @@ jobs:
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-    - name: Upload results to BigQuery
+    - name: Upload results to BigQuery (skipped tests)
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 1
         max_attempts: 3
         command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
+    - name: Upload results to BigQuery (test run)
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 2
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
