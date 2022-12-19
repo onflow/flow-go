@@ -137,7 +137,7 @@ func NewOutgoingScope(
 
 	msg, err := scope.buildMessage()
 	if err != nil {
-		return nil, fmt.Errorf("could not build message: %v", err)
+		return nil, fmt.Errorf("could not build message: %w", err)
 	}
 	scope.msg = msg
 	return scope, nil
