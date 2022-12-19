@@ -183,6 +183,19 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
+		for _, block := range segment.ExtraBlocks {
+			blockID := block.ID()
+			height := block.Header.Height
+			err := state.blocks.StoreTx(block)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert root block: %w", err)
+			}
+			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+			}
+		}
+
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height

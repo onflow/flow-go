@@ -172,6 +172,12 @@ func (segment *SealingSegment) Validate() error {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
 	}
+	for _, block := range segment.ExtraBlocks {
+		err := builder.AddExtraBlock(block)
+		if err != nil {
+			return fmt.Errorf("invalid segment: %w", err)
+		}
+	}
 	_, err := builder.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("invalid segment: %w", err)
@@ -318,6 +324,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	return &SealingSegment{
 		Blocks:           builder.blocks,
+		ExtraBlocks:      builder.extraBlocks,
 		ExecutionResults: builder.results,
 		LatestSeals:      builder.latestSeals,
 		FirstSeal:        builder.firstSeal,
