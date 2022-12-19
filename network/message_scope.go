@@ -15,6 +15,9 @@ const (
 	eventIDPackingPrefix = "libp2ppacking"
 )
 
+// ProtocolType defines the type of the protocol a message is sent over. Currently, we have two types of protocols:
+// - unicast: a message is sent to a single node through a direct connection.
+// - pubsub: a message is sent to a set of nodes through a pubsub channel.
 type ProtocolType string
 
 func (m ProtocolType) String() string {
@@ -29,14 +32,14 @@ const (
 	ProtocolTypePubSub ProtocolType = "pubsub"
 )
 
-// IncomingMessageScope captures the context around an incoming message.
+// IncomingMessageScope captures the context around an incoming message that is received by the network layer.
 type IncomingMessageScope struct {
-	originId       flow.Identifier  // the origin node ID.
-	eventId        hash.Hash        // hash of the payload and channel.
-	msg            *message.Message // the message received.
-	decodedPayload interface{}      // decoded payload of the message.
-	protocol       ProtocolType     // the type of protocol used to receive the message.
-	targetIds      flow.IdentifierList
+	originId       flow.Identifier     // the origin node ID.
+	targetIds      flow.IdentifierList // the target node IDs (i.e., intended recipients).
+	eventId        hash.Hash           // hash of the payload and channel.
+	msg            *message.Message    // the raw message received.
+	decodedPayload interface{}         // decoded payload of the message.
+	protocol       ProtocolType        // the type of protocol used to receive the message.
 }
 
 func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
@@ -95,12 +98,13 @@ func (m IncomingMessageScope) PayloadType() string {
 	return MessageType(m.msg.Payload)
 }
 
+// OutgoingMessageScope captures the context around an outgoing message that is about to be sent.
 type OutgoingMessageScope struct {
 	targetIds flow.IdentifierList               // the target node IDs.
 	channelId channels.Channel                  // the channel ID.
 	payload   interface{}                       // the payload to be sent.
 	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
-	msg       *message.Message                  // proto message sent on wire.
+	msg       *message.Message                  // raw proto message sent on wire.
 	protocol  ProtocolType                      // the type of protocol used to send the message.
 }
 
@@ -122,6 +126,12 @@ func NewOutgoingScope(
 		// for unicast messages, we should have exactly one target.
 		if len(targetIds) != 1 {
 			return nil, fmt.Errorf("expected exactly one target id for unicast message, got: %d", len(targetIds))
+		}
+	}
+	if protocolType == ProtocolTypePubSub {
+		// for pubsub messages, we should have at least one target.
+		if len(targetIds) == 0 {
+			return nil, fmt.Errorf("expected at least one target id for pubsub message, got: %d", len(targetIds))
 		}
 	}
 
@@ -149,6 +159,7 @@ func (o OutgoingMessageScope) Channel() channels.Channel {
 	return o.channelId
 }
 
+// buildMessage builds the raw proto message to be sent on the wire.
 func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
 	payload, err := o.encoder(o.payload)
 	if err != nil {
@@ -172,6 +183,7 @@ func (o OutgoingMessageScope) Proto() *message.Message {
 	return o.msg
 }
 
+// EventId computes the event ID for a given channel and payload (i.e., the hash of the payload and channel).
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
@@ -188,6 +200,7 @@ func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	return h.SumHash(), nil
 }
 
+// MessageType returns the type of the message payload.
 func MessageType(decodedPayload interface{}) string {
 	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }
