@@ -512,7 +512,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
-			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
+			require.Equal(m.T(), testChannel, msg.ChannelId())                                            // channel
 			require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())                            // sender id
 			require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0])                         // target id
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
@@ -571,7 +571,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 				msg, ok := args[0].(*network.IncomingMessageScope)
 				require.True(m.T(), ok)
 
-				require.Equal(m.T(), testChannel, msg.Channel())                      // channel
+				require.Equal(m.T(), testChannel, msg.ChannelId())                    // channel
 				require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())    // sender id
 				require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0]) // target id
 				require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())     // protocol
@@ -652,13 +652,13 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
-			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
+			require.Equal(m.T(), testChannel, msg.ChannelId())                                            // channel
 			require.Equal(m.T(), m.ids[first].NodeID, msg.OriginId())                                     // sender id
 			require.Equal(m.T(), lastNode, msg.TargetIDs()[0])                                            // target id
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
 			require.Equal(m.T(), expectedSendMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
-			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
+			eventId, err := network.EventId(msg.ChannelId(), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 
@@ -675,13 +675,13 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
-			require.Equal(m.T(), testChannel, msg.Channel())                                               // channel
+			require.Equal(m.T(), testChannel, msg.ChannelId())                                             // channel
 			require.Equal(m.T(), m.ids[last].NodeID, msg.OriginId())                                       // sender id
 			require.Equal(m.T(), firstNode, msg.TargetIDs()[0])                                            // target id
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                              // protocol
 			require.Equal(m.T(), expectedReplyMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
-			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
+			eventId, err := network.EventId(msg.ChannelId(), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 		})
@@ -758,12 +758,12 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
-			require.Equal(m.T(), channels.ProvideChunks, msg.Channel())
+			require.Equal(m.T(), channels.ProvideChunks, msg.ChannelId())
 			require.Equal(m.T(), m.ids[sourceIndex].NodeID, msg.OriginId())
 			require.Equal(m.T(), targetNode, msg.TargetIDs()[0])
 			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())
 
-			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
+			eventId, err := network.EventId(msg.ChannelId(), msg.Proto().Payload)
 			require.NoError(m.T(), err)
 			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
 			close(ch)

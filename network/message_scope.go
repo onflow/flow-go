@@ -78,7 +78,7 @@ func (m IncomingMessageScope) Protocol() ProtocolType {
 	return m.protocol
 }
 
-func (m IncomingMessageScope) Channel() channels.Channel {
+func (m IncomingMessageScope) ChannelId() channels.Channel {
 	return channels.Channel(m.msg.ChannelID)
 }
 
@@ -155,7 +155,7 @@ func (o OutgoingMessageScope) PayloadType() string {
 	return MessageType(o.payload)
 }
 
-func (o OutgoingMessageScope) Channel() channels.Channel {
+func (o OutgoingMessageScope) ChannelId() channels.Channel {
 	return o.channelId
 }
 
