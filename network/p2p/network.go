@@ -463,7 +463,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.NetworkMessageSent(msg.Size(), string(channel), network.MessageType(message))
+	n.metrics.NetworkMessageSent(msg.Size(), string(channel), msg.MessageType())
 
 	return nil
 }
