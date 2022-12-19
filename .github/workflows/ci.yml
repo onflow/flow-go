@@ -256,7 +256,7 @@ jobs:
       # This proved to be more reliable than installing it locally.
       run: cd integration/localnet && sh client/client.sh
     - name: Set up Localnet
-      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 init && make start'
+      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 bootstrap && make start-flow'
     - name: Ensure Observer is started
       run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
     - name: Get Client Version ensuring the client is provisioned
