@@ -7,6 +7,7 @@ on:
     branches:
       - staging
       - trying
+      - misha/3739-fix-flaky-test-monitor-no-data-for-TestStaticEpochTransition
 
 env:
   GO_VERSION: 1.19
@@ -22,20 +23,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - unit
-          - unit-crypto
-          - unit-insecure
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
+#          - unit
+#          - unit-crypto
+#          - unit-insecure
+#          - unit-integration
+#          - integration-bft
+#          - integration-mvp
+#          - integration-ghost
+#          - integration-network
           - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
+#          - integration-access
+#          - integration-collection
+#          - integration-consensus
+#          - integration-execution
+#          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
@@ -64,6 +65,9 @@ jobs:
         TEST_FLAKY: true
         JSON_OUTPUT: true
         RACE_DETECTOR: 1
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: success() || failure()
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:
