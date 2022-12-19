@@ -5,6 +5,7 @@ on:
     branches:
       - staging
       - trying
+      - misha/3739-fix-flaky-test-monitor-no-data-for-TestStaticEpochTransition
 
 env:
   GO_VERSION: 1.19
