@@ -31,7 +31,7 @@ func (d TransactionStorageLimiter) CheckStorageLimits(
 		return nil
 	}
 
-	defer env.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
+	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
 	err := d.checkStorageLimits(env, addresses, payer, maxTxFees)
 	if err != nil {

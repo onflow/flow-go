@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -16,7 +17,7 @@ var _ Environment = &facadeEnvironment{}
 type facadeEnvironment struct {
 	*Runtime
 
-	*Tracer
+	tracing.TracerSpan
 	Meter
 
 	*ProgramLogger
@@ -50,12 +51,12 @@ type facadeEnvironment struct {
 }
 
 func newFacadeEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	derivedTxnData DerivedTransactionData,
 	meter Meter,
 ) *facadeEnvironment {
-	tracer := NewTracer(params.TracerParams)
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
 	runtime := NewRuntime(params.RuntimeParams)
@@ -68,8 +69,8 @@ func newFacadeEnvironment(
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
-		Tracer: tracer,
-		Meter:  meter,
+		TracerSpan: tracer,
+		Meter:      meter,
 
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
@@ -147,6 +148,7 @@ func NewScriptEnvironment(
 	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracing.NewTracerSpan(),
 		params,
 		txnState,
 		derivedTxnData,
@@ -158,11 +160,13 @@ func NewScriptEnvironment(
 }
 
 func NewTransactionEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracer,
 		params,
 		txnState,
 		derivedTxnData,
@@ -171,11 +175,11 @@ func NewTransactionEnvironment(
 
 	env.TransactionInfo = NewTransactionInfo(
 		params.TransactionInfoParams,
-		env.Tracer,
+		tracer,
 		params.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = NewEventEmitter(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.Chain,
 		params.TransactionInfoParams,
@@ -186,7 +190,7 @@ func NewTransactionEnvironment(
 		params.Chain,
 		env.accounts,
 		params.ServiceAccountEnabled,
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
@@ -195,7 +199,7 @@ func NewTransactionEnvironment(
 		env.accounts,
 		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
 		env.TransactionInfo,
@@ -206,7 +210,7 @@ func NewTransactionEnvironment(
 		env.Runtime)
 
 	env.AccountKeyUpdater = NewAccountKeyUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
 		txnState,
