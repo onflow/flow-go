@@ -1,11 +1,9 @@
 package environment
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/atree"
-	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
@@ -122,16 +120,7 @@ func (store *valueStore) GetValue(
 
 	var valueByteSize int
 	span := store.tracer.StartSpanFromRoot(trace.FVMEnvGetValue)
-	defer func() {
-		if !trace.IsSampled(span) {
-			span.SetAttributes(
-				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", key),
-				attribute.Int("valueByteSize", valueByteSize),
-			)
-		}
-		span.End()
-	}()
+	defer span.End()
 
 	address := flow.BytesToAddress(owner)
 	if state.IsFVMStateKey(string(owner), key) {
@@ -162,12 +151,6 @@ func (store *valueStore) SetValue(
 	key := string(keyBytes)
 
 	span := store.tracer.StartSpanFromRoot(trace.FVMEnvSetValue)
-	if !trace.IsSampled(span) {
-		span.SetAttributes(
-			attribute.String("owner", hex.EncodeToString(owner)),
-			attribute.String("key", key),
-		)
-	}
 	defer span.End()
 
 	address := flow.BytesToAddress(owner)
