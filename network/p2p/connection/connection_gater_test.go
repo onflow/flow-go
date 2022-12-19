@@ -94,7 +94,7 @@ func TestConnectionGating(t *testing.T) {
 		node2Peers.Add(node1.Host().ID(), struct{}{})
 
 		// now both nodes should be able to connect to each other.
-		p2pfixtures.EnsureStreamCreationInBothDirections(t, ctx, []p2p.LibP2PNode{node1, node2})
+		p2ptest.EnsureStreamCreationInBothDirections(t, ctx, []p2p.LibP2PNode{node1, node2})
 	})
 }
 
@@ -273,7 +273,7 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 
 // ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
-	p2pfixtures.EnsureConnected(t, ctx, nodes)
+	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2pfixtures.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic

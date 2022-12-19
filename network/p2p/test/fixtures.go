@@ -304,3 +304,32 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 		}
 	}
 }
+
+// EnsureConnected ensures that the given nodes are connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, node := range nodes {
+		for _, other := range nodes {
+			if node == other {
+				continue
+			}
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
+		}
+	}
+}
+
+// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
+func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}

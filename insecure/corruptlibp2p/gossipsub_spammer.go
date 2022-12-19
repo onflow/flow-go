@@ -1,12 +1,11 @@
 package corruptlibp2p
 
 import (
-	"testing"
-
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	pubsub "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	"testing"
 )
 
 type ControlMessage int
@@ -26,9 +25,9 @@ func NewGossipSubRouterSpammer(router *pubsub.GossipSubRouter) *GossipSubRouterS
 // SpamIHave spams the victim with junk iHave messages.
 // msgCount is the number of iHave messages to send.
 // msgSize is the number of messageIDs to include in each iHave message.
-func (s *GossipSubRouterSpammer) SpamIHave(victim peer.ID, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim peer.ID, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
-		s.router.SendControl(victim, &ctlMessage)
+		require.True(t, s.router.SendControl(victim, &ctlMessage))
 	}
 }
 
