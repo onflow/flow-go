@@ -391,7 +391,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), network.MessageType(payload))
+	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), msg.MessageType())
 
 	return nil
 }
