@@ -1,7 +1,11 @@
 package fvm
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/onflow/flow-go/crypto/hash"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -193,8 +197,32 @@ func (v *TransactionVerifier) verifyAccountSignature(
 		return errorBuilder(txSig, fmt.Errorf("account key has been revoked"))
 	}
 
+	signature := txSig.Signature
+
+	// create io reader from signature bytes
+	sigReader := bytes.NewReader(txSig.Signature)
+	resp, err := protocol.ParseCredentialRequestResponseBody(sigReader)
+	if err == nil {
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+		if err != nil {
+			// todo
+			panic(err)
+		}
+		expectedHash := hasher.ComputeHash(message).Hex()
+		if resp.Response.CollectedClientData.Challenge != expectedHash {
+			return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
+		}
+
+		clientDataHash := sha256.Sum256(resp.Raw.AssertionResponse.ClientDataJSON)
+
+		sigData := append(resp.Raw.AssertionResponse.AuthenticatorData, clientDataHash[:]...)
+
+		message = sigData
+		signature = resp.Raw.AssertionResponse.Signature
+	}
+
 	valid, err := crypto.VerifySignatureFromTransaction(
-		txSig.Signature,
+		signature,
 		message,
 		accountKey.PublicKey,
 		accountKey.HashAlgo,
