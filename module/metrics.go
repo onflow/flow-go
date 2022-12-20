@@ -100,19 +100,23 @@ type NetworkInboundQueueMetrics interface {
 	QueueDuration(duration time.Duration, priority int)
 }
 
+// NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
-	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string, messageType string)
-	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
-	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string, messageType string)
-	DirectMessageStarted(topic string)
-	DirectMessageFinished(topic string)
-	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
+	// OutboundMessageSent collects metrics related to a message sent by the node.
+	OutboundMessageSent(sizeBytes int, topic string, messageType string)
+	// InboundMessageReceived collects metrics related to a message received by the node.
+	InboundMessageReceived(sizeBytes int, topic string, messageType string)
+	// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+	DuplicateInboundMessagesDropped(topic string, messageType string)
+	// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingStarted(topic string)
+	// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingCompleted(topic string)
+	// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 	MessageProcessingStarted(topic string)
-	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+	// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+	// the number of messages being processed by the node.
 	MessageProcessingFinished(topic string, duration time.Duration)
 }
 

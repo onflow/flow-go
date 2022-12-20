@@ -323,7 +323,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 }
 
 func (n *Network) Receive(msg *network.IncomingMessageScope) error {
-	n.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelId().String(), msg.Protocol().String())
+	n.metrics.InboundMessageReceived(msg.Size(), msg.ChannelId().String(), msg.Protocol().String())
 
 	err := n.processNetworkMessage(msg)
 	if err != nil {
@@ -342,7 +342,7 @@ func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error
 			Str("channel", msg.ChannelId().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(msg.ChannelId().String(), msg.Protocol().String())
+		n.metrics.DuplicateInboundMessagesDropped(msg.ChannelId().String(), msg.Protocol().String())
 
 		return nil
 	}
@@ -383,14 +383,14 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
-	n.metrics.DirectMessageStarted(msg.ChannelId().String())
-	defer n.metrics.DirectMessageFinished(msg.ChannelId().String())
+	n.metrics.UnicastMessageSendingStarted(msg.ChannelId().String())
+	defer n.metrics.UnicastMessageSendingCompleted(msg.ChannelId().String())
 	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.metrics.NetworkMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), network.ProtocolTypeUnicast.String(), msg.PayloadType())
 
 	return nil
 }
@@ -462,7 +462,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.NetworkMessageSent(msg.Size(), string(channel), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), string(channel), msg.PayloadType())
 
 	return nil
 }

@@ -252,14 +252,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// create middleware
 	netmet := mock.NewNetworkMetrics(m.T())
 	calls := 0
-	netmet.On("NetworkMessageReceived", mockery.Anything, mockery.Anything, mockery.Anything).Times(5).Run(func(args mockery.Arguments) {
+	netmet.On("InboundMessageReceived", mockery.Anything, mockery.Anything, mockery.Anything).Times(5).Run(func(args mockery.Arguments) {
 		calls++
 		if calls == 5 {
 			close(ch)
 		}
 	})
 	// we expect 5 messages to be processed the rest will be rate limited
-	defer netmet.AssertNumberOfCalls(m.T(), "NetworkMessageReceived", 5)
+	defer netmet.AssertNumberOfCalls(m.T(), "InboundMessageReceived", 5)
 
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
 		m.logger,

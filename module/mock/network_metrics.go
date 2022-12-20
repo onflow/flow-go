@@ -95,12 +95,12 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 }
 
 // DirectMessageFinished provides a mock function with given fields: topic
-func (_m *NetworkMetrics) DirectMessageFinished(topic string) {
+func (_m *NetworkMetrics) UnicastMessageSendingCompleted(topic string) {
 	_m.Called(topic)
 }
 
 // DirectMessageStarted provides a mock function with given fields: topic
-func (_m *NetworkMetrics) DirectMessageStarted(topic string) {
+func (_m *NetworkMetrics) UnicastMessageSendingStarted(topic string) {
 	_m.Called(topic)
 }
 
@@ -130,17 +130,17 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 }
 
 // NetworkDuplicateMessagesDropped provides a mock function with given fields: topic, messageType
-func (_m *NetworkMetrics) NetworkDuplicateMessagesDropped(topic string, messageType string) {
+func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, messageType string) {
 	_m.Called(topic, messageType)
 }
 
 // NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
+func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, messageType string) {
 	_m.Called(sizeBytes, topic, messageType)
 }
 
 // NetworkMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
+func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, messageType string) {
 	_m.Called(sizeBytes, topic, messageType)
 }
 
