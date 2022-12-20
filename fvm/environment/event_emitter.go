@@ -276,11 +276,5 @@ func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 		}
 	}
 
-	fmt.Printf("SERVICE EVENt DEBUG\n")
-	spew.Dump(chain)
-	spew.Dump(event)
-	spew.Dump(events.All())
-
-	fmt.Printf("/SERVICE EVENT DEBUG\n")
 	return false, nil
 }
