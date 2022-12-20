@@ -9,13 +9,13 @@
 - If previous result exists, we can validate the receipt, and store it in the execution tree mempool and storage.
 - After processing a receipt, we try to find child receipts from the cache, and process them.
 - When constructing a new block, the block builder reads receipts and results from the execution tree and add them to the new block’s payload
-- processing finalized block is to prune pending receipts and execution tree mempool.
+- Processing finalized block is to prune pending receipts and execution tree mempool.
 - Matching core also contains logic for fetching missing receipts (method `requestPendingReceipts`)
 
   Caution: this logic is not yet fully BFT compliant. The logic only requests receipts for blocks, where it has less than 2 consistent receipts. This is a temporary simplification and incompatible with the mature BFT protocol! There might be multiple consistent receipts that commit to a wrong result. To guarantee sealing liveness, we need to fetch receipts from *all*  ENs, whose receipts we don't have yet. There might be only a single honest EN and its result might occasionally get lost during transmission.
 
 - **Crash recovery:**
-    - crash recovery is implemented in the consensus block builder (`module/builder/consensus/builder.go` method `repopulateExecutionTree`)
+    - Crash recovery is implemented in the consensus block builder (`module/builder/consensus/builder.go` method `repopulateExecutionTree`)
     - During normal operations, we query the tree for "all receipts, whose results are derived from the latest sealed and finalized result". This requires the execution tree to know what the latest sealed and finalized result is.
 
       The builder adds the result for the latest block that is both sealed and finalized, without any Execution Receipts. This is sufficient to create a vertex in the tree. Thereby, we can traverse the tree, starting from the sealed and finalized result, to find derived results and their respective receipts.
@@ -55,7 +55,7 @@
   When pruning the tree, we keep the node at the same height as the last sealed height, so that we know which fork actually connects to the sealed block
 
 - It means adding a new result to the tree requires a lock, and is a write lock. A write lock won't block reads, so that the worker to process approvals won't be blocked.
-- when a result has been added to a tree, it also means we've received the executed block, because otherwise the block, which includes the receipt, won't pass the validation
+- When a result has been added to a tree, it also means we've received the executed block, because otherwise the block, which includes the receipt, won't pass the validation
 - We create an approval collector for each incorporated result, when we receive an approval.  We verify the approval only once, if valid, we forward it to multiple approval collectors for each result incorporated in different fork. If any fork has collected enough approval, we will generate a seal, note a seal can only be used on one fork. If a consensus leader is building a new block on a fork, it will only add new seals for that fork to the new block.
 - When adding a new result to the tree, we use a Write lock on the three to add the `AssignmentCollector`. However, when receiving an `AssignmentCollector` from the tree to add an approval, we use a read lock, so that processing approvals concurrently won’t be blocked by processing receipts.
 - When receiving an approval before receiving the corresponding result, we haven’t created the corresponding assignment collector. Therefore, we cache the approvals in an `approvalCache` within the sealing core.  Note: this is not strictly necessary, because the approval could be re-requested by the sealing engine (method `requestPendingApprovals`). Nevertheless, we found that caching the approvals is an important performance optimization to reduce sealing latency.
