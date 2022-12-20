@@ -817,10 +817,15 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	// Setup directories
 	tmpdir, _ := os.MkdirTemp(TmpRoot, "flow-integration-node")
 	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	err = os.Mkdir(flowDataDir, 0700)
+	require.NoError(t, err)
 	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	err = os.Mkdir(nodeBootstrapDir, 0700)
+	require.NoError(t, err)
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
 
-	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	require.NoError(t, err)
 
 	observerUnsecurePort := testingdock.RandomPort(t)
 	observerSecurePort := testingdock.RandomPort(t)
@@ -832,6 +837,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 
 	containerConfig := &container.Config{
 		Image: conf.ObserverImage,
+		User:  currentUser(),
 		Cmd: []string{
 			fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
 			fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
@@ -859,7 +865,6 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 		},
 	}
 	containerHostConfig := &container.HostConfig{
-		AutoRemove: true,
 		Binds: []string{
 			fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
 			fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
@@ -873,20 +878,26 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}
 
 	containerOpts := testingdock.ContainerOpts{
-		ForcePull:          false,
-		Config:             containerConfig,
-		HostConfig:         containerHostConfig,
-		Name:               conf.ObserverName,
-		HealthCheck:        nil,
-		HealthCheckTimeout: 0,
-		Reset:              nil,
+		ForcePull:  false,
+		Config:     containerConfig,
+		HostConfig: containerHostConfig,
+		Name:       conf.ObserverName,
 	}
 
-	container := net.suite.Container(containerOpts)
+	suiteContainer := net.suite.Container(containerOpts)
 
-	net.network.After(container)
+	nodeContainer := &Container{
+		//Config:  nodeConf,
+		Ports:   make(map[string]string),
+		datadir: tmpdir,
+		net:     net,
+		opts:    &containerOpts,
+	}
 
-	container.Start(ctx)
+	nodeContainer.Container = suiteContainer
+	net.Containers[nodeContainer.Name()] = nodeContainer
+
+	net.network.After(suiteContainer)
 
 	return nil
 }

@@ -82,7 +82,6 @@ func (suite *ObserverSuite) SetupTest() {
 
 	// start the network
 	ctx := context.Background()
-	suite.net.Start(ctx)
 
 	err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
@@ -92,6 +91,8 @@ func (suite *ObserverSuite) SetupTest() {
 		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
 	})
 	require.NoError(suite.T(), err)
+
+	suite.net.Start(ctx)
 
 	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
 
