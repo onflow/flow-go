@@ -94,7 +94,7 @@ func (suite *ObserverSuite) SetupTest() {
 
 	suite.net.Start(ctx)
 
-	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
+	time.Sleep(time.Second * 5) // needs breathing room for the observer to start listening
 
 	// set the teardown function
 	suite.teardown = func() {
