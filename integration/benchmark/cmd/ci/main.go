@@ -38,10 +38,8 @@ const (
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
-	// Auto TPS scaling constants
-	additiveIncrease       = 100
-	multiplicativeDecrease = 0.9
-	defaultAdjustInterval  = 20 * time.Second
+	defaultAdjustInterval           = 10 * time.Second
+	defaultMetricCollectionInterval = 20 * time.Second
 
 	// gRPC constants
 	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
@@ -57,7 +55,7 @@ func main() {
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
 	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
-	statIntervalFlag := flag.Duration("stat-interval", *adjustIntervalFlag, "")
+	statIntervalFlag := flag.Duration("stat-interval", defaultMetricCollectionInterval, "")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
