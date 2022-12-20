@@ -1876,7 +1876,7 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	return commit
 }
 
-func VersionBeaconFixture(size uint, opts ...func(beacon flow.VersionBeacon)) *flow.VersionBeacon {
+func VersionBeaconFixture(size uint, opts ...func(beacon *flow.VersionBeacon)) *flow.VersionBeacon {
 
 	if size == 0 {
 		return &flow.VersionBeacon{
