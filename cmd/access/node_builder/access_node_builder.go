@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
+	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -188,7 +189,6 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 p2p.LibP2PNode
 	FollowerState              protocol.MutableState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
@@ -208,6 +208,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+	ExecutionDataStore         execution_data.ExecutionDataStore
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -407,9 +408,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
-	var execDataStore execution_data.ExecutionDataStore
 
 	builder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -444,6 +447,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
 			bsDependable = module.NewProxiedReadyDoneAware()
 			builder.PeerManagerDependencies.Add(bsDependable)
+			return nil
+		}).
+		Module("execution datastore", func(node *cmd.NodeConfig) error {
+			blobstore := blobs.NewBlobstore(ds)
+			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -532,11 +540,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				RpcMetricsEnabled:       builder.rpcMetricsEnabled,
 			}
 
-			blobStore := blobs.NewBlobstore(ds)
-			execDataStore = execution_data.NewExecutionDataStore(blobStore, execution_data.DefaultSerializer)
 			builder.StateStreamEng = state_stream.NewEng(
 				conf,
-				execDataStore,
+				builder.ExecutionDataStore,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
@@ -691,9 +697,17 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		}
+		builder.IdentityProvider = blocklistWrapper
+
+		// register the blocklist for dynamic configuration via admin command
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
+			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+		if err != nil {
+			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
@@ -980,9 +994,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 	var libp2pNode p2p.LibP2PNode
 	builder.
+		Module("public network metrics", func(node *cmd.NodeConfig) error {
+			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(builder.Logger, metrics.WithNetworkPrefix("public"))
+			return nil
+		}).
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey, builder.PublicNetworkConfig.BindAddress, builder.PublicNetworkConfig.Metrics)
 
 			var err error
 			libp2pNode, err = libP2PFactory()
@@ -993,8 +1011,6 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
-
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
 			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
@@ -1038,16 +1054,17 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.NetworkMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+		connManager := connection.NewConnManager(builder.Logger, networkMetrics)
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
-			builder.Metrics.Network,
-			builder.PublicNetworkConfig.BindAddress,
+			networkMetrics,
+			bindAddress,
 			networkKey,
-			builder.SporkID).
+			builder.SporkID,
+			builder.LibP2PResourceManagerConfig).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
@@ -1061,7 +1078,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 					h,
 					unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
-					builder.PublicNetworkConfig.Metrics,
+					networkMetrics,
 					dht.AsServer(),
 				)
 			}).
@@ -1073,9 +1090,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
 
-		builder.LibP2PNode = libp2pNode
-
-		return builder.LibP2PNode, nil
+		return libp2pNode, nil
 	}
 }
 
@@ -1088,7 +1103,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
 
 	builder.Middleware = middleware.NewMiddleware(
 		logger,

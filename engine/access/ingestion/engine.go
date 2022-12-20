@@ -383,6 +383,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 // processBlock handles an incoming finalized block.
 func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
@@ -430,6 +431,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 }
 
 func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	// retrieve the block
 	block, err := e.blocks.ByID(hb.BlockID)
 	if err != nil {
@@ -481,6 +483,7 @@ func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	now := time.Now().UTC()
 
 	// retrieve the block
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
 
 	if errors.Is(err, storage.ErrNotFound) {

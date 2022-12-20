@@ -28,9 +28,9 @@ func extractExecutionState(
 	outputDir string,
 	log zerolog.Logger,
 	chain flow.Chain,
-	version int, // to be removed after next spork
 	migrate bool,
 	report bool,
+	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -86,8 +86,11 @@ func extractExecutionState(
 	newState := ledger.State(targetHash)
 
 	if migrate {
-		migrations = []ledger.Migration{}
-
+		// add migration here
+		migrations = []ledger.Migration{
+			// the following migration calculate the storage usage and update the storage for each account
+			// mig.MigrateAccountUsage,
+		}
 	}
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.
@@ -125,7 +128,6 @@ func extractExecutionState(
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
-		version,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)

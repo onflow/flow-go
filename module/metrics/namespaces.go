@@ -18,7 +18,7 @@ const (
 
 // Network subsystems represent the various layers of networking.
 const (
-	// subsystemLibp2p = "libp2p"
+	subsystemLibp2p       = "libp2p"
 	subsystemGossip       = "gossip"
 	subsystemEngine       = "engine"
 	subsystemQueue        = "queue"

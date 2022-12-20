@@ -12,9 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -58,14 +58,12 @@ func TestAccountFreezing(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
 		require.NoError(t, err)
 		require.False(t, frozen)
-
-		txInvoker := fvm.NewTransactionInvoker()
 
 		code := fmt.Sprintf(`
 			transaction {
@@ -85,11 +83,11 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
-		derivedBlockData = programs.NewEmptyDerivedBlockData()
+		derivedBlockData = derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, st, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, st, derivedTxnData))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -102,7 +100,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -242,7 +240,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm := fvm.NewVirtualMachine()
 
@@ -388,7 +386,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine()
 		// create default context
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		context := fvm.NewContext(
 			fvm.WithDerivedBlockData(derivedBlockData))
 
@@ -492,7 +490,7 @@ func TestAccountFreezing(t *testing.T) {
 			}
 		`)
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		context := fvm.NewContext(
 			fvm.WithServiceAccount(false),
 			fvm.WithContractDeploymentRestricted(false),
@@ -520,15 +518,13 @@ func TestAccountFreezing(t *testing.T) {
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		txInvoker := fvm.NewTransactionInvoker()
-		err = txInvoker.Process(
+		err = fvm.Run(proc.NewExecutor(
 			fvm.NewContextFromParent(
 				context,
 				fvm.WithAuthorizationChecksEnabled(false),
 			),
-			proc,
 			st,
-			derivedTxnData)
+			derivedTxnData))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 

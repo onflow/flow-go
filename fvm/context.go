@@ -5,8 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +34,7 @@ type Context struct {
 
 	TransactionExecutorParams
 
-	DerivedBlockData *programs.DerivedBlockData
+	DerivedBlockData *derived.DerivedBlockData
 
 	environment.EnvironmentParams
 }
@@ -353,7 +353,7 @@ func WithReusableCadenceRuntimePool(
 
 // WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
+func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 	return func(ctx Context) Context {
 		ctx.DerivedBlockData = derivedBlockData
 		return ctx

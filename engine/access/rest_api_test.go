@@ -92,12 +92,11 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	const anyPort = ":0" // :0 to let the OS pick a free port
 	config := rpc.Config{
-		UnsecureGRPCListenAddr: anyPort,
-		SecureGRPCListenAddr:   anyPort,
-		HTTPListenAddr:         anyPort,
-		RESTListenAddr:         anyPort,
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
+		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,

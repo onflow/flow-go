@@ -284,21 +284,16 @@ func (lg *ContLoadGenerator) stopWorkers(num int) error {
 		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(num)
-
 	idx := len(lg.workers) - num
 	toRemove := lg.workers[idx:]
 	lg.workers = lg.workers[:idx]
 
 	for _, w := range toRemove {
 		go func(w *Worker) {
-			defer wg.Done()
 			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
 			w.Stop()
 		}(w)
 	}
-	wg.Wait()
 	lg.workerStatsTracker.AddWorkers(-num)
 
 	return nil
