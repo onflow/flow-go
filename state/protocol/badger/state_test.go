@@ -9,10 +9,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
-	pstate "github.com/onflow/flow-go/state"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	pstate "github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/storage"
 

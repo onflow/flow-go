@@ -11,6 +11,10 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,9 +37,6 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func init() {

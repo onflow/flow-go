@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/stretchr/testify/require"
 )
 
 // AddVersionBeacon adds blocks sequence with given VersionBeacon so this
