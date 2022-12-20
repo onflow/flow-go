@@ -161,7 +161,7 @@ func TestConnGater(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGaterFactory(testutils.NewConnectionGaterFactory(func(pid peer.ID) error {
 			if _, ok := node1Peers[pid]; !ok {
 				return fmt.Errorf("peer id not found: %s", pid.String())
 			}
@@ -178,7 +178,7 @@ func TestConnGater(t *testing.T) {
 	node2, identity2 := p2ptest.NodeFixture(
 		t,
 		sporkID, t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGaterFactory(testutils.NewConnectionGaterFactory(func(pid peer.ID) error {
 			if _, ok := node2Peers[pid]; !ok {
 				return fmt.Errorf("id not found: %s", pid.String())
 			}

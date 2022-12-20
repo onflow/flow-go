@@ -156,8 +156,10 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		}
 		// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
 		// protocol state.
+
 		lg.Warn().
 			Bool(logging.KeySuspicious, true).
+			Str("connectedness", l.host.Network().Connectedness(peerID).String()).
 			Msg("disconnected from peer")
 	}
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/control"
+	"github.com/rs/zerolog"
 	"testing"
 	"time"
 
@@ -38,7 +40,7 @@ func TestConnectionGating(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGaterFactory(testutils.NewConnectionGaterFactory(func(p peer.ID) error {
 			if _, ok := node1Peers[p]; !ok {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -50,7 +52,7 @@ func TestConnectionGating(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGaterFactory(testutils.NewConnectionGaterFactory(func(p peer.ID) error {
 			if _, ok := node2Peers[p]; !ok {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -134,7 +136,9 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 				}
 				return list
 			}),
-			p2ptest.WithConnectionGater(connectionGater))
+			p2ptest.WithConnectionGaterFactory(func(_ zerolog.Logger) connmgr.ConnectionGater {
+				return connectionGater
+			}))
 
 		nodes = append(nodes, node)
 		allPeerIds = append(allPeerIds, node.Host().ID())
@@ -218,18 +222,18 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
+					pid, err := unittest.PeerIDFromFlowID(id)
+					require.NoError(t, err)
+
 					if _, ok := disallowedList[id]; ok {
 						continue
 					}
-
-					pid, err := unittest.PeerIDFromFlowID(id)
-					require.NoError(t, err)
 
 					list = append(list, pid)
 				}
 				return list
 			}),
-			p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+			p2ptest.WithConnectionGaterFactory(testutils.NewConnectionGaterFactory(func(pid peer.ID) error {
 				for id := range disallowedList {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
@@ -248,6 +252,12 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+
+	for _, id := range ids {
+		pid, err := unittest.PeerIDFromFlowID(id)
+		require.NoError(t, err)
+		fmt.Printf("node %s has peer id %s\n", id.NodeID.String(), pid.String())
+	}
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 

@@ -462,10 +462,11 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 	return &p2pNetwork.NullResourceManager{}
 }
 
-// NewConnectionGater creates a new connection gater for testing with given allow listing filter.
-func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
-	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(unittest.Logger(),
-		connection.WithOnInterceptPeerDialFilters(filters),
-		connection.WithOnInterceptSecuredFilters(filters))
+func NewConnectionGaterFactory(allowListFilter p2p.PeerFilter) func(logger zerolog.Logger) connmgr.ConnectionGater {
+	return func(logger zerolog.Logger) connmgr.ConnectionGater {
+		filters := []p2p.PeerFilter{allowListFilter}
+		return connection.NewConnGater(logger,
+			connection.WithOnInterceptPeerDialFilters(filters),
+			connection.WithOnInterceptSecuredFilters(filters))
+	}
 }

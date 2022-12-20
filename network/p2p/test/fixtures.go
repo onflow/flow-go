@@ -55,7 +55,7 @@ func NodeFixture(
 		Unicasts:    nil,
 		Key:         NetworkingKeyFixtures(t),
 		Address:     unittest.DefaultAddress,
-		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
+		Logger:      unittest.Logger().Level(zerolog.WarnLevel),
 		Role:        flow.RoleCollection,
 	}
 
@@ -92,8 +92,8 @@ func NodeFixture(
 		SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
 
-	if parameters.ConnGater != nil {
-		builder.SetConnectionGater(parameters.ConnGater)
+	if parameters.ConnectionGaterFactory != nil {
+		builder.SetConnectionGater(parameters.ConnectionGaterFactory(logger))
 	}
 
 	if parameters.PeerScoringEnabled {
@@ -133,22 +133,22 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc        network.StreamHandler
-	Unicasts           []unicast.ProtocolName
-	Key                crypto.PrivateKey
-	Address            string
-	DhtOptions         []dht.Option
-	Role               flow.Role
-	Logger             zerolog.Logger
-	PeerScoringEnabled bool
-	IdProvider         module.IdentityProvider
-	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
-	ConnectionPruning  bool                  // peer manager parameter
-	UpdateInterval     time.Duration         // peer manager parameter
-	PeerProvider       p2p.PeersProvider     // peer manager parameter
-	ConnGater          connmgr.ConnectionGater
-	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
-	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
+	HandlerFunc            network.StreamHandler
+	Unicasts               []unicast.ProtocolName
+	Key                    crypto.PrivateKey
+	Address                string
+	DhtOptions             []dht.Option
+	Role                   flow.Role
+	Logger                 zerolog.Logger
+	PeerScoringEnabled     bool
+	IdProvider             module.IdentityProvider
+	AppSpecificScore       func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning      bool                  // peer manager parameter
+	UpdateInterval         time.Duration         // peer manager parameter
+	PeerProvider           p2p.PeersProvider     // peer manager parameter
+	ConnectionGaterFactory func(logger zerolog.Logger) connmgr.ConnectionGater
+	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
+	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
@@ -196,9 +196,9 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
+func WithConnectionGaterFactory(connGater func(logger zerolog.Logger) connmgr.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.ConnGater = connGater
+		p.ConnectionGaterFactory = connGater
 	}
 }
 
