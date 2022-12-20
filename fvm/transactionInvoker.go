@@ -255,10 +255,15 @@ func (executor *transactionExecutor) normalExecution() (
 	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
-	maxTxFees, err := executor.CheckPayerBalanceAndReturnMaxFees(
-		executor.proc,
-		executor.txnState,
-		executor.env)
+	var maxTxFees uint64
+	// run with limits disabled since this is a static cost check
+	// and should be accounted for in the inclusion cost.
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
+			executor.proc,
+			executor.txnState,
+			executor.env)
+	})
 
 	if err != nil {
 		return
