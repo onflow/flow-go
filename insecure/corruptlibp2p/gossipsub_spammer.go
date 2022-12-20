@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	"time"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -70,6 +71,14 @@ func GetSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, flow
 			})),
 	)
 	return spammerNode, spammerId, router
+}
+
+func WaitUntilInitialized(t *testing.T, router *atomicRouter) {
+	require.Eventuallyf(t, func() bool {
+		// ensuring the spammer router has been initialized.
+		// this is needed because the router is initialized asynchronously.
+		return router.Get() != nil
+	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.

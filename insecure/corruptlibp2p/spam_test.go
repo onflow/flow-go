@@ -62,11 +62,7 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 
-	require.Eventuallyf(t, func() bool {
-		// ensuring the spammer router has been initialized.
-		// this is needed because the router is initialized asynchronously.
-		return router.Get() != nil
-	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
+	corruptlibp2p.WaitUntilInitialized(t, router)
 
 	// prior to the test we should ensure that spammer and victim connect and discover each other.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
