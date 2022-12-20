@@ -143,13 +143,4 @@ func IsUnknownBlockError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// NoVersionBeaconError is a sentinel error indication that no Version Beacon is available
-type NoVersionBeaconError struct{}
-
-func NewNoVersionBeaconError() NoVersionBeaconError {
-	return NoVersionBeaconError{}
-}
-
-func (n NoVersionBeaconError) Error() string {
-	return "no version beacon exists"
-}
+var ErrNoVersionBeacon = errors.New("no version beacon exists")
