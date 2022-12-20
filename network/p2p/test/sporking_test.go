@@ -268,17 +268,28 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is received by the destination node
 	unittest.AssertReturnsBefore(t, func() {
 		msg, err := dstnSub.Next(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, payload, msg.Data)
+		assert.Equal(t, sentData, msg.Data)
 	},
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second)
@@ -290,10 +301,21 @@ func testOneToKMessagingFails(ctx context.Context,
 	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		network.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is never received by the destination node
@@ -303,18 +325,4 @@ func testOneToKMessagingFails(ctx context.Context,
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second,
 		"nodes on different sporks were able to communicate")
-}
-
-func createTestMessage(t *testing.T) []byte {
-	msg, err := network.NewOutgoingScope(
-		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.TestNetworkChannel,
-		&libp2pmessage.TestMessage{
-			Text: string("hello"),
-		},
-		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
-	require.NoError(t, err)
-
-	return msg.Proto().Payload
 }
