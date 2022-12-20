@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/message"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/message"
 
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
