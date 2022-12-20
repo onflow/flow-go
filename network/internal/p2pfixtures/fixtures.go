@@ -268,7 +268,8 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			if node == other {
 				require.Fail(t, "overlapping nodes in from and to lists")
 			}
-			require.Error(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			err := node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
+			require.Error(t, err, fmt.Sprintf("connection from %s to %s should not exist", node.Host().ID(), other.Host().ID()))
 		}
 	}
 }
@@ -424,7 +425,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			// stream creation should fail
 			_, err := this.CreateStream(ctx, other.Host().ID())
-			require.Error(t, err)
+			require.Error(t, err, fmt.Sprintf("expected stream creation to fail from node %s to node %s", this.Host().ID(), other.Host().ID()))
 			require.True(t, flownet.IsPeerUnreachableError(err))
 
 			// runs the error checkers if any.
