@@ -15,7 +15,7 @@
   Caution: this logic is not yet fully BFT compliant. The logic only requests receipts for blocks, where it has less than 2 consistent receipts. This is a temporary simplification and incompatible with the mature BFT protocol! There might be multiple consistent receipts that commit to a wrong result. To guarantee sealing liveness, we need to fetch receipts from *all*  ENs, whose receipts we don't have yet. There might be only a single honest EN and its result might occasionally get lost during transmission.
 
 - **Crash recovery:**
-    - Crash recovery is implemented in the consensus block builder (`module/builder/consensus/builder.go` method `repopulateExecutionTree`)
+    - Crash recovery is implemented in the consensus block builder (`module/builder/consensus/builder.go` method `repopulateExecutionTree`).
     - During normal operations, we query the tree for "all receipts, whose results are derived from the latest sealed and finalized result". This requires the execution tree to know what the latest sealed and finalized result is.
 
       The builder adds the result for the latest block that is both sealed and finalized, without any Execution Receipts. This is sufficient to create a vertex in the tree. Thereby, we can traverse the tree, starting from the sealed and finalized result, to find derived results and their respective receipts.
@@ -34,51 +34,71 @@
 - The sealing engine ingests:
     - Result approvals from the Verification nodes (message `ResultApproval`)
     - It also re-requests missing result approvals and ingests the corresponding responses (`ApprovalResponse`)
-    - Execution Results from incorporated blocks. Sealing engine can trust those incorporated results are valid, because the protocol state has validated them.
+    - Execution Results from incorporated blocks. Sealing engine can trust those incorporated results are structurally valid, because block incorporating the result has passed the node's internal compliance engine.
 
       Caution: to not compromise sealing liveness, the sealing engine cannot drop any incorporated blocks or any results contained in it. Otherwise, it cannot successfully create a seal for the incorporated results.
 
-- Sealing Engine will forward each receipts and approval to the sealing core. Receipts and approvals are concurrently processed by sealing core.
+- Sealing Engine will forward receipts and approvals to the sealing core. Receipts and approvals are concurrently processed by sealing core.
 - The purpose for the Sealing Core is to
     1. compute verifier assignments for the incorporated results
     2. track the approvals that match the assignments
     3. generate a seal once enough approvals have been collected
 - For sealing core to concurrently process receipts, it maintains an `AssignmentCollectorTree`, which is a fork-aware structure holding the assignments + approvals for each incorporated result. Therefore, it can ingest results and approvals in arbitrary order.
-    - Each vertex (`AssignmentCollector`) in the tree is responsible for collecting approvals one particular incorporated result. Each collector is able to process approvals concurrently. But accessing the tree requires a lock.
-    - A result might be incorporated in multiple blocks on different block forks. Results incorporated on different forks will lead to different assignment for verification nodes. Although the approvals are the same for incorporated results on different fork, a valid approval for a certain incorporated result on a fork might be invalid for another incorporated result in a different fork, because the assignment is different and a verification node is not allowed to verify a result if the result is not assigned to it to verify.
-- The `AssignmentCollectorTree` tracks whether the result is derived from the latest result with a finalized seal. If interim results are unknown (due to concurrent ingestion of incorporated results), approvals are only cached (status `CachingApprovals`). Once all interim results are received, the `AssignmentCollectorTree` changes the status of the result and all its *connected* children to be processable (status `VerifyingApprovals`).
-
-  Furthermore, if results are orphaned because they conflict with a result that has a finalized seal, the processing of all approvals for the conflicting result and any of its derived results is stopped  (status `Orphaned`)
-
-- In order to limit the memory usage of the `AssignmentCollectorTree`, we need to prune it by sealed height. Therefore, we subscribe to finalized block event and use the sealed height to prune the tree.
-
-  When pruning the tree, we keep the node at the same height as the last sealed height, so that we know which fork actually connects to the sealed block
-
-- It means adding a new result to the tree requires a lock, and is a write lock. A write lock won't block reads, so that the worker to process approvals won't be blocked.
-- When a result has been added to a tree, it also means we've received the executed block, because otherwise the block, which includes the receipt, won't pass the validation
-- We create an approval collector for each incorporated result, when we receive an approval.  We verify the approval only once, if valid, we forward it to multiple approval collectors for each result incorporated in different fork. If any fork has collected enough approval, we will generate a seal, note a seal can only be used on one fork. If a consensus leader is building a new block on a fork, it will only add new seals for that fork to the new block.
-- When adding a new result to the tree, we use a Write lock on the three to add the `AssignmentCollector`. However, when receiving an `AssignmentCollector` from the tree to add an approval, we use a read lock, so that processing approvals concurrently won’t be blocked by processing receipts.
+    - Each vertex (`AssignmentCollector`) in the tree is responsible for managing approvals for one particular result.
+    - A result might be incorporated in multiple blocks on different block forks. 
+    - Results incorporated on different forks will lead to different assignment for verification nodes. For example, consider block `B` with two children `C` and `D`:
+      ```
+            ┌ C   
+         B <   
+            └ D
+      ```
+      `C` and `D` can each incorporate the same result `r` for block `B`, but the verifier assignment would be different. Hence, there is one `AssignmentCollector` for `r` stored in the `AssignmentCollectorTree`.
+     
+      Although the approvals are the same for results incorporated in different forks, a valid approval for a certain incorporated result on one fork usually cannot be used for the same result incorporated in a different fork.
+      This is because verifiers are assigned to check individual chunks of a result and the assignments for a particular chunk differ with high probability from fork to fork. To guarantee correctness, approvals are only accepted
+      from verifiers that are assigned to check exactly this chunk. Hence, one `AssignmentCollector` can hold multiple `ApprovalCollector`s. An `ApprovalCollector` manages one particular verifier assignment, i.e. it corresponds to one particular _incorporated_ result.
+      So in our example above, we would have one `ApprovalCollector` for result `r` being incorporated in block `C` and another `ApprovalCollector` for result `r` being incorporated in block `D`.
+    - As forks are reasonably common and therefore multiple assignments for the same chunk, we ingest result approvals high concurrency, as follows:
+      - `AssignmentCollectorTree` has an internal `RWMutex`, which most of the time is accessed in read-mode. Specifically, adding a new approval to an `AssignmentCollector` that 
+        already exists only requires a read-lock on the `AssignmentCollectorTree`. 
+      - The sealing engine listens to `OnBlockIncorporated` events. Whenever a new execution result is found in the block, sealing core mutates the `AssignmentCollectorTree` state
+        by adding a new `AssignmentCollector` to the tree. Encountering a previously unknown result and pruning operations (details below) are the only times, when the `AssignmentCollectorTree` acquires a write lock.   
+      - While not very common, the same approval might be usable for multiple assignments. Therefore, we verify the approval only once and if valid, 
+        we forward it to the respective `ApprovalCollector`. If any assignment has collected enough approval, we will generate a seal. Note that the seal (same as the assignment) can only be used on one fork.
+        If a consensus leader is building a new block on a fork, it will only add new seals for that fork to the new block.
+      - Also `ApprovalCollector`s can ingest approvals concurrently. Verifying the approvals is done without requiring a lock. A write-lock on the `ApprovalCollector` is only held while adding the approval to an internal map,
+        which is extremely fast and minimizes any lock contention.
+- In order to limit the memory usage of the `AssignmentCollectorTree`, we need to prune it by sealed height. Therefore, we subscribe to `OnFinalizedBlock` events and use the sealed height to prune the tree.
+  When pruning the tree, we keep the node at the same height as the last sealed height, so that we know which fork actually connects to the sealed block.
 - When receiving an approval before receiving the corresponding result, we haven’t created the corresponding assignment collector. Therefore, we cache the approvals in an `approvalCache` within the sealing core.  Note: this is not strictly necessary, because the approval could be re-requested by the sealing engine (method `requestPendingApprovals`). Nevertheless, we found that caching the approvals is an important performance optimization to reduce sealing latency.
-- Race condition:
+
+  Race condition:
     - Since incorporated results and approvals are processed concurrently, when a worker is processing an approval and learned the result is missing, this state might be stale, because another working could be adding the result at this moment.
     - A naive implementation could first check whether a corresponding result is present and otherwise just add the approval to the cache. The other worker concurrently adding the result and checking the cache for corresponding approvals might not see the approvals to that are concurrently added to the `approvalCache.` In this case, some approvals might be dropped into the cache but not added to the `AssignmentCollector`.
 
       This is acceptable (though not ideal) because we will be re-requesting those approvals again. Therefore, there is no sealing liveness issue, but potentially a performance penalty.
 
     - In order to solve this, we let approval worker double check again after adding the result to the cache, whether the `AssignmentCollector` is now present. In this edge case, we move the approval from the cache and re-process it.
-- A block would be outdated if it’s on a different fork than the finalized fork. For outdated blocks, we don’t need to collect approvals for them, as they will never be sealed. However, even if we generated seals for those outdated blocks, the builder will ensure we won’t add them to new blocks, as the new block always extends the finalized fork.
-- We learned a block become outdated when a new block gets finalized, which makes a different block at the same height and its children to be outdated.
-- In other words, if a block becomes outdated, all approval collectors for that block can drop existing approvals and future approvals. In order to do that we need to distinguish different state of the approval collectors, in total, there are three different states:
-    - 1. Cache, when the execution result has been received, but the previous result has not been received (or the previous result does not connect to a sealed result). We cache the approvals without validating them
-    - 2. Verifying, when both the execution result and all previous results are known, we could validate approvals, and aggregate them
-    - 3. Outdated, when the executed block is conflicting with finalized blocks, we could drop all approvals and future approvals.
-- The only state transactions are:
+- The `AssignmentCollectorTree` tracks whether the result is derived from the latest result with a finalized seal. If interim results are unknown (due to concurrent ingestion of incorporated results), approvals are only cached (status `CachingApprovals`). Once all interim results are received, the `AssignmentCollectorTree` changes the status of the result and all its *connected* children to be processable (status `VerifyingApprovals`).
+
+  In addition, there are two different scenarios, where we want to stop processing any approvals:
+  1. Blocks are orphaned, if they are on forks other than the finalized fork. For orphaned blocks, we don’t need to process approvals. However, even if we generated seals for those orphaned blocks, the builder will ensure we won’t add them to new blocks, as the new block always extends the finalized fork.
+  2. It is possible that there are conflicting execution results for the same block, in which case only one results will eventually have a _finalized_ sealed and all conflicting results are orphaned.
+     Also in this case, the processing of all approvals for the conflicting result and any of its derived results is stopped.
+  
+  In both cases, we label the execution result as `Orphaned`. Conceptually, these different processing modes of  `CachingApprovals` vs. `VerifyingApprovals` vs. `Orphaned` pertain
+  to an execution result. Therefore, they are implemented in the `AssignmentCollector`. Algorithmically, the `AssignmentCollector` interface is implemented by a state machine, aka `AssignmentCollectorStateMachine`, which allows the following state transitions:
     - `CachingApprovals` -> `VerifyingApprovals`
     - `VerifyingApprovals` -> `Orphaned`
     - `CachingApprovals` -> `VerifyingApprovals`
-- Because of the state transitions, a worker processing an incorporated result or an approval concurrently might get staled state. One way to solve it is to double check if the state was changed after the operation, if changed, redo the operation.
-    - If the worker found the state was `CachingApprovals`, after caching the approval, and found the state becomes `VerifyingApprovals` or `Orphaned`, it needs to take the approval out of the cache and reprocess it
-    - If the worker found the state was `VerifyingApprovals`, and after verified the approval, and aggregated, and found the state becomes `Orphaned`, no action need to take.
+  The logic for each of the three states is implemented by dedicated structs, which the `AssignmentCollectorStateMachine` references through an atomic variable:
+    - 1. `CachingAssignmentCollector` implements the state `CachingApprovals`: the execution result has been received, but the previous result has not been received (or the previous result does not connect to a sealed result). We cache the approvals without validating them.
+    - 2. `VerifyingAssignmentCollector` implements the state `VerifyingApprovals`: both the execution result and all previous results are known. We validate approvals, and aggregate them to a seal once the necessary number of approvals have been collected.  
+    - 3. `OrphanAssignmentCollector` implements the state `Orphaned`: the executed block is conflicting with finalized blocks, or the result conflicts with another result that has a finalized seal. We drop all already ingested approvals and any future approvals.
+- While one worker is processing a result approval (e.g. caching it in the `CachingAssignmentCollector`), a different worker might concurrently trigger a state transitions. Therefore, we have to be careful that workers don't execute their action on a stale state.
+  Therefore, we double-check if the state was changed _after_ the operation and if the state changed (relatively rarely), we redo the operation:
+    - If the worker found the state was `CachingApprovals`, after caching the approval, and found the state becomes `VerifyingApprovals` or `Orphaned`, it needs to take the approval out of the cache and reprocess it.
+    - If the worker found the state was `VerifyingApprovals`, and after verified the approval, and aggregated, and found the state becomes `Orphaned`, no further action is needed. 
 - **Crash recovery:**
 
   The sealing core has the method `RepopulateAssignmentCollectorTree` which restores the latest state of the `AssignmentCollectorTree` based on local chain state information. Repopulating is split into two parts:
