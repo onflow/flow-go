@@ -272,6 +272,7 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 func (lg *ContLoadGenerator) startWorkers(num int) error {
 	for i := 0; i < num; i++ {
 		worker := NewWorker(len(lg.workers), 1*time.Second, lg.workFunc)
+		lg.log.Trace().Int("workerID", worker.workerID).Msg("starting worker")
 		worker.Start()
 		lg.workers = append(lg.workers, worker)
 	}
@@ -290,7 +291,7 @@ func (lg *ContLoadGenerator) stopWorkers(num int) error {
 
 	for _, w := range toRemove {
 		go func(w *Worker) {
-			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			lg.log.Trace().Int("workerID", w.workerID).Msg("stopping worker")
 			w.Stop()
 		}(w)
 	}
