@@ -462,7 +462,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.OutboundMessageSent(msg.Size(), string(channel), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), msg.ChannelId().String(), msg.PayloadType())
 
 	return nil
 }
