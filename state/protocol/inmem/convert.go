@@ -314,26 +314,11 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			FirstSeal:        seal,
 		},
-		QuorumCertificate: qc,
-		Phase:             flow.EpochPhaseStaking,
-		Epochs:            epochs,
-		Params:            params,
-		LatestVersionBeacon: &EncodableVersionBeacon{
-			Height: root.Header.Height,
-			VersionBeacon: flow.VersionBeacon{
-				RequiredVersions: []flow.VersionControlRequirement{
-					{
-						Height:  root.Header.Height - 1000,
-						Version: "v0.21.37",
-					},
-					{
-						Height:  root.Header.Height + 1000,
-						Version: "v0.21.38",
-					},
-				},
-				Sequence: 0,
-			},
-		},
+		QuorumCertificate:   qc,
+		Phase:               flow.EpochPhaseStaking,
+		Epochs:              epochs,
+		Params:              params,
+		LatestVersionBeacon: nil,
 	})
 	return snap, nil
 }

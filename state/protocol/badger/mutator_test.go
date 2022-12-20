@@ -11,10 +11,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -37,6 +33,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -223,13 +222,8 @@ func TestSealedIndex(t *testing.T) {
 
 		versionBeacons := bstorage.NewVersionBeacons(metrics, db)
 
-		versionBeacon, _, err := versionBeacons.Highest(b7.Header.Height)
-		require.NoError(t, err)
-		//require.Equal(t, )
-
-		// before finalizing B5 index should return some results for bootstrapped data, we can't easily
-		// retrieve it, so we just check it's not what we expect later
-		require.NotEqual(t, vb1, versionBeacon)
+		_, _, err = versionBeacons.Highest(b7.Header.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// when B5 is finalized, can find seal for B1
 		err = state.Finalize(context.Background(), b5.ID())

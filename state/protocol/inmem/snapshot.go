@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
@@ -84,6 +85,9 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 }
 
 func (s Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
+	if s.enc.LatestVersionBeacon == nil {
+		return nil, 0, state.NewNoVersionBeaconError()
+	}
 	return &s.enc.LatestVersionBeacon.VersionBeacon, s.enc.LatestVersionBeacon.Height, nil
 }
 

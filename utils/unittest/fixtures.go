@@ -1933,8 +1933,10 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithDKGFromParticipants(participants),
 	)
 
+	versionBeacon := VersionBeaconFixture(2)
+
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
-	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
+	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent(), versionBeacon.ServiceEvent()}
 
 	seal := Seal.Fixture(Seal.WithResult(result))
 

@@ -3,13 +3,13 @@ package badger_test
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
+	pstate "github.com/onflow/flow-go/state"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -74,10 +74,10 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
 
-		versionBeacon, _, err := state.Final().VersionBeacon()
+		_, _, err = state.Final().VersionBeacon()
 
-		require.NoError(t, err)
-		require.NotNil(t, versionBeacon)
+		require.ErrorIs(t, err, pstate.NoVersionBeaconError{})
+
 	})
 }
 
@@ -256,12 +256,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(state *bprotocol.State, versionBeacons storage.VersionBeacons, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
-
-			lastVersionBeacon, beaconHeight, err := versionBeacons.Highest(math.MaxUint64)
-
-			require.NoError(t, err)
-			require.NotNil(t, lastVersionBeacon)
-			require.Equal(t, rootBlock.Height, beaconHeight)
 		})
 	})
 }

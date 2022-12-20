@@ -914,22 +914,24 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	versionBeacons := bstorage.NewVersionBeacons(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
-		Headers:      headers,
-		Guarantees:   guarantees,
-		Receipts:     receipts,
-		Results:      results,
-		Seals:        seals,
-		Index:        index,
-		Payloads:     payloads,
-		Blocks:       blocks,
-		Transactions: transactions,
-		Collections:  collections,
-		Setups:       setups,
-		EpochCommits: epochCommits,
-		Statuses:     statuses,
-		Commits:      commits,
+		Headers:        headers,
+		Guarantees:     guarantees,
+		Receipts:       receipts,
+		Results:        results,
+		Seals:          seals,
+		Index:          index,
+		Payloads:       payloads,
+		Blocks:         blocks,
+		Transactions:   transactions,
+		Collections:    collections,
+		Setups:         setups,
+		EpochCommits:   epochCommits,
+		Statuses:       statuses,
+		Commits:        commits,
+		VersionBeacons: versionBeacons,
 	}
 
 	return nil
