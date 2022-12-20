@@ -24,7 +24,6 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"
@@ -780,7 +779,7 @@ type ObserverConfig struct {
 	AccessGRPCSecurePort    string // Does not change the access node
 }
 
-func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (err error) {
 	// Find the public key for the access node
 	accessPublicKey := ""
 	for _, stakedConf := range net.BootstrapData.StakedConfs {
@@ -831,71 +830,65 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	net.ObserverPorts[ObserverNodeAPISecurePort] = observerSecurePort
 	net.ObserverPorts[ObserverNodeAPIProxyPort] = observerHttpPort
 
-	container, err := net.cli.ContainerCreate(ctx,
-		&container.Config{
-			Image: conf.ObserverImage,
-			Cmd: []string{
-				fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
-				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
-				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
-				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
-				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-				"--bind=0.0.0.0:0",
-				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
-				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
-				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
-				"--bootstrapdir=/bootstrap",
-				"--datadir=/data/protocol",
-				"--secretsdir=/data/secrets",
-				"--loglevel=DEBUG",
-				fmt.Sprintf("--profiler-enabled=%t", false),
-				fmt.Sprintf("--tracer-enabled=%t", false),
-				"--profiler-dir=/profiler",
-				"--profiler-interval=2m",
-			},
-			ExposedPorts: nat.PortSet{
-				"9000": struct{}{},
-				"9001": struct{}{},
-				"8000": struct{}{},
-			},
+	containerConfig := &container.Config{
+		Image: conf.ObserverImage,
+		Cmd: []string{
+			fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
+			fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+			fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
+			fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
+			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
+			"--bind=0.0.0.0:0",
+			fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
+			fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
+			fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secrets",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", false),
+			fmt.Sprintf("--tracer-enabled=%t", false),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
 		},
-		&container.HostConfig{
-			AutoRemove: true,
-			Binds: []string{
-				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
-				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
-				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
-			},
-			PortBindings: nat.PortMap{
-				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
-				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
-				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
-			},
-		},
-		&network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				net.config.Name: {
-					NetworkID: net.network.ID(),
-				},
-			},
-		},
-		conf.ObserverName,
-	)
 
-	if err != nil {
-		return nil, err
+		ExposedPorts: nat.PortSet{
+			"9000": struct{}{},
+			"9001": struct{}{},
+			"8000": struct{}{},
+		},
+	}
+	containerHostConfig := &container.HostConfig{
+		AutoRemove: true,
+		Binds: []string{
+			fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+			fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+			fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+		},
+		PortBindings: nat.PortMap{
+			"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+			"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+			"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
+		},
 	}
 
-	err = net.cli.ContainerStart(ctx, container.ID, types.ContainerStartOptions{})
-	if err != nil {
-		return nil, err
+	containerOpts := testingdock.ContainerOpts{
+		ForcePull:          false,
+		Config:             containerConfig,
+		HostConfig:         containerHostConfig,
+		Name:               conf.ObserverName,
+		HealthCheck:        nil,
+		HealthCheckTimeout: 0,
+		Reset:              nil,
 	}
 
-	containerID := container.ID
-	return func() {
-		// shutdown func
-		_ = net.cli.ContainerStop(ctx, containerID, nil)
-	}, nil
+	container := net.suite.Container(containerOpts)
+
+	net.network.After(container)
+
+	container.Start(ctx)
+
+	return nil
 }
 
 // AddNode creates a node container with the given config and adds it to the

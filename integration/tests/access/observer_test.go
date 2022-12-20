@@ -84,7 +84,7 @@ func (suite *ObserverSuite) SetupTest() {
 	ctx := context.Background()
 	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
+	err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
@@ -97,7 +97,6 @@ func (suite *ObserverSuite) SetupTest() {
 
 	// set the teardown function
 	suite.teardown = func() {
-		stop()
 		suite.net.Remove()
 	}
 }
