@@ -246,7 +246,6 @@ func NewInvalidAggregatedSignatureErrorf(msg string, args ...interface{}) error 
 	return InvalidAggregatedSignatureError{fmt.Errorf(msg, args...)}
 }
 
-func (e InvalidAggregatedSignatureError) Error() string { return e.error.Error() }
 func (e InvalidAggregatedSignatureError) Unwrap() error { return e.error }
 
 // IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
