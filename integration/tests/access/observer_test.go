@@ -116,6 +116,30 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	assert.NoError(t, err)
 }
 
+func (suite *ObserverSuite) TestObserverCompareRPCs() {
+	ctx := context.Background()
+	t := suite.T()
+
+	// get an observer and access client
+	observer, err := suite.getObserverClient()
+	assert.NoError(t, err)
+
+	access, err := suite.getAccessClient()
+	assert.NoError(t, err)
+
+	// verify that both clients return the same errors
+	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
+		t.Run(rpc.name, func(t *testing.T) {
+			accessErr := rpc.call(ctx, access)
+			observerErr := rpc.call(ctx, observer)
+			assert.Equal(t, accessErr, observerErr)
+		})
+	}
+}
+
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
 	// tests that the observer returns errors when the access node is stopped
 	ctx := context.Background()
@@ -159,30 +183,6 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 		}
 	})
 
-}
-
-func (suite *ObserverSuite) TestObserverCompareRPCs() {
-	ctx := context.Background()
-	t := suite.T()
-
-	// get an observer and access client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
-
-	access, err := suite.getAccessClient()
-	assert.NoError(t, err)
-
-	// verify that both clients return the same errors
-	for _, rpc := range suite.getRPCs() {
-		if _, local := suite.local[rpc.name]; local {
-			continue
-		}
-		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access)
-			observerErr := rpc.call(ctx, observer)
-			assert.Equal(t, accessErr, observerErr)
-		})
-	}
 }
 
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
