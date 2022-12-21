@@ -20,14 +20,14 @@ var (
 	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
 	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
 
-	// ErrIdentitySignature indicates that the aggregated signature failed the module safety final
-	// verification because the aggregated signature is the 'identity signature'.
+	// ErrIdentitySignature indicates that the aggregated signature is invalid
+	// because it is the 'identity signature'. The identity signature in BLS fails
+	// the cryptographic verification. This error helps identifying the reason
+	// of an invalid aggregated signature.
 	// Context: If private keys are sampled uniformly at random, there is vanishing
 	// probability of generating the aggregated identity signature.
 	// However, (colluding) byzantine signers could force the generation of private keys that
 	// result in the identity aggregated signature.
-	// The Identity aggregated signature can also result from invalid signatures included
-	// using "Trusted Add" that add up to identity.
 	ErrIdentitySignature = errors.New("aggregated signature is invalid because it is identity")
 )
 
