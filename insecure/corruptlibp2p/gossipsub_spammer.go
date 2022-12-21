@@ -16,8 +16,6 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 )
 
-type ControlMessage int
-
 // GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
 type GossipSubRouterSpammer struct {
