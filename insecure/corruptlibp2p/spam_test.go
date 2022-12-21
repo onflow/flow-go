@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
@@ -70,6 +71,10 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&gossipsubRouterSpammer.SpammerId, &victimId})
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+		return unittest.ProposalFixture(), blockTopic
+	})
 
 	// prepare to spam - generate iHAVE control messages
 	iHaveSentCtlMsgs := gossipsubRouterSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)

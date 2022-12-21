@@ -372,43 +372,6 @@ func LongStringMessageFactoryFixture(t *testing.T) func() string {
 	}
 }
 
-// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
-	subs := make([]p2p.Subscription, len(nodes))
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
-	for i, node := range nodes {
-		ps, err := node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.NetworkCodec(),
-				slashingViolationsConsumer,
-				unittest.AllowAllPeerFilter()))
-		require.NoError(t, err)
-		subs[i] = ps
-	}
-
-	// let subscriptions propagate
-	time.Sleep(1 * time.Second)
-
-	channel, ok := channels.ChannelFromTopic(topic)
-	require.True(t, ok)
-
-	for _, node := range nodes {
-		// creates a unique message to be published by the node
-		msg, _ := messageFactory()
-		data := MustEncodeEvent(t, msg, channel)
-		require.NoError(t, node.Publish(ctx, topic, data))
-
-		// wait for the message to be received by all nodes
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		SubsMustReceiveMessage(t, ctx, data, subs)
-		cancel()
-	}
-}
-
 // MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
 func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
 	bz, err := unittest.NetworkCodec().Encode(v)

@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -29,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -331,5 +334,42 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 			require.NoError(t, err)
 			require.NotNil(t, s)
 		}
+	}
+}
+
+// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]p2p.Subscription, len(nodes))
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	for i, node := range nodes {
+		ps, err := node.Subscribe(
+			topic,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+		subs[i] = ps
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for _, node := range nodes {
+		// creates a unique message to be published by the node
+		msg, _ := messageFactory()
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+		require.NoError(t, node.Publish(ctx, topic, data))
+
+		// wait for the message to be received by all nodes
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+		cancel()
 	}
 }
