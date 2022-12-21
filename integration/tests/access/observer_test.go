@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -35,9 +34,7 @@ type ObserverSuite struct {
 }
 
 func (suite *ObserverSuite) TearDownTest() {
-	if suite.teardown != nil {
-		suite.teardown()
-	}
+	suite.net.Remove()
 }
 
 func (suite *ObserverSuite) SetupTest() {
@@ -93,13 +90,6 @@ func (suite *ObserverSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.net.Start(ctx)
-
-	time.Sleep(time.Second * 5) // needs breathing room for the observer to start listening
-
-	// set the teardown function
-	suite.teardown = func() {
-		suite.net.Remove()
-	}
 }
 
 func (suite *ObserverSuite) TestObserverConnection() {

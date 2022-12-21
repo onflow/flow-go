@@ -823,6 +823,8 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	err = os.Mkdir(nodeBootstrapDir, 0700)
 	require.NoError(t, err)
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	err = os.Mkdir(flowProfilerDir, 0700)
+	require.NoError(t, err)
 
 	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
@@ -878,10 +880,11 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}
 
 	containerOpts := testingdock.ContainerOpts{
-		ForcePull:  false,
-		Config:     containerConfig,
-		HostConfig: containerHostConfig,
-		Name:       conf.ObserverName,
+		ForcePull:   false,
+		Config:      containerConfig,
+		HostConfig:  containerHostConfig,
+		Name:        conf.ObserverName,
+		HealthCheck: testingdock.HealthCheckCustom(healthcheckAccessGRPC(observerUnsecurePort)),
 	}
 
 	suiteContainer := net.suite.Container(containerOpts)
