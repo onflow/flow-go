@@ -48,7 +48,6 @@ func TestSpam_IHave(t *testing.T) {
 					// don't inspect control messages with no iHAVE messages
 					return nil
 				}
-
 				iHaveReceivedCtlMsgs = append(iHaveReceivedCtlMsgs, *rpc.GetControl())
 				allSpamIHavesReceived.Done() // acknowledge that victim received a message.
 				return nil
@@ -78,7 +77,7 @@ func TestSpam_IHave(t *testing.T) {
 	iHaveSentCtlMsgs := gsrSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	gsrSpammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
+	gsrSpammer.SpamIHave(t, victimNode, iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
 	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")

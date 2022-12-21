@@ -1,6 +1,8 @@
 package corruptlibp2p
 
 import (
+	"sync"
+	"testing"
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -12,9 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-
-	"sync"
-	"testing"
 )
 
 type ControlMessage int
@@ -39,9 +38,9 @@ func NewGossipSubRouterSpammer2(t *testing.T, sporkId flow.Identifier) *GossipSu
 // SpamIHave spams the victim with junk iHave messages.
 // msgCount is the number of iHave messages to send.
 // msgSize is the number of messageIDs to include in each iHave message.
-func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim peer.ID, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.atomicRouter.Get().SendControl(victim, &ctlMessage))
+		require.True(t, s.atomicRouter.Get().SendControl(victim.Host().ID(), &ctlMessage))
 	}
 }
 
