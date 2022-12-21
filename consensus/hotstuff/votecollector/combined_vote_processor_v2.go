@@ -233,6 +233,9 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		}
 	}
 
+	totalWeight := p.stakingSigAggtor.TotalWeight()
+	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)
+
 	// checking of conditions for building QC are satisfied
 	if p.stakingSigAggtor.TotalWeight() < p.minRequiredWeight {
 		return nil
@@ -258,7 +261,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	p.log.Info().
 		Uint64("view", qc.View).
 		Hex("signers", qc.SignerIndices).
-		Msg("new qc has been created")
+		Msg("new QC has been created")
 
 	p.onQCCreated(qc)
 

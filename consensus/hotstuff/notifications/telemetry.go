@@ -36,9 +36,9 @@ type TelemetryConsumer struct {
 
 var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
 
-func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryConsumer {
+func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
 	return &TelemetryConsumer{
-		pathHandler: NewPathHandler(log, chain),
+		pathHandler: NewPathHandler(log),
 	}
 }
 
@@ -205,8 +205,7 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 // In case there is no currently open path, the PathHandler still returns a Step,
 // but such steps are logged as telemetry errors.
 type PathHandler struct {
-	chain flow.ChainID
-	log   zerolog.Logger
+	log zerolog.Logger
 
 	// currentPath holds a Zerolog Context with the information about the current path.
 	// We represent the case where the current path has been closed by nil value.
@@ -215,10 +214,9 @@ type PathHandler struct {
 
 // NewPathHandler instantiate a new PathHandler.
 // The PathHandler has no currently open path
-func NewPathHandler(log zerolog.Logger, chain flow.ChainID) *PathHandler {
+func NewPathHandler(log zerolog.Logger) *PathHandler {
 	return &PathHandler{
-		chain:       chain,
-		log:         log.With().Str("hotstuff", "telemetry").Str("chain", chain.String()).Logger(),
+		log:         log.With().Str("hotstuff", "telemetry").Logger(),
 		currentPath: nil,
 	}
 }

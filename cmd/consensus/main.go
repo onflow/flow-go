@@ -550,8 +550,6 @@ func main() {
 			notifier := createNotifier(
 				node.Logger,
 				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
 			)
 
 			notifier.AddConsumer(finalizationDistributor)
@@ -594,7 +592,13 @@ func main() {
 			}
 
 			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
+				node.Logger,
+				timeoutCollectorDistributor,
+				committee,
+				validator,
+				msig.ConsensusTimeoutTag,
+			)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
 				mainMetrics,

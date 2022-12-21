@@ -63,7 +63,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	aggregator := &TimeoutAggregator{
-		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
+		log:                    log.With().Str("hotstuff", "timeout_aggregator").Logger(),
 		hotstuffMetrics:        hotstuffMetrics,
 		engineMetrics:          engineMetrics,
 		notifier:               notifier,

@@ -3,6 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -14,6 +15,7 @@ import (
 // their view is newer than any QC or TC previously known to the TimeoutCollector.
 // This module is safe to use in concurrent environment.
 type TimeoutCollector struct {
+	log               zerolog.Logger
 	notifier          hotstuff.Consumer
 	timeoutsCache     *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
 	collectorNotifier hotstuff.TimeoutCollectorConsumer
@@ -25,12 +27,17 @@ type TimeoutCollector struct {
 var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 
 // NewTimeoutCollector creates new instance of TimeoutCollector
-func NewTimeoutCollector(view uint64,
+func NewTimeoutCollector(log zerolog.Logger,
+	view uint64,
 	notifier hotstuff.Consumer,
 	collectorNotifier hotstuff.TimeoutCollectorConsumer,
 	processor hotstuff.TimeoutProcessor,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
+		log: log.With().
+			Str("hotstuff", "timeout_collector").
+			Uint64("view", view).
+			Logger(),
 		notifier:          notifier,
 		timeoutsCache:     NewTimeoutObjectsCache(view),
 		processor:         processor,
@@ -77,6 +84,7 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
 		if model.IsInvalidTimeoutError(err) {
+			c.log.Err(err).Msgf("invalid timeout detected")
 			c.notifier.OnInvalidTimeoutDetected(timeout)
 			return nil
 		}

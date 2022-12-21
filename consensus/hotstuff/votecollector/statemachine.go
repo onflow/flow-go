@@ -63,7 +63,7 @@ func NewStateMachine(
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
-		Str("hotstuff", "VoteCollector").
+		Str("hotstuff", "vote_collector").
 		Uint64("view", view).
 		Logger()
 	sm := &VoteCollector{
@@ -138,6 +138,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 			// where we receive the same vote twice, this is not a case of double voting.
 			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
 			if model.IsDuplicatedSignerError(err) {
+				m.log.Debug().Msgf("duplicated signer %x", vote.SignerID)
 				return nil
 			}
 			return err
@@ -274,7 +275,9 @@ func (m *VoteCollector) terminateVoteProcessing() {
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
 func (m *VoteCollector) processCachedVotes(block *model.Block) {
-	for _, vote := range m.votesCache.All() {
+	cachedVotes := m.votesCache.All()
+	m.log.Info().Msgf("processing %d cached votes", len(cachedVotes))
+	for _, vote := range cachedVotes {
 		if vote.BlockID != block.BlockID {
 			continue
 		}

@@ -75,7 +75,7 @@ func NewVoteAggregator(
 	}
 
 	aggregator := &VoteAggregator{
-		log:                        log,
+		log:                        log.With().Str("hotstuff", "vote_aggregator").Logger(),
 		hotstuffMetrics:            hotstuffMetrics,
 		engineMetrics:              engineMetrics,
 		notifier:                   notifier,
