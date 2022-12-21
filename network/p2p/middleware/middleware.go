@@ -235,9 +235,9 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
-	result := make([]peer.ID, len(flowIDs))
+	result := make([]peer.ID, 0, len(flowIDs))
 
-	for i, fid := range flowIDs {
+	for _, fid := range flowIDs {
 		pid, err := m.idTranslator.GetPeerID(fid)
 		if err != nil {
 			// We probably don't need to fail the entire function here, since the other
@@ -246,7 +246,7 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 			continue
 		}
 
-		result[i] = pid
+		result = append(result, pid)
 	}
 
 	return result
