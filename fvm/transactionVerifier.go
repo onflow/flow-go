@@ -3,10 +3,9 @@ package fvm
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/onflow/flow-go/crypto/hash"
-
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -203,14 +202,10 @@ func (v *TransactionVerifier) verifyAccountSignature(
 	sigReader := bytes.NewReader(txSig.Signature)
 	resp, err := protocol.ParseCredentialRequestResponseBody(sigReader)
 	if err == nil {
-		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
-		if err != nil {
-			// todo
-			panic(err)
-		}
-		expectedHash := hasher.ComputeHash(message).Hex()
+		hashBody := sha256.Sum256(message)
+		expectedHash := hex.EncodeToString(hashBody[:])
 		if resp.Response.CollectedClientData.Challenge != expectedHash {
-			return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
+			return errorBuilder(txSig, fmt.Errorf("signature is not valid, challenge does not match"))
 		}
 
 		clientDataHash := sha256.Sum256(resp.Raw.AssertionResponse.ClientDataJSON)

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+
+	protocol2 "github.com/go-webauthn/webauthn/protocol"
 )
 
 type Blocks interface {
@@ -284,6 +287,13 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 			return fmt.Errorf("could not check the signature format (%s): %w", signature, err)
 		}
 		if valid {
+			continue
+		}
+
+		// check if the signature could be a webathn signature
+		sigReader := bytes.NewReader(signature.Signature)
+		_, err = protocol2.ParseCredentialRequestResponseBody(sigReader)
+		if err == nil {
 			continue
 		}
 
