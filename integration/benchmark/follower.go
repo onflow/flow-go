@@ -104,18 +104,18 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 }
 
 type txStats struct {
-	txs        uint64
-	unknownTxs uint64
-	errorTxs   uint64
+	Txs        uint64
+	UnknownTxs uint64
+	ErrorTxs   uint64
 }
 
 func (f *txFollowerImpl) processTransactions(results []*flowsdk.TransactionResult) txStats {
 	txStats := txStats{
-		txs: uint64(len(results)),
+		Txs: uint64(len(results)),
 	}
 	for _, tx := range results {
 		if tx.Error != nil {
-			txStats.errorTxs++
+			txStats.ErrorTxs++
 		}
 		if txi, loaded := f.loadAndDelete(tx.TransactionID); loaded {
 			duration := time.Since(txi.submisionTime)
@@ -130,7 +130,7 @@ func (f *txFollowerImpl) processTransactions(results []*flowsdk.TransactionResul
 				f.metrics.TransactionExecuted(duration)
 			}
 		} else {
-			txStats.unknownTxs++
+			txStats.UnknownTxs++
 		}
 	}
 	return txStats
@@ -140,8 +140,6 @@ func (f *txFollowerImpl) run() {
 	t := time.NewTicker(f.interval)
 	defer t.Stop()
 	defer close(f.stopped)
-
-	lastBlockTime := time.Now()
 
 	var totalStats txStats
 	for {
@@ -159,24 +157,21 @@ func (f *txFollowerImpl) run() {
 		}
 
 		blockStats := f.processTransactions(results)
-		totalStats.txs += blockStats.txs
-		totalStats.unknownTxs += blockStats.unknownTxs
-		totalStats.errorTxs += blockStats.errorTxs
+		totalStats.Txs += blockStats.Txs
+		totalStats.UnknownTxs += blockStats.UnknownTxs
+		totalStats.ErrorTxs += blockStats.ErrorTxs
 
 		f.logger.Debug().
 			Uint64("blockHeight", hdr.Height).
 			Hex("blockID", hdr.ID.Bytes()).
-			Dur("timeSinceLastBlockInMS", time.Since(lastBlockTime)).
-			Dur("timeToParseBlockInMS", time.Since(blockResolutionStart)).
-			Dur("timeSinceBlockInMS", time.Since(hdr.Timestamp)).
+			Dur("timeToResolveBlockInMS", time.Since(blockResolutionStart)).
+			Dur("timeSinceBlockCreationInMS", time.Since(hdr.Timestamp)).
 			Interface("blockStats", blockStats).
 			Interface("totalStats", totalStats).
 			Int("txsInProgress", f.InProgress()).
 			Msg("new block parsed")
 
 		f.updateFromBlockHeader(*hdr)
-
-		lastBlockTime = time.Now()
 	}
 }
 
