@@ -43,7 +43,7 @@ func (s *TimeoutCollectorTestSuite) SetupTest() {
 	s.collectorNotifier.On("OnNewQcDiscovered", mock.Anything).Maybe()
 	s.collectorNotifier.On("OnNewTcDiscovered", mock.Anything).Maybe()
 
-	s.collector = NewTimeoutCollector(s.view, s.notifier, s.collectorNotifier, s.processor)
+	s.collector = NewTimeoutCollector(unittest.Logger(), s.view, s.notifier, s.collectorNotifier, s.processor)
 }
 
 // TestView tests that `View` returns the same value that was passed in constructor

@@ -3,8 +3,8 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
 
+	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 

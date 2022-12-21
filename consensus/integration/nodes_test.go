@@ -514,8 +514,19 @@ func createNode(
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
 	timeoutCollectorDistributor.AddConsumer(logConsumer)
 
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
-	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, timeoutCollectorDistributor, timeoutProcessorFactory)
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
+		log,
+		timeoutCollectorDistributor,
+		committee,
+		validator,
+		msig.ConsensusTimeoutTag,
+	)
+	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(
+		log,
+		notifier,
+		timeoutCollectorDistributor,
+		timeoutProcessorFactory,
+	)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
 
 	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(

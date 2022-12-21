@@ -75,7 +75,9 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 		return s.totalWeight.Load()
 	}).Maybe()
 
-	s.processor, err = NewTimeoutProcessor(s.committee,
+	s.processor, err = NewTimeoutProcessor(
+		unittest.Logger(),
+		s.committee,
 		s.validator,
 		s.sigAggregator,
 		s.notifier,
@@ -527,7 +529,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	notifier := mocks.NewTimeoutCollectorConsumer(t)
 	notifier.On("OnPartialTcCreated", view, olderQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
-	processor, err := NewTimeoutProcessor(committee, validator, aggregator, notifier)
+	processor, err := NewTimeoutProcessor(unittest.Logger(), committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view was successful, no lastViewTC in this case
@@ -548,7 +550,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
 	notifier.On("OnPartialTcCreated", view+1, newestQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
-	processor, err = NewTimeoutProcessor(committee, validator, aggregator, notifier)
+	processor, err = NewTimeoutProcessor(unittest.Logger(), committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// part of committee will use QC, another part TC, this will result in aggregated signature consisting

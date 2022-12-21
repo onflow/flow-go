@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
