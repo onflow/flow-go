@@ -27,16 +27,9 @@ type GossipSubRouterSpammer struct {
 	SpammerId    flow.Identity
 }
 
-func NewGossipSubRouterSpammer(router *corrupt.GossipSubRouter) *GossipSubRouterSpammer {
-	return &GossipSubRouterSpammer{
-		router: router,
-	}
-}
-
 func NewGossipSubRouterSpammer2(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
 	spammerNode, spammerId, atomicRouter := GetSpammerNode(t, sporkId)
 	return &GossipSubRouterSpammer{
-		//router:       atomicRouter.Get(),
 		atomicRouter: atomicRouter,
 		SpammerId:    spammerId,
 		SpammerNode:  spammerNode,

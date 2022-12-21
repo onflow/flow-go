@@ -26,13 +26,9 @@ import (
 // to the victim node without being subscribed to any of the same topics.
 // The test then checks that the victim node received all the messages from the spammer.
 func TestSpam_IHave(t *testing.T) {
-
-	// create new spammer
-
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
-	//_, _, router := corruptlibp2p.GetSpammerNode(t, sporkId)
 	gossipsubRouterSpammer := corruptlibp2p.NewGossipSubRouterSpammer2(t, sporkId)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
@@ -62,32 +58,23 @@ func TestSpam_IHave(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
-	//nodes := []p2p.LibP2PNode{spammerNode, victimNode}
 	nodes := []p2p.LibP2PNode{gossipsubRouterSpammer.SpammerNode, victimNode}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 
-	//corruptlibp2p.WaitUntilInitialized(t, router)
 	gossipsubRouterSpammer.WaitUntilInitialized(t)
 
 	// prior to the test we should ensure that spammer and victim connect and discover each other.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a priory connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
 	p2ptest.EnsureConnected(t, ctx, nodes)
-	//p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&spammerId, &victimId})
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&gossipsubRouterSpammer.SpammerId, &victimId})
 	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
 
-	// create new spammer with fully initialized gossipsub router
-	//spammer := corruptlibp2p.NewGossipSubRouterSpammer(router.Get())
-	//require.NotNil(t, router)
-
 	// prepare to spam - generate iHAVE control messages
-	//iHaveSentCtlMsgs := spammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 	iHaveSentCtlMsgs := gossipsubRouterSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	//spammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
 	gossipsubRouterSpammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
