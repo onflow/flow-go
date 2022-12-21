@@ -1,11 +1,12 @@
 package corruptlibp2p
 
 import (
+	"time"
+
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
-	"time"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +22,6 @@ type ControlMessage int
 // GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
 type GossipSubRouterSpammer struct {
-	router       *corrupt.GossipSubRouter
 	atomicRouter *atomicRouter
 	SpammerNode  p2p.LibP2PNode
 	SpammerId    flow.Identity
