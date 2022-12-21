@@ -112,10 +112,10 @@ func (v *SimpleView) Payloads() []ledger.Payload {
 //
 // This implementation is designed for testing and migration purposes.
 type MapLedger struct {
+	sync.RWMutex
 	Registers       map[flow.RegisterID]flow.RegisterValue
 	RegisterTouches map[flow.RegisterID]struct{}
 	RegisterUpdated map[flow.RegisterID]struct{}
-	mu              sync.RWMutex
 }
 
 // NewMapLedger returns an instance of map ledger (should only be used for
@@ -150,8 +150,8 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 }
 
 func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	k := flow.RegisterID{Owner: owner, Key: key}
 	m.RegisterTouches[k] = struct{}{}
@@ -161,8 +161,8 @@ func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
 }
 
 func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.Lock()
+	defer m.Unlock()
 
 	k := flow.RegisterID{Owner: owner, Key: key}
 	m.RegisterTouches[k] = struct{}{}
@@ -170,16 +170,16 @@ func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
 }
 
 func (m *MapLedger) Touch(owner, key string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	m.RegisterTouches[flow.RegisterID{Owner: owner, Key: key}] = struct{}{}
 	return nil
 }
 
 func (m *MapLedger) Delete(owner, key string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Lock()
+	defer m.Unlock()
 
 	delete(m.RegisterTouches, flow.RegisterID{Owner: owner, Key: key})
 	return nil
@@ -195,8 +195,8 @@ func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
 }
 
 func (m *MapLedger) Payloads() []ledger.Payload {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	ret := make([]ledger.Payload, 0, len(m.Registers))
 	for id, val := range m.Registers {
