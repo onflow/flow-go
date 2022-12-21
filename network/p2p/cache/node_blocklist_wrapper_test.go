@@ -170,7 +170,8 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 		require.Equal(s.T(), len(honestIdentities), len(identities)) // expected only honest nodes to be returned
 		for _, i := range identities {
 			_, isBlocked := blocklistLookup[i.NodeID]
-			require.Equal(s.T(), isBlocked, i.Ejected)
+			require.False(s.T(), isBlocked)
+			require.False(s.T(), i.Ejected)
 		}
 
 		// check that original `combinedIdentities` returned by `IdentityProvider` are _not_ modified by wrapper
