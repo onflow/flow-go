@@ -87,7 +87,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	versionBeacon, beaconHeight, err := from.VersionBeacon()
 
 	if err != nil {
-		if errors.Is(err, state.NoVersionBeaconError{}) {
+		if errors.Is(err, state.ErrNoVersionBeacon) {
 			snap.LatestVersionBeacon = nil
 		} else {
 			return nil, fmt.Errorf("could not get version beacon: %w", err)

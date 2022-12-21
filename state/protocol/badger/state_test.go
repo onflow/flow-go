@@ -77,7 +77,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 		_, _, err = state.Final().VersionBeacon()
 
-		require.ErrorIs(t, err, pstate.NoVersionBeaconError{})
+		require.ErrorIs(t, err, pstate.ErrNoVersionBeacon)
 
 	})
 }

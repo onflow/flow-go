@@ -355,7 +355,7 @@ func (s *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
 
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, 0, state.NewNoVersionBeaconError()
+			return nil, 0, state.ErrNoVersionBeacon
 		}
 		return nil, 0, fmt.Errorf("could not query highest version beacon: %w", err)
 	}

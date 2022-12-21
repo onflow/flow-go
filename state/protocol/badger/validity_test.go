@@ -129,7 +129,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 
 		vbHeight := uint64(0)
 
-		snap.On("VersionBeacon").Return(vb, vbHeight, state.NewNoVersionBeaconError())
+		snap.On("VersionBeacon").Return(vb, vbHeight, state.ErrNoVersionBeacon)
 
 		err := validateVersionBeacon(snap)
 		require.NoError(t, err)

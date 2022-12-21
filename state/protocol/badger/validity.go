@@ -348,7 +348,7 @@ func validateVersionBeacon(snap protocol.Snapshot) error {
 
 	_, versionTableHeight, err := snap.VersionBeacon()
 	if err != nil {
-		if errors.Is(err, state.NoVersionBeaconError{}) {
+		if errors.Is(err, state.ErrNoVersionBeacon) {
 			return nil
 		}
 	}

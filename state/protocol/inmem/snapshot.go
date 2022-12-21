@@ -86,7 +86,7 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 
 func (s Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
 	if s.enc.LatestVersionBeacon == nil {
-		return nil, 0, state.NewNoVersionBeaconError()
+		return nil, 0, state.ErrNoVersionBeacon
 	}
 	return &s.enc.LatestVersionBeacon.VersionBeacon, s.enc.LatestVersionBeacon.Height, nil
 }

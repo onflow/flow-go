@@ -459,7 +459,7 @@ func (state *State) boostrapVersionBeacon(snapshot protocol.Snapshot) func(*tran
 		versionBeacon, vbHeight, err := snapshot.VersionBeacon()
 		if err != nil {
 			// if there is no beacon, do nothing
-			if errors.Is(err, statepkg.NoVersionBeaconError{}) {
+			if errors.Is(err, statepkg.ErrNoVersionBeacon) {
 				return nil
 			}
 			return err

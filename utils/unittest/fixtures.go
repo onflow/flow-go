@@ -1884,7 +1884,7 @@ func VersionBeaconFixture(size uint, opts ...func(beacon *flow.VersionBeacon)) *
 		}
 	}
 
-	versionTable := flow.VersionBeacon{
+	versionTable := &flow.VersionBeacon{
 		RequiredVersions: []flow.VersionControlRequirement{{Height: 23, Version: "0.21.37"}},
 		Sequence:         uint64(5),
 	}
@@ -1896,7 +1896,7 @@ func VersionBeaconFixture(size uint, opts ...func(beacon *flow.VersionBeacon)) *
 	for _, apply := range opts {
 		apply(versionTable)
 	}
-	return &versionTable
+	return versionTable
 }
 
 func VersionControlRequirementFixture(lower flow.VersionControlRequirement) flow.VersionControlRequirement {
