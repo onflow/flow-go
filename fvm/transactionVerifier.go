@@ -3,10 +3,13 @@ package fvm
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/onflow/flow-go/crypto/hash"
 	"go.opentelemetry.io/otel/attribute"
+
+	crypto2 "github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -202,18 +205,40 @@ func (v *TransactionVerifier) verifyAccountSignature(
 	sigReader := bytes.NewReader(txSig.Signature)
 	resp, err := protocol.ParseCredentialRequestResponseBody(sigReader)
 	if err == nil {
-		hashBody := sha256.Sum256(message)
-		expectedHash := hex.EncodeToString(hashBody[:])
-		if resp.Response.CollectedClientData.Challenge != expectedHash {
+
+		expectedChallengeRaw := append(flow.TransactionDomainTag[:], message...)
+		expectedChallengeRawHashed := sha256.Sum256(expectedChallengeRaw)
+		expectedChallenge := base64.RawURLEncoding.EncodeToString(expectedChallengeRawHashed[:])
+		if resp.Response.CollectedClientData.Challenge != expectedChallenge {
 			return errorBuilder(txSig, fmt.Errorf("signature is not valid, challenge does not match"))
 		}
 
 		clientDataHash := sha256.Sum256(resp.Raw.AssertionResponse.ClientDataJSON)
-
 		sigData := append(resp.Raw.AssertionResponse.AuthenticatorData, clientDataHash[:]...)
 
 		message = sigData
 		signature = resp.Raw.AssertionResponse.Signature
+
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, "")
+		if err != nil {
+			panic(err)
+		}
+
+		valid, err := accountKey.PublicKey.Verify(signature, message, hasher)
+		if err != nil {
+			// All inputs are guaranteed to be valid at this stage.
+			// The check for crypto.InvalidInputs is only a sanity check
+			if crypto2.IsInvalidInputsError(err) {
+				return errorBuilder(txSig, err)
+			}
+			// unexpected error in normal operations
+			panic(fmt.Errorf("verify transaction signature failed with unexpected error %w", err))
+		}
+		if valid {
+			return nil
+		}
+
+		return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 	}
 
 	valid, err := crypto.VerifySignatureFromTransaction(
@@ -232,6 +257,40 @@ func (v *TransactionVerifier) verifyAccountSignature(
 
 	return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 }
+
+type NoOPHasher struct {
+}
+
+func (h NoOPHasher) Algorithm() hash.HashingAlgorithm {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h NoOPHasher) Size() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h NoOPHasher) ComputeHash(i []byte) hash.Hash {
+	return i
+}
+
+func (h NoOPHasher) Write(p []byte) (n int, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h NoOPHasher) SumHash() hash.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h NoOPHasher) Reset() {
+	//TODO implement me
+	panic("implement me")
+}
+
+var _ hash.Hasher = (*NoOPHasher)(nil)
 
 func (v *TransactionVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
