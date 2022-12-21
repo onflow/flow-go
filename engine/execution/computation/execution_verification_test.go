@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -764,12 +763,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		_, fault, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
 		assert.Nil(t, fault)
 	}
