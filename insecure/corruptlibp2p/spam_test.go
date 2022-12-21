@@ -30,7 +30,7 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
-	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer2(t, sporkId)
+	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)

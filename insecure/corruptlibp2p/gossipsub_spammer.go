@@ -23,14 +23,13 @@ type ControlMessage int
 type GossipSubRouterSpammer struct {
 	atomicRouter *atomicRouter
 	SpammerNode  p2p.LibP2PNode
-	SpammerId    flow.Identity
 }
 
-func NewGossipSubRouterSpammer2(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
-	spammerNode, spammerId, atomicRouter := GetSpammerNode(t, sporkId)
+// NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
+func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
+	spammerNode, atomicRouter := getSpammerNode(t, sporkId)
 	return &GossipSubRouterSpammer{
 		atomicRouter: atomicRouter,
-		SpammerId:    spammerId,
 		SpammerNode:  spammerNode,
 	}
 }
@@ -68,9 +67,9 @@ func (s *GossipSubRouterSpammer) WaitUntilInitialized(t *testing.T) {
 	s.atomicRouter.set(s.atomicRouter.Get())
 }
 
-func GetSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
+func getSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, *atomicRouter) {
 	router := newAtomicRouter()
-	spammerNode, spammerId := p2ptest.NodeFixture(
+	spammerNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -84,7 +83,7 @@ func GetSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, flow
 				return nil
 			})),
 	)
-	return spammerNode, spammerId, router
+	return spammerNode, router
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.
