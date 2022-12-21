@@ -323,7 +323,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 }
 
 func (n *Network) Receive(msg *network.IncomingMessageScope) error {
-	n.metrics.InboundMessageReceived(msg.Size(), msg.ChannelId().String(), msg.Protocol().String())
+	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String())
 
 	err := n.processNetworkMessage(msg)
 	if err != nil {
@@ -339,10 +339,10 @@ func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error
 		n.logger.Debug().
 			Hex("sender_id", logging.ID(msg.OriginId())).
 			Hex("event_id", msg.EventID()).
-			Str("channel", msg.ChannelId().String()).
+			Str("channel", msg.Channel().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.DuplicateInboundMessagesDropped(msg.ChannelId().String(), msg.Protocol().String())
+		n.metrics.DuplicateInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String())
 
 		return nil
 	}
@@ -351,7 +351,7 @@ func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error
 	qm := queue.QMessage{
 		Payload:  msg.DecodedPayload(),
 		Size:     msg.Size(),
-		Target:   msg.ChannelId(),
+		Target:   msg.Channel(),
 		SenderID: msg.OriginId(),
 	}
 
@@ -383,8 +383,8 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
-	n.metrics.UnicastMessageSendingStarted(msg.ChannelId().String())
-	defer n.metrics.UnicastMessageSendingCompleted(msg.ChannelId().String())
+	n.metrics.UnicastMessageSendingStarted(msg.Channel().String())
+	defer n.metrics.UnicastMessageSendingCompleted(msg.Channel().String())
 	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
@@ -462,7 +462,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.OutboundMessageSent(msg.Size(), msg.ChannelId().String(), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), msg.PayloadType())
 
 	return nil
 }

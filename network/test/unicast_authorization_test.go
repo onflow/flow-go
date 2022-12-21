@@ -472,7 +472,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
-			require.Equal(u.T(), testChannel, msg.ChannelId())                                            // channel
+			require.Equal(u.T(), testChannel, msg.Channel())                                              // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
 			require.Equal(u.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
@@ -653,7 +653,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 			msg, ok := args[0].(*network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
-			require.Equal(u.T(), channel, msg.ChannelId())                    // channel
+			require.Equal(u.T(), channel, msg.Channel())                      // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())           // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])     // target id
 			require.Equal(u.T(), network.ProtocolTypeUnicast, msg.Protocol()) // protocol

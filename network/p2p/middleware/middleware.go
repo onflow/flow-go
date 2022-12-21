@@ -370,7 +370,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelId(), msg.PayloadType())
+	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.PayloadType())
 	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
@@ -722,7 +722,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 
 	logger := m.log.With().
-		Str("channel", scope.ChannelId().String()).
+		Str("channel", scope.Channel().String()).
 		Str("type", scope.Protocol().String()).
 		Int("msg_size", scope.Size()).
 		Hex("origin_id", logging.ID(scope.OriginId())).
@@ -757,7 +757,7 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 	m.log.Debug().
-		Str("channel", msg.ChannelId().String()).
+		Str("channel", msg.Channel().String()).
 		Interface("msg", msg.Proto()).
 		Str("type", msg.PayloadType()).
 		Int("msg_size", msg.Size()).
@@ -776,7 +776,7 @@ func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(channels.Channel(msg.ChannelId()), m.rootBlockID)
+	topic := channels.TopicFromChannel(channels.Channel(msg.Channel()), m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
