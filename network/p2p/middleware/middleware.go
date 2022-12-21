@@ -710,6 +710,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
+			Str("origin_id", originId.String()).
 			Msg("could not create incoming message scope")
 		return
 	}
