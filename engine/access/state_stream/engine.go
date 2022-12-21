@@ -124,11 +124,11 @@ func NewEng(
 }
 
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionData) {
-	e.log.Debug().Msgf("received execution data %v", executionData.BlockID)
+	e.log.Trace().Msgf("received execution data %v", executionData.BlockID)
 	_ = e.execDataCache.Add(executionData.BlockID, executionData)
 	e.latestExecDataCache.Set(executionData.BlockID)
 	e.execDataBroadcaster.Publish()
-	e.log.Debug().Msg("sent broadcast notification")
+	e.log.Trace().Msg("sent broadcast notification")
 }
 
 // serve starts the gRPC server.

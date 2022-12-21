@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type Streamable interface {
@@ -41,8 +42,8 @@ func NewStreamer(
 }
 
 func (s *Streamer) Stream(ctx context.Context) {
-	s.log.Debug().Msg("new subscription")
-	defer s.log.Debug().Msg("finished event subscription")
+	s.log.Debug().Msg("starting streaming")
+	defer s.log.Debug().Msg("finished streaming")
 
 	notifier := s.broadcaster.Subscribe()
 	for {
@@ -51,7 +52,7 @@ func (s *Streamer) Stream(ctx context.Context) {
 			s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
 			return
 		case <-notifier.Channel():
-			s.log.Debug().Msg("received broadcast notification")
+			s.log.Trace().Msg("received broadcast notification")
 		}
 
 		err := s.sendAllAvailable(ctx)
@@ -75,7 +76,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 		}
 
 		// TODO: add label that indicates the response's height/block/id
-		s.log.Debug().Msg("sending response")
+		s.log.Trace().Msg("sending response")
 
 		err = s.sub.Send(ctx, response, s.sendTimeout)
 		if err != nil {

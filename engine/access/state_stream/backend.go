@@ -59,14 +59,15 @@ func New(
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	b := &StateStreamBackend{
-		log:           logger,
-		headers:       headers,
-		seals:         seals,
-		results:       results,
-		execDataStore: execDataStore,
-		execDataCache: execDataCache,
-		broadcaster:   broadcaster,
-		sendTimeout:   DefaultSendTimeout,
+		log:              logger,
+		headers:          headers,
+		seals:            seals,
+		results:          results,
+		execDataStore:    execDataStore,
+		execDataCache:    execDataCache,
+		broadcaster:      broadcaster,
+		sendTimeout:      DefaultSendTimeout,
+		latestBlockCache: latestBlockCache,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
