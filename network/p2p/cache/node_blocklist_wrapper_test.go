@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	mocks "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -151,7 +152,32 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 		for _, i := range combinedIdentities {
 			require.False(s.T(), i.Ejected) // Ejected flag should still have the original value (false here)
 		}
+	})
 
+	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. Block listed
+	// nodes are expected to be filtered from the identity list returned after setting the ejected field.
+	s.Run("Identities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
+		blocklistLookup := blocklist.Lookup()
+		honestIdentities := unittest.IdentityListFixture(8)
+		combinedIdentities := honestIdentities.Union(blocklist)
+		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		numIdentities := len(combinedIdentities)
+
+		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
+
+		identities := s.wrapper.Identities(p2p.NotEjectedFilter)
+
+		require.Equal(s.T(), len(honestIdentities), len(identities)) // expected only honest nodes to be returned
+		for _, i := range identities {
+			_, isBlocked := blocklistLookup[i.NodeID]
+			require.Equal(s.T(), isBlocked, i.Ejected)
+		}
+
+		// check that original `combinedIdentities` returned by `IdentityProvider` are _not_ modified by wrapper
+		require.Equal(s.T(), numIdentities, len(combinedIdentities)) // length of list should not be modified by wrapper
+		for _, i := range combinedIdentities {
+			require.False(s.T(), i.Ejected) // Ejected flag should still have the original value (false here)
+		}
 	})
 }
 

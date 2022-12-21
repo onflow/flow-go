@@ -234,23 +234,6 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 	return ping.NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
-// notEjectedPeerFilter returns a p2p.PeerFilter that returns an error if a peer is not found in the topology or is ejected.
-// This peer filter is the default peer filter configured with the libp2p nodes peer manager.
-func (m *Middleware) notEjectedPeerFilter() p2p.PeerFilter {
-	return func(pid peer.ID) error {
-		id, ok := m.ov.Identity(pid)
-		if !ok {
-			return fmt.Errorf("identity for peer %s not found", pid)
-		}
-
-		if id.Ejected {
-			return fmt.Errorf("peer is ejected %s", pid)
-		}
-
-		return nil
-	}
-}
-
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	result := make([]peer.ID, len(flowIDs))
 
@@ -330,7 +313,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.UpdateNodeAddresses()
 
-	m.peerManagerFilters = append(m.peerManagerFilters, m.notEjectedPeerFilter())
 	m.libP2PNode.WithPeersProvider(m.topologyPeers)
 
 	// starting rate limiters kicks off cleanup loop
