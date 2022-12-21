@@ -337,7 +337,8 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 	}
 }
 
-// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
+// EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
+// Note: EnsureConnected() must be called to connect all nodes before calling this function.
 func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 

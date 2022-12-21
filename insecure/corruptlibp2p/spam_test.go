@@ -30,7 +30,7 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 
-	gossipsubRouterSpammer := corruptlibp2p.NewGossipSubRouterSpammer2(t, sporkId)
+	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer2(t, sporkId)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
@@ -59,25 +59,26 @@ func TestSpam_IHave(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
-	nodes := []p2p.LibP2PNode{gossipsubRouterSpammer.SpammerNode, victimNode}
+	nodes := []p2p.LibP2PNode{gsrSpammer.SpammerNode, victimNode}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 
-	gossipsubRouterSpammer.WaitUntilInitialized(t)
+	gsrSpammer.WaitUntilInitialized(t)
 
-	// prior to the test we should ensure that spammer and victim connect and discover each other.
+	// prior to the test we should ensure that spammer and victim connect.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
-	// without a priory connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
+	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
+	p2ptest.EnsureConnected(t, ctx, nodes)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})
 
 	// prepare to spam - generate iHAVE control messages
-	iHaveSentCtlMsgs := gossipsubRouterSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
+	iHaveSentCtlMsgs := gsrSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
 
 	// start spamming the victim peer
-	gossipsubRouterSpammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
+	gsrSpammer.SpamIHave(t, victimNode.Host().ID(), iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
 	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")
