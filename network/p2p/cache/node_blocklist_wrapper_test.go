@@ -138,7 +138,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
-		noFilter := filter.In(nil)
+		noFilter := filter.Not(filter.In(nil))
 		identities := s.wrapper.Identities(noFilter)
 
 		require.Equal(s.T(), numIdentities, len(identities)) // expected number resulting identities have the
