@@ -36,7 +36,7 @@ func TestSpam_IHave(t *testing.T) {
 	allSpamIHavesReceived.Add(messagesToSpam)
 
 	var iHaveReceivedCtlMsgs []pb.ControlMessage
-	victimNode, victimId := p2ptest.NodeFixture(
+	victimNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -68,9 +68,6 @@ func TestSpam_IHave(t *testing.T) {
 	// prior to the test we should ensure that spammer and victim connect and discover each other.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a priory connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
-	p2ptest.EnsureConnected(t, ctx, nodes)
-	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, flow.IdentityList{&gossipsubRouterSpammer.SpammerId, &victimId})
-	p2ptest.EnsureStreamCreationInBothDirections(t, ctx, nodes)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
