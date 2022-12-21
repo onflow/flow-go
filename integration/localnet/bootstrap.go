@@ -49,6 +49,7 @@ const (
 	DefaultTracing           = true
 	DefaultCadenceTracing    = false
 	DefaultExtensiveTracing  = false
+	DefaultCpusPerContainer  = "8"
 	DefaultConsensusDelay    = 800 * time.Millisecond
 	DefaultCollectionDelay   = 950 * time.Millisecond
 	AccessAPIPort            = 3569
@@ -245,9 +246,23 @@ type Service struct {
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
 	Labels      map[string]string
+	Deploy      Deploy `yaml:"deploy,omitempty"`
 }
 
-// Build ...
+type Deploy struct {
+	Resources Resources `yaml:"resources,omitempty"`
+}
+
+type Resources struct {
+	Limits       Resource `yaml:"limits,omitempty"`
+	Reservations Resource `yaml:"reservations,omitempty"`
+}
+
+type Resource struct {
+	Cpus   string `yaml:"cpus,omitempty"`
+	Memory string `yaml:"memory,omitempty"`
+}
+
 type Build struct {
 	Context    string
 	Dockerfile string
@@ -527,6 +542,16 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 		Labels: map[string]string{
 			"com.dapperlabs.role": role,
 			"com.dapperlabs.num":  num,
+		},
+		Deploy: Deploy{
+			Resources: Resources{
+				Limits: Resource{
+					Cpus: DefaultCpusPerContainer,
+				},
+				Reservations: Resource{
+					Cpus: DefaultCpusPerContainer,
+				},
+			},
 		},
 	}
 
