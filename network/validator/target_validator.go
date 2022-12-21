@@ -1,12 +1,11 @@
 package validator
 
 import (
-	"github.com/onflow/flow-go/utils/logging"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 var _ network.MessageValidator = &TargetValidator{}
