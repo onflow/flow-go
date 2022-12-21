@@ -211,7 +211,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	if !ok {
 		// check for identity signature (invalid aggregated signature)
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
-			return nil, nil, ErrIdentitySignature
+			fmt.Errorf("invalid aggregated signature: %w", ErrIdentitySignature)
 		}
 		// this case can only happen if at least one added signature via TrustedAdd does not verify against
 		// the signer's corresponding public key
