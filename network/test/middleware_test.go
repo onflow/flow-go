@@ -535,7 +535,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 	firstNodeIndex := 0
 	lastNodeIndex := m.size - 1
 
-	receivedPayloads := make(map[string]struct{}) // keep track of unique payloads received.
+	receivedPayloads := unittest.NewProtectedMap[string, struct{}]() // keep track of unique payloads received.
 
 	// regex to extract the payload from the message
 	regex := regexp.MustCompile(`^hello from: \d`)
@@ -554,8 +554,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-
-		mu := sync.Mutex{} // protects overlay.Receive
+		
 		m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				receiveWG.Done()
@@ -568,15 +567,11 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 				require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0]) // target id
 				require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())     // protocol
 
-				mu.Lock() // protects receivedPayloads
-				defer mu.Unlock()
-
 				// payload
 				decodedPayload := msg.DecodedPayload().(*libp2pmessage.TestMessage).Text
 				require.True(m.T(), regex.MatchString(decodedPayload))
-				_, seen := receivedPayloads[decodedPayload]
-				require.False(m.T(), seen) // payload is unique
-				receivedPayloads[decodedPayload] = struct{}{}
+				require.False(m.T(), receivedPayloads.Has(decodedPayload)) // payload must be unique
+				receivedPayloads.Add(decodedPayload, struct{}{})
 			})
 		go func() {
 			// sends a direct message from first node to the last node
