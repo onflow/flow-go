@@ -776,7 +776,7 @@ func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(channels.Channel(msg.Channel()), m.rootBlockID)
+	topic := channels.TopicFromChannel(msg.Channel(), m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
