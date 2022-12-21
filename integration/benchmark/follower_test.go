@@ -52,9 +52,12 @@ func TestTxFollower(t *testing.T) {
 	require.Equal(t, blockID, f.BlockID())
 
 	// test that transactionID is eventually discovered
-	unittest.AssertClosesBefore(t, f.Follow(transactionID), 1*time.Second)
-	// test that random transaction is not found
-	unittest.AssertNotClosesBefore(t, f.Follow(flowsdk.Identifier{0x7}), 200*time.Millisecond)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(transactionID) }, 1*time.Second)
+	select {
+	case <-f.Follow(flowsdk.Identifier{0x7}):
+		require.Fail(t, "should not have received a result")
+	default:
+	}
 
 	// once transactionID is discovered, block height should be updated
 	require.EqualValues(t, nextBlockHeight, f.Height())
@@ -65,8 +68,8 @@ func TestTxFollower(t *testing.T) {
 	f.Stop()
 
 	// test that all further Follow calls return immediately
-	unittest.AssertClosesBefore(t, f.Follow(transactionID), 1*time.Second)
-	unittest.AssertClosesBefore(t, f.Follow(flowsdk.Identifier{}), 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(transactionID) }, 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(flowsdk.Identifier{}) }, 1*time.Second)
 }
 
 // TestNopTxFollower creates a new follower and verifies that it does not block.
@@ -83,12 +86,12 @@ func TestNopTxFollower(t *testing.T) {
 		WithInteval(1*time.Hour),
 	)
 	require.NoError(t, err)
-	unittest.AssertClosesBefore(t, f.Follow(flowsdk.Identifier{}), 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(flowsdk.Identifier{}) }, 1*time.Second)
 
 	// test that multiple Stops are safe
 	f.Stop()
 	f.Stop()
 
 	// test that all further Follow calls return immediately
-	unittest.AssertClosesBefore(t, f.Follow(flowsdk.Identifier{}), 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(flowsdk.Identifier{}) }, 1*time.Second)
 }
