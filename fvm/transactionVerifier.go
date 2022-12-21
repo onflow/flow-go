@@ -3,11 +3,13 @@ package fvm
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/asn1"
 	"encoding/base64"
 	"fmt"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/onflow/flow-go/crypto/hash"
 	"go.opentelemetry.io/otel/attribute"
+	"math/big"
 
 	crypto2 "github.com/onflow/flow-go/crypto"
 
@@ -223,6 +225,23 @@ func (v *TransactionVerifier) verifyAccountSignature(
 		if err != nil {
 			panic(err)
 		}
+
+		type ECDSASignature struct {
+			R, S *big.Int
+		}
+
+		e := &ECDSASignature{}
+		_, err = asn1.Unmarshal(signature, e)
+		if err != nil {
+			return errorBuilder(txSig, fmt.Errorf("signature is not valid, could not unmarshal signature"))
+		}
+		rBytes := e.R.Bytes()
+		sBytes := e.S.Bytes()
+		Nlen := 32
+		signature := make([]byte, 2*Nlen)
+		// pad the signature with zeroes
+		copy(signature[Nlen-len(rBytes):], rBytes)
+		copy(signature[2*Nlen-len(sBytes):], sBytes)
 
 		valid, err := accountKey.PublicKey.Verify(signature, message, hasher)
 		if err != nil {
