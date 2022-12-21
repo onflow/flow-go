@@ -108,6 +108,11 @@ type OutgoingMessageScope struct {
 	protocol  ProtocolType                      // the type of protocol used to send the message.
 }
 
+// NewOutgoingScope creates a new outgoing message scope.
+// All errors returned by this function are benign and should not cause the node to crash.
+// It errors if the encoder fails to encode the payload into a protobuf message, or
+// if the number of target IDs does not match the protocol type (i.e., unicast messages
+// should have exactly one target ID, while pubsub messages should have at least one target ID).
 func NewOutgoingScope(
 	targetIds flow.IdentifierList,
 	channelId channels.Channel,

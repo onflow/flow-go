@@ -554,7 +554,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-		
+
 		m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				receiveWG.Done()
