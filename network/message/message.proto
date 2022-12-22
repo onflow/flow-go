@@ -1,4 +1,4 @@
- syntax = "proto3";
+syntax = "proto3";
 
 package message;
 
@@ -7,7 +7,8 @@ package message;
 // Message models a single message that is supposed to get exchanged by the
 // gossip network
 message Message {
+  reserved 2, 3, 6;
   string ChannelID = 1;
-  repeated bytes TargetIDs = 2;
-  bytes Payload = 3;
+  repeated bytes TargetIDs = 4;
+  bytes Payload = 5;
 }
