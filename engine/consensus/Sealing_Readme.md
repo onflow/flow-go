@@ -1,3 +1,86 @@
+# Central Concepts and Terminology
+
+
+1. Basics:
+   - For the verification-sealing logic, we **consider each fork in isolation**
+     (example: the blue fork in the figure below)
+   - **a fork has a head** (example: bold Block `F`)
+   - The sealing logic works with **height**  as opposed to view (height is denoted at the bottom of each block)
+   - **Whether or not a block can incorporate an `ExecutionReceipt` or `Seal`** only depends on the fork and **is independent of finality**
+
+   ![Forks](/docs/Chain_and_ExecutionResult_trees_A.png)
+
+
+2. An `ExecutionResult` is a claim that
+   - with starting state: final state of the *previous* Execution Result `PreviousResultID`
+   - and computation: as prescribed in Block with id `BlockID`
+
+   the output state `FinalStateCommit` is obtained.
+
+   ```go
+   type ExecutionResultBody struct {
+       PreviousResultID Identifier      // commit of the previous ER
+       BlockID          Identifier      // commit of the current block
+       FinalStateCommit StateCommitment // final state commitment
+       Chunks           ChunkList
+   }
+   ```
+   ![Forks with execution results](/docs/Chain_and_ExecutionResult_trees_B.png)
+   
+   Notation: `r[B]` is an execution result for block `B`
+
+3. Execution forks:
+
+   The Protocol must handle the case where Execution Nodes make different claims about what the final state of a block's computation is (even when starting from the same input state)
+
+   * Example: result `r[C]_1` and `r[C]_2`
+   * 💡 insight: **The `ExecutionResults` form a tree.**
+
+   ![For a single fork of blocks, the execution results can form a tree](/docs/Chain_and_ExecutionResult_trees_C.png)
+
+   Notation: `r[C]` denotes an execution result for block `C`. If there are multiple results, we denote them as `r[C]_1`,  `r[C]_2`, ...
+
+
+4. `ExecutionReceipts` are commitments from Execution Nodes where they vouch that a certain `ExecutionResult` is correct.
+
+   - 📌 Caution: A single Execution Node can vouch for the correctness of multiple different results for the same block!
+     
+     Example:
+      - EN1 and EN2 have different opinions what the output state of block C should be. Their `ExecutionReceipts` (`Er[r[C]_1]` and `Er[r[C]_2]`) vouch for different `ExecutionResults` (`r[C]_1` and `r[C]_2`)
+      - EN5 might not have been involved in the computation so far. But since there are different opinions which computation path to continue, EN5 just continues both.
+
+   - 📌 There is a protocol edge case where a single EN could even vouch for two different `ExecutionResults` for the same block,
+     which _both have the same parent_ (referenced by `PreviousResultID`).
+     For example, `Er[r[C]_1]` and `Er[r[C]_2]` could be published by the same Execution Node
+
+   ![Blocks with execution results and execution receipts](/docs/Chain_and_ExecutionResult_trees_D.png)
+
+   Notation: `Er[r]` is an execution receipt vouching for result `r`. For example `Er[r[C]_2]` is the receipt for result `r[C]_2`
+
+
+5. `ResultApprovals` approve results (*not* receipts).
+
+   ![Blocks with execution results and execution receipts and result approvals](/docs/Chain_and_ExecutionResult_trees_E.png)
+
+
+# Embedding of Execution results and Receipts into _descending_ blocks
+
+![Verifier Assignments](/docs/VerifierAssignment.png)
+
+Execution receipts and results are embedded into downstream blocks, to record what results the execution nodes committed to
+and to generate verifier assignment. As an example depicted in the figure above:
+* Execution nodes 'Alice' and 'Bob' have both generated the Execution Result `r[A]_1` for block `A`.
+  The Execution Result contains no information about the node generating it. As long as Execution Nodes generate exactly the same result for a particular block (a.g. block `A`),
+  their Execution Results are indistinguishable. 
+* Their Execution Receipts, i.e. their commitment to the execution result, `Er[r[A]_1]_Alice` and `Er[r[A]_1]_Bob` are included by consensus nodes into blocks.
+  Consensus nodes can only include a receipt or result in a block, if the executed block is a direct ancestor. In our example, blocks `X` and `C`
+  can each contain the result for block `A`, because they both have `A` as an ancestor. In contrast, it would be illegal for the blocks `C`, `D`, `E`, `F` to include a result for
+  block `X`, because they do not descend from `X`  
+* For each fork individually, the verifier assignment is determined by the _first_ block holding a particular Execution Result. Thereby, we reduce unnecessary redundancy of data embedded into the chain and avoid unnecessary repeated verification of the same result.   
+
+We are omitting other subtle but safety-critical rules here, which impose additional restriction of when receipts or results can be embedded into blocks.      
+
+
 # Matching Engine and Sealing Engine
 
 ### Matching Engine
@@ -46,18 +129,13 @@
 - For sealing core to concurrently process receipts, it maintains an `AssignmentCollectorTree`, which is a fork-aware structure holding the assignments + approvals for each incorporated result. Therefore, it can ingest results and approvals in arbitrary order.
     - Each vertex (`AssignmentCollector`) in the tree is responsible for managing approvals for one particular result.
     - A result might be incorporated in multiple blocks on different block forks. 
-    - Results incorporated on different forks will lead to different assignment for verification nodes. For example, consider block `B` with two children `C` and `D`:
-      ```
-            ┌ C   
-         B <   
-            └ D
-      ```
-      `C` and `D` can each incorporate the same result `r` for block `B`, but the verifier assignment would be different. Hence, there is one `AssignmentCollector` for `r` stored in the `AssignmentCollectorTree`.
+    - Results incorporated on different forks will lead to different assignment for verification nodes. In our example in the previous section, blocks `X` and `C` were both descending from block `A`.  
+      `C` and `X` can each incorporate the same result `r[A]_1` for block `A`. Hence, there is one `AssignmentCollector` for `r[A]_1` stored in the `AssignmentCollectorTree`.
      
-      Although the approvals are the same for results incorporated in different forks, a valid approval for a certain incorporated result on one fork usually cannot be used for the same result incorporated in a different fork.
+      Although the approvals are the same for results incorporated in different forks, a valid approval for a certain incorporated result on one fork usually cannot be used for the same result incorporated in a different fork. 
       This is because verifiers are assigned to check individual chunks of a result and the assignments for a particular chunk differ with high probability from fork to fork. To guarantee correctness, approvals are only accepted
       from verifiers that are assigned to check exactly this chunk. Hence, one `AssignmentCollector` can hold multiple `ApprovalCollector`s. An `ApprovalCollector` manages one particular verifier assignment, i.e. it corresponds to one particular _incorporated_ result.
-      So in our example above, we would have one `ApprovalCollector` for result `r` being incorporated in block `C` and another `ApprovalCollector` for result `r` being incorporated in block `D`.
+      So in our example above, we would have one `ApprovalCollector` for result `r[A]_1` being incorporated in block `C` and another `ApprovalCollector` for result `r[A]_1` being incorporated in block `X`.
     - As forks are reasonably common and therefore multiple assignments for the same chunk, we ingest result approvals high concurrency, as follows:
       - `AssignmentCollectorTree` has an internal `RWMutex`, which most of the time is accessed in read-mode. Specifically, adding a new approval to an `AssignmentCollector` that 
         already exists only requires a read-lock on the `AssignmentCollectorTree`. 
