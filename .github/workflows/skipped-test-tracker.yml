@@ -1,3 +1,7 @@
+# This workflow
+# 1) runs all non-skipped (regular) tests and generates a summary.
+# 2) generates a report of all skipped tests (e.g. due to flakiness).
+
 name: Skipped Test Tracker
 
 on:
@@ -6,6 +10,7 @@ on:
   push:
     branches:
       - master
+      - misha/3739-fix-flaky-test-monitor-no-data-for-TestStaticEpochTransition
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -24,20 +29,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - unit
-          - unit-crypto
-          - unit-insecure
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
+#          - unit
+#          - unit-crypto
+#          - unit-insecure
+#          - unit-integration
+#          - integration-bft
+#          - integration-mvp
+#          - integration-ghost
+#          - integration-network
           - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
+#          - integration-access
+#          - integration-collection
+#          - integration-consensus
+#          - integration-execution
+#          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}

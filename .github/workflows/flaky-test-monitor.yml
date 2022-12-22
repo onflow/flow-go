@@ -1,12 +1,15 @@
-name: Flaky Test Monitor
 # This workflow run ALL tests, including all tests that are skipped because they are flaky, as well as all the normal (non-skipped) tests.
 # This workflow is run less frequently because running flaky tests is problematic and causes errors.
+
+name: Flaky Test Monitor
+
 on:
   schedule:
     - cron: '0 */12 * * *' # every 12 hours
   push:
     branches:
       - master
+      - misha/3739-fix-flaky-test-monitor-no-data-for-TestStaticEpochTransition
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -24,20 +27,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - unit
-          - unit-crypto
-          - unit-insecure
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
+#          - unit
+#          - unit-crypto
+#          - unit-insecure
+#          - unit-integration
+#          - integration-bft
+#          - integration-mvp
+#          - integration-ghost
+#          - integration-network
           - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
+#          - integration-access
+#          - integration-collection
+#          - integration-consensus
+#          - integration-execution
+#          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
