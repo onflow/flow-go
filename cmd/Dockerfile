@@ -1,12 +1,14 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
+####################################
+## (1) Setup the build environment
 FROM golang:1.19-bullseye AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip
 
-## (2) Build the app binary
+## (2) Setup crypto dependencies
 FROM build-setup AS build-env
 
 # Build the app binary in /app
@@ -23,6 +25,8 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto_setup_gopath
 
+####################################
+## (3) Build the production app binary
 FROM build-env as build-production
 WORKDIR /app
 ARG GOARCH=amd64
@@ -36,14 +40,15 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
 
 RUN chmod a+x /app/app
 
-## (3) Add the statically linked binary to a distroless image
+## (4) Add the statically linked production binary to a distroless image
 FROM gcr.io/distroless/base-debian11 as production
 
 COPY --from=build-production /app/app /bin/app
 
 ENTRYPOINT ["/bin/app"]
 
-
+####################################
+## (3) Build the debug app binary
 FROM build-env as build-debug
 WORKDIR /app
 ARG GOARCH=amd64
@@ -56,6 +61,7 @@ RUN --mount=type=ssh \
 
 RUN chmod a+x /app/app
 
+## (4) Add the statically linked debug binary to a distroless image configured for debugging
 FROM golang:1.19-bullseye as debug
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
@@ -64,11 +70,5 @@ COPY --from=build-debug /app/app /bin/app
 
 ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app", "--"]
 
-## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base-debian11 as production-transit-nocgo
-
-COPY --from=build-transit-production-nocgo /app/app /bin/app
-
-ENTRYPOINT ["/bin/app"]
 
 FROM build-setup as environment-clean
