@@ -189,6 +189,8 @@ func (o OutgoingMessageScope) Proto() *message.Message {
 }
 
 // EventId computes the event ID for a given channel and payload (i.e., the hash of the payload and channel).
+// All errors returned by this function are benign and should not cause the node to crash.
+// It errors if the hash function fails to hash the payload and channel.
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
