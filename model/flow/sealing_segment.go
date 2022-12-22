@@ -2,6 +2,8 @@ package flow
 
 import (
 	"fmt"
+
+	"golang.org/x/exp/slices"
 )
 
 // SealingSegment is the chain segment such that the last block (greatest height)
@@ -172,7 +174,9 @@ func (segment *SealingSegment) Validate() error {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
 	}
-	for _, block := range segment.ExtraBlocks {
+	// extra blocks should be added in reverse order, starting from the highest one
+	for i := len(segment.ExtraBlocks) - 1; i >= 0; i-- {
+		block := segment.ExtraBlocks[i]
 		err := builder.AddExtraBlock(block)
 		if err != nil {
 			return fmt.Errorf("invalid segment: %w", err)
@@ -214,6 +218,8 @@ type SealingSegmentBuilder struct {
 	results     []*ExecutionResult
 	latestSeals map[Identifier]Identifier
 	firstSeal   *Seal
+	// extraBlocks included in sealing segment, must connect to the lowest block of segment
+	// stored in descending order for simpler population logic
 	extraBlocks []*Block
 }
 
@@ -289,6 +295,10 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	return nil
 }
 
+// AddExtraBlock appends an extra block to sealing segment under construction.
+// Extra blocks needs to be added in descending order and the first block must connect to the lowest block
+// of sealing segment, this way they form a continuous chain.
+// No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 	if len(builder.extraBlocks) == 0 {
 		if len(builder.blocks) == 0 {
@@ -321,6 +331,12 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	if err := builder.validateSegment(); err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
+
+	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
+	// Apply a sort to reverse the slice and use correct ordering.
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) bool {
+		return lhs.Header.Height < rhs.Header.Height
+	})
 
 	return &SealingSegment{
 		Blocks:           builder.blocks,
