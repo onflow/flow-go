@@ -37,6 +37,7 @@ package crypto
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -232,7 +233,10 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
-const identityBLSSignatureHeader = byte(0xC0)
+// 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
+const infinityPointHeader = 0xC0
+
+var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
 
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
@@ -243,18 +247,7 @@ const identityBLSSignatureHeader = byte(0xC0)
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	if len(s) != signatureLengthBLSBLS12381 {
-		return false
-	}
-	if s[0] != identityBLSSignatureHeader {
-		return false
-	}
-	for _, b := range s[1:] {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
+	return bytes.Compare(s, identityBLSSignature) == 0
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12-381 curve.
