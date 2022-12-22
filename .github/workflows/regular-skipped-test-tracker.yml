@@ -2,7 +2,7 @@
 # 1) runs all non-skipped (regular) tests and generates a summary.
 # 2) generates a report of all skipped tests (e.g. due to flakiness).
 
-name: Skipped Test Tracker
+name: Regular and Skipped Test Tracker
 
 on:
   schedule:
