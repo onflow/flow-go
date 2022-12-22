@@ -42,6 +42,11 @@ type IncomingMessageScope struct {
 	protocol       ProtocolType        // the type of protocol used to receive the message.
 }
 
+// NewIncomingScope creates a new incoming message scope.
+// All errors returned by this function are benign and should not cause the node to crash, especially that it is not
+// safe to crash the node when receiving a message.
+// It errors if event id (i.e., hash of the payload and channel) cannot be computed, or if it fails to
+// convert the target IDs from bytes slice to a flow.IdentifierList.
 func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
 	eventId, err := EventId(channels.Channel(msg.ChannelID), msg.Payload)
 	if err != nil {
