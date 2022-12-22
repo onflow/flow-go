@@ -46,8 +46,8 @@
    - 📌 Caution: A single Execution Node can vouch for the correctness of multiple different results for the same block!
      
      Example:
-      - EN1 and EN2 have different opinions what the output state of block C should be. Their `ExecutionReceipts` (`Er[r[C]_1]` and `Er[r[C]_2]`) vouch for different `ExecutionResults` (`r[C]_1` and `r[C]_2`)
-      - EN5 might not have been involved in the computation so far. But since there are different opinions which computation path to continue, EN5 just continues both.
+      - Execution nodes EN1 and EN2 have different opinions what the output state of block C should be. Their `ExecutionReceipts` (`Er[r[C]_1]` and `Er[r[C]_2]`) vouch for different `ExecutionResults` (`r[C]_1` and `r[C]_2`)
+      - Execution node EN5 might not have been involved in the computation so far. But since there are different opinions which computation path to continue, EN5 just continues both.
 
    - 📌 There is a protocol edge case where a single EN could even vouch for two different `ExecutionResults` for the same block,
      which _both have the same parent_ (referenced by `PreviousResultID`).
@@ -67,7 +67,7 @@
 
 
 
-Execution receipts and results are embedded into downstream blocks, to record what results the execution nodes committed to
+Execution receipts and results are embedded into downstream blocks, to record what results the execution nodes [ENs] committed to
 and to generate verifier assignment. Let's take a look at the following example:
 
 ![Verifier Assignments](/docs/VerifierAssignment.png)
