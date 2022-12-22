@@ -68,11 +68,11 @@ func main() {
 			message1 := "CollectionRequest"
 			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
+			collector.OutboundMessageSent(rand.Intn(1000), collProvider, message1)
+			collector.OutboundMessageSent(rand.Intn(1000), collIngest, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
+			collector.InboundMessageReceived(rand.Intn(1000), collProvider, message1)
+			collector.InboundMessageReceived(rand.Intn(1000), collIngest, message2)
 
 			time.Sleep(1 * time.Second)
 		}

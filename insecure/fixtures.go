@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +40,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
-	eventIDHash, err := p2p.EventId(channel, payload)
+	eventIDHash, err := network.EventId(channel, payload)
 	require.NoError(t, err)
 
 	eventID := flow.HashToID(eventIDHash)

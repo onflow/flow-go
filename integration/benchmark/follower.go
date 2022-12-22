@@ -103,40 +103,37 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 	return f, nil
 }
 
-func (f *txFollowerImpl) getAllCollections(ctx context.Context, block *flowsdk.Block) ([]flowsdk.Collection, error) {
-	cols := make([]flowsdk.Collection, 0, len(block.CollectionGuarantees))
-	for i, guaranteed := range block.CollectionGuarantees {
-		col, err := f.client.GetCollection(ctx, guaranteed.CollectionID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get collection: %d: %s: %w",
-				i, guaranteed.CollectionID.Hex(), err)
-		}
-		cols = append(cols, *col)
-	}
-	return cols, nil
+type txStats struct {
+	Txs        uint64
+	UnknownTxs uint64
+	ErrorTxs   uint64
 }
 
-func (f *txFollowerImpl) processTransactions(cols []flowsdk.Collection) (blockTxs uint64, blockUnknownTxs uint64) {
-	for _, col := range cols {
-		for _, tx := range col.TransactionIDs {
-			blockTxs++
-
-			if txi, loaded := f.loadAndDelete(tx); loaded {
-				duration := time.Since(txi.submisionTime)
+func (f *txFollowerImpl) processTransactions(results []*flowsdk.TransactionResult) txStats {
+	txStats := txStats{
+		Txs: uint64(len(results)),
+	}
+	for _, tx := range results {
+		if tx.Error != nil {
+			txStats.ErrorTxs++
+		}
+		if txi, loaded := f.loadAndDelete(tx.TransactionID); loaded {
+			duration := time.Since(txi.submisionTime)
+			if f.logger.Trace().Enabled() {
 				f.logger.Trace().
 					Dur("durationInMS", duration).
-					Hex("txID", tx.Bytes()).
+					Hex("txID", tx.TransactionID.Bytes()).
 					Msg("returned account to the pool")
-				close(txi.C)
-				if f.metrics != nil {
-					f.metrics.TransactionExecuted(duration)
-				}
-			} else {
-				blockUnknownTxs++
 			}
+			close(txi.C)
+			if f.metrics != nil {
+				f.metrics.TransactionExecuted(duration)
+			}
+		} else {
+			txStats.UnknownTxs++
 		}
 	}
-	return
+	return txStats
 }
 
 func (f *txFollowerImpl) run() {
@@ -144,9 +141,7 @@ func (f *txFollowerImpl) run() {
 	defer t.Stop()
 	defer close(f.stopped)
 
-	lastBlockTime := time.Now()
-
-	var totalTxs, totalUnknownTxs uint64
+	var totalStats txStats
 	for {
 		select {
 		case <-f.ctx.Done():
@@ -155,61 +150,49 @@ func (f *txFollowerImpl) run() {
 		}
 
 		blockResolutionStart := time.Now()
-		block, cols, err := f.pollCollections()
+		hdr, results, err := f.getNextBlocksTransactions()
 		if err != nil {
 			f.logger.Trace().Err(err).Uint64("next_height", f.Height()+1).Msg("collections are not ready yet")
 			continue
 		}
 
-		blockTxs, blockUnknownTxs := f.processTransactions(cols)
-		totalTxs += blockTxs
-		totalUnknownTxs += blockUnknownTxs
+		blockStats := f.processTransactions(results)
+		totalStats.Txs += blockStats.Txs
+		totalStats.UnknownTxs += blockStats.UnknownTxs
+		totalStats.ErrorTxs += blockStats.ErrorTxs
 
 		f.logger.Debug().
-			Uint64("blockHeight", block.Height).
-			Hex("blockID", block.ID.Bytes()).
-			Dur("timeSinceLastBlockInMS", time.Since(lastBlockTime)).
-			Dur("timeToParseBlockInMS", time.Since(blockResolutionStart)).
-			Int("numCollections", len(block.CollectionGuarantees)).
-			Int("numSeals", len(block.Seals)).
-			Uint64("txsTotal", totalTxs).
-			Uint64("txsTotalUnknown", totalUnknownTxs).
-			Uint64("txsInBlock", blockTxs).
-			Uint64("txsInBlockUnknown", blockUnknownTxs).
+			Uint64("blockHeight", hdr.Height).
+			Hex("blockID", hdr.ID.Bytes()).
+			Dur("timeToResolveBlockInMS", time.Since(blockResolutionStart)).
+			Dur("timeSinceBlockCreationInMS", time.Since(hdr.Timestamp)).
+			Interface("blockStats", blockStats).
+			Interface("totalStats", totalStats).
 			Int("txsInProgress", f.InProgress()).
 			Msg("new block parsed")
 
-		f.updateFromBlockHeader(block.BlockHeader)
-
-		lastBlockTime = time.Now()
+		f.updateFromBlockHeader(*hdr)
 	}
 }
 
-func (f *txFollowerImpl) pollCollections() (*flowsdk.Block, []flowsdk.Collection, error) {
+func (f *txFollowerImpl) getNextBlocksTransactions() (*flowsdk.BlockHeader, []*flowsdk.TransactionResult, error) {
 	ctx, cancel := context.WithTimeout(f.ctx, 1*time.Second)
 	defer cancel()
 
-	hdr, err := f.client.GetLatestBlockHeader(ctx, true)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get latest block header: %w", err)
-	}
-
 	nextHeight := f.Height() + 1
-	if hdr.Height < nextHeight {
-		return nil, nil, fmt.Errorf("expected block is not yet sealed: want %d, got %d", nextHeight, hdr.Height)
-	}
-
-	block, err := f.client.GetBlockByHeight(ctx, nextHeight)
+	hdr, err := f.client.GetBlockHeaderByHeight(ctx, nextHeight)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get block by height: %w", err)
+		return nil, nil, fmt.Errorf("failed to get block header for height: %d: %w",
+			nextHeight, err)
 	}
 
-	cols, err := f.getAllCollections(ctx, block)
+	results, err := f.client.GetTransactionResultsByBlockID(ctx, hdr.ID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get collections: %w", err)
+		return nil, nil, fmt.Errorf("results for block are not available: %d/%s: %w",
+			hdr.Height, hdr.ID, err)
 	}
 
-	return block, cols, nil
+	return hdr, results, nil
 }
 
 // Follow returns a channel that will be closed when the transaction is completed.
