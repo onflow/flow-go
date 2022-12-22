@@ -27,6 +27,8 @@ FROM build-env as build-production
 WORKDIR /app
 
 ARG GOARCH=amd64
+
+# TAGS can be overriden to modify the go build tags (e.g. build without netgo)
 ARG TAGS="relic,netgo"
 
 # Keep Go's build cache between builds.
