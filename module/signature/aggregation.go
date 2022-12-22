@@ -171,11 +171,10 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
-//   - ErrIdentitySignature if the aggregated signature is identity, which is invalid.
-//     This error can arise in two scenarios:
-//     1. Some signatures added via TrustedAdd were forged specifically with the goal to yield the
-//     identity signature. Here, these signatures would be invalid w.r.t to their respective public keys.
-//     2. The signatures are valid but the public keys were forged to sum up to an identity public key.
+//   - ErrIdentityPublicKey if the signer's public keys add up to the BLS identity public key.
+//     The aggregated signature would fail the cryptographic verification if verified against the
+//     the identity public key. This case can only happen if public keys were forged to sum up to
+//     an identity public key.
 //   - InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	// check if signature was already computed
@@ -204,14 +203,15 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		}
 		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
 	}
-	ok, err := s.VerifyAggregate(indices, aggregatedSignature) // no errors expected (unless some public BLS keys are invalid)
+	ok, aggregatedKey, err := s.VerifyAggregate(indices, aggregatedSignature) // no errors expected (unless some public BLS keys are invalid)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
+
 	if !ok {
 		// check for identity signature (invalid aggregated signature)
-		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
-			fmt.Errorf("invalid aggregated signature: %w", ErrIdentitySignature)
+		if aggregatedKey.Equals(crypto.IdentityBLSPublicKey()) {
+			return nil, nil, fmt.Errorf("invalid aggregated signature: %w", ErrIdentityPublicKey)
 		}
 		// this case can only happen if at least one added signature via TrustedAdd does not verify against
 		// the signer's corresponding public key
@@ -224,40 +224,41 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 
 // VerifyAggregate verifies an aggregated signature against the stored message and the stored
 // keys corresponding to the input signers.
-// Aggregating the keys of the signers internally is optimized to only look at the keys delta
-// compared to the latest execution of the function. The function is therefore not thread-safe.
+// The aggregated public key of input signers is returned.
+// The function is not thread-safe.
 // Possible returns:
-//   - (true, nil): aggregate signature is valid
-//   - (false, nil): aggregate signature is cryptographically invalid
-//   - (false, err) with error types:
+//   - (true, agg_key, nil): aggregate signature is valid
+//   - (false, agg_key, nil): aggregate signature is cryptographically invalid
+//   - (false, nil, err) with error types:
 //   - InsufficientSignaturesError if no signer indices are given (`signers` is empty)
 //   - InvalidSignerIdxError if some signer indices are out of bound
 //   - generic error in case of an unexpected runtime failure
-func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, error) {
+func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, crypto.PublicKey, error) {
 
 	keys := make([]crypto.PublicKey, 0, len(signers))
 	for _, signer := range signers {
 		if signer >= s.n || signer < 0 {
-			return false, NewInvalidSignerIdxErrorf("signer index %d is invalid", signer)
+			return false, nil, NewInvalidSignerIdxErrorf("signer index %d is invalid", signer)
 		}
 		keys = append(keys, s.publicKeys[signer])
 	}
-	KeyAggregate, err := crypto.AggregateBLSPublicKeys(keys)
+
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(keys)
 	if err != nil {
 		// error for:
 		//  * empty `keys` slice
 		//  * some keys are not BLS12 381 keys, which should not happen, as we checked
 		//    each key's signing algorithm in the constructor to be `crypto.BLSBLS12381`
 		if crypto.IsBLSAggregateEmptyListError(err) {
-			return false, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
+			return false, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
 		}
-		return false, fmt.Errorf("unexpected internal error during public key aggregation: %w", err)
+		return false, nil, fmt.Errorf("unexpected internal error during public key aggregation: %w", err)
 	}
-	ok, err := KeyAggregate.Verify(sig, s.message, s.hasher) // no errors expected
+	ok, err := aggregatedKey.Verify(sig, s.message, s.hasher) // no errors expected
 	if err != nil {
-		return false, fmt.Errorf("signature verification failed: %w", err)
+		return false, nil, fmt.Errorf("signature verification failed: %w", err)
 	}
-	return ok, nil
+	return ok, aggregatedKey, nil
 }
 
 // PublicKeyAggregator aggregates BLS public keys in an optimized manner.

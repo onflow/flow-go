@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
+func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature, []crypto.PublicKey) {
 	// create message and tag
 	msgLen := 100
 	msg := make([]byte, msgLen)
@@ -40,7 +40,7 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 	}
 	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
 	require.NoError(t, err)
-	return aggregator, sigs
+	return aggregator, sigs, keys
 }
 
 func TestAggregatorSameMessage(t *testing.T) {
@@ -68,7 +68,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Happy paths
 	t.Run("happy path", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs, pks := createAggregationData(t, signersNum)
 		// only add half of the signatures
 		subSet := signersNum / 2
 		for i, sig := range sigs[subSet:] {
@@ -91,9 +91,13 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 		signers, agg, err := aggregator.Aggregate()
 		assert.NoError(t, err)
-		ok, err := aggregator.VerifyAggregate(signers, agg)
+		ok, aggKey, err := aggregator.VerifyAggregate(signers, agg)
 		assert.NoError(t, err)
 		assert.True(t, ok)
+		// check aggregated public key
+		expectedKey, err := crypto.AggregateBLSPublicKeys(pks[subSet:])
+		assert.NoError(t, err)
+		assert.True(t, expectedKey.Equals(aggKey))
 		// check signers
 		sort.Ints(signers)
 		for i := 0; i < subSet; i++ {
@@ -116,9 +120,13 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 		signers, agg, err = aggregator.Aggregate()
 		assert.NoError(t, err)
-		ok, err = aggregator.VerifyAggregate(signers, agg)
+		ok, aggKey, err = aggregator.VerifyAggregate(signers, agg)
 		assert.NoError(t, err)
 		assert.True(t, ok)
+		// check aggregated public key
+		expectedKey, err = crypto.AggregateBLSPublicKeys(pks[:])
+		assert.NoError(t, err)
+		assert.True(t, expectedKey.Equals(aggKey))
 		// check signers
 		sort.Ints(signers)
 		for i := 0; i < signersNum; i++ {
@@ -128,7 +136,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs, _ := createAggregationData(t, signersNum)
 		// loop through invalid inputs
 		for _, index := range []int{-1, signersNum} {
 			ok, err := aggregator.Verify(index, sigs[0])
@@ -146,18 +154,20 @@ func TestAggregatorSameMessage(t *testing.T) {
 			assert.False(t, ok)
 			assert.True(t, IsInvalidSignerIdxError(err))
 
-			ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
+			ok, aggKey, err := aggregator.VerifyAggregate([]int{index}, sigs[0])
 			assert.False(t, ok)
+			assert.Nil(t, aggKey)
 			assert.True(t, IsInvalidSignerIdxError(err))
 		}
 		// empty list
-		ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
+		ok, aggKey, err := aggregator.VerifyAggregate([]int{}, sigs[0])
 		assert.False(t, ok)
+		assert.Nil(t, aggKey)
 		assert.True(t, IsInsufficientSignaturesError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs, _ := createAggregationData(t, signersNum)
 		for i, sig := range sigs {
 			err := aggregator.TrustedAdd(i, sig)
 			require.NoError(t, err)
@@ -184,12 +194,12 @@ func TestAggregatorSameMessage(t *testing.T) {
 	//  3. The signatures were deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key
 	//     (although it is not identity)
 	t.Run("invalid signature", func(t *testing.T) {
-		_, s := createAggregationData(t, 1)
+		_, s, _ := createAggregationData(t, 1)
 		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
 		mismatchingSig := s[0]
 
 		for _, invalidSig := range []crypto.Signature{invalidStructureSig, mismatchingSig} {
-			aggregator, sigs := createAggregationData(t, signersNum)
+			aggregator, sigs, _ := createAggregationData(t, signersNum)
 			ok, err := aggregator.VerifyAndAdd(0, sigs[0]) // first, add a valid signature
 			require.NoError(t, err)
 			assert.True(t, ok)
@@ -221,24 +231,29 @@ func TestAggregatorSameMessage(t *testing.T) {
 	})
 
 	t.Run("identity aggregated signature", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, 2)
-		// signature at index 1 is opposite of signature at index 0
-		copy(sigs[1], sigs[0])
-		sigs[1][0] ^= 0x20 // flip the sign bit
+		aggregator, sigs, pks := createAggregationData(t, 2)
+
+		// public key at index 1 is opposite of public key at index 0
+		oppositePk := pks[0].Encode()
+		oppositePk[0] ^= 0x20 // flip the sign bit to flip the point sign
+		var err error
+		pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, oppositePk)
+		require.NoError(t, err)
 
 		// first, add a valid signature
 		ok, err := aggregator.VerifyAndAdd(0, sigs[0])
 		require.NoError(t, err)
 		assert.True(t, ok)
 
-		// add invalid signature for signer with index 1:
-		err = aggregator.TrustedAdd(1, sigs[1]) // stand-alone verification
+		// add invalid signature for signer with index 1
+		// (invalid because the corresponding key was altered)
+		err = aggregator.TrustedAdd(1, sigs[1])
 		require.NoError(t, err)
 
-		// Aggregation should validate its own aggregation result and error with sentinel ErrIdentitySignature
+		// Aggregation should validate its own aggregation result and error with sentinel ErrIdentityPublicKey
 		signers, agg, err := aggregator.Aggregate()
 		assert.Error(t, err)
-		assert.True(t, errors.Is(err, ErrIdentitySignature))
+		assert.True(t, errors.Is(err, ErrIdentityPublicKey))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})
