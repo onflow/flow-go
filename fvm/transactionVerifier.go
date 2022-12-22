@@ -6,10 +6,11 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"fmt"
+	"math/big"
+
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/onflow/flow-go/crypto/hash"
 	"go.opentelemetry.io/otel/attribute"
-	"math/big"
 
 	crypto2 "github.com/onflow/flow-go/crypto"
 
@@ -216,7 +217,7 @@ func (v *TransactionVerifier) verifyAccountSignature(
 		}
 
 		clientDataHash := sha256.Sum256(resp.Raw.AssertionResponse.ClientDataJSON)
-		sigData := append(resp.Raw.AssertionResponse.AuthenticatorData, clientDataHash[:]...)
+		sigData := append(resp.Raw.AssertionResponse.AuthenticatorData[:], clientDataHash[:]...)
 
 		message = sigData
 		signature = resp.Raw.AssertionResponse.Signature
@@ -276,40 +277,6 @@ func (v *TransactionVerifier) verifyAccountSignature(
 
 	return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 }
-
-type NoOPHasher struct {
-}
-
-func (h NoOPHasher) Algorithm() hash.HashingAlgorithm {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (h NoOPHasher) Size() int {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (h NoOPHasher) ComputeHash(i []byte) hash.Hash {
-	return i
-}
-
-func (h NoOPHasher) Write(p []byte) (n int, err error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (h NoOPHasher) SumHash() hash.Hash {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (h NoOPHasher) Reset() {
-	//TODO implement me
-	panic("implement me")
-}
-
-var _ hash.Hasher = (*NoOPHasher)(nil)
 
 func (v *TransactionVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
