@@ -305,7 +305,7 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
 		}
 		// first extra block has to match the lowest block of sealing segment
-		if (block.Header.Height + 1) != builder.blocks[0].Header.Height {
+		if (block.Header.Height + 1) != builder.lowest().Header.Height {
 			return fmt.Errorf("invalid extra block height (%d), doesn't connect to sealing segment: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 		}
 	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
