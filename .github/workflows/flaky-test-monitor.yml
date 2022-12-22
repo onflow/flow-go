@@ -1,8 +1,9 @@
 name: Flaky Test Monitor
-
+# This workflow run ALL tests, including all tests that are skipped because they are flaky, as well as all the normal (non-skipped) tests.
+# This workflow is run less frequently because running flaky tests is problematic and causes errors.
 on:
   schedule:
-    - cron: '0 */2 * * *' # every 2 hours
+    - cron: '0 */12 * * *' # every 12 hours
   push:
     branches:
       - master
