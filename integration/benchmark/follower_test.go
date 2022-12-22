@@ -52,7 +52,13 @@ func TestTxFollower(t *testing.T) {
 	require.Equal(t, blockID, f.BlockID())
 
 	// test that transactionID is eventually discovered
-	unittest.AssertReturnsBefore(t, func() { <-f.Follow(transactionID) }, 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() {
+		result := <-f.Follow(transactionID)
+		require.Equal(t, transactionID, result.TransactionID)
+		require.Equal(t, flowsdk.TransactionStatusSealed, result.Status)
+	}, 1*time.Second)
+
+	// wait for a transaction that is not in the block should not return
 	select {
 	case <-f.Follow(flowsdk.Identifier{0x7}):
 		require.Fail(t, "should not have received a result")
@@ -60,16 +66,17 @@ func TestTxFollower(t *testing.T) {
 	}
 
 	// once transactionID is discovered, block height should be updated
-	require.EqualValues(t, nextBlockHeight, f.Height())
-	require.Equal(t, nextBlockID, f.BlockID())
+	require.Eventually(t, func() bool {
+		return nextBlockHeight == f.Height() && nextBlockID == f.BlockID()
+	}, 10*time.Second, 10*time.Millisecond)
 
 	// test that multiple Stops are safe
 	f.Stop()
 	f.Stop()
 
 	// test that all further Follow calls return immediately
-	unittest.AssertReturnsBefore(t, func() { <-f.Follow(transactionID) }, 1*time.Second)
-	unittest.AssertReturnsBefore(t, func() { <-f.Follow(flowsdk.Identifier{}) }, 1*time.Second)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(transactionID) }, 100*time.Millisecond)
+	unittest.AssertReturnsBefore(t, func() { <-f.Follow(flowsdk.Identifier{}) }, 100*time.Millisecond)
 }
 
 // TestNopTxFollower creates a new follower and verifies that it does not block.

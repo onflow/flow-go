@@ -296,7 +296,9 @@ func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followe
 	return nop, nil
 }
 
-// Follow immediately returns a result.
+// Follow immediately returns an empty result.
+// This is mostly useful for testing purposes or of cases where waiting for a transaction
+// to complete is not necessary.
 func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan flowsdk.TransactionResult {
 	closedCh := make(chan flowsdk.TransactionResult, 1)
 	closedCh <- flowsdk.TransactionResult{

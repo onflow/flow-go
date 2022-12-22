@@ -418,6 +418,8 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		lg.workerStatsTracker.IncTxExecuted()
 	case <-time.After(60 * time.Second):
 		return fmt.Errorf("timeout waiting for account creation tx to be executed")
+	case <-lg.Done():
+		return fmt.Errorf("loader stopped while waiting for account creation tx to be executed")
 	}
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
@@ -727,6 +729,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			Int("availableAccounts", len(lg.availableAccounts)).
 			Msg("transaction lost")
 		lg.workerStatsTracker.IncTxTimedout()
+	case <-lg.Done():
+		return
 	}
 	lg.workerStatsTracker.IncTxExecuted()
 }
