@@ -126,9 +126,7 @@ func (r *tpsRecorder) statsToRawTPS(nowTs time.Time, stats benchmark.WorkerStats
 		InputTPS:    float64(stats.TxsSent-r.lastStats.TxsSent) / timeDiff,
 		OutputTPS:   float64(stats.TxsExecuted-r.lastStats.TxsExecuted) / timeDiff,
 		TimedoutTPS: float64(stats.TxsTimedout-r.lastStats.TxsTimedout) / timeDiff,
-
-		// TODO(rbtz): add error stats.
-		ErrorTPS: 0,
+		ErrorTPS:    float64(stats.TxsFailed-r.lastStats.TxsFailed) / timeDiff,
 
 		InflightTxs: stats.TxsSent - stats.TxsExecuted,
 	}
