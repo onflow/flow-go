@@ -175,7 +175,17 @@ func GenerateMiddlewares(t *testing.T,
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
-		mws[i] = middleware.NewMiddleware(logger, node, nodeId, bitswapmet, sporkID, middleware.DefaultUnicastTimeout, translator.NewIdentityProviderIDTranslator(idProviders[i]), codec, consumer, middleware.WithUnicastRateLimiters(o.unicastRateLimiters))
+		mws[i] = middleware.NewMiddleware(
+			logger,
+			node,
+			nodeId,
+			bitswapmet,
+			sporkID,
+			middleware.DefaultUnicastTimeout,
+			translator.NewIdentityProviderIDTranslator(idProviders[i]),
+			codec,
+			consumer,
+			middleware.WithUnicastRateLimiters(o.unicastRateLimiters))
 	}
 	return mws, idProviders
 }

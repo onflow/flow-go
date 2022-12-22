@@ -140,7 +140,17 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(log zerolog.Logger, libP2PNode p2p.LibP2PNode, flowID flow.Identifier, bitswapMet module.BitswapMetrics, rootBlockID flow.Identifier, unicastMessageTimeout time.Duration, idTranslator p2p.IDTranslator, codec network.Codec, slashingViolationsConsumer slashing.ViolationsConsumer, opts ...MiddlewareOption) *Middleware {
+func NewMiddleware(
+	log zerolog.Logger,
+	libP2PNode p2p.LibP2PNode,
+	flowID flow.Identifier,
+	bitswapMet module.BitswapMetrics,
+	rootBlockID flow.Identifier,
+	unicastMessageTimeout time.Duration,
+	idTranslator p2p.IDTranslator,
+	codec network.Codec,
+	slashingViolationsConsumer slashing.ViolationsConsumer,
+	opts ...MiddlewareOption) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout

@@ -1105,7 +1105,17 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
 
-	builder.Middleware = middleware.NewMiddleware(logger, libp2pNode, nodeID, builder.Metrics.Bitswap, builder.SporkID, middleware.DefaultUnicastTimeout, builder.IDTranslator, builder.CodecFactory(), slashingViolationsConsumer, middleware.WithMessageValidators(validators...))
+	builder.Middleware = middleware.NewMiddleware(
+		logger,
+		libp2pNode,
+		nodeID,
+		builder.Metrics.Bitswap,
+		builder.SporkID,
+		middleware.DefaultUnicastTimeout,
+		builder.IDTranslator,
+		builder.CodecFactory(),
+		slashingViolationsConsumer,
+		middleware.WithMessageValidators(validators...))
 
 	return builder.Middleware
 }
