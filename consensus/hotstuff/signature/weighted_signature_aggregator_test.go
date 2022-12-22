@@ -239,17 +239,21 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	t.Run("identity aggregated signature", func(t *testing.T) {
-		aggregator, ids, _, sigs, _, _ := createAggregationData(t, 2)
-		// signature at index 1 is opposite of signature at index 0
-		copy(sigs[1], sigs[0])
-		sigs[1][0] ^= 0x20 // flip the sign bit
-
-		// first, add a valid signature
-		_, err := aggregator.TrustedAdd(ids[0].NodeID, sigs[0])
+		aggregator, ids, pks, sigs, _, _ := createAggregationData(t, 2)
+		// public key at index 1 is opposite of public key at index 0
+		oppositePk := pks[0].Encode()
+		oppositePk[0] ^= 0x20 // flip the sign bit to flip the point sign
+		var err error
+		pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, oppositePk)
 		require.NoError(t, err)
 
-		// add invalid signature for signer with index 1:
-		_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[1]) // stand-alone verification
+		// first, add a valid signature
+		_, err = aggregator.TrustedAdd(ids[0].NodeID, sigs[0])
+		require.NoError(t, err)
+
+		// add invalid signature for signer with index 1
+		// (invalid because the corresponding key was altered)
+		_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[1])
 		require.NoError(t, err)
 
 		// Aggregation should validate its own aggregation result and error with sentinel model.InvalidAggregatedSignatureError
