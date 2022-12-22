@@ -3,8 +3,8 @@
 ### Matching Engine
 
 - Matching engine ingests the Execution Receipts (ERs) from execution nodes and incorporated blocks, validates the ERs and stores then in its `ExecutionTree`.
-- Matching core is fully concurrent
-- if receipts are received before the block, we will drop the receipt
+- Matching core is fully concurrent.
+- If receipts are received before the block, we will drop the receipt.
 - If receipts are received after the block, but the previous result is missing, we will cache the receipt in the mempool
 - If previous result exists, we can validate the receipt, and store it in the execution tree mempool and storage.
 - After processing a receipt, we try to find child receipts from the cache, and process them.
@@ -26,7 +26,7 @@
 
       It is *strictly required* to add the result for the latest block that is both sealed and finalized. This is necessary because the ID of the latest result is given as a query to find all descending results during block construction. Without the sealed result, the block builder could not proceed.
 
-      In contrast, conceptually it is *not strictly required* for the builder to also add the receipts from the known blocks (finalized unsealed blocks and all pending blocks descending from the latest finalized block). This is because this matching engine *would* re-request these (method `requestPendingReceipts`) by itself. Nevertheless, relying on re-feting already known receipts would add a large latency overhead after recovering from a crash.
+      In contrast, conceptually it is *not strictly required* for the builder to also add the receipts from the known blocks (finalized unsealed blocks and all pending blocks descending from the latest finalized block). This is because this matching engine *would* re-request these (method `requestPendingReceipts`) by itself. Nevertheless, relying on re-fetching already known receipts would add a large latency overhead after recovering from a crash.
 
 
 ### Sealing Engine
