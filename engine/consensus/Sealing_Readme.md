@@ -65,10 +65,13 @@
 
 # Embedding of Execution results and Receipts into _descending_ blocks
 
-![Verifier Assignments](/docs/VerifierAssignment.png)
+
 
 Execution receipts and results are embedded into downstream blocks, to record what results the execution nodes committed to
-and to generate verifier assignment. As an example depicted in the figure above:
+and to generate verifier assignment. Let's take a look at the following example:
+
+![Verifier Assignments](/docs/VerifierAssignment.png)
+
 * Execution nodes 'Alice' and 'Bob' have both generated the Execution Result `r[A]_1` for block `A`.
   The Execution Result contains no information about the node generating it. As long as Execution Nodes generate exactly the same result for a particular block (a.g. block `A`),
   their Execution Results are indistinguishable. 
