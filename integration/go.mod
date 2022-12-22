@@ -29,7 +29,6 @@ require (
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.28.0
-	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.8.0
 	go.einride.tech/pid v0.1.0
 	go.uber.org/atomic v1.10.0
@@ -237,6 +236,7 @@ require (
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
 	github.com/schollz/progressbar/v3 v3.8.3 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
+	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/shirou/gopsutil/v3 v3.22.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
