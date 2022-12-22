@@ -1,12 +1,11 @@
-# This workflow
-# 1) runs all non-skipped (regular) tests and generates a summary.
-# 2) generates a report of all skipped tests (e.g. due to flakiness).
+# This workflow run ALL tests, including all tests that are skipped because they are flaky, as well as all the normal (non-skipped) tests.
+# This workflow is run less frequently because running flaky tests is problematic and causes errors.
 
-name: Regular and Skipped Test Monitor
+name: Test Monitor - Flaky
 
 on:
   schedule:
-    - cron: '0 */2 * * *' # every 2 hours
+    - cron: '0 */12 * * *' # every 12 hours
   push:
     branches:
       - master
@@ -14,8 +13,7 @@ on:
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
-  BIGQUERY_TABLE: skipped_tests
-  BIGQUERY_TABLE2: test_results
+  BIGQUERY_TABLE: test_results
   GO_VERSION: 1.19
 
 concurrency: 
@@ -23,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  upload-skipped-test-summary:
-    name: Upload Skipped Test Summary
+  upload-flaky-test-summary:
+    name: Upload Flaky Test Summary
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +45,6 @@ jobs:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
       RUN_ID: ${{ github.run_id }}
-      SKIPPED_TESTS_FILE: skipped-tests
       RESULTS_FILE: test-results
     runs-on: ubuntu-latest
     steps:
@@ -70,27 +67,20 @@ jobs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
     - name: Run tests
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 60
-        max_attempts: 5
-        command: ./tools/test_monitor/run-tests.sh
+      continue-on-error: true
+      run: ./tools/test_monitor/run-tests.sh
       env:
+        TEST_FLAKY: true
         JSON_OUTPUT: true
+        RACE_DETECTOR: 1
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-    - name: Upload results to BigQuery (skipped tests)
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 1
-        max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
-    - name: Upload results to BigQuery (test run)
+    - name: Upload results to BigQuery
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 2
         max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
