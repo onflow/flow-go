@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -152,7 +153,7 @@ func (s *SignatureValidationAttackOrchestrator) getReqChunksEvent(originID, targ
 		ChunkID: unittest.IdentifierFixture(),
 		Nonce:   rand.Uint64(),
 	}
-	eventID := insecure.GetFlowProtocolEventID(s.t, channel, chunkDataReq)
+	eventID := unittest.GetFlowProtocolEventID(s.t, channel, chunkDataReq, p2p.EventId)
 	return &insecure.EgressEvent{
 		CorruptOriginId:     originID,
 		Channel:             channel,

@@ -119,12 +119,3 @@ func EgressMessageFixtures(t *testing.T, codec network.Codec, protocol Protocol,
 
 	return msgs, events, identities
 }
-
-// GetFlowProtocolEventID returns the event ID for the event provided.
-func GetFlowProtocolEventID(t *testing.T, channel channels.Channel, event interface{}) flow.Identifier {
-	payload, err := unittest.NetworkCodec().Encode(event)
-	require.NoError(t, err)
-	eventIDHash, err := p2p.EventId(channel, payload)
-	require.NoError(t, err)
-	return flow.HashToID(eventIDHash)
-}
