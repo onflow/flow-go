@@ -23,8 +23,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  upload-skipped-test-summary:
-    name: Upload Skipped Test Summary
+  regular-skipped-test-run:
+    name: Test Monitor - Regular, Skipped Tests Run
     strategy:
       fail-fast: false
       matrix:

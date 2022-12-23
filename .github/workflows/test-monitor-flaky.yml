@@ -21,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  upload-flaky-test-summary:
-    name: Upload Flaky Test Summary
+  flaky-test-run:
+    name: Test Monitor - Flaky Tests Run
     strategy:
       fail-fast: false
       matrix:
