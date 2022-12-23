@@ -11,12 +11,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type SignatureVerificationTestSuite struct {
+type GossipSubSignatureRequirementTestSuite struct {
 	Suite
 }
 
-func TestSignatureVerification(t *testing.T) {
-	suite.Run(t, new(SignatureVerificationTestSuite))
+func TestGossipSubSignatureRequirement(t *testing.T) {
+	suite.Run(t, new(GossipSubSignatureRequirementTestSuite))
 }
 
 // TestGossipSubSignatureRequirement ensures that the libp2p signature verification is working as expected.
@@ -26,7 +26,7 @@ func TestSignatureVerification(t *testing.T) {
 // signing enabled, this node will send messages that are expected to be delivered to the victim EN.
 // This tests ensures that message signing and message signature verification requirements are working as expected. It does not
 // test for malformed message signatures or impersonation message signatures.
-func (s *SignatureVerificationTestSuite) TestGossipSubSignatureRequirement() {
+func (s *GossipSubSignatureRequirementTestSuite) TestGossipSubSignatureRequirement() {
 	s.Orchestrator.sendUnauthorizedMsgs(s.T())
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
 	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
