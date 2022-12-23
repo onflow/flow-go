@@ -169,7 +169,7 @@ func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
 			ChunkID: unittest.IdentifierFixture(),
 			Nonce:   rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataReq, p2p.EventId)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataReq)
 		event := &insecure.EgressEvent{
 			CorruptOriginId:     o.victimVN,
 			Channel:             channel,
@@ -190,7 +190,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
 		unauthorizedProposal := unittest.ProposalFixture()
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, unauthorizedProposal, p2p.EventId)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, unauthorizedProposal)
 		unauthorizedMsgByRole := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -213,7 +213,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n 
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq, p2p.EventId)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
 		unauthorizedMsgOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -236,7 +236,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedUnicastOnChannelEvent
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq, p2p.EventId)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
 		unauthorizedUnicastOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -256,7 +256,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 	channel := channels.ProvideChunks
 	for i := 0; i < n; i++ {
 		chunkDataResponse := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataResponse, p2p.EventId)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataResponse)
 		unauthorizedPublishOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerEN,
 			Channel:             channel,
