@@ -126,7 +126,9 @@ func (s *SignatureValidationAttackOrchestrator) Register(orchestratorNetwork ins
 	s.orchestratorNetwork = orchestratorNetwork
 }
 
-// sendUnauthorizedMsgs publishes a number of unauthorized messages without signatures from the corrupt AN with message signing enabled to the victim AN.
+// sendUnauthorizedMsgs publishes a number of unauthorized messages without signatures from one corrupt VN to another (victim) corrupt EN.
+// The sender is corrupt since the attacker needs to take control over what it sends. Moreover, the receiver is also corrupt as the testing
+// framework needs to have an eye on what it receives (i.e., ingress traffic).
 func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
 		event := s.getReqChunksEvent(s.attackerVNNoMsgSigning, s.victimENID)
