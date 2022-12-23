@@ -138,7 +138,8 @@ func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.
 	}
 }
 
-// sendAuthorizedMsgs publishes a number of authorized messages from the corrupt AN with message signing enabled to the victim AN.
+// sendAuthorizedMsgs publishes a number of authorized messages from one corrupt VN with message signing enabled to another (victim) corrupt EN.
+// This func allows us to ensure that unauthorized messages have been processed.
 func (s *SignatureValidationAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
 		event := s.getReqChunksEvent(s.attackerVNWithMsgSigning, s.victimENID)
