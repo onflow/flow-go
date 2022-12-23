@@ -43,11 +43,11 @@ func main() {
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))
 
-			collector.NetworkMessageSent(rand.Intn(1000), topic1, message1)
-			collector.NetworkMessageSent(rand.Intn(1000), topic2, message2)
+			collector.OutboundMessageSent(rand.Intn(1000), topic1, message1)
+			collector.OutboundMessageSent(rand.Intn(1000), topic2, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), topic1, message1)
-			collector.NetworkMessageReceived(rand.Intn(1000), topic2, message2)
+			collector.InboundMessageReceived(rand.Intn(1000), topic1, message1)
+			collector.InboundMessageReceived(rand.Intn(1000), topic2, message2)
 
 			priority1 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 			collector.MessageRemoved(priority1)

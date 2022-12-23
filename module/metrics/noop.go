@@ -34,16 +34,16 @@ func (nc *NoopCollector) DataSent(prefix string, n uint64)                      
 func (nc *NoopCollector) DupBlobsReceived(prefix string, n uint64)                               {}
 func (nc *NoopCollector) DupDataReceived(prefix string, n uint64)                                {}
 func (nc *NoopCollector) MessagesReceived(prefix string, n uint64)                               {}
-func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string)     {}
-func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {}
-func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageType string)       {}
+func (nc *NoopCollector) OutboundMessageSent(sizeBytes int, topic string, messageType string)    {}
+func (nc *NoopCollector) InboundMessageReceived(sizeBytes int, topic string, messageType string) {}
+func (nc *NoopCollector) DuplicateInboundMessagesDropped(topic string, messageType string)       {}
 func (nc *NoopCollector) MessageAdded(priority int)                                              {}
 func (nc *NoopCollector) MessageRemoved(priority int)                                            {}
 func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)                     {}
 func (nc *NoopCollector) MessageProcessingStarted(topic string)                                  {}
 func (nc *NoopCollector) MessageProcessingFinished(topic string, duration time.Duration)         {}
-func (nc *NoopCollector) DirectMessageStarted(topic string)                                      {}
-func (nc *NoopCollector) DirectMessageFinished(topic string)                                     {}
+func (nc *NoopCollector) UnicastMessageSendingStarted(topic string)                              {}
+func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)                            {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}

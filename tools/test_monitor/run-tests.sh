@@ -24,7 +24,7 @@ then
 
   echo "preparing $TEST_CATEGORY tests">&2
   make crypto_setup_gopath
-  make docker-build-flow
+  make docker-build-flow docker-build-flow-corrupt
   echo "running $TEST_CATEGORY tests">&2
   make -C integration -s ${BASH_REMATCH[1]}-tests > test-output
 else
