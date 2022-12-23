@@ -5,6 +5,7 @@
 # (which sends output to standard output) which needs to be parsed.
 # Extra commit to cause CI workflow run.
 # Extra commit to cause CI workflow run - take 2.
+# Extra commit to cause CI workflow run - take 3.
 
 set -e
 shopt -s extglob
