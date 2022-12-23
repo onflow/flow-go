@@ -304,6 +304,7 @@ func SnapshotFromBootstrapStateWithParams(
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			FirstSeal:        seal,
+			ExtraBlocks:      make([]*flow.Block, 0),
 		},
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,

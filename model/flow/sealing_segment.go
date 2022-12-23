@@ -453,6 +453,7 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		includedResults:     make(map[Identifier]struct{}),
 		latestSeals:         make(map[Identifier]Identifier),
 		blocks:              make([]*Block, 0),
+		extraBlocks:         make([]*Block, 0),
 		results:             make(ExecutionResultList, 0),
 	}
 }
