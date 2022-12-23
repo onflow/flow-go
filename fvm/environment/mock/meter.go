@@ -13,6 +13,22 @@ type Meter struct {
 	mock.Mock
 }
 
+// ComputationIntensities provides a mock function with given fields:
+func (_m *Meter) ComputationIntensities() map[common.ComputationKind]uint {
+	ret := _m.Called()
+
+	var r0 map[common.ComputationKind]uint
+	if rf, ok := ret.Get(0).(func() map[common.ComputationKind]uint); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[common.ComputationKind]uint)
+		}
+	}
+
+	return r0
+}
+
 // ComputationUsed provides a mock function with given fields:
 func (_m *Meter) ComputationUsed() uint64 {
 	ret := _m.Called()
@@ -36,6 +52,22 @@ func (_m *Meter) MemoryEstimate() uint64 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// MemoryIntensities provides a mock function with given fields:
+func (_m *Meter) MemoryIntensities() map[common.MemoryKind]uint {
+	ret := _m.Called()
+
+	var r0 map[common.MemoryKind]uint
+	if rf, ok := ret.Get(0).(func() map[common.MemoryKind]uint); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[common.MemoryKind]uint)
+		}
 	}
 
 	return r0

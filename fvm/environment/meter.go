@@ -45,7 +45,9 @@ const (
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
+	MemoryIntensities() map[common.MemoryKind]uint
 	ComputationUsed() uint64
+	ComputationIntensities() map[common.ComputationKind]uint
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryEstimate() uint64
@@ -74,8 +76,16 @@ func (meter *meterImpl) MeterComputation(
 	return nil
 }
 
+func (meter *meterImpl) MemoryIntensities() map[common.MemoryKind]uint {
+	return meter.txnState.MemoryIntensities()
+}
+
 func (meter *meterImpl) ComputationUsed() uint64 {
 	return uint64(meter.txnState.TotalComputationUsed())
+}
+
+func (meter *meterImpl) ComputationIntensities() map[common.ComputationKind]uint {
+	return meter.txnState.ComputationIntensities()
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {

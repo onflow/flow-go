@@ -223,17 +223,17 @@ func (i TransactionInvoker) logExecutionIntensities(
 	}
 
 	computation := zerolog.Dict()
-	for s, u := range txnState.ComputationIntensities() {
+	for s, u := range env.ComputationIntensities() {
 		computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
 	memory := zerolog.Dict()
-	for s, u := range txnState.MemoryIntensities() {
+	for s, u := range env.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
 	env.Logger().Info().
 		Uint64("ledgerInteractionUsed", txnState.InteractionUsed()).
-		Uint("computationUsed", txnState.TotalComputationUsed()).
-		Uint64("memoryEstimate", txnState.TotalMemoryEstimate()).
+		Uint64("computationUsed", env.ComputationUsed()).
+		Uint64("memoryEstimate", env.MemoryEstimate()).
 		Dict("computationIntensities", computation).
 		Dict("memoryIntensities", memory).
 		Msg("transaction execution data")

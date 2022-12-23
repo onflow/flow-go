@@ -1,8 +1,6 @@
 package environment
 
 import (
-	cadenceRuntime "github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/flow-go/fvm/runtime"
 )
 
@@ -14,7 +12,8 @@ func DefaultRuntimeParams() RuntimeParams {
 	return RuntimeParams{
 		ReusableCadenceRuntimePool: runtime.NewReusableCadenceRuntimePool(
 			0,
-			cadenceRuntime.Config{}),
+			runtime.ReusableCadenceRuntimePoolConfig{},
+		),
 	}
 }
 

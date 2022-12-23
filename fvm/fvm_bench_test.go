@@ -20,8 +20,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
-
 	flow2 "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
 
@@ -155,7 +153,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
-				runtime.Config{},
+				reusableRuntime.ReusableCadenceRuntimePoolConfig{},
 			),
 		),
 	}

@@ -3,12 +3,11 @@ package runtime
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(0, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(0, ReusableCadenceRuntimePoolConfig{})
 	require.Nil(t, pool.pool)
 
 	entry := pool.Borrow(nil)
@@ -23,7 +22,7 @@ func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
 }
 
 func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(100, ReusableCadenceRuntimePoolConfig{})
 	require.NotNil(t, pool.pool)
 
 	select {
@@ -50,7 +49,7 @@ func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
 }
 
 func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(100, ReusableCadenceRuntimePoolConfig{})
 	require.NotNil(t, pool.pool)
 
 	select {

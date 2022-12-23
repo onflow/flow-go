@@ -121,8 +121,10 @@ func New(
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{
-					TracingEnabled: params.CadenceTracing,
+				reusableRuntime.ReusableCadenceRuntimePoolConfig{
+					Config: runtime.Config{
+						TracingEnabled: params.CadenceTracing,
+					},
 				})),
 	}
 	if params.ExtensiveTracing {

@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -111,7 +110,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{})),
+				reusableRuntime.ReusableCadenceRuntimePoolConfig{})),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,

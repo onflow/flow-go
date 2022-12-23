@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -44,11 +45,22 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(rt runtime.Runtime, poolConfig ReusableCadenceRuntimePoolConfig) *ReusableCadenceRuntime {
+
 	reusable := &ReusableCadenceRuntime{
-		Runtime:     rt,
-		Environment: runtime.NewBaseInterpreterEnvironment(runtime.Config{}),
+		Runtime: rt,
 	}
+
+	config := runtime.Config{}
+	if poolConfig.OnCadenceStatement != nil {
+		config.OnStatement = func(inter *interpreter.Interpreter, statement ast.Statement) {
+			if reusable.fvmEnv != nil {
+				poolConfig.OnCadenceStatement(reusable.fvmEnv, inter, statement)
+			}
+		}
+	}
+
+	reusable.Environment = runtime.NewBaseInterpreterEnvironment(config)
 
 	setAccountFrozen := stdlib.StandardLibraryValue{
 		Name: "setAccountFrozen",
@@ -88,6 +100,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime) *ReusableCadenceRuntime {
 	}
 
 	reusable.Declare(setAccountFrozen)
+
 	return reusable
 }
 
@@ -163,10 +176,18 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	)
 }
 
+type ReusableCadenceRuntimePoolConfig struct {
+	runtime.Config
+
+	// OnCadenceStatement is called when a statement is executed by the Cadence runtime.
+	// If this is set it will override the one set in the runtime.Config.
+	OnCadenceStatement func(fvmEnv Environment, inter *interpreter.Interpreter, statement ast.Statement)
+}
+
 type ReusableCadenceRuntimePool struct {
 	pool chan *ReusableCadenceRuntime
 
-	config runtime.Config
+	config ReusableCadenceRuntimePoolConfig
 
 	// When newCustomRuntime is nil, the pool will create standard cadence
 	// interpreter runtimes via runtime.NewInterpreterRuntime.  Otherwise, the
@@ -176,11 +197,7 @@ type ReusableCadenceRuntimePool struct {
 	newCustomRuntime func() runtime.Runtime
 }
 
-func newReusableCadenceRuntimePool(
-	poolSize int,
-	config runtime.Config,
-	newCustomRuntime func() runtime.Runtime,
-) ReusableCadenceRuntimePool {
+func newReusableCadenceRuntimePool(poolSize int, config ReusableCadenceRuntimePoolConfig, newCustomRuntime func() runtime.Runtime) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
 		pool = make(chan *ReusableCadenceRuntime, poolSize)
@@ -195,7 +212,7 @@ func newReusableCadenceRuntimePool(
 
 func NewReusableCadenceRuntimePool(
 	poolSize int,
-	config runtime.Config,
+	config ReusableCadenceRuntimePoolConfig,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(poolSize, config, nil)
 }
@@ -206,7 +223,7 @@ func NewCustomReusableCadenceRuntimePool(
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
-		runtime.Config{},
+		ReusableCadenceRuntimePoolConfig{},
 		newCustomRuntime)
 }
 
@@ -214,7 +231,7 @@ func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 	if pool.newCustomRuntime != nil {
 		return pool.newCustomRuntime()
 	}
-	return runtime.NewInterpreterRuntime(pool.config)
+	return runtime.NewInterpreterRuntime(pool.config.Config)
 }
 
 func (pool ReusableCadenceRuntimePool) Borrow(
@@ -228,7 +245,9 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 		reusable = NewReusableCadenceRuntime(
 			WrappedCadenceRuntime{
 				pool.newRuntime(),
-			})
+			},
+			pool.config,
+		)
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
