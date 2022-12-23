@@ -201,7 +201,7 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 	return &transactionResult, nil
 }
 
-// ByBlockIDIndex returns the runtime transaction result for the given block ID and transaction index
+// ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
 func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
