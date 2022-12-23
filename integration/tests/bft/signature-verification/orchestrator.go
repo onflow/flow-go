@@ -131,7 +131,7 @@ func (s *SignatureValidationAttackOrchestrator) Register(orchestratorNetwork ins
 // framework needs to have an eye on what it receives (i.e., ingress traffic).
 func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
-		event := s.getReqChunksEvent(s.attackerVNNoMsgSigning, s.victimENID)
+		event := s.requestChunkDataPackFixture(s.attackerVNNoMsgSigning, s.victimENID)
 		err := s.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.unauthorizedEvents[event.FlowProtocolEventID] = event
@@ -142,7 +142,7 @@ func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.
 // This func allows us to ensure that unauthorized messages have been processed.
 func (s *SignatureValidationAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := s.getReqChunksEvent(s.attackerVNWithMsgSigning, s.victimENID)
+		event := s.requestChunkDataPackFixture(s.attackerVNWithMsgSigning, s.victimENID)
 		err := s.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.authorizedEvents[event.FlowProtocolEventID] = event
@@ -150,8 +150,8 @@ func (s *SignatureValidationAttackOrchestrator) sendAuthorizedMsgs(t *testing.T)
 	}
 }
 
-// getReqCollEvent returns sync req event with the provided node ID as the originID.
-func (s *SignatureValidationAttackOrchestrator) getReqChunksEvent(originID, targetID flow.Identifier) *insecure.EgressEvent {
+// requestChunkDataPackFixture returns an insecure.EgressEvent with messages.ChunkDataRequest payload and the provided node ID as the originID.
+func (s *SignatureValidationAttackOrchestrator) requestChunkDataPackFixture(originID, targetID flow.Identifier) *insecure.EgressEvent {
 	channel := channels.RequestChunks
 	chunkDataReq := &messages.ChunkDataRequest{
 		ChunkID: unittest.IdentifierFixture(),
