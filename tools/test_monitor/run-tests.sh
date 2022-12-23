@@ -3,10 +3,6 @@
 # This script runs the tests in the category specified by the TEST_CATEGORY environment variable.
 # Echo / logging statements send output to standard error to separate that output from test result output
 # (which sends output to standard output) which needs to be parsed.
-# Extra commit to cause CI workflow run.
-# Extra commit to cause CI workflow run - take 2.
-# Extra commit to cause CI workflow run - take 3.
-# Extra commit to cause CI workflow run - take 4.
 
 set -e
 shopt -s extglob
