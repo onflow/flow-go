@@ -30,7 +30,7 @@ const (
 	numOfUnauthorizedEvents = 10
 )
 
-// SignatureValidationAttackOrchestrator represents an simple insecure.AttackOrchestrator that tracks any unsigned messages received by victim nodes as well as normal expected messages.
+// SignatureValidationAttackOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
 type SignatureValidationAttackOrchestrator struct {
 	sync.Mutex
 	t                          *testing.T
