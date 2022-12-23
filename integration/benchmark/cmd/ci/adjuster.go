@@ -24,6 +24,7 @@ type adjuster struct {
 	log                zerolog.Logger
 }
 type AdjusterParams struct {
+	Delay       time.Duration
 	Interval    time.Duration
 	InitialTPS  uint
 	MinTPS      uint
@@ -75,6 +76,14 @@ func NewTPSAdjuster(
 
 	go func() {
 		defer close(a.done)
+
+		log.Info().Dur("delayInMS", params.Delay).Msg("Waiting before starting TPS adjuster")
+		select {
+		case <-time.After(params.Delay):
+			log.Info().Msg("starting TPS adjuster")
+		case <-ctx.Done():
+			return
+		}
 
 		err := a.adjustTPSForever()
 		if err != nil && err != context.Canceled {
