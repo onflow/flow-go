@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -111,6 +112,7 @@ func (v *SimpleView) Payloads() []ledger.Payload {
 //
 // This implementation is designed for testing and migration purposes.
 type MapLedger struct {
+	sync.RWMutex
 	Registers       map[flow.RegisterID]flow.RegisterValue
 	RegisterTouches map[flow.RegisterID]struct{}
 	RegisterUpdated map[flow.RegisterID]struct{}
@@ -148,6 +150,9 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 }
 
 func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
+	m.Lock()
+	defer m.Unlock()
+
 	k := flow.RegisterID{Owner: owner, Key: key}
 	m.RegisterTouches[k] = struct{}{}
 	m.RegisterUpdated[k] = struct{}{}
@@ -156,17 +161,26 @@ func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
 }
 
 func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
+	m.Lock()
+	defer m.Unlock()
+
 	k := flow.RegisterID{Owner: owner, Key: key}
 	m.RegisterTouches[k] = struct{}{}
 	return m.Registers[k], nil
 }
 
 func (m *MapLedger) Touch(owner, key string) error {
+	m.Lock()
+	defer m.Unlock()
+
 	m.RegisterTouches[flow.RegisterID{Owner: owner, Key: key}] = struct{}{}
 	return nil
 }
 
 func (m *MapLedger) Delete(owner, key string) error {
+	m.Lock()
+	defer m.Unlock()
+
 	delete(m.RegisterTouches, flow.RegisterID{Owner: owner, Key: key})
 	return nil
 }
@@ -181,6 +195,9 @@ func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
 }
 
 func (m *MapLedger) Payloads() []ledger.Payload {
+	m.RLock()
+	defer m.RUnlock()
+
 	ret := make([]ledger.Payload, 0, len(m.Registers))
 	for id, val := range m.Registers {
 		key := registerIdToLedgerKey(id)
