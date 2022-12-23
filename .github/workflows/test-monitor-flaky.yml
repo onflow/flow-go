@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - master
+      - misha/3739-fix-flaky-test-monitor-no-data-for-TestStaticEpochTransition
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -26,20 +27,20 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - unit
-          - unit-crypto
-          - unit-insecure
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
+#          - unit
+#          - unit-crypto
+#          - unit-insecure
+#          - unit-integration
+#          - integration-bft
+#          - integration-mvp
+#          - integration-ghost
+#          - integration-network
           - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
+#          - integration-access
+#          - integration-collection
+#          - integration-consensus
+#          - integration-execution
+#          - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}
