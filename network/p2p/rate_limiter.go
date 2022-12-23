@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/onflow/flow-go/network/message"
 )
 
 // RateLimiter unicast rate limiter interface
 type RateLimiter interface {
-	// Allow returns true if a message should be allowed to be processed.
-	Allow(peerID peer.ID, msg *message.Message) bool
+	// Allow returns true if a message with the give size should be allowed to be processed.
+	Allow(peerID peer.ID, msgSize int) bool
 
 	// IsRateLimited returns true if a peer is rate limited.
 	IsRateLimited(peerID peer.ID) bool
