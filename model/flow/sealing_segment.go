@@ -174,7 +174,8 @@ func (segment *SealingSegment) Validate() error {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
 	}
-	// extra blocks should be added in reverse order, starting from the highest one
+	// extra blocks should be added in reverse order, starting from the highest one since they are sorted
+	// in ascending order.
 	for i := len(segment.ExtraBlocks) - 1; i >= 0; i-- {
 		block := segment.ExtraBlocks[i]
 		err := builder.AddExtraBlock(block)
