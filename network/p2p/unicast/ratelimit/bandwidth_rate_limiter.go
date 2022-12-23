@@ -9,8 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
-
-	"github.com/onflow/flow-go/network/message"
 )
 
 // BandWidthRateLimiter unicast rate limiter that limits the bandwidth that can be sent
@@ -44,9 +42,9 @@ func NewBandWidthRateLimiter(limit rate.Limit, burst int, lockout time.Duration,
 // Allow checks the cached limiter for the peer and returns limiter.AllowN(msg.Size())
 // which will check if a peer is able to send a message of msg.Size().
 // If a limiter is not cached one is created.
-func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msg *message.Message) bool {
+func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msgSize int) bool {
 	limiter := b.getLimiter(peerID)
-	if !limiter.AllowN(b.now(), msg.Size()) {
+	if !limiter.AllowN(b.now(), msgSize) {
 		b.limiters.UpdateLastRateLimit(peerID, b.now())
 		return false
 	}

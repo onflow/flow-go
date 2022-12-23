@@ -33,25 +33,25 @@ func TestConnectionGating(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 
 	// create 2 nodes
-	node1Peers := make(map[peer.ID]struct{})
+	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, node1Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
-			if _, ok := node1Peers[p]; !ok {
+			if !node1Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
 			return nil
 		})))
 
-	node2Peers := make(map[peer.ID]struct{})
+	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
-			if _, ok := node2Peers[p]; !ok {
+			if !node2Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
 			return nil
@@ -78,7 +78,7 @@ func TestConnectionGating(t *testing.T) {
 		// the connection gater on the listening node is checking the allow-list upon accepting the connection.
 
 		// add node2 to node1's allow list, but not the other way around.
-		node1Peers[node2.Host().ID()] = struct{}{}
+		node1Peers.Add(node2.Host().ID(), struct{}{})
 
 		// now node2 should be able to connect to node1.
 		// from node1 -> node2 shouldn't work
@@ -90,8 +90,8 @@ func TestConnectionGating(t *testing.T) {
 
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
 		// adding both nodes to each other's allow lists.
-		node1Peers[node2.Host().ID()] = struct{}{}
-		node2Peers[node1.Host().ID()] = struct{}{}
+		node1Peers.Add(node2.Host().ID(), struct{}{})
+		node2Peers.Add(node1.Host().ID(), struct{}{})
 
 		// now both nodes should be able to connect to each other.
 		p2pfixtures.EnsureStreamCreationInBothDirections(t, ctx, []p2p.LibP2PNode{node1, node2})
@@ -112,7 +112,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	nodes := make([]p2p.LibP2PNode, 0, count)
 	inbounds := make([]chan string, 0, count)
 
-	disallowedPeerIds := map[peer.ID]struct{}{}
+	disallowedPeerIds := unittest.NewProtectedMap[peer.ID, struct{}]()
 	allPeerIds := make(peer.IDSlice, 0, count)
 
 	connectionGater := mockp2p.NewConnectionGater(t)
@@ -128,7 +128,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, pid := range allPeerIds {
-					if _, ok := disallowedPeerIds[pid]; !ok {
+					if !disallowedPeerIds.Has(pid) {
 						list = append(list, pid)
 					}
 				}
@@ -143,13 +143,11 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 
 	connectionGater.On("InterceptSecured", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ network.Direction, p peer.ID, _ network.ConnMultiaddrs) bool {
-			_, ok := disallowedPeerIds[p]
-			return !ok
+			return !disallowedPeerIds.Has(p)
 		})
 
 	connectionGater.On("InterceptPeerDial", mock.Anything).Return(func(p peer.ID) bool {
-		_, ok := disallowedPeerIds[p]
-		return !ok
+		return !disallowedPeerIds.Has(p)
 	})
 
 	// we don't inspect connections during "accept" and "dial" phases as the peer IDs are not available at those phases.
@@ -157,7 +155,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
 
 	// adds first node to disallowed list
-	disallowedPeerIds[nodes[0].Host().ID()] = struct{}{}
+	disallowedPeerIds.Add(nodes[0].Host().ID(), struct{}{})
 
 	// starts the nodes
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
@@ -173,12 +171,10 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 		require.True(t, ok)
 
 		remote := conn.RemotePeer()
-		_, disallowed := disallowedPeerIds[remote]
-		require.False(t, disallowed)
+		require.False(t, disallowedPeerIds.Has(remote))
 
 		local := conn.LocalPeer()
-		_, disallowed = disallowedPeerIds[local]
-		require.False(t, disallowed)
+		require.False(t, disallowedPeerIds.Has(local))
 	}).Return(true, control.DisconnectReason(0))
 
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
@@ -198,7 +194,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
 
-	disallowedList := map[*flow.Identity]struct{}{}
+	disallowedList := unittest.NewProtectedMap[*flow.Identity, struct{}]()
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)
@@ -212,7 +208,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
-					if _, ok := disallowedList[id]; ok {
+					if disallowedList.Has(id) {
 						continue
 					}
 
@@ -224,15 +220,14 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				return list
 			}),
 			p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
-				for id := range disallowedList {
+				return disallowedList.ForEach(func(id *flow.Identity, _ struct{}) error {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
 					if bid == pid {
 						return fmt.Errorf("disallow-listed")
 					}
-				}
-
-				return nil
+					return nil
+				})
 			})))
 
 		nodes = append(nodes, node)
@@ -249,14 +244,14 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes, inbounds)
 
 	// now we add one of the nodes (the last node) to the disallow-list.
-	disallowedList[ids[len(ids)-1]] = struct{}{}
+	disallowedList.Add(ids[len(ids)-1], struct{}{})
 	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
 	// ensures no connection, unicast, or pubsub going to or coming from the disallow-listed node.
 	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], nodes[count-1:])
 
 	// now we add another node (the second last node) to the disallowed list.
-	disallowedList[ids[len(ids)-2]] = struct{}{}
+	disallowedList.Add(ids[len(ids)-2], struct{}{})
 	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
 	// ensures no connection, unicast, or pubsub going to and coming from the disallow-listed nodes.

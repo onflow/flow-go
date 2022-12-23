@@ -236,20 +236,18 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 	return nc
 }
 
-// NetworkMessageSent tracks the message size of the last message sent out on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
+// OutboundMessageSent collects metrics related to a message sent by the node.
+func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic string, messageType string) {
 	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkMessageReceived tracks the message size of the last message received on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
+// InboundMessageReceived collects metrics related to a message received by the node.
+func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic string, messageType string) {
 	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
-func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
+// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, messageType string) {
 	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
 }
 
@@ -265,15 +263,18 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
+// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageStarted(topic string) {
+// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingStarted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageFinished(topic string) {
+// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingCompleted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
 }
 
@@ -285,7 +286,8 @@ func (nc *NetworkCollector) RoutingTablePeerRemoved() {
 	nc.routingTableSize.Dec()
 }
 
-// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+// the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())

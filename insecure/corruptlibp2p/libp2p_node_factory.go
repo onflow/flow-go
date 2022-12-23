@@ -26,7 +26,7 @@ func NewCorruptLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
@@ -56,7 +56,8 @@ func NewCorruptLibP2PNodeFactory(
 			onInterceptSecuredFilters,
 			peerScoringEnabled,
 			connectionPruning,
-			updateInterval)
+			updateInterval,
+			p2pbuilder.DefaultResourceManagerConfig())
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}

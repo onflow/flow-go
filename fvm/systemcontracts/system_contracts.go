@@ -43,7 +43,7 @@ const (
 	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
 	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
-	ContractStorageFeesFunction_calculateAccountsCapacity                     = "calculateAccountsCapacity"
+	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
 	ContractDeploymentAuditsFunction_useVoucherForDeploy                      = "useVoucherForDeploy"
 )
