@@ -269,6 +269,8 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 				require.Fail(t, "overlapping nodes in from and to lists")
 			}
 			err := node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
+			fmt.Printf("%s from %s to %s\n", node.Host().Network().Connectedness(other.Host().ID()), node.Host().ID(), other.Host().ID())
+			fmt.Printf("%s from %s to %s\n", other.Host().Network().Connectedness(node.Host().ID()), other.Host().ID(), node.Host().ID())
 			require.Error(t, err, fmt.Sprintf("connection from %s to %s should not exist", node.Host().ID(), other.Host().ID()))
 		}
 	}
