@@ -6,6 +6,7 @@
 # Extra commit to cause CI workflow run.
 # Extra commit to cause CI workflow run - take 2.
 # Extra commit to cause CI workflow run - take 3.
+# Extra commit to cause CI workflow run - take 4.
 
 set -e
 shopt -s extglob
