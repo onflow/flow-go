@@ -3,9 +3,7 @@ package testnet
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io/fs"
 	"math/rand"
 	gonet "net"
 	"os"
@@ -815,16 +813,11 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}()
 
 	// Setup directories
-	tmpdir, _ := os.MkdirTemp(TmpRoot, "flow-integration-node")
-	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
-	err = os.Mkdir(flowDataDir, 0700)
-	require.NoError(t, err)
-	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
-	err = os.Mkdir(nodeBootstrapDir, 0700)
-	require.NoError(t, err)
-	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
-	err = os.Mkdir(flowProfilerDir, 0700)
-	require.NoError(t, err)
+	tmpdir := t.TempDir()
+
+	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
+	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
+	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
 
 	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
@@ -890,7 +883,6 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	suiteContainer := net.suite.Container(containerOpts)
 
 	nodeContainer := &Container{
-		//Config:  nodeConf,
 		Ports:   make(map[string]string),
 		datadir: tmpdir,
 		net:     net,
@@ -929,13 +921,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
-	// get a temporary directory in the host. On macOS the default tmp
-	// directory is NOT accessible to Docker by default, so we use /tmp
-	// instead.
-	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-integration-node")
-	if err != nil {
-		return fmt.Errorf("could not get tmp dir: %w", err)
-	}
+	tmpdir := t.TempDir()
 
 	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
@@ -948,27 +934,19 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	// create a directory for the node database
-	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
-	err = os.Mkdir(flowDataDir, 0700)
-	require.NoError(t, err)
+	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
 
 	// create the profiler dir for the node
-	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
 	t.Logf("create profiler dir: %v", flowProfilerDir)
-	err = os.MkdirAll(flowProfilerDir, 0755)
-	if err != nil && !errors.Is(err, fs.ErrExist) {
-		panic(err)
-	}
 
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
 	// bootstrapping from different root state snapshots and epochs
-	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
-	err = os.Mkdir(nodeBootstrapDir, 0700)
-	require.NoError(t, err)
+	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
 
 	// copy bootstrap files to node-specific bootstrap directory
-	err = io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
+	err := io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
@@ -1188,6 +1166,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	require.NoError(net.t, err)
+}
+
+func (net *FlowNetwork) makeDir(t *testing.T, base string, dir string) string {
+	flowDataDir := filepath.Join(base, dir)
+	err := os.Mkdir(flowDataDir, 0700)
+	require.NoError(t, err)
+	return flowDataDir
 }
 
 func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {
