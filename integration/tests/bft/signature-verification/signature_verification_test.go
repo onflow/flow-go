@@ -20,10 +20,10 @@ func TestSignatureVerification(t *testing.T) {
 }
 
 // TestSignatureVerificationE2E ensures that the libp2p signature verification is working as expected.
-// The test network is set up with 3 corrupted AN, 2 attackers and one victim. 1 attacker AN that has message signing disabled, this
-// node will be used to send messages without signatures to the victim AN. These messages should never be
-// delivered to the victim as the signature verification is expected to fail. 1 attacker AN with message
-// signing enabled, this node will send messages that are expected to be delivered to the victim AN.
+// The test network is set up with 3 corrupted nodes, 2 attackers and one victim. 1 attacker VN that has message signing disabled, this
+// node will be used to send messages.ChunkDataRequest without signatures to the victim EN. These messages should never be
+// delivered to the victim as the signature verification is expected to fail. 1 attacker VN with message
+// signing enabled, this node will send messages that are expected to be delivered to the victim EN.
 func (s *SignatureVerificationTestSuite) TestSignatureVerificationE2E() {
 	s.Orchestrator.sendUnauthorizedMsgs(s.T())
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
