@@ -31,9 +31,9 @@ func (s *GossipSubSignatureRequirementTestSuite) TestGossipSubSignatureRequireme
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
 	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
 
-	// messages without correct signature should have all been rejected at the libp2p level and not be delivered to the victim AN.
+	// messages without correct signature should have all been rejected at the libp2p level and not be delivered to the victim EN.
 	require.Equal(s.T(), int64(0), s.Orchestrator.unauthorizedEventsReceived.Load(), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", s.Orchestrator.unauthorizedEventsReceived.Load()))
 
-	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim AN.
+	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
 	require.Equal(s.T(), int64(numOfAuthorizedEvents), s.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.Orchestrator.unauthorizedEventsReceived.Load()))
 }
