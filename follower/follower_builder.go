@@ -581,7 +581,8 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.Metrics.Network,
 			builder.BaseConfig.BindAddr,
 			networkKey,
-			builder.SporkID).
+			builder.SporkID,
+			builder.LibP2PResourceManagerConfig).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					subscription.UnstakedRole, builder.IdentityProvider,
@@ -668,7 +669,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 
 			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
-			builder.initMiddleware(node.NodeID, node.Metrics.Network, libp2pNode, msgValidators...)
+			builder.initMiddleware(node.NodeID, libp2pNode, msgValidators...)
 
 			// topology is nil since it is automatically managed by libp2p
 			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
@@ -702,7 +703,6 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
 	libp2pNode p2p.LibP2PNode,
 	validators ...network.MessageValidator) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
@@ -710,16 +710,13 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.Logger,
 		libp2pNode,
 		nodeID,
-		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
 		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
-	)
+		middleware.WithMessageValidators(validators...))
 
 	return builder.Middleware
 }

@@ -19,11 +19,6 @@ const (
 )
 
 const (
-	ChannelOneToOne         = "OneToOne"
-	ChannelOneToOneUnstaked = "OneToOneUnstaked"
-)
-
-const (
 	// collection
 	EngineClusterCompliance      = "proposal"
 	EngineCollectionIngest       = "collection_ingest"

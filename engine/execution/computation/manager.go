@@ -138,6 +138,7 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		me,
 		executionDataProvider,
 	)
 

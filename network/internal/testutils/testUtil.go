@@ -91,7 +91,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *TagWatchingConnManager {
 	cm := connection.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -175,10 +175,10 @@ func GenerateMiddlewares(t *testing.T,
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
-		mws[i] = middleware.NewMiddleware(logger,
+		mws[i] = middleware.NewMiddleware(
+			logger,
 			node,
 			nodeId,
-			o.networkMetrics,
 			bitswapmet,
 			sporkID,
 			middleware.DefaultUnicastTimeout,
@@ -330,6 +330,17 @@ func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.Lib
 	}
 }
 
+// StopComponents stops ReadyDoneAware instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration time.Duration) {
+	comps := make([]module.ReadyDoneAware, 0, len(rda))
+	for _, c := range rda {
+		comps = append(comps, c)
+	}
+
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
+}
+
 type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
@@ -356,9 +367,15 @@ func generateLibP2PNode(t *testing.T,
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
+	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
-	builder := p2pbuilder.NewNodeBuilder(logger, metrics.NewNoopCollector(), unittest.DefaultAddress, key, sporkID).
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		metrics.NewNoopCollector(),
+		unittest.DefaultAddress,
+		key,
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 
@@ -396,28 +413,6 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 		sms[i] = subscription.NewChannelSubscriptionManager(mw)
 	}
 	return sms
-}
-
-// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
-// duration.
-func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
-	// casts nets instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(nets))
-	for _, net := range nets {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
-}
-
-func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
-	// casts mws instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(mws))
-	for _, net := range mws {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.

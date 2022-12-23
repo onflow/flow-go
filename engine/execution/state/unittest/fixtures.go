@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,6 +30,7 @@ func ComputationResultForBlockFixture(
 	proofs := make([][]byte, numChunks)
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
+	spockHashes := make([]crypto.Signature, numChunks)
 	for i := 0; i < numChunks; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
@@ -44,5 +46,6 @@ func ComputationResultForBlockFixture(
 		Proofs:                 proofs,
 		Events:                 events,
 		EventsHashes:           eventHashes,
+		SpockSignatures:        spockHashes,
 	}
 }
