@@ -45,7 +45,7 @@ type SignatureValidationAttackOrchestrator struct {
 	authorizedEventReceivedWg  sync.WaitGroup
 	attackerVNNoMsgSigning     flow.Identifier
 	attackerVNWithMsgSigning   flow.Identifier
-	victimEN                   flow.Identifier
+	victimENID                 flow.Identifier
 }
 
 var _ insecure.AttackOrchestrator = &SignatureValidationAttackOrchestrator{}
@@ -62,7 +62,7 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerVNNoMsgSigning
 		authorizedEventReceivedWg:  sync.WaitGroup{},
 		attackerVNNoMsgSigning:     attackerVNNoMsgSigning,
 		attackerVNWithMsgSigning:   attackerVNWithMsgSigning,
-		victimEN:                   victimEN,
+		victimENID:                 victimEN,
 	}
 
 	return orchestrator
@@ -128,7 +128,7 @@ func (s *SignatureValidationAttackOrchestrator) Register(orchestratorNetwork ins
 // sendUnauthorizedMsgs publishes a number of unauthorized messages without signatures from the corrupt AN with message signing enabled to the victim AN.
 func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
-		event := s.getReqChunksEvent(s.attackerVNNoMsgSigning, s.victimEN)
+		event := s.getReqChunksEvent(s.attackerVNNoMsgSigning, s.victimENID)
 		err := s.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.unauthorizedEvents[event.FlowProtocolEventID] = event
@@ -138,7 +138,7 @@ func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.
 // sendAuthorizedMsgs publishes a number of authorized messages from the corrupt AN with message signing enabled to the victim AN.
 func (s *SignatureValidationAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := s.getReqChunksEvent(s.attackerVNWithMsgSigning, s.victimEN)
+		event := s.getReqChunksEvent(s.attackerVNWithMsgSigning, s.victimENID)
 		err := s.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.authorizedEvents[event.FlowProtocolEventID] = event
