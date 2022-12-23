@@ -1,4 +1,4 @@
-# This workflow run ALL tests, including all tests that are skipped because they are flaky, as well as all the normal (non-skipped) tests.
+# This workflow runs ALL tests, including all tests that are skipped because they are flaky, as well as all the normal (non-skipped) tests.
 # This workflow is run less frequently because running flaky tests is problematic and causes errors.
 
 name: Test Monitor - Flaky
