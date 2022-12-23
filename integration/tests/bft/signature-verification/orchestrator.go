@@ -68,7 +68,8 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerVNNoMsgSigning
 	return orchestrator
 }
 
-// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node. This attack orchestrator
+// simply passes through messages without changes to the orchestrator network.
 func (s *SignatureValidationAttackOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	lg := s.logger.With().
 		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
