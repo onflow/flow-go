@@ -7,10 +7,10 @@ on:
   schedule:
     - cron: '0 */12 * * *' # every 12 hours
   push:
-    branches:
-      - master
     paths:
       - 'tools/test_monitor/**'
+    branches:
+      - master
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
