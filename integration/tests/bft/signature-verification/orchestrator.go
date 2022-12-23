@@ -25,7 +25,7 @@ const (
 	// The numOfAuthorizedEvents allows us to wait for a certain number of authorized messages to be received, this should
 	// give the network enough time to process the unauthorized messages. This ensures us that the unauthorized messages
 	// were indeed dropped and not unprocessed.
-	numOfAuthorizedEvents = 100
+	numOfAuthorizedEvents = 50
 
 	// numOfUnauthorizedEvents the number of unauthorized events to send by the test orchestrator.
 	numOfUnauthorizedEvents = 10
@@ -107,7 +107,9 @@ func (s *SignatureValidationAttackOrchestrator) HandleIngressEvent(event *insecu
 	}
 
 	// track all authorized events sent during test
-	if _, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
+	if expectedEvent, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
+		// ensure event received intact no changes have been made to the underlying message
+		require.Equal(s.t, expectedEvent.FlowProtocolEvent.(*messages.ChunkDataRequest), event.FlowProtocolEvent.(*messages.ChunkDataRequest))
 		s.authorizedEventsReceived.Inc()
 		s.authorizedEventReceivedWg.Done()
 	}
