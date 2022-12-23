@@ -176,7 +176,6 @@ func (collector *resultCollector) AddTransactionResult(
 }
 
 func (collector *resultCollector) CommitCollection(
-	collectionIndex int,
 	collection collectionItem,
 	collectionView state.View,
 ) module.ExecutionResultStats {
@@ -189,7 +188,7 @@ func (collector *resultCollector) CommitCollection(
 	}
 
 	select {
-	case collector.eventHasherInputChan <- collector.result.Events[collectionIndex]:
+	case collector.eventHasherInputChan <- collector.result.Events[collection.collectionIndex]:
 		// Do nothing
 	case <-collector.eventHasherDoneChan:
 		// Events hasher exited (probably due to an error)
@@ -204,7 +203,7 @@ func (collector *resultCollector) CommitCollection(
 	}
 
 	collector.result.AddCollection(snapshot)
-	return collector.result.CollectionStats(collectionIndex)
+	return collector.result.CollectionStats(collection.collectionIndex)
 }
 
 func (collector *resultCollector) Stop() {

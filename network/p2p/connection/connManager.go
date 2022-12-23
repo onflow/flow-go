@@ -16,16 +16,16 @@ import (
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
 // This implementation updates networking metrics when a peer connection is added or removed
 type ConnManager struct {
-	connmgr.NullConnMgr                       // a null conn mgr provided by libp2p to allow implementing only the functions needed
-	n                   network.Notifiee      // the notifiee callback provided by libp2p
-	log                 zerolog.Logger        // logger to log connection, stream and other statistics about libp2p
-	metrics             module.NetworkMetrics // metrics to report connection statistics
+	connmgr.NullConnMgr                  // a null conn mgr provided by libp2p to allow implementing only the functions needed
+	n                   network.Notifiee // the notifiee callback provided by libp2p
+	log                 zerolog.Logger   // logger to log connection, stream and other statistics about libp2p
+	metrics             module.LibP2PConnectionMetrics
 
 	plk       sync.RWMutex
 	protected map[peer.ID]map[string]struct{}
 }
 
-func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnManager {
+func NewConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *ConnManager {
 	cn := &ConnManager{
 		log:         log.With().Str("component", "conn_manager").Logger(),
 		NullConnMgr: connmgr.NullConnMgr{},
