@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/module/signature"
 	"math/rand"
 	"testing"
 	"time"
@@ -497,7 +498,7 @@ func TestSealingSegment(t *testing.T) {
 	// Test the case where the reference block of the snapshot contains no seal.
 	// We should consider the latest seal in a prior block.
 	// ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5
-	// Expected sealing segment: [B1, B2, B3, B4, B5]
+	// Expected sealing segment: [B1, B2, B3, B4, B5], Extra blocks: [ROOT]
 	t.Run("sealing segment where highest block in segment does not seal lowest", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
@@ -533,6 +534,77 @@ func TestSealingSegment(t *testing.T) {
 			assert.Len(t, segment.ExecutionResults, 1)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
+		})
+	})
+}
+
+// TestBootstrapSealingSegmentWithExtraBlocks test sealing segment where the segment blocks contain collection
+// guarantees referencing blocks prior to the sealing segment. After bootstrapping from sealing segment we should be able to
+// extend with B7 with contains a guarantee referring B1.
+// ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5 <- B6(S2)
+// Expected sealing segment: [B2, B3, B4, B5, B6], Extra blocks: [ROOT, B1]
+func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootEpoch := rootSnapshot.Epochs().Current()
+	cluster, err := rootEpoch.Cluster(0)
+	require.NoError(t, err)
+	collID := cluster.Members()[0].NodeID
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		block1 := unittest.BlockWithParentFixture(head)
+		buildBlock(t, state, block1)
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+		buildBlock(t, state, block2)
+
+		receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		buildBlock(t, state, block3)
+
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
+		buildBlock(t, state, block4)
+
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		buildBlock(t, state, block5)
+
+		block6 := unittest.BlockWithParentFixture(block5.Header)
+		block6.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
+		buildBlock(t, state, block6)
+
+		segment, err := state.AtBlockID(block6.ID()).SealingSegment()
+		require.NoError(t, err)
+
+		// build a valid child to ensure we have a QC
+		buildBlock(t, state, unittest.BlockWithParentFixture(block6.Header))
+
+		// sealing segment should be [B2, B3, B4, B5, B6]
+		require.Len(t, segment.Blocks, 5)
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
+		require.Len(t, segment.ExecutionResults, 1)
+
+		snapshot := state.AtBlockID(block6.ID())
+		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
+
+		// bootstrap from snapshot
+		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+			block7 := unittest.BlockWithParentFixture(block6.Header)
+			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(block1.ID()))
+			guarantee.ChainID = cluster.ChainID()
+
+			signerIndices, err := signature.EncodeSignersToIndices(
+				[]flow.Identifier{collID}, []flow.Identifier{collID})
+			require.NoError(t, err)
+			guarantee.SignerIndices = signerIndices
+
+			block7.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
+			buildBlock(t, state, block7)
 		})
 	})
 }
