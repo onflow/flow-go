@@ -1,4 +1,4 @@
-package signature_verification
+package signature_requirement
 
 import (
 	"fmt"
