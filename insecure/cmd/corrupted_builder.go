@@ -24,8 +24,8 @@ const CorruptNetworkPort = 4300
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	TopicValidatorDisabled                bool
-	WithPubSubMessageSigning              bool
-	WithPubSubStrictSignatureVerification bool
+	WithPubSubMessageSigning              bool // libp2p option that enables message signing on the node
+	WithPubSubStrictSignatureVerification bool // libp2p option that enforces message signature verification
 }
 
 func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
