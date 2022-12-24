@@ -249,7 +249,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 
 	update, err := ledger.NewEmptyUpdate(ledger.State(vch.ChunkDataPack.StartState))
 	require.NoError(s.T(), err)
-	updateExecutionData(s.T(), &col, flow.EventsList{}, update, vch.Result.BlockID, vch)
+	updateExecutionData(s.T(), &col, nil, update, vch.Result.BlockID, vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
@@ -431,12 +431,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 	require.NoError(t, err)
 
 	// events
-	chunkEvents := make(flow.EventsList, 0)
+	var chunkEvents flow.EventsList
 
 	erServiceEvents := make([]flow.ServiceEvent, 0)
 
 	if system {
-		chunkEvents = flow.EventsList{}
+		chunkEvents = nil
 		erServiceEvents = serviceEventsList
 	} else {
 		for i := 0; i < collectionSize; i++ {

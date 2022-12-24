@@ -134,7 +134,23 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			nil
 	}
 
-	events := make(flow.EventsList, 0)
+	// enhance ChDP with collection if this is a system chunk
+	if systemChunk {
+		if chunkDataPack.Collection == nil {
+			systemTxn, err := blueprints.SystemChunkTransaction(context.Chain)
+			if err != nil {
+				return nil, nil, fmt.Errorf(
+					"could not get system chunk transaction: %w",
+					err)
+			}
+
+			chunkDataPack.Collection = &flow.Collection{
+				Transactions: []*flow.TransactionBody{systemTxn},
+			}
+		}
+	}
+
+	var events flow.EventsList = nil
 	serviceEvents := make(flow.EventsList, 0)
 
 	// constructing a partial trie given chunk data package
