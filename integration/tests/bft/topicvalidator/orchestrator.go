@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -274,7 +273,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 func (o *TopicValidatorAttackOrchestrator) getFlowProtocolEventID(channel channels.Channel, event interface{}) flow.Identifier {
 	payload, err := o.codec.Encode(event)
 	require.NoError(o.t, err)
-	eventIDHash, err := p2p.EventId(channel, payload)
+	eventIDHash, err := network.EventId(channel, payload)
 	require.NoError(o.t, err)
 	return flow.HashToID(eventIDHash)
 }

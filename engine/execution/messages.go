@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -33,6 +34,7 @@ type ComputationResult struct {
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
 	ExecutionDataRoot      *flow.BlockExecutionDataRoot
+	SpockSignatures        []crypto.Signature
 }
 
 func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
