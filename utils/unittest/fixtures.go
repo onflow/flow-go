@@ -1478,6 +1478,10 @@ func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataP
 		StartState: StateCommitmentFixture(),
 		Proof:      []byte{'p'},
 		Collection: &coll,
+		ExecutionDataRoot: flow.BlockExecutionDataRoot{
+			BlockID:               IdentifierFixture(),
+			ChunkExecutionDataIDs: []cid.Cid{CidFixture()},
+		},
 	}
 
 	for _, opt := range opts {

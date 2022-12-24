@@ -8,9 +8,10 @@ import (
 // Its prime difference is instead of an actual collection, it keeps a collection ID hence relying on maintaining
 // the collection on a secondary storage.
 type StoredChunkDataPack struct {
-	ChunkID      flow.Identifier
-	StartState   flow.StateCommitment
-	Proof        flow.StorageProof
-	CollectionID flow.Identifier
-	SystemChunk  bool
+	ChunkID           flow.Identifier
+	StartState        flow.StateCommitment
+	Proof             flow.StorageProof
+	CollectionID      flow.Identifier
+	SystemChunk       bool
+	ExecutionDataRoot flow.BlockExecutionDataRoot
 }

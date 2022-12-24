@@ -42,7 +42,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i], result.ExecutionDataRoot)
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i], *result.ExecutionDataRoot)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(completeCollection.Transactions))
 		} else {
 			// system chunk
@@ -50,7 +50,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 			// also, number of transactions is one for system chunk.
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
 			// system chunk has a nil collection.
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i], result.ExecutionDataRoot)
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i], *result.ExecutionDataRoot)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), 1)
 		}
 
@@ -122,7 +122,7 @@ func GenerateChunkDataPack(
 	startState flow.StateCommitment,
 	collection *flow.Collection,
 	proof flow.StorageProof,
-	executionDataRoot *flow.BlockExecutionDataRoot,
+	executionDataRoot flow.BlockExecutionDataRoot,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
 		ChunkID:           chunkID,

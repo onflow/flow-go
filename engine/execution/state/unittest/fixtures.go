@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -31,12 +32,14 @@ func ComputationResultForBlockFixture(
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
 	spockHashes := make([]crypto.Signature, numChunks)
+	cedIDs := make([]cid.Cid, numChunks)
 	for i := 0; i < numChunks; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
 		proofs[i] = unittest.RandomBytes(6)
 		events[i] = make(flow.EventsList, 0)
 		eventHashes[i] = unittest.IdentifierFixture()
+		cedIDs[i] = unittest.CidFixture()
 	}
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
@@ -47,5 +50,9 @@ func ComputationResultForBlockFixture(
 		Events:                 events,
 		EventsHashes:           eventHashes,
 		SpockSignatures:        spockHashes,
+		ExecutionDataRoot: &flow.BlockExecutionDataRoot{
+			BlockID:               completeBlock.ID(),
+			ChunkExecutionDataIDs: cedIDs,
+		},
 	}
 }

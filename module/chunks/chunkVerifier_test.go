@@ -335,13 +335,13 @@ func updateExecutionData(t *testing.T, collection *flow.Collection, chunkEvents 
 	cedCID, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), ced, nil)
 	require.NoError(t, err)
 
-	bedr := &flow.BlockExecutionDataRoot{
+	bedr := flow.BlockExecutionDataRoot{
 		BlockID:               blockID,
 		ChunkExecutionDataIDs: []cid.Cid{cedCID},
 	}
 	vch.ChunkDataPack.ExecutionDataRoot = bedr
 
-	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), bedr, nil)
+	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &bedr, nil)
 	require.NoError(t, err)
 }
 
@@ -466,12 +466,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 	chunkCid, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), &chunkExecutionData, nil)
 	require.NoError(t, err)
 
-	executionDataRoot := &flow.BlockExecutionDataRoot{
+	executionDataRoot := flow.BlockExecutionDataRoot{
 		BlockID:               blockID,
 		ChunkExecutionDataIDs: []cid.Cid{chunkCid},
 	}
 
-	executionDataID, err := ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), executionDataRoot, nil)
+	executionDataID, err := ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &executionDataRoot, nil)
 	require.NoError(t, err)
 
 	// Chunk setup
