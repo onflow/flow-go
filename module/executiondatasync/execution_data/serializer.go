@@ -7,6 +7,7 @@ import (
 
 	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
+
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/model/encoding"

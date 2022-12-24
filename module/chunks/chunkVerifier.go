@@ -1,14 +1,16 @@
 package chunks
 
 import (
+	gocontext "context"
 	"errors"
 	"fmt"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/convert"
@@ -341,7 +343,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
 
-	cedID, err := cidProvider.AddChunkExecutionData(nil, chunkExecutionData, nil)
+	cedID, err := cidProvider.AddChunkExecutionData(gocontext.Background(), chunkExecutionData, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
@@ -358,7 +360,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		), nil
 	}
 
-	executionDataID, err := cidProvider.AddExecutionDataRoot(nil, chunkDataPack.ExecutionDataRoot, nil)
+	executionDataID, err := cidProvider.AddExecutionDataRoot(gocontext.Background(), chunkDataPack.ExecutionDataRoot, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}

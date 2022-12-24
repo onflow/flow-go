@@ -9,14 +9,15 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/partial"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/partial"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
@@ -161,11 +162,12 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 		keys,
 		executionState.RegisterValuesToValues(values),
 	)
+	assert.NoError(s.T(), err)
 
 	updateExecutionData(s.T(), vch.ChunkDataPack.Collection, chunkEvents, update, vch.Result.BlockID, vch)
 
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
 	assert.IsType(s.T(), &chunksmodels.CFNonMatchingFinalState{}, chFaults)

@@ -33,10 +33,10 @@ type Provider interface {
 }
 
 type ExecutionDataProvider struct {
-	logger       zerolog.Logger
-	metrics      module.ExecutionDataProviderMetrics
-	maxBlobSize  int
-	serializer   execution_data.Serializer
+	logger      zerolog.Logger
+	metrics     module.ExecutionDataProviderMetrics
+	maxBlobSize int
+	//serializer   execution_data.Serializer
 	blobService  network.BlobService
 	storage      tracker.Storage
 	cidsProvider *ExecutionDataCIDProvider
