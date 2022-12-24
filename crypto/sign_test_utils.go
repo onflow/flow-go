@@ -110,18 +110,22 @@ func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int)
 	seed := make([]byte, minLen)
 	_, err := GeneratePrivateKey(salg, seed)
 	assert.NoError(t, err)
-	seed = make([]byte, maxLen)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.NoError(t, err)
+	if maxLen > 0 {
+		seed = make([]byte, maxLen)
+		_, err = GeneratePrivateKey(salg, seed)
+		assert.NoError(t, err)
+	}
 	// invalid seed lengths
 	seed = make([]byte, minLen-1)
 	_, err = GeneratePrivateKey(salg, seed)
 	assert.Error(t, err)
 	assert.True(t, IsInvalidInputsError(err))
-	seed = make([]byte, maxLen+1)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.Error(t, err)
-	assert.True(t, IsInvalidInputsError(err))
+	if maxLen > 0 {
+		seed = make([]byte, maxLen+1)
+		_, err = GeneratePrivateKey(salg, seed)
+		assert.Error(t, err)
+		assert.True(t, IsInvalidInputsError(err))
+	}
 }
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {

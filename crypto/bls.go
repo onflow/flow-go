@@ -61,13 +61,12 @@ const (
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
 	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
-	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
-	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
+	KeyGenSeedMinLenBLSBLS12381 = 2 * (securityBits / 8)
 	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
 	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
 	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
-	// scheme implemented as a countermasure for Rogue attacks of the form : SchemeTag_
+	// scheme implemented as a countermasure for rogue attacks of the form : SchemeTag_
 	schemeTag = "POP_"
 	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
 	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
@@ -259,19 +258,19 @@ func IsBLSSignatureIdentity(s Signature) bool {
 // The generated private key (resp. its corresponding public key) are guaranteed
 // not to be equal to the identity element of Z_r (resp. G2).
 func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	if len(seed) < KeyGenSeedMinLenBLSBLS12381 || len(seed) > KeyGenSeedMaxLenBLSBLS12381 {
+	if len(seed) < KeyGenSeedMinLenBLSBLS12381 {
 		return nil, invalidInputsErrorf(
-			"seed length should be between %d and %d bytes",
-			KeyGenSeedMinLenBLSBLS12381,
-			KeyGenSeedMaxLenBLSBLS12381)
+			"seed length should be at least %d bytes",
+			KeyGenSeedMinLenBLSBLS12381)
 	}
 
 	sk := newPrKeyBLSBLS12381(nil)
 
 	// maps the seed to a private key
-	err := mapToZrStar(&sk.scalar, seed)
-	if err != nil {
-		return nil, invalidInputsErrorf("private key generation failed %w", err)
+	isZero := mapToZr(&sk.scalar, seed)
+	if isZero {
+		seed[0] ^= 1 // TODO: seed := H(seed)
+		return a.generatePrivateKey(seed)
 	}
 	return sk, nil
 }

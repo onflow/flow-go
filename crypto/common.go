@@ -15,10 +15,6 @@ const (
 	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
 	securityBits = 128
 
-	// Relic internal constant (related to exported constants above)
-	// max byte length of bn_st set to 2048 bits
-	maxScalarSize = 256
-
 	// max relic PRG seed length in bytes
 	maxRelicPrgSeed = 1 << 32
 )
