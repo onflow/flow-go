@@ -3,7 +3,7 @@ name: Flaky Test Debug
 on:
   push:
     branches:
-      - '**/*flaky-test*'
+      - '**/*flaky-test-debug*'
 env:
   GO_VERSION: 1.19
 
