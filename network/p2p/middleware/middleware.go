@@ -135,7 +135,7 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 }
 
 // WithNodeBlockListDistributor adds a consumer func mw.onNodeBlockListUpdate to the node block list distributor provided.
-// This will allow the middleware to disconnect from block listed peers without waiting for the peer update interval.
+// This will allow the middleware to disconnect from block listed peers without waiting for the peer manager peer update interval.
 func WithNodeBlockListDistributor(distributor *cache.NodeBlockListDistributor) MiddlewareOption {
 	return func(mw *Middleware) {
 		distributor.AddConsumer(mw.onNodeBlockListUpdate)
