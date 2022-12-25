@@ -407,16 +407,20 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	}
 
 	// Do not wait for the transaction to be sealed.
-	_, err = lg.sendTx(-1, createAccountTx)
+	ch, err := lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
 	}
 
-	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
-	if err != nil {
-		return fmt.Errorf("failed to get transactions result: %w", err)
+	var result flowsdk.TransactionResult
+	select {
+	case result = <-ch:
+		lg.workerStatsTracker.IncTxExecuted()
+	case <-time.After(60 * time.Second):
+		return fmt.Errorf("timeout waiting for account creation tx to be executed")
+	case <-lg.Done():
+		return fmt.Errorf("loader stopped while waiting for account creation tx to be executed")
 	}
-	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	log.Trace().Str("status", result.Status.String()).Msg("account creation tx executed")
@@ -709,9 +713,14 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	defer t.Stop()
 
 	select {
-	case <-ch:
+	case result := <-ch:
+		if result.Error != nil {
+			lg.workerStatsTracker.IncTxFailed()
+		}
 		log.Trace().
 			Dur("duration", time.Since(startTime)).
+			Err(result.Error).
+			Str("status", result.Status.String()).
 			Msg("transaction confirmed")
 	case <-t.C:
 		lg.loaderMetrics.TransactionLost()
@@ -720,6 +729,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			Int("availableAccounts", len(lg.availableAccounts)).
 			Msg("transaction lost")
 		lg.workerStatsTracker.IncTxTimedout()
+	case <-lg.Done():
+		return
 	}
 	lg.workerStatsTracker.IncTxExecuted()
 }
@@ -768,7 +779,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	<-ch
 }
 
-func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan struct{}, error) {
+func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan flowsdk.TransactionResult, error) {
 	log := lg.log.With().Int("workerID", workerID).Str("tx_id", tx.ID().String()).Logger()
 	log.Trace().Msg("sending transaction")
 

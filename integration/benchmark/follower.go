@@ -15,7 +15,7 @@ import (
 
 type TxFollower interface {
 	// Follow returns a channel that is closed when the transaction is complete.
-	Follow(ID flowsdk.Identifier) <-chan struct{}
+	Follow(ID flowsdk.Identifier) <-chan flowsdk.TransactionResult
 
 	// Height returns the last acted upon block height.
 	Height() uint64
@@ -67,7 +67,7 @@ type txFollowerImpl struct {
 type txInfo struct {
 	submisionTime time.Time
 
-	C chan struct{}
+	C chan flowsdk.TransactionResult
 }
 
 // NewTxFollower creates a new follower that tracks the current block height
@@ -125,6 +125,8 @@ func (f *txFollowerImpl) processTransactions(results []*flowsdk.TransactionResul
 					Hex("txID", tx.TransactionID.Bytes()).
 					Msg("returned account to the pool")
 			}
+			// txi.C is buffered, so we can safely write to it.
+			txi.C <- *tx
 			close(txi.C)
 			if f.metrics != nil {
 				f.metrics.TransactionExecuted(duration)
@@ -195,26 +197,25 @@ func (f *txFollowerImpl) getNextBlocksTransactions() (*flowsdk.BlockHeader, []*f
 	return hdr, results, nil
 }
 
-// Follow returns a channel that will be closed when the transaction is completed.
-// If transaction is already being followed, return the existing channel.
-func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan struct{} {
+// Follow returns a channel where result of the transaction will be sent.
+func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan flowsdk.TransactionResult {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	select {
 	case <-f.ctx.Done():
-		// This channel is closed when the follower is stopped.
-		return f.stopped
+		closedCh := make(chan flowsdk.TransactionResult)
+		close(closedCh)
+		return closedCh
 	default:
 	}
 
-	// Return existing follower if exists.
-	if txi, ok := f.txToChan[txID]; ok {
-		return txi.C
+	if _, ok := f.txToChan[txID]; ok {
+		panic(fmt.Sprintf("transaction %s is already being followed", txID))
 	}
 
 	// Create new one.
-	ch := make(chan struct{})
+	ch := make(chan flowsdk.TransactionResult, 1)
 	f.txToChan[txID] = txInfo{submisionTime: time.Now(), C: ch}
 	return ch
 }
@@ -278,8 +279,6 @@ func (f *txFollowerImpl) Stop() {
 
 type nopTxFollower struct {
 	*txFollowerImpl
-
-	closedCh chan struct{}
 }
 
 // NewNopTxFollower creates a new follower that tracks the current block height and ID
@@ -291,17 +290,21 @@ func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followe
 	}
 	impl, _ := f.(*txFollowerImpl)
 
-	closedCh := make(chan struct{})
-	close(closedCh)
-
 	nop := &nopTxFollower{
 		txFollowerImpl: impl,
-		closedCh:       closedCh,
 	}
 	return nop, nil
 }
 
-// Follow always returns a closed channel.
-func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan struct{} {
-	return nop.closedCh
+// Follow immediately returns an empty result.
+// This is mostly useful for testing purposes or of cases where waiting for a transaction
+// to complete is not necessary.
+func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan flowsdk.TransactionResult {
+	closedCh := make(chan flowsdk.TransactionResult, 1)
+	closedCh <- flowsdk.TransactionResult{
+		TransactionID: ID,
+		Status:        flowsdk.TransactionStatusSealed,
+	}
+	close(closedCh)
+	return closedCh
 }

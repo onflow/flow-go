@@ -121,7 +121,9 @@ func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 		if w.blocklist.Contains(identity.NodeID) {
 			var i = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 			i.Ejected = true
-			idtx = append(idtx, &i)
+			if filter(&i) { // we need to check the filter here again, because the filter might drop ejected nodes and we are modifying the ejected status here
+				idtx = append(idtx, &i)
+			}
 		} else {
 			idtx = append(idtx, identity)
 		}
