@@ -102,7 +102,6 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	nodeBlockListDistributor   *cache.NodeBlockListDistributor
 	component.Component
 }
 
