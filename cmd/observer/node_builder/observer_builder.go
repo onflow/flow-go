@@ -727,7 +727,8 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}

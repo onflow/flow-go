@@ -77,7 +77,9 @@ func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
 	}
 	w.blocklist = b
 
-	w.notifier.OnNodeBlockListUpdate(blocklist)
+	if blocklist.Len() > 0 {
+		w.notifier.OnNodeBlockListUpdate(blocklist)
+	}
 
 	return nil
 }

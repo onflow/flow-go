@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -249,6 +250,9 @@ type NodeConfig struct {
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
+
+	// NodeBlockListDistributor notifies consumers of updates to the node block listr
+	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
