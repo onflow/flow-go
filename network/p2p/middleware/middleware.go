@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -101,6 +102,7 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
+	nodeBlockListDistributor   *cache.NodeBlockListDistributor
 	component.Component
 }
 
@@ -130,6 +132,14 @@ func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOptio
 func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.unicastRateLimiters = rateLimiters
+	}
+}
+
+// WithNodeBlockListDistributor adds a consumer func mw.onNodeBlockListUpdate to the node block list distributor provided.
+// This will allow the middleware to disconnect from block listed peers without waiting for the peer update interval.
+func WithNodeBlockListDistributor(distributor *cache.NodeBlockListDistributor) MiddlewareOption {
+	return func(mw *Middleware) {
+		distributor.AddConsumer(mw.onNodeBlockListUpdate)
 	}
 }
 
@@ -346,6 +356,15 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	}
 
 	return peerIDs
+}
+
+func (m *Middleware) onNodeBlockListUpdate(blockList flow.IdentifierList) {
+	for _, pid := range m.peerIDs(blockList) {
+		err := m.libP2PNode.RemovePeer(pid)
+		if err != nil {
+			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
+		}
+	}
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous

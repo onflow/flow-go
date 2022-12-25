@@ -1119,6 +1119,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		slashingViolationsConsumer,
 		middleware.WithMessageValidators(validators...),
 		// use default identifier provider
+		middleware.WithNodeBlockListDistributor(builder.NodeBlockListDistributor),
 	)
 
 	return builder.Middleware

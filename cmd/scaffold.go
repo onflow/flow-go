@@ -405,6 +405,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
 
+	mwOpts = append(mwOpts, middleware.WithNodeBlockListDistributor(fnb.NodeBlockListDistributor))
+
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 
 	fnb.Middleware = middleware.NewMiddleware(
