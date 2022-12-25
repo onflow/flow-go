@@ -1,4 +1,4 @@
-package signature_requirement
+package requirement
 
 import (
 	"context"
