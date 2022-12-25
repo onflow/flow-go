@@ -108,7 +108,7 @@ func (s *SignatureValidationAttackOrchestrator) HandleIngressEvent(event *insecu
 	// track all authorized events sent during test
 	if expectedEvent, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
 		// ensure event received intact no changes have been made to the underlying message
-		require.Equal(s.t, expectedEvent.FlowProtocolEvent.(*messages.ChunkDataRequest), event.FlowProtocolEvent.(*messages.ChunkDataRequest))
+		s.assertEventsEqual(expectedEvent, event)
 		s.authorizedEventsReceived.Inc()
 		s.authorizedEventReceivedWg.Done()
 	}
@@ -168,4 +168,14 @@ func (s *SignatureValidationAttackOrchestrator) requestChunkDataPackFixture(orig
 		FlowProtocolEvent:   chunkDataReq,
 		FlowProtocolEventID: eventID,
 	}
+}
+
+// assertEventsEqual checks that an all the fields in an egress event are equal to the given ingress event, this asserts
+// that the event was not tampered with as it passes through from attacker -> victim node.
+func (s *SignatureValidationAttackOrchestrator) assertEventsEqual(egressEvent *insecure.EgressEvent, ingressEvent *insecure.IngressEvent) {
+	// ensure event received intact no changes have been made to the underlying message
+	require.Equal(s.t, egressEvent.FlowProtocolEventID, ingressEvent.FlowProtocolEventID)
+	require.Equal(s.t, egressEvent.Channel, ingressEvent.Channel)
+	require.Equal(s.t, egressEvent.TargetIds[0], ingressEvent.CorruptTargetID)
+	require.Equal(s.t, egressEvent.FlowProtocolEvent.(*messages.ChunkDataRequest), ingressEvent.FlowProtocolEvent.(*messages.ChunkDataRequest))
 }
