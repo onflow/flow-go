@@ -101,6 +101,8 @@ github.com/OneOfOne/xxhash v1.2.5 h1:zl/OfRA6nftbBK9qTohYBJ5xvw6C/oNKizR7cZGl3cI
 github.com/OneOfOne/xxhash v1.2.5/go.mod h1:eZbhyaAYD41SGSSsnmcpxVoRiQ/MPUTjUdIIOT9Um7Q=
 github.com/SaveTheRbtz/golang-lru/v2 v2.0.0-20221227022314-ba4db09a53e8 h1:xx9vXW1gaSk1EkuK5QcBppelLrqGra4wrF0HLu1x9+s=
 github.com/SaveTheRbtz/golang-lru/v2 v2.0.0-20221227022314-ba4db09a53e8/go.mod h1:TSmeaXrdoHRf391A8uJf5NWR1Yo+rZc9nrWyUdfY0Y0=
+github.com/SaveTheRbtz/golang-lru/v2 v2.0.0-20221227032703-178293dc94c0 h1:2kWs281oZpHUGJXMpTm2BFi+2A21OcHfqHMaSZuGLo8=
+github.com/SaveTheRbtz/golang-lru/v2 v2.0.0-20221227032703-178293dc94c0/go.mod h1:TSmeaXrdoHRf391A8uJf5NWR1Yo+rZc9nrWyUdfY0Y0=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
