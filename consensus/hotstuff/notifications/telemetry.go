@@ -33,8 +33,8 @@ import (
 // Telemetry does NOT capture slashing notifications
 type TelemetryConsumer struct {
 	NoopConsumer
-	pathHandler *PathHandler
-	noPathEvent *zerolog.Event
+	pathHandler  *PathHandler
+	noPathLogger zerolog.Logger
 }
 
 var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
@@ -42,8 +42,8 @@ var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
 func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
 	pathHandler := NewPathHandler(log)
 	return &TelemetryConsumer{
-		pathHandler: pathHandler,
-		noPathEvent: pathHandler.log.Info(),
+		pathHandler:  pathHandler,
+		noPathLogger: pathHandler.log,
 	}
 }
 
@@ -204,7 +204,7 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 }
 
 func (t *TelemetryConsumer) OnVoteProcessed(vote *model.Vote) {
-	t.noPathEvent.
+	t.noPathLogger.Info().
 		Uint64("voted_block_view", vote.View).
 		Hex("voted_block_id", logging.ID(vote.BlockID)).
 		Hex("signer_id", logging.ID(vote.SignerID)).
@@ -212,7 +212,7 @@ func (t *TelemetryConsumer) OnVoteProcessed(vote *model.Vote) {
 }
 
 func (t *TelemetryConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
-	step := t.noPathEvent.
+	step := t.noPathLogger.Info().
 		Uint64("view", timeout.View).
 		Uint64("timeout_tick", timeout.TimeoutTick).
 		Uint64("newest_qc_view", timeout.NewestQC.View).
