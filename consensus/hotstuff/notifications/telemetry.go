@@ -25,6 +25,8 @@ import (
 //     -- a local timeout has been initiated
 //   - Each path through the state machine is identified by a unique id.
 //
+// Additionally, the TelemetryConsumer reports events related to vote and timeout aggregation
+// but those events are not bound to a path, so they are reported differently.
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
 // For now, we export the data to a logger.
 //
@@ -32,13 +34,16 @@ import (
 type TelemetryConsumer struct {
 	NoopConsumer
 	pathHandler *PathHandler
+	noPathEvent *zerolog.Event
 }
 
 var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
 
 func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
+	pathHandler := NewPathHandler(log)
 	return &TelemetryConsumer{
-		pathHandler: NewPathHandler(log),
+		pathHandler: pathHandler,
+		noPathEvent: pathHandler.log.Info(),
 	}
 }
 
@@ -196,6 +201,31 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
 	}
 	step.Msg("OnOwnTimeout")
+}
+
+func (t *TelemetryConsumer) OnVoteProcessed(vote *model.Vote) {
+	t.noPathEvent.
+		Uint64("voted_block_view", vote.View).
+		Hex("voted_block_id", logging.ID(vote.BlockID)).
+		Hex("signer_id", logging.ID(vote.SignerID)).
+		Msg("OnVoteProcessed")
+}
+
+func (t *TelemetryConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	step := t.noPathEvent.
+		Uint64("view", timeout.View).
+		Uint64("timeout_tick", timeout.TimeoutTick).
+		Uint64("newest_qc_view", timeout.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(timeout.NewestQC.BlockID)).
+		Hex("signer_id", logging.ID(timeout.SignerID))
+	lastViewTC := timeout.LastViewTC
+	if lastViewTC != nil {
+		step.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+	step.Msg("OnTimeoutProcessed")
 }
 
 func (t *TelemetryConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
