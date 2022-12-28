@@ -49,6 +49,12 @@ func (*NoopPartialConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, ui
 
 func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
 
+func (*NoopPartialConsumer) OnVoteProcessed(*model.Vote) {}
+
+func (*NoopPartialConsumer) OnTimeoutProcessed(*model.TimeoutObject) {}
+
+func (*NoopPartialConsumer) OnCurrentViewDetails(uint64, flow.Identifier) {}
+
 func (*NoopPartialConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (*NoopPartialConsumer) OnInvalidVoteDetected(*model.Vote) {}

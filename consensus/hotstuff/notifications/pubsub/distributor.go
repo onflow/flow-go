@@ -118,6 +118,30 @@ func (p *Distributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	}
 }
 
+func (p *Distributor) OnVoteProcessed(vote *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnVoteProcessed(vote)
+	}
+}
+
+func (p *Distributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnTimeoutProcessed(timeout)
+	}
+}
+
+func (p *Distributor) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnCurrentViewDetails(finalizedView, currentLeader)
+	}
+}
+
 func (p *Distributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

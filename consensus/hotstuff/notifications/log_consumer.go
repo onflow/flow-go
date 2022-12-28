@@ -140,6 +140,26 @@ func (lc *LogConsumer) OnStartingTimeout(info model.TimerInfo) {
 		Msg("timeout started")
 }
 
+func (lc *LogConsumer) OnVoteProcessed(vote *model.Vote) {
+	lc.log.Debug().
+		Hex("block_id", vote.BlockID[:]).
+		Uint64("block_view", vote.View).
+		Hex("recipient_id", vote.SignerID[:]).
+		Msg("processed HotStuff vote")
+}
+
+func (lc *LogConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	log := timeout.LogContext(lc.log).Logger()
+	log.Debug().Msg("processed timeout object")
+}
+
+func (lc *LogConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+	lc.log.Info().
+		Uint64("finalized_view", finalizedView).
+		Hex("current_leader", currentLeader[:]).
+		Msg("current view details")
+}
+
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
