@@ -198,6 +198,13 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	step.Msg("OnOwnTimeout")
 }
 
+func (t *TelemetryConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+	t.pathHandler.NextStep().
+		Uint64("finalized_view", finalizedView).
+		Hex("current_leader", currentLeader[:]).
+		Msg("OnCurrentViewDetails")
+}
+
 // PathHandler maintains a notion of the current path through the state machine.
 // It allows to close a path and open new path. Each path is identified by a unique
 // (randomly generated) uuid. Along each path, we can capture information about relevant

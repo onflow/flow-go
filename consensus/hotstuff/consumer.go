@@ -133,6 +133,26 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnStartingTimeout(model.TimerInfo)
 
+	// OnVoteProcessed notifications are produced by Vote Aggregation logic.
+	// Such a notification indicates that we have successfully processed vote.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteProcessed(vote *model.Vote)
+
+	// OnTimeoutProcessed notifications are produced by Timeout Aggregation logic.
+	// Such a notification indicates that we have successfully processed timeout.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTimeoutProcessed(timeout *model.TimeoutObject)
+
+	// OnCurrentViewDetails notifications are produced by EventHandler when proposing logic is triggered.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier)
+
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
 	// Prerequisites:

@@ -74,6 +74,7 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	if err != nil {
 		return fmt.Errorf("internal error processing TO %v for view: %d: %w", timeout.ID(), timeout.View, err)
 	}
+	c.notifier.OnTimeoutProcessed(timeout)
 	return nil
 }
 

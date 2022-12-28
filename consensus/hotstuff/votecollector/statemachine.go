@@ -120,6 +120,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
 			vote.ID(), vote.BlockID, err)
 	}
+	m.notifier.OnVoteProcessed(vote)
 	return nil
 }
 
