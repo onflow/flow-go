@@ -134,14 +134,14 @@ type Consumer interface {
 	OnStartingTimeout(model.TimerInfo)
 
 	// OnVoteProcessed notifications are produced by Vote Aggregation logic.
-	// Such a notification indicates that we have successfully processed vote.
+	// Such a notification indicates that we have processed a vote.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnVoteProcessed(vote *model.Vote)
 
 	// OnTimeoutProcessed notifications are produced by Timeout Aggregation logic.
-	// Such a notification indicates that we have successfully processed timeout.
+	// Such a notification indicates that we have processed a timeout.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).

@@ -60,6 +60,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 		go func() {
 			defer wg.Done()
 			timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
+			s.notifier.On("OnTimeoutProcessed", timeout).Once()
 			s.processor.On("Process", timeout).Return(nil).Once()
 			err := s.collector.AddTimeout(timeout)
 			require.NoError(s.T(), err)
@@ -74,6 +75,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 // double timeout to notifier which can be slashed later.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_DoubleTimeout() {
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
+	s.notifier.On("OnTimeoutProcessed", timeout).Once()
 	s.processor.On("Process", timeout).Return(nil).Once()
 	err := s.collector.AddTimeout(timeout)
 	require.NoError(s.T(), err)
@@ -92,6 +94,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_DoubleTimeout() {
 // TestAddTimeout_RepeatedTimeout checks that repeated timeouts are silently dropped without any errors.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_RepeatedTimeout() {
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
+	s.notifier.On("OnTimeoutProcessed", timeout).Once()
 	s.processor.On("Process", timeout).Return(nil).Once()
 	err := s.collector.AddTimeout(timeout)
 	require.NoError(s.T(), err)
@@ -116,6 +119,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	s.Run("invalid-timeout", func() {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 		s.processor.On("Process", timeout).Return(model.NewInvalidTimeoutErrorf(timeout, "")).Once()
+		s.notifier.On("OnTimeoutProcessed", timeout).Once()
 		s.notifier.On("OnInvalidTimeoutDetected", timeout).Once()
 		err := s.collector.AddTimeout(timeout)
 		require.NoError(s.T(), err)
@@ -161,6 +165,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 			timeout.LastViewTC = lastViewTC
 		})
 		timeouts = append(timeouts, timeout)
+		s.notifier.On("OnTimeoutProcessed", timeout).Once()
 		s.processor.On("Process", timeout).Return(nil).Once()
 	}
 

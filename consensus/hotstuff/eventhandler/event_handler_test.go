@@ -301,6 +301,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier.On("OnReceiveTc", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnPartialTc", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnLocalTimeout", mock.Anything).Maybe()
+	es.notifier.On("OnCurrentViewDetails", mock.Anything, mock.Anything).Maybe()
 
 	eventhandler, err := NewEventHandler(
 		zerolog.New(os.Stderr),

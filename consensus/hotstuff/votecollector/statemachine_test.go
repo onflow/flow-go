@@ -121,6 +121,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	require.NoError(s.T(), err)
 	s.T().Run("add-valid-vote", func(t *testing.T) {
 		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Once()
 		processor.On("Process", vote).Return(nil).Once()
 		err := s.collector.AddVote(vote)
 		require.NoError(t, err)
@@ -128,6 +129,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	})
 	s.T().Run("add-double-vote", func(t *testing.T) {
 		firstVote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", firstVote).Once()
 		processor.On("Process", firstVote).Return(nil).Once()
 		err := s.collector.AddVote(firstVote)
 		require.NoError(t, err)
@@ -149,7 +151,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	s.T().Run("add-invalid-vote", func(t *testing.T) {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
-
+		s.notifier.On("OnVoteProcessed", vote).Once()
 		s.notifier.On("OnInvalidVoteDetected", vote).Return(nil).Once()
 		err := s.collector.AddVote(vote)
 		// in case process returns model.InvalidVoteError we should silently ignore this error
@@ -161,6 +163,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	})
 	s.T().Run("add-repeated-vote", func(t *testing.T) {
 		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Once()
 		processor.On("Process", vote).Return(nil).Once()
 		err := s.collector.AddVote(vote)
 		require.NoError(t, err)
@@ -203,6 +206,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
 		// eventually it has to be process by processor
+		s.notifier.On("OnVoteProcessed", vote).Once()
 		processor.On("Process", vote).Return(nil).Once()
 		require.NoError(s.T(), s.collector.AddVote(vote))
 	}
