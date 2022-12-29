@@ -32,6 +32,7 @@ const (
 	codeExecutedBlock           = 23 // latest executed block with max height
 	codeRootHeight              = 24 // the height of the first loaded block
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
+	codeSporkRootBlockHeight    = 26 // the height of the lowest block in current spork that our node is aware of
 
 	// codes for single entity storage
 	// 31 was used for identities before epochs

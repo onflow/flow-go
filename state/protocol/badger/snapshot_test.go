@@ -5,7 +5,6 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/signature"
 	"math/rand"
 	"testing"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -577,7 +577,8 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 		block6.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
 		buildBlock(t, state, block6)
 
-		segment, err := state.AtBlockID(block6.ID()).SealingSegment()
+		snapshot := state.AtBlockID(block6.ID())
+		segment, err := snapshot.SealingSegment()
 		require.NoError(t, err)
 
 		// build a valid child to ensure we have a QC
@@ -589,7 +590,6 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1}, segment.ExtraBlocks[1:])
 		require.Len(t, segment.ExecutionResults, 1)
 
-		snapshot := state.AtBlockID(block6.ID())
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
 		// bootstrap from snapshot

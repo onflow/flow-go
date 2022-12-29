@@ -33,6 +33,8 @@ type State struct {
 	}
 	// cache the root height because it cannot change over the lifecycle of a protocol state instance
 	rootHeight uint64
+	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	sporkRootBlockHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -121,7 +123,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
+		err = state.bootstrapEpoch(root.Epochs(), segment, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -254,6 +256,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 		highest := segment.Highest()
 		lowest := segment.Lowest()
+		sporkRootBlockHeight := segment.AllBlocks()[0].Header.Height
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
@@ -302,6 +305,10 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 
 		// insert height pointers
+		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork root block height: %w", err)
+		}
 		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
@@ -328,11 +335,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		previous := root.Epochs().Previous()
-		current := root.Epochs().Current()
-		next := root.Epochs().Next()
+		previous := epochs.Previous()
+		current := epochs.Current()
+		next := epochs.Next()
 
 		// build the status as we go
 		status := new(flow.EpochStatus)
@@ -443,11 +450,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment in within the same phase within the same epoch.
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
-		for _, block := range segment.Blocks {
+		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()
 			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
 			if err != nil {
@@ -696,6 +699,12 @@ func (state *State) populateCache() error {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
 	state.rootHeight = rootHeight
+	var sporkRootBlockHeight uint64
+	err = state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+	if err != nil {
+		return fmt.Errorf("could not read spork root block height: %w", err)
+	}
+	state.sporkRootBlockHeight = sporkRootBlockHeight
 	return nil
 }
 

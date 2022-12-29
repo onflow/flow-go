@@ -103,6 +103,10 @@ func (segment *SealingSegment) Lowest() *Block {
 	return segment.Blocks[0]
 }
 
+func (segment *SealingSegment) AllBlocks() []*Block {
+	return append(segment.ExtraBlocks, segment.Blocks...)
+}
+
 // FinalizedSeal returns the seal that seals the lowest block.
 // Per specification, this seal must be included in a SealingSegment.
 // The SealingSegment must be validated.
