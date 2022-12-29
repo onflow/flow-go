@@ -27,7 +27,7 @@ func main() {
 		}{
 			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
 			CollectionCollector: metrics.NewCollectionCollector(tracer),
-			NetworkCollector:    metrics.NewNetworkCollector(),
+			NetworkCollector:    metrics.NewNetworkCollector(unittest.Logger()),
 		}
 
 		topic1 := channels.TestNetworkChannel.String()

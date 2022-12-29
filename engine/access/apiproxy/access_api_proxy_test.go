@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Methodology
@@ -128,13 +129,13 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	done := make(chan int)
 
 	// Bring up 1st upstream server
-	charlie1, _, err := newFlowLite("tcp", "127.0.0.1:11634", done)
+	charlie1, _, err := newFlowLite("tcp", unittest.IPPort("11634"), done)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Prepare a proxy that fails due to the second connection being idle
-	l := flow.IdentityList{{Address: "127.0.0.1:11634"}, {Address: "127.0.0.1:11635"}}
+	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c := FlowAccessAPIForwarder{}
 	err = c.setFlowAccessAPI(l, time.Second)
 	if err == nil {
@@ -142,7 +143,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	}
 
 	// Bring up 2nd upstream server
-	charlie2, _, err := newFlowLite("tcp", "127.0.0.1:11635", done)
+	charlie2, _, err := newFlowLite("tcp", unittest.IPPort("11635"), done)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	background := context.Background()
 
 	// Prepare a proxy
-	l = flow.IdentityList{{Address: "127.0.0.1:11634"}, {Address: "127.0.0.1:11635"}}
+	l = flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c = FlowAccessAPIForwarder{}
 	err = c.setFlowAccessAPI(l, time.Second)
 	if err != nil {

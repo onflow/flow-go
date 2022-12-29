@@ -23,7 +23,6 @@ type DiskWAL struct {
 	pathByteSize   int
 	log            zerolog.Logger
 	dir            string
-	outputVersion  uint16
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
@@ -39,7 +38,6 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 		pathByteSize:   pathByteSize,
 		log:            logger.With().Str("ledger_mod", "diskwal").Logger(),
 		dir:            dir,
-		outputVersion:  MaxVersion,
 	}, nil
 }
 
@@ -49,10 +47,6 @@ func (w *DiskWAL) PauseRecord() {
 
 func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
-}
-
-func (w *DiskWAL) UseCheckpointVersion5() {
-	w.outputVersion = VersionV5
 }
 
 // RecordUpdate writes the trie update to the write ahead log on disk.
@@ -316,7 +310,7 @@ func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
 
 // NewCheckpointer returns a Checkpointer for this WAL
 func (w *DiskWAL) NewCheckpointer() (*Checkpointer, error) {
-	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity, w.outputVersion), nil
+	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity), nil
 }
 
 func (w *DiskWAL) Ready() <-chan struct{} {

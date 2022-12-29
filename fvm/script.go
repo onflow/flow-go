@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
@@ -76,17 +76,9 @@ func NewScriptWithContextAndArgs(
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (proc *ScriptProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
-) error {
-	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -117,19 +109,19 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) InitialSnapshotTime() derived.LogicalTime {
+	return derived.EndOfBlockExecutionTime
 }
 
-func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
+	return derived.EndOfBlockExecutionTime
 }
 
 type scriptExecutor struct {
 	ctx            Context
 	proc           *ScriptProcedure
 	txnState       *state.TransactionState
-	derivedTxnData *programs.DerivedTransactionData
+	derivedTxnData *derived.DerivedTransactionData
 
 	env environment.Environment
 }
@@ -138,7 +130,7 @@ func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
 	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	derivedTxnData *derived.DerivedTransactionData,
 ) *scriptExecutor {
 	return &scriptExecutor{
 		ctx:            ctx,

@@ -99,9 +99,7 @@ func New(
 		retry.Activate()
 	}
 
-	var err error
-
-	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}

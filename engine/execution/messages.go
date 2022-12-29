@@ -1,11 +1,13 @@
 package execution
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -31,29 +33,32 @@ type ComputationResult struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
+	SpockSignatures        []crypto.Signature
 }
 
 func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
-	numberOfChunks := len(block.CompleteCollections) + 1
+	numCollections := len(block.CompleteCollections) + 1
 	return &ComputationResult{
 		ExecutableBlock:        block,
-		Events:                 make([]flow.EventsList, numberOfChunks),
+		Events:                 make([]flow.EventsList, numCollections),
 		ServiceEvents:          make(flow.EventsList, 0),
 		TransactionResults:     make([]flow.TransactionResult, 0),
 		TransactionResultIndex: make([]int, 0),
-		StateCommitments:       make([]flow.StateCommitment, 0, numberOfChunks),
-		Proofs:                 make([][]byte, 0, numberOfChunks),
-		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numberOfChunks),
-		EventsHashes:           make([]flow.Identifier, 0, numberOfChunks),
+		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
+		Proofs:                 make([][]byte, 0, numCollections),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numCollections),
+		EventsHashes:           make([]flow.Identifier, 0, numCollections),
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
 
 func (cr *ComputationResult) AddTransactionResult(
-	chunkIndex int,
+	collectionIndex int,
 	txn *fvm.TransactionProcedure,
 ) {
-	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], txn.Events...)
+	cr.Events[collectionIndex] = append(
+		cr.Events[collectionIndex],
+		txn.Events...)
 	cr.ServiceEvents = append(cr.ServiceEvents, txn.ServiceEvents...)
 
 	txnResult := flow.TransactionResult{
@@ -74,56 +79,48 @@ func (cr *ComputationResult) AddTransactionResult(
 	}
 }
 
-// TODO(patrick): compute this in a loop in computer after cleaning up system
-// collection execution.
-func (cr *ComputationResult) UpdateTransactionResultIndex(txCounts int) {
-	lastIndex := 0
-	if len(cr.TransactionResultIndex) > 0 {
-		lastIndex = cr.TransactionResultIndex[len(cr.TransactionResultIndex)-1]
-	}
-	cr.TransactionResultIndex = append(cr.TransactionResultIndex, lastIndex+txCounts)
+func (cr *ComputationResult) AddCollection(snapshot *delta.SpockSnapshot) {
+	cr.TransactionResultIndex = append(
+		cr.TransactionResultIndex,
+		len(cr.TransactionResults))
+	cr.StateSnapshots = append(cr.StateSnapshots, snapshot)
 }
 
-func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
-	cr.StateSnapshots = append(cr.StateSnapshots, inp)
+func (cr *ComputationResult) CollectionStats(
+	collectionIndex int,
+) module.ExecutionResultStats {
+	var startTxnIndex int
+	if collectionIndex > 0 {
+		startTxnIndex = cr.TransactionResultIndex[collectionIndex-1]
+	}
+	endTxnIndex := cr.TransactionResultIndex[collectionIndex]
+
+	var computationUsed uint64
+	var memoryUsed uint64
+	for _, txn := range cr.TransactionResults[startTxnIndex:endTxnIndex] {
+		computationUsed += txn.ComputationUsed
+		memoryUsed += txn.MemoryUsed
+	}
+
+	events := cr.Events[collectionIndex]
+	snapshot := cr.StateSnapshots[collectionIndex]
+	return module.ExecutionResultStats{
+		ComputationUsed:                 computationUsed,
+		MemoryUsed:                      memoryUsed,
+		EventCounts:                     len(events),
+		EventSize:                       events.ByteSize(),
+		NumberOfRegistersTouched:        snapshot.NumberOfRegistersTouched,
+		NumberOfBytesWrittenToRegisters: snapshot.NumberOfBytesWrittenToRegisters,
+		NumberOfCollections:             1,
+		NumberOfTransactions:            endTxnIndex - startTxnIndex,
+	}
 }
 
-func (cr *ComputationResult) ChunkEventCountsAndSize(chunkIndex int) (int, int) {
-	return len(cr.Events[chunkIndex]), cr.Events[chunkIndex].ByteSize()
-}
-
-func (cr *ComputationResult) BlockEventCountsAndSize() (int, int) {
-	totalSize := cr.ServiceEvents.ByteSize()
-	totalCounts := len(cr.ServiceEvents)
-	for _, events := range cr.Events {
-		totalSize += events.ByteSize()
-		totalCounts += len(events)
+func (cr *ComputationResult) BlockStats() module.ExecutionResultStats {
+	stats := module.ExecutionResultStats{}
+	for idx := 0; idx < len(cr.StateCommitments); idx++ {
+		stats.Merge(cr.CollectionStats(idx))
 	}
-	return totalCounts, totalSize
-}
 
-func (cr *ComputationResult) ChunkComputationAndMemoryUsed(chunkIndex int) (uint64, uint64) {
-	var startTxIndex int
-	if chunkIndex > 0 {
-		startTxIndex = cr.TransactionResultIndex[chunkIndex-1]
-	}
-	endTxIndex := cr.TransactionResultIndex[chunkIndex]
-
-	var totalComputationUsed uint64
-	var totalMemoryUsed uint64
-	for i := startTxIndex; i < endTxIndex; i++ {
-		totalComputationUsed += cr.TransactionResults[i].ComputationUsed
-		totalMemoryUsed += cr.TransactionResults[i].MemoryUsed
-	}
-	return totalComputationUsed, totalMemoryUsed
-}
-
-func (cr *ComputationResult) BlockComputationAndMemoryUsed() (uint64, uint64) {
-	var totalComputationUsed uint64
-	var totalMemoryUsed uint64
-	for i := 0; i < len(cr.TransactionResults); i++ {
-		totalComputationUsed += cr.TransactionResults[i].ComputationUsed
-		totalMemoryUsed += cr.TransactionResults[i].MemoryUsed
-	}
-	return totalComputationUsed, totalMemoryUsed
+	return stats
 }

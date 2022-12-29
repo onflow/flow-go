@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,8 +26,6 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
-
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
@@ -47,11 +45,11 @@ func TestSafetyCheck(t *testing.T) {
 					meter.DefaultParameters().WithStorageInteractionLimit(
 						context.MaxStateInteractionSize)))
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
 		require.Nil(t, err)
 		require.Error(t, proc.Err)
 
@@ -64,7 +62,6 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
 
 		code := `transaction(arg: X) { }`
 
@@ -85,11 +82,11 @@ func TestSafetyCheck(t *testing.T) {
 					meter.DefaultParameters().WithStorageInteractionLimit(
 						context.MaxStateInteractionSize)))
 
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 		require.NoError(t, err)
 
-		err = txInvoker.Process(context, proc, txnState, derivedTxnData)
+		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
 		require.Nil(t, err)
 		require.Error(t, proc.Err)
 

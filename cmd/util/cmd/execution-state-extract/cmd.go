@@ -3,14 +3,12 @@ package extract
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -26,7 +24,7 @@ var (
 	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
-	flagVersion           int
+	flagNWorker           int
 )
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -72,7 +70,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
 
-	Cmd.Flags().IntVar(&flagVersion, "version", 6, "checkpoint version")
+	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
 }
 
 func run(*cobra.Command, []string) {
@@ -118,29 +116,14 @@ func run(*cobra.Command, []string) {
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
-		// read state commitment from root checkpoint
-
-		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid root checkpoint")
-		}
-		defer f.Close()
-
-		rootHash, err := wal.ReadLastTrieRootHashFromCheckpoint(f)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to read last root hash in root checkpoint: %s", err.Error())
-		}
-
-		stateCommitment, err = flow.ToStateCommitment(rootHash[:])
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert state commitment from last root hash in root checkpoint")
-		}
+		log.Fatal().Msg("no --block-hash or --state-commitment was specified")
 	}
 
 	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
 		flagExecutionStateDir,
 		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
-		flagVersion)
+		6,
+	)
 
 	log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
 		hex.EncodeToString(stateCommitment[:]),
@@ -163,9 +146,9 @@ func run(*cobra.Command, []string) {
 		flagOutputDir,
 		log.Logger,
 		chain,
-		flagVersion,
 		!flagNoMigration,
 		!flagNoReport,
+		flagNWorker,
 	)
 
 	if err != nil {
