@@ -71,6 +71,7 @@ func NewFollowerState(
 		blockTimer: blockTimer,
 		cfg:        DefaultConfig(),
 	}
+	followerState.State.maxSealingSegmentLength = followerState.cfg.transactionExpiry
 	return followerState, nil
 }
 

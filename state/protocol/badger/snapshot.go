@@ -4,7 +4,6 @@ package badger
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -285,15 +284,35 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	lowestBlockID := seal.BlockID
-	maxSealingSegmentLength := 600
-
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(lowestBlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
 	}
 
-	sealingSegmentLength := builder.Len()
-	if sealingSegmentLength < maxSealingSegmentLength {
+	// strictly speaking sealing segment length should be bounded by next formula:
+	// limitHeight = max(s.block.Height - maxSealingSegmentLength, SporkRootBlockHeight)
+
+	highestBlock, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest block in sealing segment: %w", err)
+	}
+
+	// start by assuming that we won't go lower than spork root block height
+	limitHeight := s.state.sporkRootBlockHeight
+	if highestBlock.Height > s.state.maxSealingSegmentLength {
+		lowestSealingSegmentHeight := highestBlock.Height - s.state.maxSealingSegmentLength
+		if limitHeight < lowestSealingSegmentHeight {
+			limitHeight = lowestSealingSegmentHeight
+		}
+	}
+
+	lowestSealingSegmentBlock, err := s.state.headers.ByBlockID(lowestBlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query lowest sealing segment block: %w", err)
+	}
+
+	if limitHeight < lowestSealingSegmentBlock.Height {
+		// we need to include extra blocks in sealing segment
 		extraBlocksScrapper := func(header *flow.Header) error {
 			blockID := header.ID()
 			block, err := s.state.blocks.ByID(blockID)
@@ -308,22 +327,10 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 			return nil
 		}
-		// need to include extra blocks
-		remainingBlocks := uint64(maxSealingSegmentLength - sealingSegmentLength)
-		lowestSealingSegmentBlock, err := s.state.headers.ByBlockID(lowestBlockID)
-		if err != nil {
-			return nil, fmt.Errorf("could not query lowest sealing segment block: %w", err)
-		}
 
-		if remainingBlocks > lowestSealingSegmentBlock.Height {
-			remainingBlocks = lowestSealingSegmentBlock.Height
-		}
-		if remainingBlocks > 0 {
-			stopHeight := lowestSealingSegmentBlock.Height - remainingBlocks
-			err = fork.TraverseBackward(s.state.headers, lowestSealingSegmentBlock.ParentID, extraBlocksScrapper, fork.IncludingHeight(stopHeight))
-			if err != nil {
-				return nil, fmt.Errorf("could not traverse extra blocks for sealing segment: %w", err)
-			}
+		err = fork.TraverseBackward(s.state.headers, lowestSealingSegmentBlock.ParentID, extraBlocksScrapper, fork.IncludingHeight(limitHeight))
+		if err != nil {
+			return nil, fmt.Errorf("could not traverse extra blocks for sealing segment: %w", err)
 		}
 	}
 

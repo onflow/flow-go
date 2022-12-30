@@ -6,8 +6,10 @@ func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
 	payload := Payload{
-		Guarantees: nil,
-		Seals:      nil,
+		Guarantees: make([]*CollectionGuarantee, 0),
+		Seals:      make([]*Seal, 0),
+		Receipts:   make(ExecutionReceiptMetaList, 0),
+		Results:    make(ExecutionResultList, 0),
 	}
 
 	// create the header

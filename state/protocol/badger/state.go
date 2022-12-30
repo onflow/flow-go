@@ -35,6 +35,8 @@ type State struct {
 	rootHeight uint64
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
+	// maximum length of sealing segment that replica will be building
+	maxSealingSegmentLength uint64
 }
 
 type BootstrapConfig struct {
@@ -623,6 +625,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
+		maxSealingSegmentLength: flow.DefaultTransactionExpiry,
 	}
 }
 
