@@ -251,12 +251,29 @@ func (lg *ContLoadGenerator) populateServiceAccountKeys(num int) error {
 		return fmt.Errorf("error adding keys to service account: %w", result.Error)
 	}
 
-	// reload service account
-	lg.serviceAccount, err = account.LoadServiceAccount(lg.ctx, lg.flowClient, lg.serviceAccount.Address, lg.networkParams.ServAccPrivKeyHex)
-	if err != nil {
-		return fmt.Errorf("error loading service account %w", err)
+	// reload service account until it has enough keys
+	timeout := time.After(30 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for service account to have %d keys", num)
+		case <-lg.Done():
+			return fmt.Errorf("load generator stopped")
+		default:
+		}
+
+		lg.serviceAccount, err = account.LoadServiceAccount(lg.ctx, lg.flowClient, lg.serviceAccount.Address, lg.networkParams.ServAccPrivKeyHex)
+		if err != nil {
+			return fmt.Errorf("error loading service account %w", err)
+		}
+		lg.log.Info().Int("num_keys", lg.serviceAccount.NumKeys()).Msg("service account reloaded")
+
+		if lg.serviceAccount.NumKeys() >= num {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
 	}
-	lg.log.Info().Int("num_keys", lg.serviceAccount.NumKeys()).Msg("service account reloaded")
 
 	return nil
 }
