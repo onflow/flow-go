@@ -292,6 +292,7 @@ func (lg *ContLoadGenerator) Init() error {
 				return err
 			}
 		})
+		// This is needed to avoid hitting the gRPC message size limit.
 		time.Sleep(1 * time.Second)
 	}
 
@@ -536,12 +537,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account created")
 
-			signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+			newAcc, err := account.New(accountsCreated, &accountAddress, privKey, []*flowsdk.AccountKey{accountKey})
 			if err != nil {
-				return fmt.Errorf("singer creation failed: %w", err)
+				return fmt.Errorf("failed to create account: %w", err)
 			}
-
-			newAcc := account.New(accountsCreated, &accountAddress, []*flowsdk.AccountKey{accountKey}, signer)
 			accountsCreated++
 
 			lg.accountsMutex.Lock()

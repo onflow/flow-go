@@ -87,16 +87,10 @@ func (k *accountKey) IncrementSequenceNumber() {
 }
 
 func (k *accountKey) SignPayload(tx *flowsdk.Transaction) error {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-
 	return tx.SignPayload(*k.Address, k.Index, k.Signer)
 }
 
 func (k *accountKey) SignTx(tx *flowsdk.Transaction) error {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-
 	if len(tx.Authorizers) == 0 {
 		tx = tx.AddAuthorizer(*k.Address)
 	}

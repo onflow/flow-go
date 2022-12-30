@@ -15,13 +15,17 @@ type FlowAccount struct {
 	Address *flowsdk.Address
 	ID      int
 
-	keys   *keystore
-	signer crypto.InMemorySigner
+	keys *keystore
 }
 
-func New(i int, address *flowsdk.Address, accountKeys []*flowsdk.AccountKey, signer crypto.InMemorySigner) *FlowAccount {
+func New(i int, address *flowsdk.Address, privKey crypto.PrivateKey, accountKeys []*flowsdk.AccountKey) (*FlowAccount, error) {
 	keys := make([]*accountKey, 0, len(accountKeys))
 	for _, key := range accountKeys {
+		signer, err := crypto.NewInMemorySigner(privKey, key.HashAlgo)
+		if err != nil {
+			return nil, fmt.Errorf("error while creating signer: %w", err)
+		}
+
 		keys = append(keys, &accountKey{
 			AccountKey: *key,
 			Address:    address,
@@ -33,8 +37,7 @@ func New(i int, address *flowsdk.Address, accountKeys []*flowsdk.AccountKey, sig
 		Address: address,
 		ID:      i,
 		keys:    newKeystore(keys),
-		signer:  signer,
-	}
+	}, nil
 }
 
 func LoadServiceAccount(
@@ -53,12 +56,7 @@ func LoadServiceAccount(
 		return nil, fmt.Errorf("error while decoding serice account private key hex: %w", err)
 	}
 
-	signer, err := crypto.NewInMemorySigner(privateKey, acc.Keys[0].HashAlgo)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating signer: %w", err)
-	}
-
-	return New(0, servAccAddress, acc.Keys, signer), nil
+	return New(0, servAccAddress, privateKey, acc.Keys)
 }
 
 func (acc *FlowAccount) NumKeys() int {
