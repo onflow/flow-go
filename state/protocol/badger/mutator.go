@@ -100,6 +100,8 @@ func NewFullConsensusState(
 }
 
 // sealingSegmentMaxLength overrides sealing segment max length to use transaction expiry
+//
+//nolint:unused
 func (m *FollowerState) sealingSegmentMaxLength() uint64 {
 	return m.cfg.transactionExpiry
 }
