@@ -163,6 +163,11 @@ func Bootstrap(
 	return state, nil
 }
 
+// sealingSegmentMaxLength returns pre-configured maximum length of sealing segment, can be overridden
+func (state *State) sealingSegmentMaxLength() uint64 {
+	return state.maxSealingSegmentLength
+}
+
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {

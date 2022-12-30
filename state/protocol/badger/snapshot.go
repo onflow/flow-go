@@ -299,8 +299,9 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// start by assuming that we won't go lower than spork root block height
 	limitHeight := s.state.sporkRootBlockHeight
-	if highestBlock.Height > s.state.maxSealingSegmentLength {
-		lowestSealingSegmentHeight := highestBlock.Height - s.state.maxSealingSegmentLength
+	sealingSegmentMaxLength := s.state.sealingSegmentMaxLength()
+	if highestBlock.Height > sealingSegmentMaxLength {
+		lowestSealingSegmentHeight := highestBlock.Height - sealingSegmentMaxLength
 		if limitHeight < lowestSealingSegmentHeight {
 			limitHeight = lowestSealingSegmentHeight
 		}
