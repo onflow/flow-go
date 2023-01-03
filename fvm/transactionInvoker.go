@@ -286,6 +286,10 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 		}
 	}
 
+	// log the execution intensities here, so that they do not contain data
+	// from transaction fee deduction, because the payer is not charged for that.
+	executor.logExecutionIntensities()
+
 	executor.errs.Collect(executor.commit(invalidator))
 
 	return executor.errs.ErrorOrNil()
@@ -329,7 +333,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	for s, u := range executor.txnState.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
-	executor.env.Logger().Info().
+	executor.env.Logger().Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
@@ -393,10 +397,6 @@ func (executor *transactionExecutor) normalExecution() (
 	if err != nil {
 		return
 	}
-
-	// log the execution intensities here, so that they do not contain data
-	// from transaction fee deduction, because the payer is not charged for that.
-	executor.logExecutionIntensities()
 
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.deductTransactionFees()
