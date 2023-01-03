@@ -3,11 +3,13 @@
 package operation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestMakePrefix(t *testing.T) {
@@ -36,4 +38,13 @@ func TestMakePrefix(t *testing.T) {
 	actual = makePrefix(code, id)
 
 	assert.Equal(t, expected, actual)
+}
+
+func TestUnknownDecode(t *testing.T) {
+	// pass an encoded Identifier to `d`
+	id := unittest.IdentifierFixture()
+	fmt.Println(id)
+	enc := b(id)
+	dec := d(enc)
+	fmt.Println(dec)
 }
