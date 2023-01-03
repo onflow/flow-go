@@ -94,9 +94,9 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// DuplicateInboundMessagesDropped provides a mock function with given fields: topic, messageType
-func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, messageType string) {
-	_m.Called(topic, messageType)
+// DuplicateInboundMessagesDropped provides a mock function with given fields: topic, _a1, messageType
+func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 string, messageType string) {
+	_m.Called(topic, _a1, messageType)
 }
 
 // InboundConnections provides a mock function with given fields: connectionCount
@@ -104,9 +104,9 @@ func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
-// InboundMessageReceived provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
+// InboundMessageReceived provides a mock function with given fields: sizeBytes, topic, _a2, messageType
+func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, _a2 string, messageType string) {
+	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
 // MessageAdded provides a mock function with given fields: priority
@@ -204,9 +204,9 @@ func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
-// OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
+// OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, _a2, messageType
+func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, _a2 string, messageType string) {
+	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority
