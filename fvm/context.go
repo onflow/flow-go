@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -35,6 +36,8 @@ type Context struct {
 	TransactionExecutorParams
 
 	DerivedBlockData *derived.DerivedBlockData
+
+	tracing.TracerSpan
 
 	environment.EnvironmentParams
 }
