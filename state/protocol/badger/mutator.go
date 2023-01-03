@@ -71,6 +71,7 @@ func NewFollowerState(
 		blockTimer: blockTimer,
 		cfg:        DefaultConfig(),
 	}
+	state.maxSealingSegmentLength = followerState.cfg.transactionExpiry
 	return followerState, nil
 }
 
@@ -97,13 +98,6 @@ func NewFullConsensusState(
 		receiptValidator: receiptValidator,
 		sealValidator:    sealValidator,
 	}, nil
-}
-
-// sealingSegmentMaxLength overrides sealing segment max length to use transaction expiry
-//
-//nolint:unused
-func (m *FollowerState) sealingSegmentMaxLength() uint64 {
-	return m.cfg.transactionExpiry
 }
 
 // Extend extends the protocol state of a CONSENSUS FOLLOWER. While it checks
