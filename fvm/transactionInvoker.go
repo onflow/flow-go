@@ -454,18 +454,14 @@ func (executor *transactionExecutor) commit(
 	}
 
 	// if tx failed this will only contain fee deduction logs
-	executor.proc.Logs = append(executor.proc.Logs, executor.env.Logs()...)
-	executor.proc.ComputationUsed += executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate += executor.env.MemoryEstimate()
-	if executor.proc.IsSampled() {
-		executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
-	}
+	executor.proc.Logs = executor.env.Logs()
+	executor.proc.ComputationUsed = executor.env.ComputationUsed()
+	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
+	executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
 
 	// if tx failed this will only contain fee deduction events
-	executor.proc.Events = append(executor.proc.Events, executor.env.Events()...)
-	executor.proc.ServiceEvents = append(
-		executor.proc.ServiceEvents,
-		executor.env.ServiceEvents()...)
+	executor.proc.Events = executor.env.Events()
+	executor.proc.ServiceEvents = executor.env.ServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
