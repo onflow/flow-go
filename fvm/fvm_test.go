@@ -2100,3 +2100,59 @@ func TestInteractionLimit(t *testing.T) {
 		)
 	}
 }
+
+func TestAuthAccountLinking(t *testing.T) {
+	t.Parallel()
+
+	t.Run("script",
+		newVMTest().run(func(
+			t *testing.T,
+			vm *fvm.VirtualMachine,
+			chain flow.Chain,
+			ctx fvm.Context,
+			view state.View,
+			derivedBlockData *derived.DerivedBlockData,
+		) {
+			script := fvm.Script([]byte(`
+				pub fun foo(signer: AuthAccount) {
+					signer.linkAccount(/private/AuthAccountCapability)
+				}
+
+				pub fun main() {}
+			`))
+
+			err := vm.Run(ctx, script, view)
+			assert.NoError(t, err)
+		}),
+	)
+
+	t.Run("transaction",
+		newVMTest().withContextOptions(
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		).run(func(
+			t *testing.T,
+			vm *fvm.VirtualMachine,
+			chain flow.Chain,
+			ctx fvm.Context,
+			view state.View,
+			derivedBlockData *derived.DerivedBlockData,
+		) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+						prepare(signer: AuthAccount) {
+							signer.linkAccount(/private/AuthAccountCapability)
+						}
+					}
+                `)).
+				AddAuthorizer(chain.ServiceAddress())
+
+			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+
+			err := vm.Run(ctx, tx, view)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+		}),
+	)
+}
