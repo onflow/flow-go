@@ -247,7 +247,7 @@ var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, sign
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	return bytes.Compare(s, identityBLSSignature) == 0
+	return bytes.Equal(s, identityBLSSignature)
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12-381 curve.
