@@ -98,6 +98,11 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 	}
 	f.updateFromBlockHeader(*hdr)
 
+	f.logger.Debug().
+		Uint64("height", f.height).
+		Hex("blockID", f.blockID.Bytes()).
+		Msg("initialized follower")
+
 	go f.run()
 
 	return f, nil

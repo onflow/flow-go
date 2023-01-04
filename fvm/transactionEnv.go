@@ -18,12 +18,13 @@ func NewTransactionEnvironment(
 	txIndex uint32,
 	traceSpan otelTrace.Span,
 ) environment.Environment {
-	ctx.RootSpan = traceSpan
+	ctx.Span = traceSpan
 	ctx.TxIndex = txIndex
 	ctx.TxId = tx.ID()
 	ctx.TxBody = tx
 
 	return environment.NewTransactionEnvironment(
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
