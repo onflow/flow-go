@@ -24,17 +24,23 @@ type signatureType struct {
 	aggregateWeights map[flow.Address]int
 }
 
-type signatureEntry struct {
+type signatureEntryData struct {
 	flow.TransactionSignature
 
 	signatureType
+}
+
+type signatureEntry struct {
+	signatureEntryData
 
 	accountKey flow.AccountPublicKey
+
+	verified bool
 
 	verifyErr errors.CodedError
 }
 
-func (entry *signatureEntry) newError(err error) errors.CodedError {
+func (entry *signatureEntryData) newError(err error) errors.CodedError {
 	return entry.errorBuilder(entry.TransactionSignature, err)
 }
 
@@ -46,17 +52,24 @@ func (entry *signatureEntry) matches(
 }
 
 func (entry *signatureEntry) verify() errors.CodedError {
+	if entry.verified {
+		return entry.verifyErr
+	}
+
 	valid, err := crypto.VerifySignatureFromTransaction(
 		entry.Signature,
 		entry.message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
 	)
+
 	if err != nil {
 		entry.verifyErr = entry.newError(err)
 	} else if !valid {
 		entry.verifyErr = entry.newError(fmt.Errorf("signature is not valid"))
 	}
+
+	entry.verified = true
 
 	return entry.verifyErr
 }
@@ -67,7 +80,7 @@ func newSignatureEntries(
 	envelopeSignatures []flow.TransactionSignature,
 	envelopeMessage []byte,
 ) (
-	[]*signatureEntry,
+	[]*signatureEntryData,
 	map[flow.Address]int,
 	map[flow.Address]int,
 	error,
@@ -100,7 +113,7 @@ func newSignatureEntries(
 	}
 
 	numSignatures := len(payloadSignatures) + len(envelopeSignatures)
-	signatures := make([]*signatureEntry, 0, numSignatures)
+	signatures := make([]*signatureEntryData, 0, numSignatures)
 
 	type uniqueKey struct {
 		address flow.Address
@@ -110,7 +123,7 @@ func newSignatureEntries(
 
 	for _, group := range list {
 		for _, signature := range group.signatures {
-			entry := &signatureEntry{
+			entryData := &signatureEntryData{
 				TransactionSignature: signature,
 				signatureType:        group.signatureType,
 			}
@@ -122,11 +135,11 @@ func newSignatureEntries(
 
 			_, ok := duplicate[key]
 			if ok {
-				return nil, nil, nil, entry.newError(
+				return nil, nil, nil, entryData.newError(
 					fmt.Errorf("duplicate signatures are provided for the same key"))
 			}
 			duplicate[key] = struct{}{}
-			signatures = append(signatures, entry)
+			signatures = append(signatures, entryData)
 		}
 	}
 
@@ -162,6 +175,12 @@ func (v *TransactionVerifier) CheckAuthorization(
 	return nil
 }
 
+// verifyTransaction verifies the transaction from the given procedure,
+// and check the Authorizers have enough weights
+// it returns:
+// - nil, if all checks are passed
+// - errors.CodedError, if the transaction did pass certain check
+// - other error would be exceptions
 func (v *TransactionVerifier) verifyTransaction(
 	tracer module.Tracer,
 	proc *TransactionProcedure,
@@ -179,7 +198,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		return errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 	}
 
-	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(
+	signaturesData, payloadWeights, envelopeWeights, err := newSignatureEntries(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.EnvelopeSignatures,
@@ -198,7 +217,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		return nil
 	}
 
-	err = v.getAccountKeys(txnState, accounts, signatures, tx.ProposalKey)
+	signatures, err := v.getAccountKeys(txnState, accounts, signaturesData, tx.ProposalKey)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
 	}
@@ -240,24 +259,32 @@ func (v *TransactionVerifier) verifyTransaction(
 func (v *TransactionVerifier) getAccountKeys(
 	txnState *state.TransactionState,
 	accounts environment.Accounts,
-	signatures []*signatureEntry,
+	signaturesData []*signatureEntryData,
 	proposalKey flow.ProposalKey,
-) error {
+) ([]*signatureEntry, error) {
 	foundProposalSignature := false
-	for _, signature := range signatures {
+	signatures := make([]*signatureEntry, 0, len(signaturesData))
+	for _, signatureData := range signaturesData {
 		accountKey, err := accounts.GetPublicKey(
-			signature.Address,
-			signature.KeyIndex)
+			signatureData.Address,
+			signatureData.KeyIndex)
 		if err != nil {
-			return signature.newError(err)
+			return nil, signatureData.newError(err)
 		}
 
 		if accountKey.Revoked {
-			return signature.newError(
+			return nil, signatureData.newError(
 				fmt.Errorf("account key has been revoked"))
 		}
 
-		signature.accountKey = accountKey
+		signature := signatureEntry{
+			signatureEntryData: *signatureData,
+			accountKey:         accountKey,
+			verified:           false,
+			verifyErr:          nil,
+		}
+
+		signatures = append(signatures, &signature)
 
 		if !foundProposalSignature && signature.matches(proposalKey) {
 			foundProposalSignature = true
@@ -265,14 +292,19 @@ func (v *TransactionVerifier) getAccountKeys(
 	}
 
 	if !foundProposalSignature {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"either the payload or the envelope should provide proposal " +
 				"signatures")
 	}
 
-	return nil
+	return signatures, nil
 }
 
+// verifyAccountSignatures verifies the given signatures concurrently, and returns
+//   - nil, if all signatures are valid
+//   - errors.CodedError if at least one signature is invalid, the returned error is
+//     for the first invalid signature in order to ensure output to be deterministic
+//   - other error would be exceptions
 func (v *TransactionVerifier) verifyAccountSignatures(
 	signatures []*signatureEntry,
 ) error {
@@ -324,6 +356,10 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 	foundError := false
 	for i := 0; i < len(signatures); i++ {
 		entry := <-verifiedChan
+		if !entry.verified {
+			// this would be a software bug
+			return fmt.Errorf("fatal error: expected the signature to be verified, but not")
+		}
 
 		if entry.verifyErr != nil {
 			// Unfortunately, we cannot return the first error we received
