@@ -28,24 +28,44 @@ type signatureEntry struct {
 	flow.TransactionSignature
 
 	signatureType
-
-	accountKey flow.AccountPublicKey
-
-	verifyErr errors.CodedError
 }
 
-func (entry *signatureEntry) newError(err error) errors.CodedError {
+// signatureContinatuion is an internal/helper struct, accessible only by
+// TransactionVerifier, used to keep track of the signature verification
+// continuation state.
+type signatureContinuation struct {
+	// signatureEntry is the initial input.
+	signatureEntry
+
+	// accountKey is set by getAccountKeys().
+	accountKey flow.AccountPublicKey
+
+	// invokedVerify and verifyErr are set by verifyAccountSignatures().  Note
+	// that	verifyAccountSignatures() is always called after getAccountKeys()
+	// (i.e., accountKey is always initialized by the time
+	// verifyAccountSignatures is called).
+	invokedVerify bool
+	verifyErr     errors.CodedError
+}
+
+func (entry *signatureContinuation) newError(err error) errors.CodedError {
 	return entry.errorBuilder(entry.TransactionSignature, err)
 }
 
-func (entry *signatureEntry) matches(
+func (entry *signatureContinuation) matches(
 	proposalKey flow.ProposalKey,
 ) bool {
 	return entry.Address == proposalKey.Address &&
 		entry.KeyIndex == proposalKey.KeyIndex
 }
 
-func (entry *signatureEntry) verify() errors.CodedError {
+func (entry *signatureContinuation) verify() errors.CodedError {
+	if entry.invokedVerify {
+		return entry.verifyErr
+	}
+
+	entry.invokedVerify = true
+
 	valid, err := crypto.VerifySignatureFromTransaction(
 		entry.Signature,
 		entry.message,
@@ -67,7 +87,7 @@ func newSignatureEntries(
 	envelopeSignatures []flow.TransactionSignature,
 	envelopeMessage []byte,
 ) (
-	[]*signatureEntry,
+	[]*signatureContinuation,
 	map[flow.Address]int,
 	map[flow.Address]int,
 	error,
@@ -100,7 +120,7 @@ func newSignatureEntries(
 	}
 
 	numSignatures := len(payloadSignatures) + len(envelopeSignatures)
-	signatures := make([]*signatureEntry, 0, numSignatures)
+	signatures := make([]*signatureContinuation, 0, numSignatures)
 
 	type uniqueKey struct {
 		address flow.Address
@@ -110,9 +130,11 @@ func newSignatureEntries(
 
 	for _, group := range list {
 		for _, signature := range group.signatures {
-			entry := &signatureEntry{
-				TransactionSignature: signature,
-				signatureType:        group.signatureType,
+			entry := &signatureContinuation{
+				signatureEntry: signatureEntry{
+					TransactionSignature: signature,
+					signatureType:        group.signatureType,
+				},
 			}
 
 			key := uniqueKey{
@@ -162,6 +184,8 @@ func (v *TransactionVerifier) CheckAuthorization(
 	return nil
 }
 
+// verifyTransaction verifies the transaction from the given procedure,
+// and check the Authorizers have enough weights.
 func (v *TransactionVerifier) verifyTransaction(
 	tracer module.Tracer,
 	proc *TransactionProcedure,
@@ -237,10 +261,12 @@ func (v *TransactionVerifier) verifyTransaction(
 	return nil
 }
 
+// getAccountKeys gets the signatures' account keys and populate the account
+// keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
 	txnState *state.TransactionState,
 	accounts environment.Accounts,
-	signatures []*signatureEntry,
+	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,
 ) error {
 	foundProposalSignature := false
@@ -273,11 +299,13 @@ func (v *TransactionVerifier) getAccountKeys(
 	return nil
 }
 
+// verifyAccountSignatures verifies the given signature continuations and
+// aggregate the valid signatures' weights.
 func (v *TransactionVerifier) verifyAccountSignatures(
-	signatures []*signatureEntry,
+	signatures []*signatureContinuation,
 ) error {
-	toVerifyChan := make(chan *signatureEntry, len(signatures))
-	verifiedChan := make(chan *signatureEntry, len(signatures))
+	toVerifyChan := make(chan *signatureContinuation, len(signatures))
+	verifiedChan := make(chan *signatureContinuation, len(signatures))
 
 	verificationConcurrency := v.VerificationConcurrency
 	if len(signatures) < verificationConcurrency {
@@ -324,6 +352,11 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 	foundError := false
 	for i := 0; i < len(signatures); i++ {
 		entry := <-verifiedChan
+
+		if !entry.invokedVerify {
+			// This is a programming error.
+			return fmt.Errorf("signatureContinuation.verify not called")
+		}
 
 		if entry.verifyErr != nil {
 			// Unfortunately, we cannot return the first error we received
