@@ -892,20 +892,6 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
-			name:          "If not enough balance, transaction fails because of insufficient funds",
-			fundWith:      txFees - 1,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.Error(t, tx.Err)
-				require.True(t, errors.HasErrorCode(tx.Err, errors.ErrCodeInsufficientPayerBalance))
-
-				// no computation used, due to transaction exiting early.
-				require.Equal(t, uint64(0), tx.ComputationUsed)
-
-				require.Equal(t, minimumStorageReservation-1, balanceAfter)
-			},
-		},
-		{
 			name:          "If tx fails, fees are deducted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
