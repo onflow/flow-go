@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -94,7 +95,7 @@ type accountCreator struct {
 
 	isServiceAccountEnabled bool
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	meter   Meter
 	metrics MetricsReporter
 
@@ -128,7 +129,7 @@ func NewAccountCreator(
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
 	systemContracts *SystemContracts,
@@ -262,7 +263,7 @@ func (creator *accountCreator) CreateAccount(
 	runtime.Address,
 	error,
 ) {
-	defer creator.tracer.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
+	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
 	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
 	if err != nil {

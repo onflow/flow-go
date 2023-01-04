@@ -411,15 +411,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
-		fnb.Metrics.Network,
 		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
-		mwOpts...,
-	)
+		mwOpts...)
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()

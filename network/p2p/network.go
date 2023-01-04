@@ -3,16 +3,15 @@ package p2p
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -22,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -32,8 +30,6 @@ const (
 	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
 	// for sake of deduplication.
 	DefaultReceiveCacheSize = 10e4
-	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
-	eventIDPackingPrefix = "libp2ppacking"
 )
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
@@ -62,7 +58,7 @@ type Network struct {
 	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
-	metrics                     module.NetworkMetrics
+	metrics                     module.NetworkCoreMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
@@ -107,7 +103,7 @@ type NetworkParameters struct {
 	MiddlewareFactory   func() (network.Middleware, error)
 	Topology            network.Topology
 	SubscriptionManager network.SubscriptionManager
-	Metrics             module.NetworkMetrics
+	Metrics             module.NetworkCoreMetrics
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
 	Options             []NetworkOptFunction
@@ -326,35 +322,37 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
-	err := n.processNetworkMessage(nodeID, msg, decodedMsgPayload)
+func (n *Network) Receive(msg *network.IncomingMessageScope) error {
+	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
+
+	err := n.processNetworkMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
+func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if !n.receiveCache.Add(message.EventID) {
+	if !n.receiveCache.Add(msg.EventID()) {
 		// drops duplicate message
 		n.logger.Debug().
-			Hex("sender_id", senderID[:]).
-			Hex("event_id", message.EventID).
-			Str("channel", message.ChannelID).
+			Hex("sender_id", logging.ID(msg.OriginId())).
+			Hex("event_id", msg.EventID()).
+			Str("channel", msg.Channel().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
+		n.metrics.DuplicateInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
 		return nil
 	}
 
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMsgPayload,
-		Size:     message.Size(),
-		Target:   channels.Channel(message.ChannelID),
-		SenderID: senderID,
+		Payload:  msg.DecodedPayload(),
+		Size:     msg.Size(),
+		Target:   msg.Channel(),
+		SenderID: msg.OriginId(),
 	}
 
 	// insert the message in the queue
@@ -366,52 +364,33 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	return nil
 }
 
-// genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
-	// encode the payload using the configured codec
-	payload, err := n.codec.Encode(event)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode event: %w", err)
-	}
-
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
-	//defer binstat.Leave(bs)
-
-	var emTargets [][]byte
-	for _, targetID := range targetIDs {
-		tempID := targetID // avoid capturing loop variable
-		emTargets = append(emTargets, tempID[:])
-	}
-
-	// cast event to a libp2p.Message
-	msg := &message.Message{
-		ChannelID: channel.String(),
-		TargetIDs: emTargets,
-		Payload:   payload,
-	}
-
-	return msg, nil
-}
-
 // UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
 	}
 
-	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetID)
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{targetID},
+		channel,
+		payload,
+		n.codec.Encode,
+		network.ProtocolTypeUnicast)
 	if err != nil {
-		return fmt.Errorf("unicast could not generate network message: %w", err)
+		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
-	err = n.mw.SendDirect(msg, targetID)
+	n.metrics.UnicastMessageSendingStarted(msg.Channel().String())
+	defer n.metrics.UnicastMessageSendingCompleted(msg.Channel().String())
+	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
+
+	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), network.ProtocolTypeUnicast.String(), msg.PayloadType())
 
 	return nil
 }
@@ -471,17 +450,19 @@ func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, t
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
+	msg, err := network.NewOutgoingScope(targetIDs, channel, message, n.codec.Encode, network.ProtocolTypePubSub)
 	if err != nil {
-		return fmt.Errorf("failed to generate network message for channel %s: %w", channel, err)
+		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg, channel)
+	err = n.mw.Publish(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
+
+	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), network.ProtocolTypePubSub.String(), msg.PayloadType())
 
 	return nil
 }
@@ -523,24 +504,4 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 func (n *Network) Topology() flow.IdentityList {
 	return n.topology.Fanout(n.Identities())
-}
-
-func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
-	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
-	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	return h.SumHash(), nil
-}
-
-func MessageType(decodedPayload interface{}) string {
-	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }

@@ -188,13 +188,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
 
-	var spockSecret []byte
-	var chFault chmodels.ChunkFault
-	if vc.IsSystemChunk {
-		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
-	} else {
-		spockSecret, chFault, err = e.chVerif.Verify(vc)
-	}
+	spockSecret, chFault, err := e.chVerif.Verify(vc)
 	span.End()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err

@@ -3,7 +3,7 @@ name: Flaky Test Debug
 on:
   push:
     branches:
-      - '**/*flaky-test*'
+      - '**/*flaky-test-debug*'
 env:
   GO_VERSION: 1.19
 
@@ -209,7 +209,7 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-flow
+        run: make docker-build-flow docker-build-flow-corrupt
       - name: Run tests
         if: github.actor != 'bors[bot]'
         run: VERBOSE=1 ${{ matrix.make }}
