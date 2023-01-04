@@ -90,7 +90,7 @@ func CorruptGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
 // from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt.RPC) error) p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
-		return NewCorruptPubSubAdapterConfigWithInspector(base, inspector)
+		return NewCorruptPubSubAdapterConfig(base, WithInspector(inspector))
 	}
 }
 

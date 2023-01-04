@@ -27,17 +27,23 @@ type CorruptPubSubAdapterConfig struct {
 
 var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 
-func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
-	return &CorruptPubSubAdapterConfig{
-		options: defaultCorruptPubsubOptions(base),
+func WithInspector(inspector func(peer.ID, *corrupt.RPC) error) func(config *CorruptPubSubAdapterConfig) {
+	return func(config *CorruptPubSubAdapterConfig) {
+		config.inspector = inspector
+		config.options = append(config.options, corrupt.WithAppSpecificRpcInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			return config.inspector(id, rpc)
+		}))
 	}
 }
 
-func NewCorruptPubSubAdapterConfigWithInspector(base *p2p.BasePubSubAdapterConfig, inspector func(peer.ID, *corrupt.RPC) error) *CorruptPubSubAdapterConfig {
-	return &CorruptPubSubAdapterConfig{
-		options:   defaultCorruptPubsubOptions(base),
-		inspector: inspector,
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...func(config *CorruptPubSubAdapterConfig)) *CorruptPubSubAdapterConfig {
+	cfg := &CorruptPubSubAdapterConfig{
+		options: defaultCorruptPubsubOptions(base),
 	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
 }
 
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
