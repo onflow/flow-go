@@ -25,9 +25,9 @@ type GossipSubRouterSpammer struct {
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
 func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
-	spammerNode, atomicRouter := createSpammerNode(t, sporkId, flow.RoleConsensus)
+	spammerNode, router := createSpammerNode(t, sporkId, flow.RoleConsensus)
 	return &GossipSubRouterSpammer{
-		router:      atomicRouter,
+		router:      router,
 		SpammerNode: spammerNode,
 	}
 }
