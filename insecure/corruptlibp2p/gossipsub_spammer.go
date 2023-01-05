@@ -25,7 +25,7 @@ type GossipSubRouterSpammer struct {
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
 func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
-	spammerNode, atomicRouter := getSpammerNode(t, sporkId)
+	spammerNode, atomicRouter := getSpammerNode(t, sporkId, flow.RoleConsensus)
 	return &GossipSubRouterSpammer{
 		atomicRouter: atomicRouter,
 		SpammerNode:  spammerNode,
@@ -65,13 +65,13 @@ func (s *GossipSubRouterSpammer) WaitUntilInitialized(t *testing.T) {
 	s.atomicRouter.set(s.atomicRouter.Get())
 }
 
-func getSpammerNode(t *testing.T, sporkId flow.Identifier) (p2p.LibP2PNode, *atomicRouter) {
+func getSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
 	router := newAtomicRouter()
 	spammerNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 			require.NotNil(t, r)
 			router.set(r)
