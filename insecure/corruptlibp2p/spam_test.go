@@ -29,8 +29,9 @@ import (
 func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
+	role := flow.RoleConsensus
 
-	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId)
+	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
@@ -40,7 +41,7 @@ func TestSpam_IHave(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
-		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				iHaves := rpc.GetControl().GetIhave()
