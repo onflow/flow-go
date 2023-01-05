@@ -42,7 +42,7 @@ func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, 
 }
 
 // GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
-// to receive them before they are sent by the spammer.
+// to expect receiving them before they are sent by the spammer.
 func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
 	var iHaveCtlMsgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
