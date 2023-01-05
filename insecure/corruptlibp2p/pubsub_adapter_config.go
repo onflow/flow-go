@@ -75,11 +75,11 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 }
 
 func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
-	// Corrupt does not support score options. This is a no-op.
+	// CorruptPubSub does not support score options. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ func(peer.ID, *pubsub.RPC) error) {
-	// Corrupt does not support app specific rpc inspectors. This is a no-op.
+	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
