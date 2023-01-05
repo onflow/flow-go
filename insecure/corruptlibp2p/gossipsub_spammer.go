@@ -19,16 +19,16 @@ import (
 // GossipSubRouterSpammer is a wrapper around the GossipSubRouter that allows us to
 // spam the victim with junk control messages.
 type GossipSubRouterSpammer struct {
-	atomicRouter *atomicRouter
-	SpammerNode  p2p.LibP2PNode
+	router      *atomicRouter
+	SpammerNode p2p.LibP2PNode
 }
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
 func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSubRouterSpammer {
 	spammerNode, atomicRouter := createSpammerNode(t, sporkId, flow.RoleConsensus)
 	return &GossipSubRouterSpammer{
-		atomicRouter: atomicRouter,
-		SpammerNode:  spammerNode,
+		router:      atomicRouter,
+		SpammerNode: spammerNode,
 	}
 }
 
@@ -36,7 +36,7 @@ func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSub
 // ctlMessages is the list of spam messages to send to the victim node.
 func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.atomicRouter.Get().SendControl(victim.Host().ID(), &ctlMessage))
+		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage))
 	}
 }
 
@@ -59,9 +59,9 @@ func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.
-		return s.atomicRouter.Get() != nil
+		return s.router.Get() != nil
 	}, 1*time.Second, 100*time.Millisecond, "spammer router not set")
-	s.atomicRouter.set(s.atomicRouter.Get())
+	s.router.set(s.router.Get())
 }
 
 func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
