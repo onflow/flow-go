@@ -97,7 +97,7 @@ func newAtomicRouter() *atomicRouter {
 	}
 }
 
-// SetRouter sets the router if it has never been set.
+// SetRouter sets the router if it has never been set. Returns true if the router was set, false otherwise.
 func (a *atomicRouter) set(router *corrupt.GossipSubRouter) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
