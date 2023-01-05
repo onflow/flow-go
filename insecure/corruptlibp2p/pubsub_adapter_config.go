@@ -83,12 +83,6 @@ func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ func(peer.ID,
 }
 
 func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
-	if c.inspector != nil {
-		c.options = append(c.options, corrupt.WithAppSpecificRpcInspector(func(id peer.ID, rpc *corrupt.RPC) error {
-			return c.inspector(id, rpc)
-		}))
-	}
-
 	c.options = append(c.options, corrupt.WithMessageIdFn(func(pmsg *pb.Message) string {
 		return f(pmsg.Data)
 	}))
