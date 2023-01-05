@@ -3,7 +3,6 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -213,7 +212,7 @@ type ChunkVerifierMock struct {
 
 func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
 	if vc.IsSystemChunk {
-		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
+		return nil, nil, nil
 	}
 
 	switch vc.Chunk.Index {
@@ -247,11 +246,4 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte,
 		return nil, nil, nil
 	}
 
-}
-
-func (v ChunkVerifierMock) SystemChunkVerify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
-	if !vc.IsSystemChunk {
-		return nil, nil, fmt.Errorf("wrong method invoked for verifying non-system chunk")
-	}
-	return nil, nil, nil
 }

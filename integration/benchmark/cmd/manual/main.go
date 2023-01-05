@@ -29,6 +29,10 @@ type LoadCase struct {
 	duration time.Duration
 }
 
+const (
+	defaultMaxMsgSize = 1024 * 1024 * 16 // 16 MB
+)
+
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
@@ -86,7 +90,14 @@ func main() {
 	accessNodeAddrs := strings.Split(*accessNodes, ",")
 	clients := make([]access.Client, 0, len(accessNodeAddrs))
 	for _, addr := range accessNodeAddrs {
-		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		client, err := client.NewClient(
+			addr,
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
 		}

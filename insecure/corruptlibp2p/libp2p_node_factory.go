@@ -27,7 +27,7 @@ func NewCorruptLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
@@ -35,7 +35,9 @@ func NewCorruptLibP2PNodeFactory(
 	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
-	topicValidatorDisabled bool,
+	topicValidatorDisabled,
+	withMessageSigning,
+	withStrictSignatureVerification bool,
 ) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		if chainID != flow.BftTestnet {
@@ -60,7 +62,8 @@ func NewCorruptLibP2PNodeFactory(
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}
-		overrideWithCorruptGossipSub(builder)
+
+		overrideWithCorruptGossipSub(builder, WithMessageSigning(withMessageSigning), WithStrictSignatureVerification(withStrictSignatureVerification))
 		return builder.Build()
 	}
 }
@@ -80,9 +83,9 @@ func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2pbu
 
 // CorruptGossipSubConfigFactory returns a factory function that creates a new instance of the forked gossipsub config
 // from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
-func CorruptGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
+func CorruptGossipSubConfigFactory(opts ...CorruptPubSubAdapterConfigOption) p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
-		return NewCorruptPubSubAdapterConfig(base)
+		return NewCorruptPubSubAdapterConfig(base, opts...)
 	}
 }
 
@@ -94,7 +97,7 @@ func CorruptGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt
 	}
 }
 
-func overrideWithCorruptGossipSub(builder p2pbuilder.NodeBuilder) {
+func overrideWithCorruptGossipSub(builder p2pbuilder.NodeBuilder, opts ...CorruptPubSubAdapterConfigOption) {
 	factory := CorruptGossipSubFactory()
-	builder.SetGossipSubFactory(factory, CorruptGossipSubConfigFactory())
+	builder.SetGossipSubFactory(factory, CorruptGossipSubConfigFactory(opts...))
 }

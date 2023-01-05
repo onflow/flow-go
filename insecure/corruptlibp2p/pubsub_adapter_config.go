@@ -21,8 +21,26 @@ import (
 // implementation, it is designed to be completely isolated in the "insecure" package, and
 // totally separated from the rest of the codebase.
 type CorruptPubSubAdapterConfig struct {
-	options   []corrupt.Option
-	inspector func(peer.ID, *corrupt.RPC) error
+	options                         []corrupt.Option
+	inspector                       func(peer.ID, *corrupt.RPC) error
+	withMessageSigning              bool
+	withStrictSignatureVerification bool
+}
+
+type CorruptPubSubAdapterConfigOption func(config *CorruptPubSubAdapterConfig)
+
+// WithMessageSigning overrides the libp2p node message signing option. This option can be used to enable or disable message signing.
+func WithMessageSigning(withMessageSigning bool) CorruptPubSubAdapterConfigOption {
+	return func(config *CorruptPubSubAdapterConfig) {
+		config.withMessageSigning = withMessageSigning
+	}
+}
+
+// WithStrictSignatureVerification overrides the libp2p node message signature verification option. This option can be used to enable or disable message signature verification.
+func WithStrictSignatureVerification(withStrictSignatureVerification bool) CorruptPubSubAdapterConfigOption {
+	return func(config *CorruptPubSubAdapterConfig) {
+		config.withStrictSignatureVerification = withStrictSignatureVerification
+	}
 }
 
 var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
@@ -36,7 +54,7 @@ func WithInspector(inspector func(peer.ID, *corrupt.RPC) error) func(config *Cor
 	}
 }
 
-func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...func(config *CorruptPubSubAdapterConfig)) *CorruptPubSubAdapterConfig {
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...CorruptPubSubAdapterConfigOption) *CorruptPubSubAdapterConfig {
 	cfg := &CorruptPubSubAdapterConfig{
 		options: defaultCorruptPubsubOptions(base),
 	}
@@ -45,6 +63,8 @@ func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...fu
 	}
 	return cfg
 }
+
+//
 
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
 	c.options = append(c.options, corrupt.WithDiscovery(discoveryRouting.NewRoutingDiscovery(routing)))

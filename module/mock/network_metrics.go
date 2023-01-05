@@ -94,19 +94,19 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// DirectMessageFinished provides a mock function with given fields: topic
-func (_m *NetworkMetrics) DirectMessageFinished(topic string) {
-	_m.Called(topic)
-}
-
-// DirectMessageStarted provides a mock function with given fields: topic
-func (_m *NetworkMetrics) DirectMessageStarted(topic string) {
-	_m.Called(topic)
+// DuplicateInboundMessagesDropped provides a mock function with given fields: topic, _a1, messageType
+func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 string, messageType string) {
+	_m.Called(topic, _a1, messageType)
 }
 
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
+}
+
+// InboundMessageReceived provides a mock function with given fields: sizeBytes, topic, _a2, messageType
+func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, _a2 string, messageType string) {
+	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
 // MessageAdded provides a mock function with given fields: priority
@@ -127,21 +127,6 @@ func (_m *NetworkMetrics) MessageProcessingStarted(topic string) {
 // MessageRemoved provides a mock function with given fields: priority
 func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
-}
-
-// NetworkDuplicateMessagesDropped provides a mock function with given fields: topic, messageType
-func (_m *NetworkMetrics) NetworkDuplicateMessagesDropped(topic string, messageType string) {
-	_m.Called(topic, messageType)
-}
-
-// NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
-}
-
-// NetworkMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
 }
 
 // OnDNSCacheHit provides a mock function with given fields:
@@ -219,6 +204,11 @@ func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
+// OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, _a2, messageType
+func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, _a2 string, messageType string) {
+	_m.Called(sizeBytes, topic, _a2, messageType)
+}
+
 // QueueDuration provides a mock function with given fields: duration, priority
 func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
@@ -232,6 +222,16 @@ func (_m *NetworkMetrics) RoutingTablePeerAdded() {
 // RoutingTablePeerRemoved provides a mock function with given fields:
 func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
 	_m.Called()
+}
+
+// UnicastMessageSendingCompleted provides a mock function with given fields: topic
+func (_m *NetworkMetrics) UnicastMessageSendingCompleted(topic string) {
+	_m.Called(topic)
+}
+
+// UnicastMessageSendingStarted provides a mock function with given fields: topic
+func (_m *NetworkMetrics) UnicastMessageSendingStarted(topic string) {
+	_m.Called(topic)
 }
 
 type mockConstructorTestingTNewNetworkMetrics interface {

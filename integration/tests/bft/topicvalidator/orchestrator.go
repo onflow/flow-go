@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,7 +29,7 @@ const (
 	numOfUnauthorizedEvents = 10
 )
 
-// TopicValidatorAttackOrchestrator represents a simple TopicValidatorAttackOrchestrator that passes through all incoming events.
+// TopicValidatorAttackOrchestrator represents an insecure.AttackOrchestrator track incoming unauthorized messages and authorized messages received by victim nodes.
 type TopicValidatorAttackOrchestrator struct {
 	sync.Mutex
 	t                          *testing.T
@@ -170,7 +169,7 @@ func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
 			ChunkID: unittest.IdentifierFixture(),
 			Nonce:   rand.Uint64(),
 		}
-		eventID := o.getFlowProtocolEventID(channel, chunkDataReq)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataReq)
 		event := &insecure.EgressEvent{
 			CorruptOriginId:     o.victimVN,
 			Channel:             channel,
@@ -191,7 +190,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
 		unauthorizedProposal := unittest.ProposalFixture()
-		eventID := o.getFlowProtocolEventID(channel, unauthorizedProposal)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, unauthorizedProposal)
 		unauthorizedMsgByRole := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -214,7 +213,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n 
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := o.getFlowProtocolEventID(channel, syncReq)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
 		unauthorizedMsgOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -237,7 +236,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedUnicastOnChannelEvent
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := o.getFlowProtocolEventID(channel, syncReq)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
 		unauthorizedUnicastOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -257,7 +256,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 	channel := channels.ProvideChunks
 	for i := 0; i < n; i++ {
 		chunkDataResponse := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
-		eventID := o.getFlowProtocolEventID(channel, chunkDataResponse)
+		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataResponse)
 		unauthorizedPublishOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerEN,
 			Channel:             channel,
@@ -269,12 +268,4 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 		}
 		o.unauthorizedEvents[eventID] = unauthorizedPublishOnChannel
 	}
-}
-
-func (o *TopicValidatorAttackOrchestrator) getFlowProtocolEventID(channel channels.Channel, event interface{}) flow.Identifier {
-	payload, err := o.codec.Encode(event)
-	require.NoError(o.t, err)
-	eventIDHash, err := p2p.EventId(channel, payload)
-	require.NoError(o.t, err)
-	return flow.HashToID(eventIDHash)
 }

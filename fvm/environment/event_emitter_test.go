@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -158,7 +159,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		))
 
 	return environment.NewEventEmitter(
-		environment.NewTracer(environment.DefaultTracerParams()),
+		tracing.NewTracerSpan(),
 		environment.NewMeter(stTxn),
 		chain.Chain(),
 		environment.TransactionInfoParams{
