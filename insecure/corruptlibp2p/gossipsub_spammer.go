@@ -33,8 +33,7 @@ func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier) *GossipSub
 }
 
 // SpamIHave spams the victim with junk iHave messages.
-// msgCount is the number of iHave messages to send.
-// msgSize is the number of messageIDs to include in each iHave message.
+// ctlMessages is the list of spam messages to send to the victim node.
 func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
 		require.True(t, s.atomicRouter.Get().SendControl(victim.Host().ID(), &ctlMessage))
