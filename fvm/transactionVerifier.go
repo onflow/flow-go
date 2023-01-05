@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -167,7 +167,7 @@ type TransactionVerifier struct {
 }
 
 func (v *TransactionVerifier) CheckAuthorization(
-	tracer module.Tracer,
+	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	keyWeightThreshold int,
@@ -187,12 +187,12 @@ func (v *TransactionVerifier) CheckAuthorization(
 // verifyTransaction verifies the transaction from the given procedure,
 // and check the Authorizers have enough weights.
 func (v *TransactionVerifier) verifyTransaction(
-	tracer module.Tracer,
+	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 	keyWeightThreshold int,
 ) error {
-	span := proc.StartSpanFromProcTraceSpan(tracer, trace.FVMVerifyTransaction)
+	span := tracer.StartChildSpan(trace.FVMVerifyTransaction)
 	span.SetAttributes(
 		attribute.String("transaction.ID", proc.ID.String()),
 	)

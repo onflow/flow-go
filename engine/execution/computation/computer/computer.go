@@ -448,8 +448,11 @@ func (e *blockComputer) executeTransaction(
 	logger.Info().Msg("executing transaction in fvm")
 
 	proc := fvm.Transaction(txn.TransactionBody, txn.txIndex)
+
 	if isSampled {
-		proc.SetTraceSpan(txInternalSpan)
+		txn.ctx = fvm.NewContextFromParent(
+			txn.ctx,
+			fvm.WithSpan(txInternalSpan))
 	}
 
 	txView := collectionView.NewChild()
