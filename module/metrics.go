@@ -104,11 +104,11 @@ type NetworkInboundQueueMetrics interface {
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
 	// OutboundMessageSent collects metrics related to a message sent by the node.
-	OutboundMessageSent(sizeBytes int, topic string, messageType string)
+	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
-	InboundMessageReceived(sizeBytes int, topic string, messageType string)
+	InboundMessageReceived(sizeBytes int, topic string, protocol string, messageType string)
 	// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
-	DuplicateInboundMessagesDropped(topic string, messageType string)
+	DuplicateInboundMessagesDropped(topic string, protocol string, messageType string)
 	// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
 	UnicastMessageSendingStarted(topic string)
 	// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.

@@ -16,24 +16,24 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
-	github.com/onflow/cadence v0.30.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221214150253-cb74e7764c12
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221214150253-cb74e7764c12
+	github.com/onflow/cadence v0.31.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221216161720-c1b31d5a4722
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722
 	github.com/onflow/flow-emulator v0.38.1
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20221012204608-ed91c80fee2b
-	github.com/onflow/flow-go-sdk v0.30.1-0.20221219095751-2f3cf15caf98
-	github.com/onflow/flow-go/crypto v0.24.5-fvm
+	github.com/onflow/flow-go-sdk v0.31.0
+	github.com/onflow/flow-go/crypto v0.24.6
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221130185733-92eb85ead310
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.28.0
-	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.8.0
 	go.einride.tech/pid v0.1.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
@@ -237,6 +237,7 @@ require (
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
 	github.com/schollz/progressbar/v3 v3.8.3 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
+	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/shirou/gopsutil/v3 v3.22.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
@@ -277,7 +278,6 @@ require (
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/term v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect

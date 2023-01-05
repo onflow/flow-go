@@ -55,6 +55,7 @@ func main() {
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
 	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
+	adjustDelayFlag := flag.Duration("tps-adjust-delay", 120*time.Second, "delay before adjusting TPS")
 	statIntervalFlag := flag.Duration("stat-interval", defaultMetricCollectionInterval, "")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
@@ -118,7 +119,14 @@ func main() {
 		Stringer("flowTokenAddress", flowTokenAddress).
 		Msg("addresses")
 
-	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		accessNodeAddress,
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+			grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize Flow client")
 	}
@@ -186,6 +194,7 @@ func main() {
 		workerStatsTracker,
 
 		AdjusterParams{
+			Delay:       *adjustDelayFlag,
 			Interval:    *adjustIntervalFlag,
 			InitialTPS:  uint(*initialTPSFlag),
 			MinTPS:      uint(*minTPSFlag),

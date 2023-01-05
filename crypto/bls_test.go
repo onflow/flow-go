@@ -160,7 +160,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 
 	//  identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = identityBLSSignatureHeader
+	pkBytes[0] = infinityPointHeader
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 	require.NoError(t, err, "decoding identity public key should succeed")
 	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
@@ -1070,9 +1070,7 @@ func TestBLSIdentity(t *testing.T) {
 		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
 		// construct identity signature by summing (aggregating) a random signature and its inverse.
 
-		identitySig = make([]byte, signatureLengthBLSBLS12381)
-		identitySig[0] = identityBLSSignatureHeader
-		assert.True(t, IsBLSSignatureIdentity(identitySig))
+		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
 
 		// sum up a random signature and its inverse to get identity
 		seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)

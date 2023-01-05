@@ -229,7 +229,24 @@ func SetupMockConsensusNode(t *testing.T,
 				hasher,
 			)
 			assert.NoError(t, err)
-			assert.True(t, valid)
+
+			if !valid {
+				// When chunk verifier returns chunk fault, a placeholder
+				// signature is generated for that chunk.
+				isChunkFaultSignature, err := crypto.SPOCKVerifyAgainstData(
+					pk,
+					resultApproval.Body.Spock,
+					nil, // chunk fault has no spock secret
+					hasher,
+				)
+				assert.NoError(t, err)
+
+				if isChunkFaultSignature {
+					assert.Fail(t, "chunk verifier returned chunk fault")
+				} else {
+					assert.Fail(t, "spock secret mismatch")
+				}
+			}
 
 			wg.Done()
 		}).Return(nil)

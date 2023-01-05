@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -100,7 +101,7 @@ func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
 type transactionInfo struct {
 	params TransactionInfoParams
 
-	tracer *Tracer
+	tracer tracing.TracerSpan
 
 	authorizers                []runtime.Address
 	isServiceAccountAuthorizer bool
@@ -108,7 +109,7 @@ type transactionInfo struct {
 
 func NewTransactionInfo(
 	params TransactionInfoParams,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	serviceAccount flow.Address,
 ) TransactionInfo {
 
@@ -158,7 +159,7 @@ func (info *transactionInfo) IsServiceAccountAuthorizer() bool {
 }
 
 func (info *transactionInfo) GetSigningAccounts() ([]runtime.Address, error) {
-	defer info.tracer.StartExtensiveTracingSpanFromRoot(
+	defer info.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGetSigningAccounts).End()
 
 	return info.authorizers, nil

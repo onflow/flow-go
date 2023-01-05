@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -28,7 +29,7 @@ type DerivedTransactionData interface {
 // these nested transactions on Set calls in order to capture the states
 // needed for parsing the programs.
 type Programs struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	txnState *state.TransactionState
@@ -43,7 +44,7 @@ type Programs struct {
 
 // NewPrograms construts a new ProgramHandler
 func NewPrograms(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	txnState *state.TransactionState,
 	accounts Accounts,
@@ -133,7 +134,7 @@ func (programs *Programs) GetProgram(
 	*interpreter.Program,
 	error,
 ) {
-	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
+	defer programs.tracer.StartChildSpan(trace.FVMEnvGetProgram).End()
 
 	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
 	if err != nil {
@@ -161,7 +162,7 @@ func (programs *Programs) SetProgram(
 	location common.Location,
 	program *interpreter.Program,
 ) error {
-	defer programs.tracer.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
+	defer programs.tracer.StartChildSpan(trace.FVMEnvSetProgram).End()
 
 	err := programs.meter.MeterComputation(ComputationKindSetProgram, 1)
 	if err != nil {
@@ -182,7 +183,7 @@ func (programs *Programs) DecodeArgument(
 	cadence.Value,
 	error,
 ) {
-	defer programs.tracer.StartExtensiveTracingSpanFromRoot(
+	defer programs.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvDecodeArgument).End()
 
 	v, err := jsoncdc.Decode(programs.meter, bytes)

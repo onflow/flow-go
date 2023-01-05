@@ -14,6 +14,7 @@ type WorkerStats struct {
 	TxsSent                  int
 	TxsTimedout              int
 	TxsExecuted              int
+	TxsFailed                int
 	TxsSentMovingAverage     float64
 	TxsExecutedMovingAverage float64
 }
@@ -94,6 +95,13 @@ func (st *WorkerStatsTracker) IncTxExecuted() {
 	defer st.mux.Unlock()
 
 	st.stats.TxsExecuted++
+}
+
+func (st *WorkerStatsTracker) IncTxFailed() {
+	st.mux.Lock()
+	defer st.mux.Unlock()
+
+	st.stats.TxsFailed++
 }
 
 func (st *WorkerStatsTracker) AddWorkers(i int) {
