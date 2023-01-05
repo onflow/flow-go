@@ -55,7 +55,8 @@ func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount
 	return iHaveCtlMsgs
 }
 
-func (s *GossipSubRouterSpammer) WaitUntilInitialized(t *testing.T) {
+// Start starts the spammer and waits until it is fully initialized before returning.
+func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		// ensuring the spammer router has been initialized.
 		// this is needed because the router is initialized asynchronously.

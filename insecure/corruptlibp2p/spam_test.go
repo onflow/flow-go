@@ -62,7 +62,7 @@ func TestSpam_IHave(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 
-	gsrSpammer.WaitUntilInitialized(t)
+	gsrSpammer.Start(t)
 
 	// prior to the test we should ensure that spammer and victim connect.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
