@@ -94,6 +94,7 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 
 		// win have matching node as we have a check before
 		matchingNode := localNodeMap[registeredNode.NodeID]
+
 		// check node type and error if mismatch
 		if matchingNode.Role != registeredNode.Role {
 			log.Error().
@@ -104,16 +105,6 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 				Msg("node role does not match")
 		}
 
-		// check that weight matches
-		if matchingNode.Weight != registeredNode.Weight {
-			log.Error().
-				Str("node id", registeredNode.NodeID.String()).
-				Uint64("registered node weight", registeredNode.Weight).
-				Uint64("local node weight", matchingNode.Weight).
-				Msg("node weight does not match")
-		}
-
-		// check that network address matches
 		if matchingNode.Address != registeredNode.Address {
 			log.Error().
 				Str("registered node id", registeredNode.NodeID.String()).
@@ -121,6 +112,14 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 				Str("local node", matchingNode.NodeID.String()).
 				Str("local node address", matchingNode.Address).
 				Msg("node address does not match")
+		}
+
+		// check address match
+		if matchingNode.Address != registeredNode.Address {
+			log.Warn().
+				Str("registered node", registeredNode.NodeID.String()).
+				Str("node id", matchingNode.NodeID.String()).
+				Msg("address do not match")
 		}
 
 		// flow localNodes contain private key info
