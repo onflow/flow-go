@@ -222,7 +222,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	block := proposal.Block.ToInternal()
 	header := block.Header
 
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), header.ID(), trace.FollowerOnBlockProposal)
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), header.ID(), trace.FollowerOnBlockProposal)
 	defer span.End()
 
 	log := e.log.With().
