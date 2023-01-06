@@ -3,10 +3,8 @@
 package mockp2p
 
 import (
-	message "github.com/onflow/flow-go/network/message"
-	mock "github.com/stretchr/testify/mock"
-
 	p2p "github.com/onflow/flow-go/network/p2p"
+	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
@@ -16,13 +14,13 @@ type RateLimiter struct {
 	mock.Mock
 }
 
-// Allow provides a mock function with given fields: peerID, msg
-func (_m *RateLimiter) Allow(peerID peer.ID, msg *message.Message) bool {
-	ret := _m.Called(peerID, msg)
+// Allow provides a mock function with given fields: peerID, msgSize
+func (_m *RateLimiter) Allow(peerID peer.ID, msgSize int) bool {
+	ret := _m.Called(peerID, msgSize)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(peer.ID, *message.Message) bool); ok {
-		r0 = rf(peerID, msg)
+	if rf, ok := ret.Get(0).(func(peer.ID, int) bool); ok {
+		r0 = rf(peerID, msgSize)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 )
 
 const (
@@ -68,7 +67,7 @@ func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
 		return true
 	}
 
-	if !r.MessageRateLimiter.Allow(peerID, nil) {
+	if !r.MessageRateLimiter.Allow(peerID, 0) { // 0 is not used for message rate limiter. It is only used for bandwidth rate limiter.
 		r.onRateLimitedPeer(peerID, "", "", "", ReasonMessageCount)
 
 		// avoid rate limiting during dry run
@@ -80,13 +79,13 @@ func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
 
 // BandwidthAllowed will return result from BandWidthRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
 // callback each time a peer is not allowed.
-func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, role string, msg *message.Message) bool {
+func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, originRole string, msgSize int, msgType string, msgTopic channels.Topic) bool {
 	if r.BandWidthRateLimiter == nil {
 		return true
 	}
 
-	if !r.BandWidthRateLimiter.Allow(peerID, msg) {
-		r.onRateLimitedPeer(peerID, role, msg.Type, channels.Topic(msg.ChannelID), ReasonBandwidth)
+	if !r.BandWidthRateLimiter.Allow(peerID, msgSize) {
+		r.onRateLimitedPeer(peerID, originRole, msgType, msgTopic, ReasonBandwidth)
 
 		// avoid rate limiting during dry runs if disabled set to false
 		return r.disabled
@@ -96,7 +95,7 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, role string, msg *messag
 }
 
 // onRateLimitedPeer invokes the r.onRateLimitedPeer callback if it is not nil
-func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role, msgType string, topic channels.Topic, reason RateLimitReason) {
+func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role string, msgType string, topic channels.Topic, reason RateLimitReason) {
 	if r.OnRateLimitedPeer != nil {
 		r.OnRateLimitedPeer(peerID, role, msgType, topic, reason)
 	}
