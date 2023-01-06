@@ -399,7 +399,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.verifier)
 
-	weight := uint64(1000)
+	weight := uint64(flow.DefaultInitialWeight)
 
 	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
