@@ -6,6 +6,7 @@ const (
 	LabelProposer            = "proposer"
 	EngineLabel              = "engine"
 	LabelResource            = "resource"
+	LabelProtocol            = "protocol"
 	LabelMessage             = "message"
 	LabelNodeID              = "nodeid"
 	LabelNodeAddress         = "nodeaddress"

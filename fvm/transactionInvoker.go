@@ -81,17 +81,15 @@ func newTransactionExecutor(
 	txnState *state.TransactionState,
 	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
-	span := proc.StartSpanFromProcTraceSpan(
-		ctx.Tracer,
-		trace.FVMExecuteTransaction)
+	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	ctx.RootSpan = span
 	ctx.TxIndex = proc.TxIndex
 	ctx.TxId = proc.Transaction.ID()
 	ctx.TxBody = proc.Transaction
 
 	env := environment.NewTransactionEnvironment(
+		span,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
@@ -213,7 +211,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -226,7 +224,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState)
 		if err != nil {
@@ -286,6 +284,10 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 		}
 	}
 
+	// log the execution intensities here, so that they do not contain data
+	// from transaction fee deduction, because the payer is not charged for that.
+	executor.logExecutionIntensities()
+
 	executor.errs.Collect(executor.commit(invalidator))
 
 	return executor.errs.ErrorOrNil()
@@ -329,7 +331,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	for s, u := range executor.txnState.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
-	executor.env.Logger().Info().
+	executor.env.Logger().Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
@@ -394,10 +396,6 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// log the execution intensities here, so that they do not contain data
-	// from transaction fee deduction, because the payer is not charged for that.
-	executor.logExecutionIntensities()
-
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.deductTransactionFees()
 	})
@@ -454,18 +452,14 @@ func (executor *transactionExecutor) commit(
 	}
 
 	// if tx failed this will only contain fee deduction logs
-	executor.proc.Logs = append(executor.proc.Logs, executor.env.Logs()...)
-	executor.proc.ComputationUsed += executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate += executor.env.MemoryEstimate()
-	if executor.proc.IsSampled() {
-		executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
-	}
+	executor.proc.Logs = executor.env.Logs()
+	executor.proc.ComputationUsed = executor.env.ComputationUsed()
+	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
+	executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
 
 	// if tx failed this will only contain fee deduction events
-	executor.proc.Events = append(executor.proc.Events, executor.env.Events()...)
-	executor.proc.ServiceEvents = append(
-		executor.proc.ServiceEvents,
-		executor.env.ServiceEvents()...)
+	executor.proc.Events = executor.env.Events()
+	executor.proc.ServiceEvents = executor.env.ServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

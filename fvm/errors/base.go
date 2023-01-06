@@ -33,6 +33,10 @@ func NewInvalidArgumentErrorf(msg string, args ...interface{}) CodedError {
 		args...)
 }
 
+func IsInvalidArgumentError(err error) bool {
+	return HasErrorCode(err, ErrCodeInvalidArgumentError)
+}
+
 // NewInvalidLocationErrorf constructs a new CodedError which indicates an
 // invalid location is passed.
 func NewInvalidLocationErrorf(

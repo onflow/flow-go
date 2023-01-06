@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/slices"
 )
@@ -36,14 +37,14 @@ func (generator ParseRestrictedUUIDGenerator) GenerateUUID() (uint64, error) {
 }
 
 type uUIDGenerator struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	txnState *state.TransactionState
 }
 
 func NewUUIDGenerator(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	txnState *state.TransactionState,
 ) *uUIDGenerator {
@@ -85,7 +86,7 @@ func (generator *uUIDGenerator) setUUID(uuid uint64) error {
 
 // GenerateUUID generates a new uuid and persist the data changes into state
 func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
-	defer generator.tracer.StartExtensiveTracingSpanFromRoot(
+	defer generator.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGenerateUUID).End()
 
 	err := generator.meter.MeterComputation(

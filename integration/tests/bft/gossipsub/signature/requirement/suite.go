@@ -1,4 +1,4 @@
-package topicvalidator
+package requirement
 
 import (
 	"context"
@@ -17,8 +17,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Suite represents a test suite evaluating the correctness of different p2p topic validator
-// validation conditions.
+// Suite represents a test suite ensures libP2P signature verification works as expected.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger
@@ -27,12 +26,11 @@ type Suite struct {
 	net                     *testnet.FlowNetwork // used to keep an instance of testnet
 	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
-	attackerANID            flow.Identifier      // corrupt attacker AN id
-	attackerENID            flow.Identifier      // corrupt attacker EN id
-	victimENID              flow.Identifier      // corrupt victim EN id
-	victimVNID              flow.Identifier      // corrupt victim VN id
+	attackerVNIDNoSigning   flow.Identifier      // corrupt attacker EN id, this node has message signing disabled
+	attackerVNIDWithSigning flow.Identifier      // corrupt attacker EN id, this node has message signing enabled
+	victimENID              flow.Identifier      // corrupt attacker VN id
 	ghostID                 flow.Identifier      // represents id of ghost node
-	Orchestrator            *TopicValidatorAttackOrchestrator
+	Orchestrator            *SignatureValidationAttackOrchestrator
 	orchestratorNetwork     *orchestrator.Network
 }
 
@@ -44,23 +42,16 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return cli
 }
 
-// SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes
-// and 2 victim nodes.
-// - Corrupt AN that will serve as an attacker and send unauthorized messages to a victim EN.
-// - Corrupt EN that will serve as an attacker and send unauthorized messages to a victim VN.
-// - Corrupt EN with the topic validator enabled that will serve as a victim.
-// - Corrupt VN with the topic validator enabled that will serve as a victim.
+// SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes and 1 victim node.
+// - Corrupt VN with message signing disabled.
+// - Corrupt VN with message signing enabled.
+// - Corrupt EN that will serve as the victim node.
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
-	// create corrupt access node
-	s.attackerANID = unittest.IdentifierFixture()
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess,
-		testnet.WithID(s.attackerANID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted()))
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	blockRateFlag := "--block-rate-delay=1ms"
 
@@ -77,44 +68,38 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// create corrupt verification node with the topic validator enabled. This is the victim
-	// node that will be published unauthorized messages from the attacker execution node.
-	s.victimVNID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.victimVNID),
-		testnet.WithAdditionalFlag("--topic-validator-disabled=false"),
+	// generate 2 corrupt verification nodes
+	s.attackerVNIDNoSigning = unittest.IdentifierFixture()
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.attackerVNIDNoSigning),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+		// turn off message signing and signature verification using corrupt builder flags
+		testnet.WithAdditionalFlag("--pubsub-message-signing=false"),
+		testnet.WithAdditionalFlag("--pubsub-strict-sig-verification=false"),
+		testnet.AsCorrupted()))
 
-	// generates two execution nodes, 1 of them will be corrupt
-	s.attackerENID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.attackerENID),
+	s.attackerVNIDWithSigning = unittest.IdentifierFixture()
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.attackerVNIDWithSigning),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+		testnet.AsCorrupted()))
 
-	// create corrupt execution node with the topic validator enabled. This is the victim
-	// node that will be published unauthorized messages from the attacker execution node.
+	// generate 1 corrupt execution node
 	s.victimENID = unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.victimENID),
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag("--topic-validator-disabled=false"),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
+		testnet.AsCorrupted()))
+
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleExecution,
+		testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generates two collection node
-	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
-	)
-	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
+		testnet.WithAdditionalFlag(blockRateFlag)), testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
-	)
-	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
+		testnet.WithAdditionalFlag(blockRateFlag)))
 
 	// Ghost Node
 	// the ghost node's objective is to observe the messages exchanged on the
@@ -129,7 +114,7 @@ func (s *Suite) SetupSuite() {
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(
-		"bft_topic_validator_test",
+		"bft_signature_validation_test",
 		s.nodeConfigs,
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
@@ -145,7 +130,7 @@ func (s *Suite) SetupSuite() {
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
 
-	s.Orchestrator = NewOrchestrator(s.T(), s.log, s.attackerANID, s.attackerENID, s.victimENID, s.victimVNID)
+	s.Orchestrator = NewOrchestrator(s.T(), s.log, s.attackerVNIDNoSigning, s.attackerVNIDWithSigning, s.victimENID)
 
 	// start orchestrator network
 	codec := unittest.NetworkCodec()

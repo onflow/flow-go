@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -51,7 +52,7 @@ func DefaultProgramLoggerParams() ProgramLoggerParams {
 }
 
 type ProgramLogger struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 
 	ProgramLoggerParams
 
@@ -59,7 +60,7 @@ type ProgramLogger struct {
 }
 
 func NewProgramLogger(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	params ProgramLoggerParams,
 ) *ProgramLogger {
 	return &ProgramLogger{
@@ -79,7 +80,7 @@ func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
-	defer logger.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvProgramLog).End()
+	defer logger.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvProgramLog).End()
 
 	if logger.CadenceLoggingEnabled {
 		logger.logs = append(logger.logs, message)
@@ -95,7 +96,7 @@ func (logger *ProgramLogger) RecordTrace(operation string, location common.Locat
 	if location != nil {
 		attrs = append(attrs, attribute.String("location", location.String()))
 	}
-	logger.tracer.RecordSpanFromRoot(
+	logger.tracer.RecordChildSpan(
 		trace.FVMCadenceTrace.Child(operation),
 		duration,
 		attrs)

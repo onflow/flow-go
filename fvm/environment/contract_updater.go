@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -277,7 +278,7 @@ func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
 }
 
 type ContractUpdaterImpl struct {
-	tracer          *Tracer
+	tracer          tracing.TracerSpan
 	meter           Meter
 	accounts        Accounts
 	transactionInfo TransactionInfo
@@ -294,7 +295,7 @@ func NewContractUpdaterForTesting(
 	stubs ContractUpdaterStubs,
 ) *ContractUpdaterImpl {
 	updater := NewContractUpdater(
-		nil,
+		tracing.NewTracerSpan(),
 		nil,
 		accounts,
 		nil,
@@ -308,7 +309,7 @@ func NewContractUpdaterForTesting(
 }
 
 func NewContractUpdater(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 	transactionInfo TransactionInfo,
@@ -341,7 +342,7 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 	name string,
 	code []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(
+	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvUpdateAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
@@ -372,7 +373,7 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 	address runtime.Address,
 	name string,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(
+	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvRemoveAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
