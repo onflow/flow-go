@@ -68,7 +68,14 @@ type SealingSegment struct {
 	Blocks []*Block
 
 	// ExtraBlocks contain the chain extra blocks in ascending height order. These blocks
-	// are connecting to the Blocks[0](the lowest block of sealing segment)
+	// are connecting to `Blocks[0]` (the lowest block of sealing segment). Formally, let `l`
+	// be the length of `ExtraBlocks`, then ExtraBlocks[l-1] is the _parent_ of `Blocks[0]`.
+	// These extra blocks are included in order to ensure that a newly bootstrapped node
+	// knows about all entities which might be referenced by blocks which extend from
+	// the sealing segment.
+	// ExtraBlocks are stored separately from Blocks, because not all node roles need
+	// the same amount of history. Blocks represents the minimal possible required history;
+	// ExtraBlocks represents additional role-required history.
 	ExtraBlocks []*Block
 
 	// ExecutionResults contain any results which are referenced by receipts
