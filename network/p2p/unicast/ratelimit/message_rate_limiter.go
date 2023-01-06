@@ -7,7 +7,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
 )
@@ -43,7 +42,7 @@ func NewMessageRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Dur
 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
 // If a limiter is not cached for a peer one is created.
-func (s *MessageRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
+func (s *MessageRateLimiter) Allow(peerID peer.ID, _ int) bool {
 	limiter := s.getLimiter(peerID)
 	if !limiter.AllowN(s.now(), 1) {
 		s.limiters.UpdateLastRateLimit(peerID, s.now())

@@ -21,15 +21,42 @@ import (
 // implementation, it is designed to be completely isolated in the "insecure" package, and
 // totally separated from the rest of the codebase.
 type CorruptPubSubAdapterConfig struct {
-	options []corrupt.Option
+	options                         []corrupt.Option
+	withMessageSigning              bool
+	withStrictSignatureVerification bool
+}
+
+type CorruptPubSubAdapterConfigOption func(config *CorruptPubSubAdapterConfig)
+
+// WithMessageSigning overrides the libp2p node message signing option. This option can be used to enable or disable message signing.
+func WithMessageSigning(withMessageSigning bool) CorruptPubSubAdapterConfigOption {
+	return func(config *CorruptPubSubAdapterConfig) {
+		config.withMessageSigning = withMessageSigning
+	}
+}
+
+// WithStrictSignatureVerification overrides the libp2p node message signature verification option. This option can be used to enable or disable message signature verification.
+func WithStrictSignatureVerification(withStrictSignatureVerification bool) CorruptPubSubAdapterConfigOption {
+	return func(config *CorruptPubSubAdapterConfig) {
+		config.withStrictSignatureVerification = withStrictSignatureVerification
+	}
 }
 
 var _ p2p.PubSubAdapterConfig = (*CorruptPubSubAdapterConfig)(nil)
 
-func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig) *CorruptPubSubAdapterConfig {
-	return &CorruptPubSubAdapterConfig{
-		options: defaultCorruptPubsubOptions(base),
+func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...CorruptPubSubAdapterConfigOption) *CorruptPubSubAdapterConfig {
+	config := &CorruptPubSubAdapterConfig{
+		withMessageSigning:              true,
+		withStrictSignatureVerification: true,
 	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	config.options = defaultCorruptPubsubOptions(base, config.withMessageSigning, config.withStrictSignatureVerification)
+
+	return config
 }
 
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
@@ -58,10 +85,10 @@ func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }
 
-func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig) []corrupt.Option {
+func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig, withMessageSigning, withStrictSignatureVerification bool) []corrupt.Option {
 	return []corrupt.Option{
-		corrupt.WithMessageSigning(true),
-		corrupt.WithStrictSignatureVerification(true),
+		corrupt.WithMessageSigning(withMessageSigning),
+		corrupt.WithStrictSignatureVerification(withStrictSignatureVerification),
 		corrupt.WithMaxMessageSize(base.MaxMessageSize),
 	}
 }

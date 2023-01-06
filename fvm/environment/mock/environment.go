@@ -22,8 +22,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
 	sema "github.com/onflow/cadence/runtime/sema"
@@ -33,6 +31,8 @@ import (
 	time "time"
 
 	trace "github.com/onflow/flow-go/module/trace"
+
+	tracing "github.com/onflow/flow-go/fvm/tracing"
 
 	zerolog "github.com/rs/zerolog"
 )
@@ -1123,17 +1123,15 @@ func (_m *Environment) SigningAccounts() []common.Address {
 	return r0
 }
 
-// StartSpanFromRoot provides a mock function with given fields: name
-func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
+// StartChildSpan provides a mock function with given fields: name
+func (_m *Environment) StartChildSpan(name trace.SpanName) tracing.TracerSpan {
 	ret := _m.Called(name)
 
-	var r0 oteltrace.Span
-	if rf, ok := ret.Get(0).(func(trace.SpanName) oteltrace.Span); ok {
+	var r0 tracing.TracerSpan
+	if rf, ok := ret.Get(0).(func(trace.SpanName) tracing.TracerSpan); ok {
 		r0 = rf(name)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(oteltrace.Span)
-		}
+		r0 = ret.Get(0).(tracing.TracerSpan)
 	}
 
 	return r0

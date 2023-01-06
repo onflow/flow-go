@@ -139,6 +139,7 @@ func newScriptExecutor(
 		derivedTxnData: derivedTxnData,
 		env: environment.NewScriptEnvironment(
 			proc.RequestContext,
+			ctx.TracerSpan,
 			ctx.EnvironmentParams,
 			txnState,
 			derivedTxnData),

@@ -72,10 +72,8 @@ func (cr *ComputationResult) AddTransactionResult(
 
 	cr.TransactionResults = append(cr.TransactionResults, txnResult)
 
-	if txn.IsSampled() {
-		for computationKind, intensity := range txn.ComputationIntensities {
-			cr.ComputationIntensities[computationKind] += intensity
-		}
+	for computationKind, intensity := range txn.ComputationIntensities {
+		cr.ComputationIntensities[computationKind] += intensity
 	}
 }
 

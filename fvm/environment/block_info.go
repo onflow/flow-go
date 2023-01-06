@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -75,7 +76,7 @@ func DefaultBlockInfoParams() BlockInfoParams {
 }
 
 type blockInfo struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	blockHeader *flow.Header
@@ -83,7 +84,7 @@ type blockInfo struct {
 }
 
 func NewBlockInfo(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	blockHeader *flow.Header,
 	blocks Blocks,
@@ -98,7 +99,7 @@ func NewBlockInfo(
 
 // GetCurrentBlockHeight returns the current block height.
 func (info *blockInfo) GetCurrentBlockHeight() (uint64, error) {
-	defer info.tracer.StartExtensiveTracingSpanFromRoot(
+	defer info.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := info.meter.MeterComputation(
@@ -122,7 +123,7 @@ func (info *blockInfo) GetBlockAtHeight(
 	bool,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := info.meter.MeterComputation(
 		ComputationKindGetBlockAtHeight,
