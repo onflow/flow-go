@@ -42,6 +42,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"golang.org/x/crypto/hkdf"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -60,8 +62,12 @@ const (
 	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+	//
+	// keygen minimum seed length
 	KeyGenSeedMinLenBLSBLS12381 = 2 * (securityBits / 8)
+
+	// Hash to curve params
 	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
 	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
@@ -257,22 +263,57 @@ func IsBLSSignatureIdentity(s Signature) bool {
 //
 // The generated private key (resp. its corresponding public key) are guaranteed
 // not to be equal to the identity element of Z_r (resp. G2).
-func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	if len(seed) < KeyGenSeedMinLenBLSBLS12381 {
+func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
+	if len(ikm) < KeyGenSeedMinLenBLSBLS12381 {
 		return nil, invalidInputsErrorf(
 			"seed length should be at least %d bytes",
 			KeyGenSeedMinLenBLSBLS12381)
 	}
 
-	sk := newPrKeyBLSBLS12381(nil)
+	// HKDF parameters
 
-	// maps the seed to a private key
-	isZero := mapToZr(&sk.scalar, seed)
-	if isZero {
-		seed[0] ^= 1 // TODO: seed := H(seed)
-		return a.generatePrivateKey(seed)
+	// use SHA3-256 as the building block H in HKDF
+	// L is the size of H (32 bytes)
+	hashFunction := sha3.New256
+	hasher := hashFunction()
+	hashLen := hasher.Size()
+	// salt = H(UTF-8("BLS-SIG-KEYGEN-SALT-")) as per draft-irtf-cfrg-bls-signature-05 section 2.3.
+	// UTF-8 is used as a non-ambiguous encoding (TODO: swtich to ASCII for better compatibility with other implementations)
+	saltString := "BLS-SIG-KEYGEN-SALT-"
+	hasher.Write([]byte(saltString))
+	salt := make([]byte, hashLen)
+	hasher.Sum(salt[:0])
+
+	// HKDF secret = IKM || I2OSP(0, 1)
+	secret := append(ikm, byte(0))
+	// HKDF info = key_info || I2OSP(L, 2)
+	keyInfo := "" // use empty key diversifier
+	info := append([]byte(keyInfo), byte(hashLen>>8), byte(hashLen))
+
+	sk := newPrKeyBLSBLS12381(nil)
+	for true {
+		// instanciate HKDF and extract L bytes
+		reader := hkdf.New(hashFunction, secret, salt, info)
+		okm := make([]byte, hashLen)
+		n, err := reader.Read(okm)
+		if err != nil || n != hashLen {
+			return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
+				n, err)
+		}
+
+		// map the bytes to a private key : SK = OS2IP(OKM) mod r
+		isZero := mapToZr(&sk.scalar, okm)
+		if !isZero {
+			fmt.Println(sk)
+			return sk, nil
+		}
+
+		// update salt = H(salt)
+		hasher.Reset()
+		hasher.Write(salt)
+		salt = hasher.Sum(salt[:0])
 	}
-	return sk, nil
+	return nil, errors.New("key generation failed")
 }
 
 const invalidBLSSignatureHeader = byte(0xE0)

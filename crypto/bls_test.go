@@ -19,10 +19,10 @@ import (
 
 // TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
 func TestBLSMainMethods(t *testing.T) {
-	hasher := NewExpandMsgXOFKMAC128("test tag")
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, 0)
 	// test the consistency with different inputs
+	hasher := NewExpandMsgXOFKMAC128("test tag")
 	testGenSignVerify(t, BLSBLS12381, hasher)
 
 	// specific signature test for BLS:
@@ -51,7 +51,6 @@ func TestBLSMainMethods(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, valid)
 	})
-
 }
 
 // Signing bench
