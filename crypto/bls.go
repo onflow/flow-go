@@ -304,7 +304,6 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
 		isZero := mapToZr(&sk.scalar, okm)
 		if !isZero {
-			fmt.Println(sk)
 			return sk, nil
 		}
 
