@@ -273,36 +273,41 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 	// HKDF parameters
 
 	// use SHA3-256 as the building block H in HKDF
-	// L is the size of H (32 bytes)
 	hashFunction := sha3.New256
-	hasher := hashFunction()
-	hashLen := hasher.Size()
 	// salt = H(UTF-8("BLS-SIG-KEYGEN-SALT-")) as per draft-irtf-cfrg-bls-signature-05 section 2.3.
-	// UTF-8 is used as a non-ambiguous encoding (TODO: swtich to ASCII for better compatibility with other implementations)
+	// Note that UTF-8 is used as the non-ambiguous encoding, as it is the serialization method
+	// used by golang, although IETF draft uses ASCII.
+	// TODO: swtich to ASCII for better compatibility with other implementations
 	saltString := "BLS-SIG-KEYGEN-SALT-"
+	hasher := hashFunction()
 	hasher.Write([]byte(saltString))
-	salt := make([]byte, hashLen)
+	salt := make([]byte, hasher.Size())
 	hasher.Sum(salt[:0])
+
+	// L is the OKM length
+	// L = ceil((3 * ceil(log2(r))) / 16) which makes L  (security bits/8)-larger than r size
+	okmLength := (3 * PrKeyLenBLSBLS12381) / 2
 
 	// HKDF secret = IKM || I2OSP(0, 1)
 	secret := append(ikm, byte(0))
 	// HKDF info = key_info || I2OSP(L, 2)
 	keyInfo := "" // use empty key diversifier
-	info := append([]byte(keyInfo), byte(hashLen>>8), byte(hashLen))
+	info := append([]byte(keyInfo), byte(okmLength>>8), byte(okmLength))
 
 	sk := newPrKeyBLSBLS12381(nil)
 	for true {
 		// instanciate HKDF and extract L bytes
 		reader := hkdf.New(hashFunction, secret, salt, info)
-		okm := make([]byte, hashLen)
+		okm := make([]byte, okmLength)
 		n, err := reader.Read(okm)
-		if err != nil || n != hashLen {
+		if err != nil || n != okmLength {
 			return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
 				n, err)
 		}
 
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
 		isZero := mapToZr(&sk.scalar, okm)
+		fmt.Println(okmLength)
 		if !isZero {
 			return sk, nil
 		}
