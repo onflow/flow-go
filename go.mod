@@ -50,7 +50,6 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221201175637-3d2eab35722e
-	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-multiaddr v0.7.0
