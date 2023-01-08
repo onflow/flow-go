@@ -38,6 +38,7 @@ import "C"
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 
@@ -287,6 +288,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	// HKDF secret = IKM || I2OSP(0, 1)
 	secret := append(ikm, byte(0))
+	defer rand.Read(secret) // overwrite secret
 	// HKDF info = key_info || I2OSP(L, 2)
 	keyInfo := "" // use empty key diversifier
 	info := append([]byte(keyInfo), byte(okmLength>>8), byte(okmLength))
@@ -301,6 +303,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 			return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
 				n, err)
 		}
+		defer rand.Read(okm) // overwrite okm
 
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
 		isZero := mapToZr(&sk.scalar, okm)

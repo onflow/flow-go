@@ -220,6 +220,7 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 		return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
 			n, err)
 	}
+	defer rand.Read(okm) // overwrite okm
 
 	sk := goecdsaGenerateKey(a.curve, okm)
 	return &prKeyECDSA{

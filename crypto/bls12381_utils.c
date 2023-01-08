@@ -189,6 +189,7 @@ void bn_randZr_star(bn_t x) {
     byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
+    rand_bytes(seed, seed_len); // overwrite seed
 }
 
 // generates a random number less than the order r
@@ -208,7 +209,8 @@ int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
     bn_new(tmp);
     bn_new_size(tmp, BYTES_TO_DIGITS(len));
     bn_read_bin(tmp, bin, len);
-    bn_mod(a,tmp,&core_get()->ep_r);
+    bn_mod(a, tmp, &core_get()->ep_r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
     bn_free(tmp);
     if (bn_cmp_dig(a, 0) == RLC_EQ) {
         return VALID;
@@ -224,13 +226,14 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_new(tmp);
     bn_new_size(tmp, BYTES_TO_DIGITS(len));
     bn_read_bin(tmp, bin, len);
-    bn_t r;
-    bn_new(r); 
-    bn_sub_dig(r,&core_get()->ep_r,1);
-    bn_mod_basic(a,tmp,r);
+    bn_t r_1;
+    bn_new(r_1); 
+    bn_sub_dig(r_1, &core_get()->ep_r, 1);
+    bn_mod_basic(a,tmp,r_1);
     bn_add_dig(a,a,1);
-    bn_free(r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
     bn_free(tmp);
+    bn_free(r_1);
 }
 
 // returns the sign of y.
