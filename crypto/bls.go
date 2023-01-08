@@ -38,13 +38,13 @@ import "C"
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 const (
@@ -288,13 +288,13 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	// HKDF secret = IKM || I2OSP(0, 1)
 	secret := append(ikm, byte(0))
-	defer rand.Read(secret) // overwrite secret
+	defer overwrite(secret) // overwrite secret
 	// HKDF info = key_info || I2OSP(L, 2)
 	keyInfo := "" // use empty key diversifier
 	info := append([]byte(keyInfo), byte(okmLength>>8), byte(okmLength))
 
 	sk := newPrKeyBLSBLS12381(nil)
-	for true {
+	for {
 		// instanciate HKDF and extract L bytes
 		reader := hkdf.New(hashFunction, secret, salt, info)
 		okm := make([]byte, okmLength)
@@ -303,7 +303,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 			return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
 				n, err)
 		}
-		defer rand.Read(okm) // overwrite okm
+		defer overwrite(okm) // overwrite okm
 
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
 		isZero := mapToZr(&sk.scalar, okm)
@@ -316,7 +316,6 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 		hasher.Write(salt)
 		salt = hasher.Sum(salt[:0])
 	}
-	return nil, errors.New("key generation failed")
 }
 
 const invalidBLSSignatureHeader = byte(0xE0)
