@@ -63,9 +63,6 @@ const (
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
 	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
-	//
-	// keygen minimum seed length
-	KeyGenSeedMinLenBLSBLS12381 = 2 * (securityBits / 8)
 
 	// Hash to curve params
 	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
@@ -264,10 +261,10 @@ func IsBLSSignatureIdentity(s Signature) bool {
 // The generated private key (resp. its corresponding public key) are guaranteed
 // not to be equal to the identity element of Z_r (resp. G2).
 func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
-	if len(ikm) < KeyGenSeedMinLenBLSBLS12381 {
+	if len(ikm) < KeyGenSeedMinLen || len(ikm) > KeyGenSeedMaxLen {
 		return nil, invalidInputsErrorf(
-			"seed length should be at least %d bytes",
-			KeyGenSeedMinLenBLSBLS12381)
+			"seed length should be at least %d bytes and at most %d bytes",
+			KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	}
 
 	// HKDF parameters
@@ -307,7 +304,6 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
 		isZero := mapToZr(&sk.scalar, okm)
-		fmt.Println(okmLength)
 		if !isZero {
 			return sk, nil
 		}

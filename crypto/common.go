@@ -15,6 +15,12 @@ const (
 	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
 	securityBits = 128
 
+	// keygen seed length conditions
+	// enforce seed to be at least double the security bits and have enough entropy.
+	// it is still recommened that seed is generated using a secure RNG.
+	KeyGenSeedMinLen = 2 * (securityBits / 8)
+	KeyGenSeedMaxLen = KeyGenSeedMinLen + 1024
+
 	// max relic PRG seed length in bytes
 	maxRelicPrgSeed = 1 << 32
 )
