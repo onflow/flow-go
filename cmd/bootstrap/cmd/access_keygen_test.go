@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/pem"
-	golog "log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,8 +40,6 @@ func TestAccessKeyFileCreated(t *testing.T) {
 		flagCommonName = "unittest.onflow.org"
 		flagOutputKeyFile = filepath.Join(bootDir, "test-access-key.key")
 		flagOutputCertFile = filepath.Join(bootDir, "test-access-key.cert")
-
-		golog.Println(bootDir)
 
 		// run command with flags
 		accessKeyCmdRun(nil, nil)
