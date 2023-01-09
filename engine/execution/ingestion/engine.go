@@ -467,7 +467,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
+	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
@@ -872,7 +872,7 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 	collID := collection.ID()
 
-	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
+	span, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
 	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
