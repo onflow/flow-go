@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain) (*mux.Router, error) {
@@ -18,9 +19,9 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain) (*mu
 
 	// common middleware for all request
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
-	v1SubRouter.Use(middleware.MetricsMiddleware())
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
+	v1SubRouter.Use(metrics.MetricsMiddleware())
 
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 
