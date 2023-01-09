@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,10 +53,10 @@ func TestAccessKeyFileCreated(t *testing.T) {
 		require.FileExists(t, flagOutputCertFile)
 
 		// decode key and cert and make sure they match
-		keyData, err := io.ReadFile(flagOutputKeyFile)
+		keyData, err := os.ReadFile(flagOutputKeyFile)
 		require.NoError(t, err)
 
-		certData, err := io.ReadFile(flagOutputCertFile)
+		certData, err := os.ReadFile(flagOutputCertFile)
 		require.NoError(t, err)
 
 		privKey, cert := decodeKeys(t, keyData, certData)

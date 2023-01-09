@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 const certValidityPeriod = 100 * 365 * 24 * time.Hour // ~100 years
@@ -81,25 +81,25 @@ func accessKeyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Msgf("could not encode private key: %v", err)
 	}
 
-	err = io.WriteFile(flagOutputKeyFile, pem.EncodeToMemory(&pem.Block{
+	err = os.WriteFile(flagOutputKeyFile, pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: keyBytes,
-	}))
+	}), 0600)
 	if err != nil {
 		log.Fatal().Msgf("could not write private key: %v", err)
 	}
 
-	err = io.WriteFile(flagOutputCertFile, pem.EncodeToMemory(&pem.Block{
+	err = os.WriteFile(flagOutputCertFile, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Certificate[0],
-	}))
+	}), 0600)
 	if err != nil {
 		log.Fatal().Msgf("could not write certificate: %v", err)
 	}
 }
 
 func loadNetworkKey(nodeInfoPath string) (crypto.PrivateKey, error) {
-	data, err := io.ReadFile(nodeInfoPath)
+	data, err := os.ReadFile(nodeInfoPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read private node info (path=%s): %w", nodeInfoPath, err)
 	}
