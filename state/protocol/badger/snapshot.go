@@ -309,7 +309,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	// the highest sealed block is the first block above any extra blocks
-	highestSealedBlock, err := s.state.headers.ByBlockID(lowestBlockID)
+	lowestSealingSegmentBlock, err := s.state.headers.ByBlockID(lowestBlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query lowest sealing segment block: %w", err)
 	}
@@ -331,7 +331,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 			return nil
 		}
 
-		err = fork.TraverseBackward(s.state.headers, lowestSealingSegmentBlock.ParentID, extraBlocksScrapper, fork.IncludingHeight(limitHeight))
+		err = fork.TraverseBackward(s.state.headers, lowestSealingSegmentBlock.ParentID, extraBlocksScraper, fork.IncludingHeight(limitHeight))
 		if err != nil {
 			return nil, fmt.Errorf("could not traverse extra blocks for sealing segment: %w", err)
 		}

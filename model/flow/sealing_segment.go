@@ -236,10 +236,14 @@ type SealingSegmentBuilder struct {
 	extraBlocks []*Block
 }
 
-
 // AddBlock appends a block to the sealing segment under construction.
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+	// sanity check: all blocks have to be added before adding extra blocks
+	if len(builder.extraBlocks) > 0 {
+		return fmt.Errorf("cannot add sealing segment block after extra block is added")
+	}
+
 	// sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
 		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
