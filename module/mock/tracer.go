@@ -68,7 +68,7 @@ func (_m *Tracer) RecordSpanFromParent(parentSpan trace.Span, operationName modu
 }
 
 // StartBlockSpan provides a mock function with given fields: ctx, blockID, spanName, opts
-func (_m *Tracer) StartBlockSpan(ctx context.Context, blockID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context, bool) {
+func (_m *Tracer) StartBlockSpan(ctx context.Context, blockID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -96,18 +96,11 @@ func (_m *Tracer) StartBlockSpan(ctx context.Context, blockID flow.Identifier, s
 		}
 	}
 
-	var r2 bool
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, moduletrace.SpanName, ...trace.SpanStartOption) bool); ok {
-		r2 = rf(ctx, blockID, spanName, opts...)
-	} else {
-		r2 = ret.Get(2).(bool)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // StartCollectionSpan provides a mock function with given fields: ctx, collectionID, spanName, opts
-func (_m *Tracer) StartCollectionSpan(ctx context.Context, collectionID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context, bool) {
+func (_m *Tracer) StartCollectionSpan(ctx context.Context, collectionID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -135,14 +128,7 @@ func (_m *Tracer) StartCollectionSpan(ctx context.Context, collectionID flow.Ide
 		}
 	}
 
-	var r2 bool
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, moduletrace.SpanName, ...trace.SpanStartOption) bool); ok {
-		r2 = rf(ctx, collectionID, spanName, opts...)
-	} else {
-		r2 = ret.Get(2).(bool)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // StartSpanFromContext provides a mock function with given fields: ctx, operationName, opts
@@ -201,7 +187,7 @@ func (_m *Tracer) StartSpanFromParent(parentSpan trace.Span, operationName modul
 }
 
 // StartTransactionSpan provides a mock function with given fields: ctx, transactionID, spanName, opts
-func (_m *Tracer) StartTransactionSpan(ctx context.Context, transactionID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context, bool) {
+func (_m *Tracer) StartTransactionSpan(ctx context.Context, transactionID flow.Identifier, spanName moduletrace.SpanName, opts ...trace.SpanStartOption) (trace.Span, context.Context) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -229,14 +215,7 @@ func (_m *Tracer) StartTransactionSpan(ctx context.Context, transactionID flow.I
 		}
 	}
 
-	var r2 bool
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, moduletrace.SpanName, ...trace.SpanStartOption) bool); ok {
-		r2 = rf(ctx, transactionID, spanName, opts...)
-	} else {
-		r2 = ret.Get(2).(bool)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // WithSpanFromContext provides a mock function with given fields: ctx, operationName, f, opts

@@ -42,8 +42,11 @@ func (t *NoopTracer) StartBlockSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartCollectionSpan(
@@ -51,8 +54,11 @@ func (t *NoopTracer) StartCollectionSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartTransactionSpan(
@@ -60,15 +66,21 @@ func (t *NoopTracer) StartTransactionSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	return NoopSpan, ctx
 }
 
