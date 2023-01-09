@@ -74,7 +74,6 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	if err != nil {
 		return fmt.Errorf("internal error processing TO %v for view: %d: %w", timeout.ID(), timeout.View, err)
 	}
-	c.notifier.OnTimeoutProcessed(timeout)
 	return nil
 }
 
@@ -92,6 +91,8 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
+
+	c.notifier.OnTimeoutProcessed(timeout)
 
 	// In the following, we emit notifications about new QCs, if their view is newer than any QC previously
 	// known to the TimeoutCollector. Note that our implementation only provides weak ordering:
