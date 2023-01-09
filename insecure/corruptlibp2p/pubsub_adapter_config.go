@@ -55,16 +55,19 @@ func WithInspector(inspector func(peer.ID, *corrupt.RPC) error) func(config *Cor
 }
 
 func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...CorruptPubSubAdapterConfigOption) *CorruptPubSubAdapterConfig {
-	cfg := &CorruptPubSubAdapterConfig{
-		options: defaultCorruptPubsubOptions(base),
+	config := &CorruptPubSubAdapterConfig{
+		withMessageSigning:              true,
+		withStrictSignatureVerification: true,
 	}
-	for _, opt := range opts {
-		opt(cfg)
-	}
-	return cfg
-}
 
-//
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	config.options = defaultCorruptPubsubOptions(base, config.withMessageSigning, config.withStrictSignatureVerification)
+
+	return config
+}
 
 func (c *CorruptPubSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRouting) {
 	c.options = append(c.options, corrupt.WithDiscovery(discoveryRouting.NewRoutingDiscovery(routing)))
@@ -92,10 +95,10 @@ func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }
 
-func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig) []corrupt.Option {
+func defaultCorruptPubsubOptions(base *p2p.BasePubSubAdapterConfig, withMessageSigning, withStrictSignatureVerification bool) []corrupt.Option {
 	return []corrupt.Option{
-		corrupt.WithMessageSigning(true),
-		corrupt.WithStrictSignatureVerification(true),
+		corrupt.WithMessageSigning(withMessageSigning),
+		corrupt.WithStrictSignatureVerification(withStrictSignatureVerification),
 		corrupt.WithMaxMessageSize(base.MaxMessageSize),
 	}
 }
