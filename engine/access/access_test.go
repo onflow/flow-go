@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/google/go-cmp/cmp"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -362,11 +364,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
-			actual := *resp.Block
+			actual := resp.Block
 			expectedMessage, err := convert.BlockHeaderToMessage(header, suite.signerIds)
 			require.NoError(suite.T(), err)
-			require.Equal(suite.T(), *expectedMessage, actual)
-			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
+			require.Empty(suite.T(), cmp.Diff(expectedMessage, actual, protocmp.Transform()))
+			expectedBlockHeader, err := convert.MessageToBlockHeader(actual)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
@@ -484,7 +486,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
-			er := *resp.ExecutionResult
+			er := resp.ExecutionResult
 
 			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
 			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
