@@ -271,8 +271,8 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		limit = 0
 	}
 
-	if limit < m.sporkRootBlockHeight {
-		limit = m.sporkRootBlockHeight
+	if limit < m.rootSealingSegmentMinHeight {
+		limit = m.rootSealingSegmentMinHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
