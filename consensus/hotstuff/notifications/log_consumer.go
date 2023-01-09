@@ -145,12 +145,12 @@ func (lc *LogConsumer) OnVoteProcessed(vote *model.Vote) {
 		Hex("block_id", vote.BlockID[:]).
 		Uint64("block_view", vote.View).
 		Hex("recipient_id", vote.SignerID[:]).
-		Msg("processed HotStuff vote")
+		Msg("processed valid HotStuff vote")
 }
 
 func (lc *LogConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
 	log := timeout.LogContext(lc.log).Logger()
-	log.Debug().Msg("processed timeout object")
+	log.Debug().Msg("processed valid timeout object")
 }
 
 func (lc *LogConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {

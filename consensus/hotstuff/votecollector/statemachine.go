@@ -63,7 +63,7 @@ func NewStateMachine(
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
-		Str("hotstuff", "vote_collector").
+		Str("component", "hotstuff.vote_collector").
 		Uint64("view", view).
 		Logger()
 	sm := &VoteCollector{

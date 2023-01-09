@@ -36,7 +36,7 @@ func NewTimeoutCollector(log zerolog.Logger,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
 		log: log.With().
-			Str("hotstuff", "timeout_collector").
+			Str("component", "hotstuff.timeout_collector").
 			Uint64("view", view).
 			Logger(),
 		notifier:          notifier,

@@ -253,7 +253,7 @@ type PathHandler struct {
 // The PathHandler has no currently open path
 func NewPathHandler(log zerolog.Logger) *PathHandler {
 	return &PathHandler{
-		log:         log.With().Str("hotstuff", "telemetry").Logger(),
+		log:         log.With().Str("component", "hotstuff.telemetry").Logger(),
 		currentPath: nil,
 	}
 }

@@ -77,7 +77,7 @@ func NewTimeoutProcessor(log zerolog.Logger,
 	}
 	return &TimeoutProcessor{
 		log: log.With().
-			Str("hotstuff", "timeout_processor").
+			Str("component", "hotstuff.timeout_processor").
 			Uint64("view", view).
 			Logger(),
 		view:      view,
@@ -146,7 +146,6 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		// It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
 		return fmt.Errorf("adding signature to aggregator failed: %w", err)
 	}
-
 	p.log.Debug().Msgf("processed timeout, total weight=(%d), required=(%d)", totalWeight, p.tcTracker.minRequiredWeight)
 
 	if p.partialTCTracker.Track(totalWeight) {

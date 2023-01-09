@@ -147,7 +147,17 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTimeoutProcessed(timeout *model.TimeoutObject)
 
-	// OnCurrentViewDetails notifications are produced by EventHandler when proposing logic is triggered.
+	// OnCurrentViewDetails notifications are produced by the EventHandler during the course of a view with auxiliary information.
+	// These notifications are generally not produced for all views (for example skipped views).
+	// These notifications are guaranteed to be produced for all views we enter after fully processing a message.
+	// Example 1: 
+	//   - We are in view 8. We process a QC with view 10, causing us to enter view 11.
+	//   - Then this notification will be produced for view 11.
+	// Example 2: 
+	//   - We are in view 8. We process a proposal with view 10, which contains a TC for view 9 and TC.NewestQC for view 8.
+	//   - The QC would allow us to enter view 9 and the TC would allow us to enter view 10, 
+	//     so after fully processing the message we are in view 10.
+	//   - Then this notification will be produced for view 10, but not view 9
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).

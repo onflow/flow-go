@@ -160,7 +160,6 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 		Uint64("view", qc.View).
 		Hex("signers", qc.SignerIndices).
 		Msg("new QC has been created")
-
 	p.onQCCreated(qc)
 
 	return nil

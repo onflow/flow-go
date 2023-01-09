@@ -72,10 +72,8 @@ func (f *HotStuffFactory) CreateModules(
 	payloads storage.ClusterPayloads,
 	updater module.Finalizer,
 ) (*consensus.HotstuffModules, module.HotstuffMetrics, error) {
-
-	log := f.createLogger(cluster)
-
 	// setup metrics/logging with the new chain ID
+	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
