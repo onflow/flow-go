@@ -102,6 +102,11 @@ func NewRecorder(cfg metricsProm.Config) CustomRecorder {
 	return r
 }
 
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
 func MetricsMiddleware() mux.MiddlewareFunc {
 	r := NewRecorder(metricsProm.Config{Prefix: "access_rest_api"})
 	metricsMiddleware := middleware.New(middleware.Config{Recorder: r})
