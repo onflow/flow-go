@@ -10,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/io"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestAccessKeyFileCreated(t *testing.T) {
