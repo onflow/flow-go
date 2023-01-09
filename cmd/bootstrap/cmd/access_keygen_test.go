@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
 	"os"
 	"path/filepath"
@@ -11,8 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 )
 
 func TestAccessKeyFileCreated(t *testing.T) {
@@ -37,6 +38,9 @@ func TestAccessKeyFileCreated(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		sans := []string{"unittest1.onflow.org", "unittest2.onflow.org"}
+
+		flagSANs = strings.Join(sans, ",")
 		flagCommonName = "unittest.onflow.org"
 		flagOutputKeyFile = filepath.Join(bootDir, "test-access-key.key")
 		flagOutputCertFile = filepath.Join(bootDir, "test-access-key.cert")
@@ -62,9 +66,19 @@ func TestAccessKeyFileCreated(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, privKey.PublicKey, *ecdsaPubKey)
 
-		// check that the common name is correct
+		// check that the common name and subject alt names are correct
 		assert.Equal(t, flagCommonName, cert.Subject.CommonName, "expected %s, got %s", flagCommonName, cert.Subject.CommonName)
 		assert.Equal(t, flagCommonName, cert.Issuer.CommonName, "expected %s, got %s", flagCommonName, cert.Issuer.CommonName)
+		assert.ElementsMatch(t, sans, cert.DNSNames)
+
+		// check that the libp2p extension is present
+		found := false
+		for _, ext := range cert.Extensions {
+			if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 53594, 1, 1}) {
+				found = true
+			}
+		}
+		assert.True(t, found, "expected to find libp2p extension")
 	})
 }
 

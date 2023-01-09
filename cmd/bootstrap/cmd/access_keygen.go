@@ -9,7 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -23,6 +23,7 @@ import (
 const certValidityPeriod = 100 * 365 * 24 * time.Hour // ~100 years
 
 var (
+	flagSANs           string
 	flagCommonName     string
 	flagNodeInfoFile   string
 	flagOutputKeyFile  string
@@ -44,6 +45,7 @@ func init() {
 	accessKeyCmd.Flags().StringVar(&flagOutputKeyFile, "key", "./access-tls.key", "path to output private key file")
 	accessKeyCmd.Flags().StringVar(&flagOutputCertFile, "cert", "./access-tls.crt", "path to output certificate file")
 	accessKeyCmd.Flags().StringVar(&flagCommonName, "cn", "", "common name to include in the certificate")
+	accessKeyCmd.Flags().StringVar(&flagSANs, "sans", "", "subject alternative names to include in the certificate, comma separated")
 }
 
 // accessKeyCmdRun generate an Access node TLS key and certificate
@@ -60,8 +62,12 @@ func accessKeyCmdRun(_ *cobra.Command, _ []string) {
 
 	if flagCommonName != "" {
 		log.Info().Msgf("using cn: %s", flagCommonName)
-		// needed to pass envoy's certificate validity check
 		certTmpl.Subject.CommonName = flagCommonName
+	}
+
+	if flagSANs != "" {
+		log.Info().Msgf("using SANs: %s", flagSANs)
+		certTmpl.DNSNames = strings.Split(flagSANs, ",")
 	}
 
 	cert, err := grpcutils.X509Certificate(networkKey, grpcutils.WithCertTemplate(certTmpl))
@@ -75,7 +81,7 @@ func accessKeyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Msgf("could not encode private key: %v", err)
 	}
 
-	err = writeFile(flagOutputKeyFile, pem.EncodeToMemory(&pem.Block{
+	err = io.WriteFile(flagOutputKeyFile, pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: keyBytes,
 	}))
@@ -83,7 +89,7 @@ func accessKeyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Msgf("could not write private key: %v", err)
 	}
 
-	err = writeFile(flagOutputCertFile, pem.EncodeToMemory(&pem.Block{
+	err = io.WriteFile(flagOutputCertFile, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Certificate[0],
 	}))
@@ -105,21 +111,6 @@ func loadNetworkKey(nodeInfoPath string) (crypto.PrivateKey, error) {
 	}
 
 	return info.NetworkPrivKey.PrivateKey, nil
-}
-
-func writeFile(path string, data []byte) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("could not create file (path=%s): %w", path, err)
-	}
-	defer file.Close()
-
-	_, err = file.Write(data)
-	if err != nil {
-		return fmt.Errorf("could not write file: %w", err)
-	}
-
-	return nil
 }
 
 func defaultCertTemplate() (*x509.Certificate, error) {
