@@ -232,6 +232,7 @@ func (nc *NoopCollector) BlockService(svc string)                               
 func (nc *NoopCollector) BlockServicePeer(svc string, p peer.ID)                                {}
 func (nc *NoopCollector) AllowMemory(size int)                                                  {}
 func (nc *NoopCollector) BlockMemory(size int)                                                  {}
+func (nc *NoopCollector) MetricsMiddleware()                                                    {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
