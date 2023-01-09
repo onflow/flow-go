@@ -174,7 +174,7 @@ func (vm *VirtualMachine) GetAccount(
 		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
-		if errors.IsALedgerFailure(err) {
+		if errors.IsLedgerFailure(err) {
 			return nil, fmt.Errorf(
 				"cannot get account, this error usually happens if the "+
 					"reference block for this query is not set to a recent "+
