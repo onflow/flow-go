@@ -119,7 +119,6 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	s.Run("invalid-timeout", func() {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 		s.processor.On("Process", timeout).Return(model.NewInvalidTimeoutErrorf(timeout, "")).Once()
-		s.notifier.On("OnTimeoutProcessed", timeout).Once()
 		s.notifier.On("OnInvalidTimeoutDetected", timeout).Once()
 		err := s.collector.AddTimeout(timeout)
 		require.NoError(s.T(), err)
