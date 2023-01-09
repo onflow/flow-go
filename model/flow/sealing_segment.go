@@ -110,6 +110,7 @@ func (segment *SealingSegment) Lowest() *Block {
 	return segment.Blocks[0]
 }
 
+// AllBlocks returns all blocks within the sealing segment, including extra blocks, in ascending height order.
 func (segment *SealingSegment) AllBlocks() []*Block {
 	return append(segment.ExtraBlocks, segment.Blocks...)
 }
@@ -235,9 +236,6 @@ type SealingSegmentBuilder struct {
 	extraBlocks []*Block
 }
 
-func (builder *SealingSegmentBuilder) Len() int {
-	return len(builder.blocks)
-}
 
 // AddBlock appends a block to the sealing segment under construction.
 // No errors are expected during normal operation.

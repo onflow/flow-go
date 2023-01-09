@@ -308,14 +308,15 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		}
 	}
 
-	lowestSealingSegmentBlock, err := s.state.headers.ByBlockID(lowestBlockID)
+	// the highest sealed block is the first block above any extra blocks
+	highestSealedBlock, err := s.state.headers.ByBlockID(lowestBlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query lowest sealing segment block: %w", err)
 	}
 
 	if limitHeight < lowestSealingSegmentBlock.Height {
 		// we need to include extra blocks in sealing segment
-		extraBlocksScrapper := func(header *flow.Header) error {
+		extraBlocksScraper := func(header *flow.Header) error {
 			blockID := header.ID()
 			block, err := s.state.blocks.ByID(blockID)
 			if err != nil {

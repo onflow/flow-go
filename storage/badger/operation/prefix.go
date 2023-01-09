@@ -30,7 +30,7 @@ const (
 	codeSealedHeight            = 21 // latest sealed block height
 	codeClusterHeight           = 22 // latest finalized height on cluster
 	codeExecutedBlock           = 23 // latest executed block with max height
-	codeRootHeight              = 24 // the height of the first loaded block
+	codeRootHeight              = 24 // the height of the highest block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 	codeSporkRootBlockHeight    = 26 // the height of the lowest block in current spork that our node is aware of
 
