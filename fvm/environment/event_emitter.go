@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -103,7 +104,7 @@ func (NoEventEmitter) Reset() {
 }
 
 type eventEmitter struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	chain   flow.Chain
@@ -117,7 +118,7 @@ type eventEmitter struct {
 
 // NewEventEmitter constructs a new eventEmitter
 func NewEventEmitter(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	chain flow.Chain,
 	txInfo TransactionInfoParams,
@@ -148,7 +149,7 @@ func (emitter *eventEmitter) EventCollection() *EventCollection {
 }
 
 func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
-	defer emitter.tracer.StartExtensiveTracingSpanFromRoot(
+	defer emitter.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvEmitEvent).End()
 
 	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, 1)

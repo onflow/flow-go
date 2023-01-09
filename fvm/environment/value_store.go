@@ -1,14 +1,13 @@
 package environment
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/atree"
-	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -97,13 +96,17 @@ func (store ParseRestrictedValueStore) AllocateStorageIndex(
 }
 
 type valueStore struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
 }
 
-func NewValueStore(tracer *Tracer, meter Meter, accounts Accounts) ValueStore {
+func NewValueStore(
+	tracer tracing.TracerSpan,
+	meter Meter,
+	accounts Accounts,
+) ValueStore {
 	return &valueStore{
 		tracer:   tracer,
 		meter:    meter,
@@ -118,20 +121,9 @@ func (store *valueStore) GetValue(
 	[]byte,
 	error,
 ) {
-	key := string(keyBytes)
+	defer store.tracer.StartChildSpan(trace.FVMEnvGetValue).End()
 
-	var valueByteSize int
-	span := store.tracer.StartSpanFromRoot(trace.FVMEnvGetValue)
-	defer func() {
-		if !trace.IsSampled(span) {
-			span.SetAttributes(
-				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", key),
-				attribute.Int("valueByteSize", valueByteSize),
-			)
-		}
-		span.End()
-	}()
+	key := string(keyBytes)
 
 	address := flow.BytesToAddress(owner)
 	if state.IsFVMStateKey(string(owner), key) {
@@ -142,11 +134,8 @@ func (store *valueStore) GetValue(
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
-	valueByteSize = len(v)
 
-	err = store.meter.MeterComputation(
-		ComputationKindGetValue,
-		uint(valueByteSize))
+	err = store.meter.MeterComputation(ComputationKindGetValue, uint(len(v)))
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -159,16 +148,9 @@ func (store *valueStore) SetValue(
 	keyBytes []byte,
 	value []byte,
 ) error {
-	key := string(keyBytes)
+	defer store.tracer.StartChildSpan(trace.FVMEnvSetValue).End()
 
-	span := store.tracer.StartSpanFromRoot(trace.FVMEnvSetValue)
-	if !trace.IsSampled(span) {
-		span.SetAttributes(
-			attribute.String("owner", hex.EncodeToString(owner)),
-			attribute.String("key", key),
-		)
-	}
-	defer span.End()
+	key := string(keyBytes)
 
 	address := flow.BytesToAddress(owner)
 	if state.IsFVMStateKey(string(owner), key) {
@@ -196,7 +178,7 @@ func (store *valueStore) ValueExists(
 	exists bool,
 	err error,
 ) {
-	defer store.tracer.StartSpanFromRoot(trace.FVMEnvValueExists).End()
+	defer store.tracer.StartChildSpan(trace.FVMEnvValueExists).End()
 
 	err = store.meter.MeterComputation(ComputationKindValueExists, 1)
 	if err != nil {
@@ -219,7 +201,7 @@ func (store *valueStore) AllocateStorageIndex(
 	atree.StorageIndex,
 	error,
 ) {
-	defer store.tracer.StartSpanFromRoot(trace.FVMEnvAllocateStorageIndex).End()
+	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateStorageIndex).End()
 
 	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
 	if err != nil {

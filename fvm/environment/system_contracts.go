@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -25,14 +26,14 @@ type ContractFunctionSpec struct {
 type SystemContracts struct {
 	chain flow.Chain
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	logger  *ProgramLogger
 	runtime *Runtime
 }
 
 func NewSystemContracts(
 	chain flow.Chain,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	logger *ProgramLogger,
 	runtime *Runtime,
 ) *SystemContracts {
@@ -56,7 +57,7 @@ func (sys *SystemContracts) Invoke(
 		Name:    spec.LocationName,
 	}
 
-	span := sys.tracer.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
 	span.SetAttributes(
 		attribute.String(
 			"transaction.ContractFunctionCall",
@@ -247,6 +248,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
 	addresses []common.Address,
+	payer common.Address,
+	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
 	for i, address := range addresses {
@@ -257,17 +260,21 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		ContractFunctionSpec{
 			AddressFromChain: ServiceAddress,
 			LocationName:     systemcontracts.ContractStorageFees,
-			FunctionName:     systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
+			FunctionName:     systemcontracts.ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck,
 			ArgumentTypes: []sema.Type{
 				sema.NewConstantSizedType(
 					nil,
 					&sema.AddressType{},
 					int64(len(arrayValues)),
 				),
+				&sema.AddressType{},
+				sema.UFix64Type,
 			},
 		},
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
+			cadence.BytesToAddress(payer.Bytes()),
+			cadence.UFix64(maxTxFees),
 		},
 	)
 }

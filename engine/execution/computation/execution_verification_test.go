@@ -2,12 +2,22 @@ package computation
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -15,6 +25,8 @@ import (
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -23,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -35,15 +46,6 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 var chain = flow.Emulator.Chain()
@@ -172,7 +174,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010489")
+		minimumStorage, err := cadence.NewUFix64("0.00010807")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -191,7 +193,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// ensure fee deduction events are emitted even though tx fails
 		require.Len(t, cr.Events[1], 3)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -261,8 +263,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 10, transactionEvents)
 
-		// insufficient account balance error as account is at minimum account balance and inclusion fee is non-zero
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
@@ -477,7 +478,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -688,7 +689,26 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter, prov)
+	// generates signing identity including staking key for signing
+	myIdentity := unittest.IdentityFixture()
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(t, err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+	myIdentity.StakingPubKey = sk.PublicKey()
+	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommiter,
+		me,
+		prov)
 	require.NoError(t, err)
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
@@ -702,6 +722,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		view,
 		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
+
+	spockHasher := utils.NewSPOCKHasher()
+	for i, snapshot := range computationResult.StateSnapshots {
+		valid, err := crypto.SPOCKVerifyAgainstData(
+			myIdentity.StakingPubKey,
+			computationResult.SpockSignatures[i],
+			snapshot.SpockSecret,
+			spockHasher)
+		require.NoError(t, err)
+		require.True(t, valid)
+	}
 
 	prevResultId := unittest.IdentifierFixture()
 
@@ -731,12 +762,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		_, fault, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
 		assert.Nil(t, fault)
 	}

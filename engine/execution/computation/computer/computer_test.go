@@ -54,6 +54,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	rag := &RandomAddressGenerator{}
 
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	t.Run("single collection", func(t *testing.T) {
 
 		execCtx := fvm.NewContext()
@@ -106,7 +110,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, exemetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			exemetrics,
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -151,7 +163,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -237,7 +257,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			ctx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			comm,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -276,7 +304,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -427,7 +463,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return emittingRuntime
 					})))
 
@@ -447,7 +483,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
@@ -509,7 +553,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
@@ -529,7 +573,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -604,7 +656,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
@@ -624,7 +676,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -832,7 +892,19 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		trackerStorage,
 	)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -908,7 +980,19 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		trackerStorage,
 	)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics,
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer,
+		me,
+		prov)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing

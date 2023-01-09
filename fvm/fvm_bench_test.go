@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -146,11 +147,15 @@ type BasicBlockExecutor struct {
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
 	vm := fvm.NewVirtualMachine()
 
+	// a big interaction limit since that is not what's being tested.
+	interactionLimit := fvm.DefaultMaxInteractionSize * uint64(1000)
+
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
+		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
@@ -210,8 +215,20 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		trackerStorage,
 	)
 
+	me := new(moduleMock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommitter,
+		me,
+		prov)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))

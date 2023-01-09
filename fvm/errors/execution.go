@@ -48,6 +48,11 @@ func NewTransactionFeeDeductionFailedError(
 		payer)
 }
 
+// IsTransactionFeeDeductionFailedError returns true if error has this code.
+func IsTransactionFeeDeductionFailedError(err error) bool {
+	return HasErrorCode(err, ErrCodeTransactionFeeDeductionFailedError)
+}
+
 // NewInsufficientPayerBalanceError constructs a new CodedError which
 // indicates that the payer has insufficient balance to attempt transaction execution.
 func NewInsufficientPayerBalanceError(
@@ -62,7 +67,11 @@ func NewInsufficientPayerBalanceError(
 	)
 }
 
-// NewPayerBalanceCheckFailure constructs a new CodedError which
+// IsInsufficientPayerBalanceError returns true if error has this code.
+func IsInsufficientPayerBalanceError(err error) bool {
+	return HasErrorCode(err, ErrCodeInsufficientPayerBalance)
+}
+
 // indicates that a there was an error checking the payers balance.
 // This is an implementation error most likely between the smart contract and FVM interaction
 // and should not happen in regular execution.

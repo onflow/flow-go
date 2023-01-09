@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -32,6 +33,7 @@ type ComputationResult struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
+	SpockSignatures        []crypto.Signature
 }
 
 func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
@@ -70,10 +72,8 @@ func (cr *ComputationResult) AddTransactionResult(
 
 	cr.TransactionResults = append(cr.TransactionResults, txnResult)
 
-	if txn.IsSampled() {
-		for computationKind, intensity := range txn.ComputationIntensities {
-			cr.ComputationIntensities[computationKind] += intensity
-		}
+	for computationKind, intensity := range txn.ComputationIntensities {
+		cr.ComputationIntensities[computationKind] += intensity
 	}
 }
 

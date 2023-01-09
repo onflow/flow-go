@@ -119,6 +119,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
@@ -134,7 +136,15 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -177,6 +187,8 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture([][]flow.Identifier{
 		{unittest.IdentifierFixture()},
@@ -220,6 +232,8 @@ func TestExecuteScript(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	vm := fvm.NewVirtualMachine()
 
@@ -284,6 +298,8 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, fmt.Errorf("error getting register")
@@ -695,6 +711,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
@@ -717,6 +735,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		trace.NewNoopTracer(),
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
+		me,
 		prov,
 	)
 	require.NoError(t, err)
@@ -829,6 +848,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)

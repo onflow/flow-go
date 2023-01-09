@@ -987,5 +987,6 @@ func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 			ret = append(ret, p)
 		}
 	}
+
 	return ret, nil
 }

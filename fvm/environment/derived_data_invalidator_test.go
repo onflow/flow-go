@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -151,6 +152,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.NoError(t, err)
 
 		env := environment.NewTransactionEnvironment(
+			tracing.NewTracerSpan(),
 			ctx.EnvironmentParams,
 			txnState,
 			nil)
