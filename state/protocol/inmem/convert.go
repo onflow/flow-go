@@ -103,6 +103,10 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
+	params.SporkRootBlockHeight, err = from.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork root block height: %w", err)
+	}
 	params.ProtocolVersion, err = from.ProtocolVersion()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
@@ -290,6 +294,7 @@ func SnapshotFromBootstrapStateWithParams(
 	params := EncodableParams{
 		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
 		SporkID:                    root.ID(),                  // use root block ID as the unique spork identifier
+		SporkRootBlockHeight:       root.Header.Height,         // use root block height as the spork root block height
 		ProtocolVersion:            protocolVersion,            // major software version for this spork
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}

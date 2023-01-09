@@ -14,12 +14,12 @@ func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeRootHeight), height)
 }
 
-func InsertSporkRootBlockHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeSporkRootBlockHeight), height)
+func InsertRootSealingSegmentMinHeight(height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeRootSealingSegmentMinHeight), height)
 }
 
-func RetrieveSporkRootBlockHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSporkRootBlockHeight), height)
+func RetrieveRootSealingSegmentMinHeight(height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeRootSealingSegmentMinHeight), height)
 }
 
 func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {

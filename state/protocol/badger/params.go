@@ -33,6 +33,16 @@ func (p Params) SporkID() (flow.Identifier, error) {
 	return sporkID, nil
 }
 
+func (p Params) SporkRootBlockHeight() (uint64, error) {
+	var sporkRootBlockHeight uint64
+	err := p.state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+	if err != nil {
+		return 0, fmt.Errorf("could not get spork root block height: %w", err)
+	}
+
+	return sporkRootBlockHeight, nil
+}
+
 func (p Params) ProtocolVersion() (uint, error) {
 
 	var version uint
