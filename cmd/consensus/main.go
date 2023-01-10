@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -70,6 +73,25 @@ import (
 )
 
 func main() {
+
+	sigchnl := make(chan os.Signal, 1)
+	signal.Notify(sigchnl)
+	go func() {
+		for {
+			s := <-sigchnl
+			switch s {
+			case syscall.SIGTERM:
+				fallthrough
+			case syscall.SIGKILL:
+				fallthrough
+			case syscall.SIGINT:
+				debug.PrintStack()
+				os.Exit(1)
+			default:
+				fmt.Printf("unknown signal %d, not handling\n", s)
+			}
+		}
+	}()
 
 	var (
 		guaranteeLimit                       uint
