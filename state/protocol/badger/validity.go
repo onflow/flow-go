@@ -350,3 +350,38 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	}
 	return nil
 }
+
+// SanityCheckConsensusNodeRootSnapshotValidity performs a sanity check to make sure root snapshot has enough history
+// to participate in consensus, we require one of next conditions to pass:
+//  1. IsSporkRootSnapshot() == true - this is a snapshot build from a first block of spork.
+//  2. snapshot.Head().Height - snapshot.Params().SporkRootBlockHeight() >= transaction_expiry_limit - such snapshot
+//     has enough history to validate collection guarantees and can safely participate in consensus
+func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) error {
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(snapshot)
+	if err != nil {
+		return fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err)
+	}
+	// condition 1 satisfied
+	if isSporkRootSnapshot {
+		return nil
+	}
+
+	// check condition 2
+	head, err := snapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not query root snapshot head: %w", err)
+	}
+
+	sporkRootBlockHeight, err := snapshot.Params().SporkRootBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not query spork root block height: %w", err)
+	}
+
+	cfg := DefaultConfig()
+	if head.Height+sporkRootBlockHeight < cfg.transactionExpiry {
+		return fmt.Errorf("invalid root snapshot length, expecting at least %d, got %d",
+			cfg.transactionExpiry, head.Height-sporkRootBlockHeight)
+	}
+
+	return nil
+}

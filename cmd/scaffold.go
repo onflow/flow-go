@@ -123,6 +123,7 @@ type FlowNodeBuilder struct {
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
+	extraRootSnapshotCheck   func(protocol.Snapshot) error
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
@@ -550,6 +551,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	log.Msg("flags loaded")
 
 	return fnb.extraFlagsValidation()
+}
+
+func (fnb *FlowNodeBuilder) ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder {
+	fnb.extraRootSnapshotCheck = f
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
@@ -1085,6 +1091,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
+	}
+
+	// perform extra checks requested by specific node types
+	if fnb.extraRootSnapshotCheck != nil {
+		err = fnb.extraRootSnapshotCheck(rootSnapshot)
+		if err != nil {
+			return fmt.Errorf("failed to perform extra checks on root snapshot: %w", err)
+		}
 	}
 
 	fnb.RootSnapshot = rootSnapshot

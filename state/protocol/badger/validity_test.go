@@ -101,3 +101,25 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestBootstrapInvalidConsensusRootSnapshot tests that we perform correct sanity checks when bootstrapping consensus nodes
+// we expect that we only bootstrap snapshots with sufficient history.
+func TestBootstrapConsensusRootSnapshot(t *testing.T) {
+	t.Run("spork-root-snapshot", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		require.NoError(t, err)
+	})
+	t.Run("not-enough-history", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootSnapshot.Encodable().Head.Height += 10 // advance height to be not spork root snapshot
+		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		require.Error(t, err)
+	})
+	t.Run("enough-history", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootSnapshot.Encodable().Head.Height += DefaultConfig().transactionExpiry // advance height to be not spork root snapshot, but have enough history
+		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		require.NoError(t, err)
+	})
+}
