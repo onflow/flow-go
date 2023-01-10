@@ -536,8 +536,6 @@ func (h *FlowAccessAPIForwarder) GetNetworkParameters(context context.Context, r
 func (h *FlowAccessAPIForwarder) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	// This is a passthrough request
 
-	fmt.Println("MOMOMOMOMOMOMOMOMO")
-
 	upstream, err := h.faultTolerantClient()
 	if err != nil {
 		return nil, err

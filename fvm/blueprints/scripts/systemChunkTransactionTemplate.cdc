@@ -7,8 +7,8 @@ transaction {
       ?? panic("Could not borrow heartbeat from storage path")
     heartbeat.advanceBlock()
 
-    let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.NodeVersionAdmin>(from: NodeVersionBeacon.NodeVersionAdminStoragePath) ?? panic("Could not borrow version admin from storage path")
-
+    let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.NodeVersionAdmin>(from: NodeVersionBeacon.NodeVersionAdminStoragePath)
+      ?? panic("Could not borrow version admin from storage path")
     versionBeacon.checkVersionTableChanges()
   }
 }

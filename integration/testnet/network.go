@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
-
 	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/insecure/cmd"
@@ -26,6 +24,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"

@@ -798,7 +798,7 @@ func (b *bootstrapExecutor) deployVersionBeacon(service flow.Address) {
 			0,
 		),
 	)
-	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
+	panicOnMetaInvokeErrf("failed to deploy NodeVersionBeacon contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,
