@@ -2,15 +2,19 @@ name: Build Tools
 
 on:
   workflow_dispatch:
-    inputs: 
+    inputs:
       tag:
         description: 'Tagged commit to build tools against'
         required: true
         type: string
+      promote:
+        description: 'Should this build be promoted to the official boot-tools?'
+        required: false
+        type: boolean
 
 jobs:
-  docker-push:
-    name: Push to container registry
+  build-publish:
+    name: Build boot tools
     runs-on: ubuntu-latest
     steps:
     - id: auth
@@ -24,7 +28,7 @@ jobs:
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
-        project_id: flow # TODO: is this correct?
+        project_id: flow
     - name: Checkout repo
       uses: actions/checkout@v2
       with:
@@ -39,6 +43,18 @@ jobs:
     - name: Upload boot-tools
       run: |
         mkdir boot-tools
-        mv bootstrap util transit boot-tools/
+        mv bootstrap transit boot-tools/
         tar -czf boot-tools.tar ./boot-tools/
-        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
+        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
+    - name: Upload util
+      run: |
+        tar -czf util.tar ./util
+        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
+    - name: Promote boot-tools
+      run: |
+        if [[ "${{ inputs.promote }}" = true ]]; then
+          echo "promoting boot-tools.tar"
+          gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
+        else
+          echo "not promoting boot-tools.tar"
+        fi
