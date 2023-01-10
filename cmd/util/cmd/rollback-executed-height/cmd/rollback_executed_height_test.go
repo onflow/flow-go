@@ -132,6 +132,26 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, err2)
 
+		batch = bstorage.NewBatch(db)
+
+		// remove again after flushing
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+		err2 = batch.Flush()
+
+		require.NoError(t, err)
+		require.NoError(t, err2)
+
 		// re execute result
 		err = es.SaveExecutionResults(
 			context.Background(),
@@ -244,6 +264,27 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		)
 
 		err2 := batch.Flush()
+
+		require.NoError(t, err)
+		require.NoError(t, err2)
+
+		batch = bstorage.NewBatch(db)
+
+		// remove again to test for duplicates handling
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+
+		err2 = batch.Flush()
 
 		require.NoError(t, err)
 		require.NoError(t, err2)
