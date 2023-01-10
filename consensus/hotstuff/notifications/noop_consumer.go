@@ -57,13 +57,13 @@ func (*NoopPartialConsumer) OnCurrentViewDetails(uint64, flow.Identifier) {}
 
 func (*NoopPartialConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
-func (*NoopPartialConsumer) OnInvalidVoteDetected(*model.Vote) {}
+func (*NoopPartialConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
 
 func (*NoopPartialConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
 
 func (*NoopPartialConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {}
 
-func (*NoopPartialConsumer) OnInvalidTimeoutDetected(*model.TimeoutObject) {}
+func (*NoopPartialConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) {}
 
 // no-op implementation of hotstuff.FinalizationConsumer
 

@@ -84,9 +84,8 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
-		if model.IsInvalidTimeoutError(err) {
-			c.log.Err(err).Msgf("invalid timeout detected")
-			c.notifier.OnInvalidTimeoutDetected(timeout)
+		if invalidTimeoutErr, ok := model.AsInvalidTimeoutError(err); ok {
+			c.notifier.OnInvalidTimeoutDetected(*invalidTimeoutErr)
 			return nil
 		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)

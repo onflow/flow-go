@@ -175,7 +175,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidVoteDetected(*model.Vote)
+	OnInvalidVoteDetected(err model.InvalidVoteError)
 
 	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
 	// whenever vote for invalid proposal was detected.
@@ -196,7 +196,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidTimeoutDetected(*model.TimeoutObject)
+	OnInvalidTimeoutDetected(err model.InvalidTimeoutError)
 }
 
 // QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.

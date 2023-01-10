@@ -169,12 +169,12 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 		Msg("double vote detected")
 }
 
-func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
+func (lc *LogConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	lc.log.Warn().
-		Uint64("vote_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("invalid vote detected")
+		Uint64("vote_view", err.Vote.View).
+		Hex("voted_block_id", err.Vote.BlockID[:]).
+		Hex("voter_id", err.Vote.SignerID[:]).
+		Msgf("invalid vote detected: %s", err.Error())
 }
 
 func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
@@ -195,9 +195,9 @@ func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt
 		Msg("double timeout detected")
 }
 
-func (lc *LogConsumer) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
-	log := timeout.LogContext(lc.log).Logger()
-	log.Warn().Msg("invalid timeout detected")
+func (lc *LogConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+	log := err.Timeout.LogContext(lc.log).Logger()
+	log.Warn().Msgf("invalid timeout detected: %s", err.Error())
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
