@@ -179,7 +179,7 @@ require (
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/cadence v0.31.0 // indirect
+	github.com/onflow/cadence v0.31.2 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221224000200-457c757f0c70 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221224000200-457c757f0c70 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
