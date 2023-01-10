@@ -628,12 +628,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionByIndexRequest{
+	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
 		Index:   index,
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
@@ -658,8 +658,8 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		DefaultSnapshotHistoryLimit,
 	)
 	suite.execClient.
-		On("GetTransactionResultByIndex", ctx, &exeEventReq).
-		Return(&exeEventResp, nil).
+		On("GetTransactionResultByIndex", ctx, exeEventReq).
+		Return(exeEventResp, nil).
 		Once()
 
 	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
@@ -691,11 +691,11 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
+	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultsResponse{
+	exeEventResp := &execproto.GetTransactionResultsResponse{
 		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
 	}
 
@@ -720,8 +720,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		DefaultSnapshotHistoryLimit,
 	)
 	suite.execClient.
-		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
-		Return(&exeEventResp, nil).
+		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
+		Return(exeEventResp, nil).
 		Once()
 
 	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
@@ -775,12 +775,12 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
-	exeEventReq := execproto.GetTransactionResultRequest{
+	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
@@ -807,8 +807,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// Successfully return empty event list
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Once()
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -823,8 +823,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// Successfully return empty event list from here on
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, nil)
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
 	result, err = backend.GetTransactionResult(ctx, txID)
@@ -1043,19 +1043,19 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	receipts, _ := suite.setupReceipts(&block)
 
-	exeEventReq := execproto.GetTransactionResultRequest{
+	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
 	// simulate that the execution node has not yet executed the transaction
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Once()
 
 	// create a mock connection factory
@@ -1270,7 +1270,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	// create the execution node response
-	exeResp := execproto.GetEventsForBlockIDsResponse{
+	exeResp := &execproto.GetEventsForBlockIDsResponse{
 		Results: exeResults,
 	}
 
@@ -1294,7 +1294,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	// expect two calls to the executor api client (one for each of the following 2 test cases)
 	suite.execClient.
 		On("GetEventsForBlockIDs", ctx, exeReq).
-		Return(&exeResp, nil).
+		Return(exeResp, nil).
 		Once()
 
 	suite.Run("with an execution node chosen using block ID form the list of Fixed ENs", func() {
@@ -2205,24 +2205,24 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
 	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
 	}
-	execRes := execproto.ExecuteScriptAtBlockIDResponse{
+	execRes := &execproto.ExecuteScriptAtBlockIDResponse{
 		Value: []byte{4, 5, 6},
 	}
 
 	suite.Run("happy path script execution success", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).Return(&execRes, nil).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
 		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
 
 	suite.Run("script execution failure returns status OK", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
 		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())
@@ -2231,7 +2231,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	})
 
 	suite.Run("execution node internal failure returns status code Internal", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
 		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())

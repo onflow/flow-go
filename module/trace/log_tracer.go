@@ -49,7 +49,14 @@ func (t *LogTracer) Done() <-chan struct{} {
 }
 
 // Start implements trace.Tracer interface.
-func (t *LogTracer) Start(ctx context.Context, spanName string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (t *LogTracer) Start(
+	ctx context.Context,
+	spanName string,
+	_ ...trace.SpanStartOption,
+) (
+	context.Context,
+	trace.Span,
+) {
 	sp := newLogSpan(t, spanName)
 	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
 	return ctx, sp
@@ -60,9 +67,12 @@ func (t *LogTracer) StartBlockSpan(
 	blockID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	ctx, sp := t.Start(ctx, string(spanName), opts...)
-	return sp, ctx, true
+	return sp, ctx
 }
 
 func (t *LogTracer) StartCollectionSpan(
@@ -70,9 +80,12 @@ func (t *LogTracer) StartCollectionSpan(
 	collectionID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	ctx, sp := t.Start(ctx, string(spanName), opts...)
-	return sp, ctx, true
+	return sp, ctx
 }
 
 // StartTransactionSpan starts a span that will be aggregated under the given transaction.
@@ -82,16 +95,22 @@ func (t *LogTracer) StartTransactionSpan(
 	transactionID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	ctx, sp := t.Start(ctx, string(spanName), opts...)
-	return sp, ctx, true
+	return sp, ctx
 }
 
 func (t *LogTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	parentSpanID := ctx.Value(activeSpan).(uint64)
 	sp := newLogSpanWithParent(t, operationName, parentSpanID)
 	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
@@ -122,7 +141,8 @@ func (t *LogTracer) RecordSpanFromParent(
 
 // WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 // executes the function f, and finishes the span once the function returns.
-func (t *LogTracer) WithSpanFromContext(ctx context.Context,
+func (t *LogTracer) WithSpanFromContext(
+	ctx context.Context,
 	operationName SpanName,
 	f func(),
 	opts ...trace.SpanStartOption,
@@ -156,7 +176,11 @@ func newLogSpan(tracer *LogTracer, operationName string) *logSpan {
 	}
 }
 
-func newLogSpanWithParent(tracer *LogTracer, operationName SpanName, parentSpanID uint64) *logSpan {
+func newLogSpanWithParent(
+	tracer *LogTracer,
+	operationName SpanName,
+	parentSpanID uint64,
+) *logSpan {
 	sp := newLogSpan(tracer, string(operationName))
 	sp.parentID = parentSpanID
 	return sp
@@ -179,24 +203,41 @@ func (s *logSpan) End(...trace.SpanEndOption) {
 	s.produceLog()
 }
 
-func (s *logSpan) SpanContext() trace.SpanContext { return trace.SpanContext{} }
-func (s *logSpan) IsRecording() bool              { return s.end == time.Time{} }
-func (s *logSpan) SetStatus(codes.Code, string)   {}
-func (s *logSpan) SetError(bool)                  {}
+func (s *logSpan) SpanContext() trace.SpanContext {
+	return trace.SpanContext{}
+}
+
+func (s *logSpan) IsRecording() bool {
+	return s.end == time.Time{}
+}
+
+func (s *logSpan) SetStatus(codes.Code, string) {}
+
+func (s *logSpan) SetError(bool) {}
+
 func (s *logSpan) SetAttributes(attrs ...attribute.KeyValue) {
 	for _, f := range attrs {
 		s.attrs[f.Key] = f.Value
 	}
 }
+
 func (s *logSpan) RecordError(error, ...trace.EventOption) {}
-func (s *logSpan) AddEvent(string, ...trace.EventOption)   {}
-func (s *logSpan) SetName(string)                          {}
-func (s *logSpan) TracerProvider() trace.TracerProvider    { return s.tracer.provider }
+
+func (s *logSpan) AddEvent(string, ...trace.EventOption) {}
+
+func (s *logSpan) SetName(string) {}
+
+func (s *logSpan) TracerProvider() trace.TracerProvider {
+	return s.tracer.provider
+}
 
 type logTracerProvider struct {
 	tracer *LogTracer
 }
 
-func (ltp *logTracerProvider) Tracer(instrumentationName string, _ ...trace.TracerOption) trace.Tracer {
+func (ltp *logTracerProvider) Tracer(
+	instrumentationName string,
+	_ ...trace.TracerOption,
+) trace.Tracer {
 	return ltp.tracer
 }

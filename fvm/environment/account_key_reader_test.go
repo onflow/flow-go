@@ -13,14 +13,14 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 func newDummyAccountKeyReader(
 	t *testing.T,
 	keyCount uint64,
 ) environment.AccountKeyReader {
-	params := environment.DefaultTracerParams()
-	tracer := environment.NewTracer(params)
+	tracer := tracing.NewTracerSpan()
 	meter := mock.NewMeter(t)
 	meter.On("MeterComputation", testMock.Anything, testMock.Anything).Return(nil)
 	accounts := &FakeAccounts{keyCount: keyCount}

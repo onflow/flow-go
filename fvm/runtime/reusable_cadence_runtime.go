@@ -44,10 +44,10 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:     rt,
-		Environment: runtime.NewBaseInterpreterEnvironment(runtime.Config{}),
+		Environment: runtime.NewBaseInterpreterEnvironment(config),
 	}
 
 	setAccountFrozen := stdlib.StandardLibraryValue{
@@ -163,6 +163,8 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	)
 }
 
+type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
+
 type ReusableCadenceRuntimePool struct {
 	pool chan *ReusableCadenceRuntime
 
@@ -173,13 +175,13 @@ type ReusableCadenceRuntimePool struct {
 	// pool will create runtimes using this function.
 	//
 	// Note that this is primarily used for testing.
-	newCustomRuntime func() runtime.Runtime
+	newCustomRuntime CadenceRuntimeConstructor
 }
 
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	newCustomRuntime func() runtime.Runtime,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
@@ -202,17 +204,18 @@ func NewReusableCadenceRuntimePool(
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
-	newCustomRuntime func() runtime.Runtime,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		runtime.Config{},
-		newCustomRuntime)
+		newCustomRuntime,
+	)
 }
 
 func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 	if pool.newCustomRuntime != nil {
-		return pool.newCustomRuntime()
+		return pool.newCustomRuntime(pool.config)
 	}
 	return runtime.NewInterpreterRuntime(pool.config)
 }
@@ -228,7 +231,9 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 		reusable = NewReusableCadenceRuntime(
 			WrappedCadenceRuntime{
 				pool.newRuntime(),
-			})
+			},
+			pool.config,
+		)
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
