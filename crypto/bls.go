@@ -119,10 +119,6 @@ func NewExpandMsgXOFKMAC128(domainTag string) hash.Hasher {
 // the hash-to-curve function, hashing data to G1 on BLS12 381.
 // The key is used as a customizer rather than a MAC key.
 func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
-	// UTF-8 is used by Go to convert strings into bytes.
-	// UTF-8 is a non-ambiguous encoding as required by draft-irtf-cfrg-hash-to-curve
-	// (similarly to the recommended ASCII).
-
 	// blsKMACFunction is the customizer used for KMAC in BLS
 	const blsKMACFunction = "H2C"
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
