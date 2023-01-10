@@ -33,8 +33,8 @@ type State struct {
 	}
 	// cache the root height because it cannot change over the lifecycle of a protocol state instance
 	rootHeight uint64
-	// cache the root sealing segment min height because it cannot change over the lifecycle of a protocol state instance
-	rootSealingSegmentMinHeight uint64
+	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	sporkRootBlockHeight uint64
 	// maximum length of sealing segment that replica will be building
 	maxSealingSegmentLength uint64
 }
@@ -258,7 +258,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 		highest := segment.Highest()
 		lowest := segment.Lowest()
-		rootSealingSegmentMinHeight := segment.AllBlocks()[0].Header.Height
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
@@ -307,10 +306,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 
 		// insert height pointers
-		err = operation.InsertRootSealingSegmentMinHeight(rootSealingSegmentMinHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert root sealing segment min height: %w", err)
-		}
 		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
@@ -711,12 +706,12 @@ func (state *State) populateCache() error {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
 	state.rootHeight = rootHeight
-	var rootSealingSegmentMinHeight uint64
-	err = state.db.View(operation.RetrieveRootSealingSegmentMinHeight(&rootSealingSegmentMinHeight))
+	var sporkRootBlockHeight uint64
+	err = state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
 	if err != nil {
-		return fmt.Errorf("could not read root sealing segment min height: %w", err)
+		return fmt.Errorf("could not read spork root block height: %w", err)
 	}
-	state.rootSealingSegmentMinHeight = rootSealingSegmentMinHeight
+	state.sporkRootBlockHeight = sporkRootBlockHeight
 	return nil
 }
 

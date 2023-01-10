@@ -14,14 +14,6 @@ func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeRootHeight), height)
 }
 
-func InsertRootSealingSegmentMinHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeRootSealingSegmentMinHeight), height)
-}
-
-func RetrieveRootSealingSegmentMinHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeRootSealingSegmentMinHeight), height)
-}
-
 func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeFinalizedHeight), height)
 }
