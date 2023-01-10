@@ -35,21 +35,18 @@ jobs:
         ref: ${{ inputs.tag }}
     - name: Build relic
       run: make crypto_setup_gopath
-    - name: Build Tools
+    - name: Build and upload boot-tools
       run: |
-        make tool-bootstrap
-        make tool-util
-        make tool-transit
-    - name: Upload boot-tools
-      run: |
+        make tool-bootstrap tool-transit
         mkdir boot-tools
         mv bootstrap transit boot-tools/
         tar -czf boot-tools.tar ./boot-tools/
         gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
-    - name: Upload util
+    - name: Build and upload util
       run: |
-        tar -czf util.tar ./util
-        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
+        make tool-util
+        tar -czf util.tar util
+        gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
     - name: Promote boot-tools
       run: |
         if [[ "${{ inputs.promote }}" = true ]]; then
