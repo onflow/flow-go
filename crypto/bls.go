@@ -294,7 +294,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 		okm := make([]byte, okmLength)
 		n, err := reader.Read(okm)
 		if err != nil || n != okmLength {
-			return nil, fmt.Errorf("key generation failed because of HKDF reader, bytes read: %d : %w",
+			return nil, fmt.Errorf("key generation failed because of the HKDF reader, %d bytes were read: %w",
 				n, err)
 		}
 		defer overwrite(okm) // overwrite okm

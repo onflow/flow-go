@@ -26,6 +26,9 @@ const (
 	maxRelicPrgSeed = 1 << 32
 )
 
+// TODO: update this code to make sure
+// the function isn't removed by the compiler
+// https://github.com/golang/go/issues/21865
 func overwrite(data []byte) {
 	_, err := rand.Read(data) // checking err is enough
 	if err != nil {

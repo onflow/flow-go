@@ -28,7 +28,7 @@ import (
 
 // validPrivateKeyBytesFlow generates bytes of a valid private key in Flow library
 func validPrivateKeyBytesFlow(t *rapid.T) []byte {
-	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "seed").([]byte)
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "seed").([]byte)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	// TODO: require.NoError(t, err) seems to mess with rapid
 	if err != nil {
@@ -39,7 +39,7 @@ func validPrivateKeyBytesFlow(t *rapid.T) []byte {
 
 // validPublicKeyBytesFlow generates bytes of a valid public key in Flow library
 func validPublicKeyBytesFlow(t *rapid.T) []byte {
-	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "seed").([]byte)
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "seed").([]byte)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
 	return sk.PublicKey().Encode()
@@ -47,7 +47,7 @@ func validPublicKeyBytesFlow(t *rapid.T) []byte {
 
 // validSignatureBytesFlow generates bytes of a valid signature in Flow library
 func validSignatureBytesFlow(t *rapid.T) []byte {
-	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "seed").([]byte)
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "seed").([]byte)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
 	hasher := NewExpandMsgXOFKMAC128("random_tag")
@@ -59,14 +59,14 @@ func validSignatureBytesFlow(t *rapid.T) []byte {
 
 // validPrivateKeyBytesBLST generates bytes of a valid private key in BLST library
 func validPrivateKeyBytesBLST(t *rapid.T) []byte {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	ikm := randomSlice.Draw(t, "ikm").([]byte)
 	return blst.KeyGen(ikm).Serialize()
 }
 
 // validPublicKeyBytesBLST generates bytes of a valid public key in BLST library
 func validPublicKeyBytesBLST(t *rapid.T) []byte {
-	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "ikm").([]byte)
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "ikm").([]byte)
 	blstS := blst.KeyGen(ikm)
 	blstG2 := new(blst.P2Affine).From(blstS)
 	return blstG2.Compress()
@@ -74,7 +74,7 @@ func validPublicKeyBytesBLST(t *rapid.T) []byte {
 
 // validSignatureBytesBLST generates bytes of a valid signature in BLST library
 func validSignatureBytesBLST(t *rapid.T) []byte {
-	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "ikm").([]byte)
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "ikm").([]byte)
 	blstS := blst.KeyGen(ikm[:])
 	blstG1 := new(blst.P1Affine).From(blstS)
 	return blstG1.Compress()
@@ -205,33 +205,20 @@ func testSignHashCrossBLST(t *rapid.T) {
 }
 
 func testKeyGenCrossBLST(t *rapid.T) {
-	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "seed").([]byte)
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMaxLen).Draw(t, "seed").([]byte)
 
 	skFlow, err := GeneratePrivateKey(BLSBLS12381, seed)
 	if err != nil {
 		assert.FailNow(t, "failed key generation")
 	}
 	skBLST := blst.KeyGen(seed)
-	assert.Equal(t, skFlow.Encode(), skBLST.Serialize())
-}
-
-func TestAAA(t *testing.T) {
-	seed := []byte{0x1, 0xea, 0x6a, 0x5, 0xff, 0x1, 0x65, 0xe, 0x5, 0x7, 0x0, 0x65, 0x5, 0x1b, 0x94, 0x1, 0x1, 0xa6, 0x6, 0x2e, 0xa7, 0x5, 0x0, 0x4, 0xa4, 0x25, 0x1, 0x3, 0x3, 0xcc, 0xa4, 0x41}
-
-	skFlow, err := GeneratePrivateKey(BLSBLS12381, seed)
-	if err != nil {
-		assert.FailNow(t, "failed key generation")
-	}
-	skBLST := blst.KeyGen(seed)
-	fmt.Println(skFlow.Encode())
-	fmt.Println(skBLST.Serialize())
 	assert.Equal(t, skFlow.Encode(), skBLST.Serialize())
 }
 
 func TestAgainstBLST(t *testing.T) {
+	rapid.Check(t, testKeyGenCrossBLST)
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
 	rapid.Check(t, testSignHashCrossBLST)
-	rapid.Check(t, testKeyGenCrossBLST)
 }
