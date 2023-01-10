@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime/debug"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -85,8 +85,9 @@ func main() {
 			case syscall.SIGKILL:
 				fallthrough
 			case syscall.SIGINT:
-				debug.PrintStack()
-				os.Exit(1)
+				buf := make([]byte, 1<<20)
+				stacklen := runtime.Stack(buf, true)
+				fmt.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 			default:
 				fmt.Printf("unknown signal %d, not handling\n", s)
 			}
