@@ -202,6 +202,19 @@ func NewMiddleware(
 
 	mw.Component = cm
 
+	mw.unicastRateLimiters.RegisterOnRateLimitedPeerFuncs(func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
+		mw.log.Warn().
+			Str("peer_id", peerID.String()).
+			Str("role", role).
+			Str("message_type", msgType).
+			Str("topic", topic.String()).
+			Str("reason", reason.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("disconnecting from rate-limited peer")
+
+		mw.libP2PNode.RequestPeerUpdate()
+	})
+
 	return mw
 }
 
@@ -553,9 +566,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		m.wg.Add(1)
+
 		go func() {
-			defer m.wg.Done()
 			m.processUnicastStreamMessage(remotePeer, &msg)
+			m.wg.Done()
 		}()
 	}
 
@@ -694,7 +708,6 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			return
 		}
 	}
-
 	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
 }
 

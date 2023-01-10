@@ -38,19 +38,19 @@ func WithDisabledRateLimiting(disabled bool) RateLimitersOption {
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
-	MessageRateLimiter   p2p.RateLimiter
-	BandWidthRateLimiter p2p.RateLimiter
-	OnRateLimitedPeer    OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
-	disabled             bool                  // flag allows rate limiter to collect metrics without rate limiting if set to false
+	MessageRateLimiter     p2p.RateLimiter
+	BandWidthRateLimiter   p2p.RateLimiter
+	onRateLimitedPeerFuncs []OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
+	disabled               bool                    // flag allows rate limiter to collect metrics without rate limiting if set to false
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, onRateLimitedPeer OnRateLimitedPeerFunc, opts ...RateLimitersOption) *RateLimiters {
+func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, opts ...RateLimitersOption) *RateLimiters {
 	r := &RateLimiters{
-		MessageRateLimiter:   messageLimiter,
-		BandWidthRateLimiter: bandwidthLimiter,
-		OnRateLimitedPeer:    onRateLimitedPeer,
-		disabled:             true,
+		MessageRateLimiter:     messageLimiter,
+		BandWidthRateLimiter:   bandwidthLimiter,
+		onRateLimitedPeerFuncs: make([]OnRateLimitedPeerFunc, 0),
+		disabled:               true,
 	}
 
 	for _, opt := range opts {
@@ -94,10 +94,16 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, originRole string, msgSi
 	return true
 }
 
+// RegisterOnRateLimitedPeerFuncs adds the given OnRateLimitedPeerFunc f to the list of rate limited peer callbacks.
+func (r *RateLimiters) RegisterOnRateLimitedPeerFuncs(f ...OnRateLimitedPeerFunc) *RateLimiters {
+	r.onRateLimitedPeerFuncs = append(r.onRateLimitedPeerFuncs, f...)
+	return r
+}
+
 // onRateLimitedPeer invokes the r.onRateLimitedPeer callback if it is not nil
 func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role string, msgType string, topic channels.Topic, reason RateLimitReason) {
-	if r.OnRateLimitedPeer != nil {
-		r.OnRateLimitedPeer(peerID, role, msgType, topic, reason)
+	for _, f := range r.onRateLimitedPeerFuncs {
+		f(peerID, role, msgType, topic, reason)
 	}
 }
 
