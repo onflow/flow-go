@@ -492,7 +492,7 @@ func findOneHighestButNoHigher(prefix []byte, height uint64, entity interface{},
 		key := it.Item().Key()
 		heightBytes := key[len(prefix):]
 
-		*actualHeight = d(heightBytes)
+		*actualHeight = d[uint64](heightBytes)
 
 		return it.Item().Value(func(val []byte) error {
 			err := msgpack.Unmarshal(val, entity)

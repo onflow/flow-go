@@ -140,13 +140,17 @@ func b(v interface{}) []byte {
 	}
 }
 
-// d is a reverse of b
-func d[T uint64](bytes []byte) (ret T) {
+// d is a reverse of b.
+// It decodes input bytes according to the return type T.
+// All types possible for T should be supported, hence no error should be possible provided the code compiles.
+func d[T uint64 | byte](bytes []byte) (ret T) {
 
 	// See https://stackoverflow.com/a/73382479
 	switch any(ret).(type) {
 	case uint64:
 		return T(binary.BigEndian.Uint64(bytes))
+	case byte:
+		return T(bytes[0])
 	}
 
 	return
