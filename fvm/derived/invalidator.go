@@ -2,7 +2,6 @@ package derived
 
 import (
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/meter"
 )
@@ -15,7 +14,7 @@ type MeterParamOverrides struct {
 
 type ProgramInvalidator TableInvalidator[
 	common.AddressLocation,
-	*interpreter.Program,
+	*Program,
 ]
 
 type MeterParamOverridesInvalidator TableInvalidator[
