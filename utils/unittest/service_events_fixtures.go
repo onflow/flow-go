@@ -146,7 +146,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
-// VersionBeaconFixtureByChainID returns an VersionTable service event as a Cadence event
+// VersionBeaconFixtureByChainID returns a VersionTable service event as a Cadence event
 // representation and as a protocol model representation.
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
 
