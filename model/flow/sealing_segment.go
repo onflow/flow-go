@@ -106,7 +106,7 @@ func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
-func (segment *SealingSegment) Lowest() *Block {
+func (segment *SealingSegment) Sealed() *Block {
 	return segment.Blocks[0]
 }
 
@@ -130,9 +130,9 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 	}
 
 	// sanity check
-	if seal.BlockID != segment.Lowest().ID() {
+	if seal.BlockID != segment.Sealed().ID() {
 		return nil, fmt.Errorf("finalized seal should seal the lowest block %v, but actually is to seal %v",
-			segment.Lowest().ID(), seal.BlockID)
+			segment.Sealed().ID(), seal.BlockID)
 	}
 	return seal, nil
 }

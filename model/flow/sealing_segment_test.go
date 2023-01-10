@@ -270,7 +270,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{root}, segment.Blocks)
 	require.Equal(suite.T(), segment.Highest().ID(), root.ID())
-	require.Equal(suite.T(), segment.Lowest().ID(), root.ID())
+	require.Equal(suite.T(), segment.Sealed().ID(), root.ID())
 }
 
 // TestBuild_RootSegmentWrongView tests that we return ErrSegmentInvalidRootView for

@@ -100,7 +100,7 @@ func Bootstrap(
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
 		highest := segment.Highest() // reference block of the snapshot
-		lowest := segment.Lowest()   // last sealed block
+		lowest := segment.Sealed()   // last sealed block
 
 		// 1) bootstrap the sealing segment
 		err = state.bootstrapSealingSegment(segment, highest)(tx)
@@ -257,7 +257,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
 		highest := segment.Highest()
-		lowest := segment.Lowest()
+		lowest := segment.Sealed()
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
@@ -706,8 +706,8 @@ func (state *State) populateCache() error {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
 	state.rootHeight = rootHeight
-	var sporkRootBlockHeight uint64
-	err = state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+
+	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
 	if err != nil {
 		return fmt.Errorf("could not read spork root block height: %w", err)
 	}

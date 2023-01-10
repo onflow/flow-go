@@ -220,7 +220,7 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	}
 
 	highest := segment.Highest() // reference block of the snapshot
-	lowest := segment.Lowest()   // last sealed block
+	lowest := segment.Sealed()   // last sealed block
 	highestID := highest.ID()
 	lowestID := lowest.ID()
 

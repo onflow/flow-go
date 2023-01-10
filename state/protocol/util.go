@@ -65,15 +65,15 @@ func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.Ide
 // IsSporkRootSnapshot returns whether the given snapshot is the state snapshot
 // representing the initial state for a spork.
 func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
-	segment, err := snapshot.SealingSegment()
+	sporkRootBlockHeight, err := snapshot.Params().SporkRootBlockHeight()
+	if err != nil {
+		return false, fmt.Errorf("could not get snapshot root block height: %w", err)
+	}
+	head, err := snapshot.Head()
 	if err != nil {
 		return false, fmt.Errorf("could not get snapshot head: %w", err)
 	}
-	if len(segment.Blocks) > 1 {
-		// spork root snapshots uniquely have only one block in the sealing segment
-		return false, nil
-	}
-	return true, nil
+	return head.Height == sporkRootBlockHeight, nil
 }
 
 // PreviousEpochExists returns whether the previous epoch exists w.r.t. the given
