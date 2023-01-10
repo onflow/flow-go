@@ -38,11 +38,11 @@ import "C"
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/hkdf"
-	"golang.org/x/crypto/sha3"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -253,14 +253,14 @@ func IsBLSSignatureIdentity(s Signature) bool {
 	return bytes.Equal(s, identityBLSSignature)
 }
 
-// generatePrivateKey generates a private key for BLS on BLS12-381 curve.
-// The minimum size of the input seed is 48 bytes.
+// generatePrivateKey deterministically generates a private key for BLS on BLS12-381 curve.
+// The minimum size of the input seed is 32 bytes.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have enough entropy and should be sampled uniformly at random.
+// Otherwise, the seed must have enough entropy.
 //
-// The generated private key (resp. its corresponding public key) are guaranteed
-// not to be equal to the identity element of Z_r (resp. G2).
+// The generated private key (resp. its corresponding public key) is guaranteed
+// to not be equal to the identity element of Z_r (resp. G2).
 func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 	if len(ikm) < KeyGenSeedMinLen || len(ikm) > KeyGenSeedMaxLen {
 		return nil, invalidInputsErrorf(
@@ -270,12 +270,9 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	// HKDF parameters
 
-	// use SHA3-256 as the building block H in HKDF
-	hashFunction := sha3.New256
+	// use SHA2-256 as the building block H in HKDF
+	hashFunction := sha256.New
 	// salt = H(UTF-8("BLS-SIG-KEYGEN-SALT-")) as per draft-irtf-cfrg-bls-signature-05 section 2.3.
-	// Note that UTF-8 is used as the non-ambiguous encoding, as it is the serialization method
-	// used by golang, although IETF draft uses ASCII.
-	// TODO: swtich to ASCII for better compatibility with other implementations
 	saltString := "BLS-SIG-KEYGEN-SALT-"
 	hasher := hashFunction()
 	hasher.Write([]byte(saltString))
@@ -283,14 +280,15 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 	hasher.Sum(salt[:0])
 
 	// L is the OKM length
-	// L = ceil((3 * ceil(log2(r))) / 16) which makes L  (security bits/8)-larger than r size
+	// L = ceil((3 * ceil(log2(r))) / 16) which makes L (security_bits/8)-larger than r size
 	okmLength := (3 * PrKeyLenBLSBLS12381) / 2
 
 	// HKDF secret = IKM || I2OSP(0, 1)
-	secret := append(ikm, byte(0))
+	secret := make([]byte, len(ikm)+1)
+	copy(secret, ikm)
 	defer overwrite(secret) // overwrite secret
 	// HKDF info = key_info || I2OSP(L, 2)
-	keyInfo := "" // use empty key diversifier
+	keyInfo := "" // use empty key diversifier. TODO: update header to accept input identifier
 	info := append([]byte(keyInfo), byte(okmLength>>8), byte(okmLength))
 
 	sk := newPrKeyBLSBLS12381(nil)

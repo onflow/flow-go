@@ -195,7 +195,7 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *ecdsa.PrivateKey {
 // deterministically using the input seed.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have enough entropy and should be sampled uniformly at random.
+// The seed must have enough entropy.
 func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLen || len(seed) > KeyGenSeedMaxLen {
 		return nil, invalidInputsErrorf("seed byte length should be between %d and %d",
