@@ -17,6 +17,7 @@ package crypto
 // from the standard as both libraries are being developed.
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -203,9 +204,34 @@ func testSignHashCrossBLST(t *rapid.T) {
 	assert.Equal(t, sigBytesBLST, sigBytesFlow)
 }
 
+func testKeyGenCrossBLST(t *rapid.T) {
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLen, KeyGenSeedMinLen+32).Draw(t, "seed").([]byte)
+
+	skFlow, err := GeneratePrivateKey(BLSBLS12381, seed)
+	if err != nil {
+		assert.FailNow(t, "failed key generation")
+	}
+	skBLST := blst.KeyGen(seed)
+	assert.Equal(t, skFlow.Encode(), skBLST.Serialize())
+}
+
+func TestAAA(t *testing.T) {
+	seed := []byte{0x1, 0xea, 0x6a, 0x5, 0xff, 0x1, 0x65, 0xe, 0x5, 0x7, 0x0, 0x65, 0x5, 0x1b, 0x94, 0x1, 0x1, 0xa6, 0x6, 0x2e, 0xa7, 0x5, 0x0, 0x4, 0xa4, 0x25, 0x1, 0x3, 0x3, 0xcc, 0xa4, 0x41}
+
+	skFlow, err := GeneratePrivateKey(BLSBLS12381, seed)
+	if err != nil {
+		assert.FailNow(t, "failed key generation")
+	}
+	skBLST := blst.KeyGen(seed)
+	fmt.Println(skFlow.Encode())
+	fmt.Println(skBLST.Serialize())
+	assert.Equal(t, skFlow.Encode(), skBLST.Serialize())
+}
+
 func TestAgainstBLST(t *testing.T) {
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
 	rapid.Check(t, testSignHashCrossBLST)
+	rapid.Check(t, testKeyGenCrossBLST)
 }
