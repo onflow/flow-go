@@ -21,41 +21,53 @@ var (
 type Tracer interface {
 	ReadyDoneAware
 
-	// StartBlockSpan starts an span for a block, built as a child of rootSpan
-	// it also returns the context including this span which can be used for nested calls.
-	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	// StartBlockSpan starts an span for a block, built as a child of rootSpan.
+	// It also returns the context including this span which can be used for
+	// nested calls.
 	StartBlockSpan(
 		ctx context.Context,
 		blockID flow.Identifier,
 		spanName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
-	) (otelTrace.Span, context.Context, bool)
+	) (
+		otelTrace.Span,
+		context.Context,
+	)
 
-	// StartCollectionSpan starts an span for a collection, built as a child of rootSpan
-	// it also returns the context including this span which can be used for nested calls.
-	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	// StartCollectionSpan starts an span for a collection, built as a child of
+	// rootSpan.  It also returns the context including this span which can be
+	// used for nested calls.
 	StartCollectionSpan(
 		ctx context.Context,
 		collectionID flow.Identifier,
 		spanName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
-	) (otelTrace.Span, context.Context, bool)
+	) (
+		otelTrace.Span,
+		context.Context,
+	)
 
-	// StartTransactionSpan starts an span for a transaction, built as a child of rootSpan
-	// it also returns the context including this span which can be used for nested calls.
-	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	// StartTransactionSpan starts an span for a transaction, built as a child
+	// of rootSpan.  It also returns the context including this span which can
+	// be used for nested calls.
 	StartTransactionSpan(
 		ctx context.Context,
 		transactionID flow.Identifier,
 		spanName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
-	) (otelTrace.Span, context.Context, bool)
+	) (
+		otelTrace.Span,
+		context.Context,
+	)
 
 	StartSpanFromContext(
 		ctx context.Context,
 		operationName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
-	) (otelTrace.Span, context.Context)
+	) (
+		otelTrace.Span,
+		context.Context,
+	)
 
 	StartSpanFromParent(
 		parentSpan otelTrace.Span,

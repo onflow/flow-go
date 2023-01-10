@@ -170,7 +170,7 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.systemBadVerifier.SystemChunkVerify(vch)
+	_, chFault, err := s.systemBadVerifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, chFault)
@@ -180,30 +180,9 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.systemOkVerifier.SystemChunkVerify(vch)
+	_, chFault, err := s.systemOkVerifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFault)
-}
-
-// TestVerifyWrongChunkType evaluates that following invocations return an error:
-// - verifying a system chunk with Verify method.
-// - verifying a non-system chunk with SystemChunkVerify method.
-func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
-	// defines verifiable chunk for a system chunk
-	svc := &verification.VerifiableChunkData{
-		IsSystemChunk: true,
-	}
-	// invoking Verify method with system chunk should return an error
-	_, _, err := s.verifier.Verify(svc)
-	require.Error(s.T(), err)
-
-	// defines verifiable chunk for a non-system chunk
-	vc := &verification.VerifiableChunkData{
-		IsSystemChunk: false,
-	}
-	// invoking SystemChunkVerify method with a non-system chunk should return an error
-	_, _, err = s.verifier.SystemChunkVerify(vc)
-	require.Error(s.T(), err)
 }
 
 // TestEmptyCollection tests verification behaviour if a

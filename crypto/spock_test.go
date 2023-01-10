@@ -72,8 +72,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	t.Run("identity proof", func(t *testing.T) {
 		// verifying with a pair of (proof, publicKey) equal to (identity_signature, identity_key) should
 		// return false
-		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = identityBLSSignatureHeader
+		identityProof := identityBLSSignature
 		result, err := SPOCKVerifyAgainstData(IdentityBLSPublicKey(), identityProof, data, kmac)
 		assert.NoError(t, err)
 		assert.False(t, result)
@@ -170,8 +169,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 	t.Run("identity proof", func(t *testing.T) {
 		// verifying with either pair of (proof, publicKey) equal to (identity_signature, identity_key) should
 		// return falsen with any other (proof, key) pair.
-		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = identityBLSSignatureHeader
+		identityProof := identityBLSSignature
 		result, err := SPOCKVerify(IdentityBLSPublicKey(), identityProof, sk2.PublicKey(), pr2)
 		assert.NoError(t, err)
 		assert.False(t, result)

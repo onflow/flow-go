@@ -96,17 +96,13 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	block := proposal.Block.ToInternal()
 	header := block.Header
 
-	var traceID string
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", header.ProposerID.String()),
-		)
-		traceID = span.SpanContext().TraceID().String()
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	span.SetAttributes(
+		attribute.Int64("view", int64(header.View)),
+		attribute.String("origin_id", originID.String()),
+		attribute.String("proposer", header.ProposerID.String()),
+	)
+	traceID := span.SpanContext().TraceID().String()
 	defer span.End()
 
 	log := c.log.With().
@@ -279,12 +275,10 @@ func (c *Core) processBlockProposal(block *flow.Block, inRangeBlockResponse bool
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.ConCompProcessBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("proposer", header.ProposerID.String()),
-		)
-	}
+	span, ctx := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.ConCompProcessBlockProposal)
+	span.SetAttributes(
+		attribute.String("proposer", header.ProposerID.String()),
+	)
 	defer span.End()
 
 	log := c.log.With().
@@ -344,12 +338,10 @@ func (c *Core) processBlockProposal(block *flow.Block, inRangeBlockResponse bool
 // OnBlockVote handles incoming block votes.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("origin_id", originID.String()),
-		)
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
+	span.SetAttributes(
+		attribute.String("origin_id", originID.String()),
+	)
 	defer span.End()
 
 	v := &model.Vote{

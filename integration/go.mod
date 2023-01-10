@@ -17,13 +17,13 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
-	github.com/onflow/cadence v0.31.0
+	github.com/onflow/cadence v0.31.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221224000200-457c757f0c70
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221224000200-457c757f0c70
 	github.com/onflow/flow-emulator v0.38.1
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20221012204608-ed91c80fee2b
-	github.com/onflow/flow-go-sdk v0.31.0
+	github.com/onflow/flow-go-sdk v0.31.2
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221130185733-92eb85ead310
@@ -34,6 +34,7 @@ require (
 	go.einride.tech/pid v0.1.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 )
@@ -278,8 +279,7 @@ require (
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.1.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
-	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/term v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect

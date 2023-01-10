@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Suite represents a test suite evaluating the integration of the testnet against
-// happy path of Corrupted Conduit Framework (CCF) for BFT testing.
+// Suite represents a test suite evaluating the correctness of different p2p topic validator
+// validation conditions.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger

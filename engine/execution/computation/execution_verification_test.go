@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -194,7 +193,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// ensure fee deduction events are emitted even though tx fails
 		require.Len(t, cr.Events[1], 3)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -264,8 +263,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 10, transactionEvents)
 
-		// insufficient account balance error as account is at minimum account balance and inclusion fee is non-zero
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
@@ -480,7 +478,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -764,12 +762,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		_, fault, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
 		assert.Nil(t, fault)
 	}
