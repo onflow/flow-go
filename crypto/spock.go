@@ -6,7 +6,7 @@ package crypto
 // SPoCK design based on the BLS signature scheme.
 // BLS is using BLS12-381 curve and the same settings in bls.go.
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include
+// #cgo CFLAGS: -g -Wall -std=c99
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"

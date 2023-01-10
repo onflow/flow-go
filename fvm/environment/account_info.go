@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -101,7 +102,7 @@ func (info ParseRestrictedAccountInfo) GetAccount(
 }
 
 type accountInfo struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts        Accounts
@@ -111,7 +112,7 @@ type accountInfo struct {
 }
 
 func NewAccountInfo(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 	systemContracts *SystemContracts,
@@ -132,7 +133,7 @@ func (info *accountInfo) GetStorageUsed(
 	uint64,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetStorageUsed).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetStorageUsed).End()
 
 	err := info.meter.MeterComputation(ComputationKindGetStorageUsed, 1)
 	if err != nil {
@@ -161,7 +162,7 @@ func (info *accountInfo) GetStorageCapacity(
 	uint64,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetStorageCapacity).End()
 
 	err := info.meter.MeterComputation(ComputationKindGetStorageCapacity, 1)
 	if err != nil {
@@ -185,7 +186,7 @@ func (info *accountInfo) GetAccountBalance(
 	uint64,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountBalance).End()
 
 	err := info.meter.MeterComputation(ComputationKindGetAccountBalance, 1)
 	if err != nil {
@@ -205,7 +206,7 @@ func (info *accountInfo) GetAccountAvailableBalance(
 	uint64,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(
+	defer info.tracer.StartChildSpan(
 		trace.FVMEnvGetAccountAvailableBalance).End()
 
 	err := info.meter.MeterComputation(
@@ -228,7 +229,7 @@ func (info *accountInfo) GetAccount(
 	*flow.Account,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetAccount).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccount).End()
 
 	account, err := info.accounts.Get(address)
 	if err != nil {

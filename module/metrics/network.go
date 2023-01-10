@@ -74,7 +74,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.inboundMessageSize = promauto.NewHistogramVec(
@@ -84,7 +84,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.duplicateMessagesDropped = promauto.NewCounterVec(
@@ -93,7 +93,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.dnsLookupDuration = promauto.NewHistogram(
@@ -237,18 +237,18 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 }
 
 // OutboundMessageSent collects metrics related to a message sent by the node.
-func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic string, messageType string) {
-	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic, protocol, messageType string) {
+	nc.outboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
 // InboundMessageReceived collects metrics related to a message received by the node.
-func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic string, messageType string) {
-	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic, protocol, messageType string) {
+	nc.inboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
 // DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
-func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, messageType string) {
-	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
+func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, messageType string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic, protocol, messageType).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {

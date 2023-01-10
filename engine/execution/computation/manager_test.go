@@ -848,6 +848,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
