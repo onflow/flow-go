@@ -163,12 +163,6 @@ func Bootstrap(
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
-		blocksById := make(map[flow.Identifier]*flow.Block, len(segment.Blocks))
-
-		for _, block := range segment.Blocks {
-			blocksById[block.ID()] = block
-		}
-
 		for _, result := range segment.ExecutionResults {
 			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
 			if err != nil {
@@ -187,8 +181,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
 		}
-
-		resultsByID := segment.ExecutionResults.Lookup()
 
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
@@ -223,37 +215,11 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
-			// add results to a lookup map for service events index
-			for _, result := range block.Payload.Results {
-				resultsByID[result.ID()] = result
-			}
-
-			// for all but the first block in the segment, index the parent->child relationship and search for service events to index
-			// It is possible, however unlikely, that sealing segment contains service events taking effect within the segment's blocks.
+			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
 				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
-				}
-
-				// by sealingSegment definition blocks are in ascending height order
-				parent := segment.Blocks[i-1]
-
-				for _, seal := range parent.Payload.Seals {
-					// check if results is outside the segment, since its cheaper in-memory check
-					resultID := seal.ResultID
-					result, has := resultsByID[resultID]
-
-					if !has {
-						return fmt.Errorf("blocks (id=%s) from sealing segment references seal (id=%s) for results (id=%s) which does not exist in other blocks or segment ExecutionResults", parent.ID(), seal, resultID)
-					}
-
-					for _, versionBeacon := range flow.FilterServiceEvents[*flow.VersionBeacon](result.ServiceEvents) {
-						err = transaction.WithTx(operation.IndexVersionBeaconByHeight(versionBeacon, block.Header.Height))(tx)
-						if err != nil {
-							return fmt.Errorf("could not insert version beacon for height=%d: %w", block.Header.Height, err)
-						}
-					}
 				}
 			}
 		}
