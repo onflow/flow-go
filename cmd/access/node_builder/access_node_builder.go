@@ -3,7 +3,6 @@ package node_builder
 import (
 	"context"
 	"crypto/tls"
-  "encoding/json"
 	"errors"
 	"fmt"
 	"os"
