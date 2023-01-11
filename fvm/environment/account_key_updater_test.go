@@ -13,18 +13,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/errors"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
 	akh := environment.NewAccountKeyUpdater(
-		nil,
+		tracing.NewTracerSpan(),
 		nil,
 		FakeAccounts{},
 		nil,

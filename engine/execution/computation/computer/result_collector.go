@@ -1,10 +1,13 @@
 package computer
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
@@ -37,13 +40,22 @@ type resultCollector struct {
 	metrics module.ExecutionMetrics
 
 	closeOnce sync.Once
-	wg        sync.WaitGroup
 
-	committer ViewCommitter
-	state     flow.StateCommitment
-	viewChan  chan state.View
+	committer          ViewCommitter
+	state              flow.StateCommitment
+	committerInputChan chan state.View
+	committerDoneChan  chan struct{}
+	committerError     error
 
-	eventsListChan chan flow.EventsList
+	eventHasherInputChan chan flow.EventsList
+	eventHasherDoneChan  chan struct{}
+	eventHasherError     error
+
+	signer               module.Local
+	spockHasher          hash.Hasher
+	spockHasherInputChan chan *delta.SpockSnapshot
+	spockHasherDoneChan  chan struct{}
+	spockHasherError     error
 
 	result *execution.ComputationResult
 }
@@ -53,31 +65,39 @@ func newResultCollector(
 	blockSpan otelTrace.Span,
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
+	signer module.Local,
+	spockHasher hash.Hasher,
 	block *entity.ExecutableBlock,
-	numChunks int,
+	numCollections int,
 ) *resultCollector {
 	collector := &resultCollector{
-		tracer:         tracer,
-		blockSpan:      blockSpan,
-		metrics:        metrics,
-		committer:      committer,
-		state:          *block.StartState,
-		viewChan:       make(chan state.View, numChunks),
-		eventsListChan: make(chan flow.EventsList, numChunks),
-		result:         execution.NewEmptyComputationResult(block),
+		tracer:               tracer,
+		blockSpan:            blockSpan,
+		metrics:              metrics,
+		committer:            committer,
+		state:                *block.StartState,
+		committerInputChan:   make(chan state.View, numCollections),
+		committerDoneChan:    make(chan struct{}),
+		eventHasherInputChan: make(chan flow.EventsList, numCollections),
+		eventHasherDoneChan:  make(chan struct{}),
+		signer:               signer,
+		spockHasher:          spockHasher,
+		spockHasherInputChan: make(chan *delta.SpockSnapshot, numCollections),
+		spockHasherDoneChan:  make(chan struct{}),
+		result:               execution.NewEmptyComputationResult(block),
 	}
 
-	collector.wg.Add(2)
-	go collector.runChunkCommitter()
-	go collector.runChunkHasher()
+	go collector.runCollectionCommitter()
+	go collector.runEventsHasher()
+	go collector.runSpockHasher()
 
 	return collector
 }
 
-func (collector *resultCollector) runChunkCommitter() {
-	defer collector.wg.Done()
+func (collector *resultCollector) runCollectionCommitter() {
+	defer close(collector.committerDoneChan)
 
-	for view := range collector.viewChan {
+	for view := range collector.committerInputChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXECommitDelta)
@@ -86,7 +106,8 @@ func (collector *resultCollector) runChunkCommitter() {
 			view,
 			collector.state)
 		if err != nil {
-			panic(err)
+			collector.committerError = fmt.Errorf("committer failed: %w", err)
+			return
 		}
 
 		collector.result.StateCommitments = append(
@@ -102,17 +123,20 @@ func (collector *resultCollector) runChunkCommitter() {
 	}
 }
 
-func (collector *resultCollector) runChunkHasher() {
-	defer collector.wg.Done()
+func (collector *resultCollector) runEventsHasher() {
+	defer close(collector.eventHasherDoneChan)
 
-	for data := range collector.eventsListChan {
+	for data := range collector.eventHasherInputChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXEHashEvents)
 
 		rootHash, err := flow.EventsMerkleRootHash(data)
 		if err != nil {
-			panic(err)
+			collector.eventHasherError = fmt.Errorf(
+				"event hasher failed: %w",
+				err)
+			return
 		}
 
 		collector.result.EventsHashes = append(
@@ -123,6 +147,27 @@ func (collector *resultCollector) runChunkHasher() {
 	}
 }
 
+func (collector *resultCollector) runSpockHasher() {
+	defer close(collector.spockHasherDoneChan)
+
+	for snapshot := range collector.spockHasherInputChan {
+		spock, err := collector.signer.SignFunc(
+			snapshot.SpockSecret,
+			collector.spockHasher,
+			SPOCKProve)
+		if err != nil {
+			collector.spockHasherError = fmt.Errorf(
+				"spock hasher failed: %w",
+				err)
+			return
+		}
+
+		collector.result.SpockSignatures = append(
+			collector.result.SpockSignatures,
+			spock)
+	}
+}
+
 func (collector *resultCollector) AddTransactionResult(
 	collectionIndex int,
 	txn *fvm.TransactionProcedure,
@@ -130,54 +175,71 @@ func (collector *resultCollector) AddTransactionResult(
 	collector.result.AddTransactionResult(collectionIndex, txn)
 }
 
-type ExecutionStats struct {
-	ComputationUsed                 uint64
-	MemoryUsed                      uint64
-	EventCounts                     int
-	EventSize                       int
-	NumberOfRegistersTouched        int
-	NumberOfBytesWrittenToRegisters int
-	NumberOfTransactions            int
-}
-
 func (collector *resultCollector) CommitCollection(
-	collectionIndex int,
 	collection collectionItem,
 	collectionView state.View,
-) ExecutionStats {
+) module.ExecutionResultStats {
 
-	collector.viewChan <- collectionView
-	collector.eventsListChan <- collector.result.Events[collectionIndex]
-
-	viewSnapshot := collectionView.(*delta.View).Interactions()
-	collector.result.AddStateSnapshot(viewSnapshot)
-	collector.result.UpdateTransactionResultIndex(len(collection.Transactions))
-
-	compUsed, memUsed := collector.result.ChunkComputationAndMemoryUsed(
-		collectionIndex)
-	eventCounts, eventSize := collector.result.ChunkEventCountsAndSize(
-		collectionIndex)
-
-	return ExecutionStats{
-		ComputationUsed:                 compUsed,
-		MemoryUsed:                      memUsed,
-		EventCounts:                     eventCounts,
-		EventSize:                       eventSize,
-		NumberOfRegistersTouched:        viewSnapshot.NumberOfRegistersTouched,
-		NumberOfBytesWrittenToRegisters: viewSnapshot.NumberOfBytesWrittenToRegisters,
-		NumberOfTransactions:            len(collection.Transactions),
+	select {
+	case collector.committerInputChan <- collectionView:
+		// Do nothing
+	case <-collector.committerDoneChan:
+		// Committer exited (probably due to an error)
 	}
+
+	select {
+	case collector.eventHasherInputChan <- collector.result.Events[collection.collectionIndex]:
+		// Do nothing
+	case <-collector.eventHasherDoneChan:
+		// Events hasher exited (probably due to an error)
+	}
+
+	snapshot := collectionView.(*delta.View).Interactions()
+	select {
+	case collector.spockHasherInputChan <- snapshot:
+		// do nothing
+	case <-collector.spockHasherDoneChan:
+		// Spock hasher exited (probably due to an error)
+	}
+
+	collector.result.AddCollection(snapshot)
+	return collector.result.CollectionStats(collection.collectionIndex)
 }
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
-		close(collector.viewChan)
-		close(collector.eventsListChan)
+		close(collector.committerInputChan)
+		close(collector.eventHasherInputChan)
+		close(collector.spockHasherInputChan)
 	})
 }
 
-func (collector *resultCollector) Finalize() *execution.ComputationResult {
+func (collector *resultCollector) Finalize() (
+	*execution.ComputationResult,
+	error,
+) {
 	collector.Stop()
-	collector.wg.Wait()
-	return collector.result
+
+	<-collector.committerDoneChan
+	<-collector.eventHasherDoneChan
+	<-collector.spockHasherDoneChan
+
+	var err error
+	if collector.committerError != nil {
+		err = multierror.Append(err, collector.committerError)
+	}
+
+	if collector.eventHasherError != nil {
+		err = multierror.Append(err, collector.eventHasherError)
+	}
+
+	if collector.spockHasherError != nil {
+		err = multierror.Append(err, collector.spockHasherError)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return collector.result, nil
 }

@@ -28,13 +28,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -50,6 +51,10 @@ import (
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	rag := &RandomAddressGenerator{}
+
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	t.Run("single collection", func(t *testing.T) {
 
@@ -73,14 +78,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
+			mock.Anything,  // duration
+			mock.Anything). // stats
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
@@ -106,7 +105,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, exemetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			exemetrics,
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -116,7 +123,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			block,
+			view,
+			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
@@ -144,12 +155,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -195,7 +214,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
@@ -227,7 +246,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			ctx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			comm,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -263,7 +290,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -275,7 +310,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -414,7 +449,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return emittingRuntime
 					})))
 
@@ -431,14 +466,22 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
@@ -493,7 +536,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
@@ -510,7 +553,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -524,7 +575,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -585,7 +636,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
@@ -602,7 +653,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -614,7 +673,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -807,7 +866,19 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		trackerStorage,
 	)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -815,7 +886,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+	_, err = exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -853,14 +924,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedNumberOfEvents := 2
 	expectedEventSize := 912
 	metrics.On("ExecutionCollectionExecuted",
-		mock.Anything, // duration
-		mock.Anything, // computation used
-		mock.Anything, // memory used
-		expectedNumberOfEvents,
-		expectedEventSize,
-		49,   // expected number of registers touched
-		3404, // expected number of bytes written
-		1).   // expected number of transactions
+		mock.Anything,  // duration
+		mock.Anything). // stats
 		Return(nil).
 		Times(1) // system collection
 
@@ -886,7 +951,19 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		trackerStorage,
 	)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+	me := new(modulemock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics,
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer,
+		me,
+		prov)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
@@ -894,12 +971,29 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	view := delta.NewView(ledger.Get)
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
 	assert.Len(t, result.TransactionResults, 1)
 
 	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+
+	stats := result.CollectionStats(0)
+	// ignore computation and memory used
+	stats.ComputationUsed = 0
+	stats.MemoryUsed = 0
+
+	assert.Equal(
+		t,
+		module.ExecutionResultStats{
+			EventCounts:                     expectedNumberOfEvents,
+			EventSize:                       expectedEventSize,
+			NumberOfRegistersTouched:        50,
+			NumberOfBytesWrittenToRegisters: 3404,
+			NumberOfCollections:             1,
+			NumberOfTransactions:            1,
+		},
+		stats)
 
 	committer.AssertExpectations(t)
 }

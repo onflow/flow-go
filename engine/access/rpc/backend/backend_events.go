@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -68,7 +69,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	for i := startHeight; i <= endHeight; i++ {
 		header, err := b.headers.ByHeight(i)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)
@@ -93,7 +94,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, convertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
 		}
 
 		blockHeaders = append(blockHeaders, header)
@@ -119,7 +120,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		return []flow.BlockEvents{}, nil
 	}
 
-	req := execproto.GetEventsForBlockIDsRequest{
+	req := &execproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
@@ -192,7 +193,7 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
 	var errors *multierror.Error
 	// try to get events from one of the execution nodes
 	for _, execNode := range execNodes {
@@ -207,14 +208,14 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
+	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)

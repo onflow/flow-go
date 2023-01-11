@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -29,14 +31,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-// Creating a node fixture with defaultAddress lets libp2p runs it on an
-// allocated port by OS. So after fixture created, its address would be
-// "0.0.0.0:<selected-port-by-os>
-const defaultAddress = "0.0.0.0:0"
 
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
 func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
@@ -59,7 +57,7 @@ func NodeFixture(
 		HandlerFunc: func(network.Stream) {},
 		Unicasts:    nil,
 		Key:         NetworkingKeyFixtures(t),
-		Address:     defaultAddress,
+		Address:     unittest.DefaultAddress,
 		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
 		Role:        flow.RoleCollection,
 	}
@@ -84,7 +82,8 @@ func NodeFixture(
 		metrics.NewNoopCollector(),
 		parameters.Address,
 		parameters.Key,
-		sporkID).
+		sporkID,
+		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
@@ -306,5 +305,72 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			require.NoError(t, err)
 			require.NoError(t, node.AddPeer(ctx, otherPInfo))
 		}
+	}
+}
+
+// EnsureConnected ensures that the given nodes are connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, node := range nodes {
+		for _, other := range nodes {
+			if node == other {
+				continue
+			}
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
+		}
+	}
+}
+
+// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
+func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}
+
+// EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
+// Note: EnsureConnected() must be called to connect all nodes before calling this function.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]p2p.Subscription, len(nodes))
+	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+	for i, node := range nodes {
+		ps, err := node.Subscribe(
+			topic,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.NetworkCodec(),
+				slashingViolationsConsumer,
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+		subs[i] = ps
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for _, node := range nodes {
+		// creates a unique message to be published by the node
+		msg, _ := messageFactory()
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+		require.NoError(t, node.Publish(ctx, topic, data))
+
+		// wait for the message to be received by all nodes
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+		cancel()
 	}
 }

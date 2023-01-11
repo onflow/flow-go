@@ -3,11 +3,12 @@ package access
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -33,7 +34,7 @@ type ObserverSuite struct {
 }
 
 func (suite *ObserverSuite) TearDownTest() {
-	suite.teardown()
+	suite.net.Remove()
 }
 
 func (suite *ObserverSuite) SetupTest() {
@@ -78,30 +79,17 @@ func (suite *ObserverSuite) SetupTest() {
 
 	// start the network
 	ctx := context.Background()
-	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
+	err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
 		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
 		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
 	})
+	require.NoError(suite.T(), err)
 
-	if err != nil {
-		// this can happen occaisionally...
-		// usually it's because docker didn't remove the observer container during the previous test.
-		// the observer container is removed by an "AutoRemove" flag in AddObserver.
-		panic(err)
-	}
-
-	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
-
-	// set the teardown function
-	suite.teardown = func() {
-		stop()
-		suite.net.Remove()
-	}
+	suite.net.Start(ctx)
 }
 
 func (suite *ObserverSuite) TestObserverConnection() {
@@ -116,6 +104,30 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	// ping the observer while the access container is running
 	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
 	assert.NoError(t, err)
+}
+
+func (suite *ObserverSuite) TestObserverCompareRPCs() {
+	ctx := context.Background()
+	t := suite.T()
+
+	// get an observer and access client
+	observer, err := suite.getObserverClient()
+	assert.NoError(t, err)
+
+	access, err := suite.getAccessClient()
+	assert.NoError(t, err)
+
+	// verify that both clients return the same errors
+	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
+		t.Run(rpc.name, func(t *testing.T) {
+			accessErr := rpc.call(ctx, access)
+			observerErr := rpc.call(ctx, observer)
+			assert.Equal(t, accessErr, observerErr)
+		})
+	}
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
@@ -163,36 +175,12 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 
 }
 
-func (suite *ObserverSuite) TestObserverCompareRPCs() {
-	ctx := context.Background()
-	t := suite.T()
-
-	// get an observer and access client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
-
-	access, err := suite.getAccessClient()
-	assert.NoError(t, err)
-
-	// verify that both clients return the same errors
-	for _, rpc := range suite.getRPCs() {
-		if _, local := suite.local[rpc.name]; local {
-			continue
-		}
-		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access)
-			observerErr := rpc.call(ctx, observer)
-			assert.Equal(t, accessErr, observerErr)
-		})
-	}
-}
-
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+	return suite.getClient(net.JoinHostPort("localhost", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {

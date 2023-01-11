@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -40,16 +41,24 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
+const (
+	defaultMemoryLimitRatio     = 0.2 // flow default
+	defaultFileDescriptorsRatio = 0.5 // libp2p default
+)
+
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
-type CreateNodeFunc func(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode
+type CreateNodeFunc func(logger zerolog.Logger,
+	host host.Host,
+	pCache *p2pnode.ProtocolPeerCache,
+	uniMgr *unicast.Manager,
+	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(
-	log zerolog.Logger,
+func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
@@ -58,13 +67,25 @@ func DefaultLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
+	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
-) LibP2PFactoryFunc {
+	rCfg *ResourceManagerConfig) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		builder := DefaultNodeBuilder(log, address, flowKey, sporkId, idProvider, metrics, resolver, role, onInterceptPeerDialFilters, onInterceptSecuredFilters, peerScoringEnabled, connectionPruning, updateInterval)
+		builder := DefaultNodeBuilder(log,
+			address,
+			flowKey,
+			sporkId,
+			idProvider,
+			metrics,
+			resolver,
+			role,
+			onInterceptPeerDialFilters,
+			onInterceptSecuredFilters,
+			peerScoringEnabled,
+			connectionPruning,
+			updateInterval,
+			rCfg)
 		return builder.Build()
 	}
 }
@@ -83,15 +104,31 @@ type NodeBuilder interface {
 	Build() (p2p.LibP2PNode, error)
 }
 
+// ResourceManagerConfig returns the resource manager configuration for the libp2p node.
+// The resource manager is used to limit the number of open connections and streams (as well as any other resources
+// used by libp2p) for each peer.
+type ResourceManagerConfig struct {
+	MemoryLimitRatio     float64 // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+}
+
+func DefaultResourceManagerConfig() *ResourceManagerConfig {
+	return &ResourceManagerConfig{
+		MemoryLimitRatio:     defaultMemoryLimitRatio,
+		FileDescriptorsRatio: defaultFileDescriptorsRatio,
+	}
+}
+
 type LibP2PNodeBuilder struct {
 	sporkID                     flow.Identifier
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
-	metrics                     module.NetworkMetrics
+	metrics                     module.LibP2PMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
+	resourceManagerCfg          *ResourceManagerConfig
 	connManager                 connmgr.ConnManager
 	connGater                   connmgr.ConnectionGater
 	idProvider                  module.IdentityProvider
@@ -105,13 +142,12 @@ type LibP2PNodeBuilder struct {
 	createNode                  CreateNodeFunc
 }
 
-func NewNodeBuilder(
-	logger zerolog.Logger,
-	metrics module.NetworkMetrics,
+func NewNodeBuilder(logger zerolog.Logger,
+	metrics module.LibP2PMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
-) *LibP2PNodeBuilder {
+	rCfg *ResourceManagerConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:              logger,
 		sporkID:             sporkID,
@@ -121,6 +157,7 @@ func NewNodeBuilder(
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 		metrics:             metrics,
+		resourceManagerCfg:  rCfg,
 	}
 }
 
@@ -219,6 +256,28 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	if builder.resourceManager != nil {
 		opts = append(opts, libp2p.ResourceManager(builder.resourceManager))
+		builder.logger.Warn().
+			Msg("libp2p resource manager is overridden by the node builder, metrics may not be available")
+	} else {
+		// setting up default resource manager, by hooking in the resource manager metrics reporter.
+		limits := rcmgr.DefaultLimits
+		libp2p.SetDefaultServiceLimits(&limits)
+
+		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
+		if err != nil {
+			return nil, fmt.Errorf("could not get allowed memory: %w", err)
+		}
+		fd, err := allowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
+		if err != nil {
+			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
+		}
+
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.Scale(mem, fd)), rcmgr.WithMetrics(builder.metrics))
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
+		}
+		opts = append(opts, libp2p.ResourceManager(mgr))
+		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
 	}
 
 	if builder.connManager != nil {
@@ -240,11 +299,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 
-	unicastManager := unicast.NewUnicastManager(
-		builder.logger,
-		unicast.NewLibP2PStreamFactory(h),
-		builder.sporkID,
-	)
+	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID)
 
 	var peerManager *connection.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
@@ -375,7 +430,11 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
-func DefaultCreateNodeFunc(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, uniMgr *unicast.Manager, peerManager *connection.PeerManager) p2p.LibP2PNode {
+func DefaultCreateNodeFunc(logger zerolog.Logger,
+	host host.Host,
+	pCache *p2pnode.ProtocolPeerCache,
+	uniMgr *unicast.Manager,
+	peerManager *connection.PeerManager) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, uniMgr, peerManager)
 }
 
@@ -385,15 +444,14 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
+	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	peerScoringEnabled bool,
 	connectionPruning bool,
 	updateInterval time.Duration,
-) NodeBuilder {
+	rCfg *ResourceManagerConfig) NodeBuilder {
 	connManager := connection.NewConnManager(log, metrics)
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
@@ -402,22 +460,14 @@ func DefaultNodeBuilder(log zerolog.Logger,
 
 	connGater := connection.NewConnGater(log,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)),
-	)
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId).
+	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(
-				ctx,
-				host,
-				unicast.FlowDHTProtocolID(sporkId),
-				log,
-				metrics,
-				dht.AsServer(),
-			)
+			return dht.NewDHT(ctx, host, unicast.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(connectionPruning, updateInterval).
 		SetCreateNode(DefaultCreateNodeFunc)

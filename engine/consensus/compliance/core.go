@@ -93,21 +93,18 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inBlockRangeResponse bool) error {
+	block := proposal.Block.ToInternal()
+	header := block.Header
 
-	var traceID string
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(proposal.Header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
-		)
-		traceID = span.SpanContext().TraceID().String()
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	span.SetAttributes(
+		attribute.Int64("view", int64(header.View)),
+		attribute.String("origin_id", originID.String()),
+		attribute.String("proposer", header.ProposerID.String()),
+	)
+	traceID := span.SpanContext().TraceID().String()
 	defer span.End()
 
-	header := proposal.Header
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
@@ -174,7 +171,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	if found {
 
 		// add the block to the cache
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -186,7 +183,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 
-		_ = c.pending.Add(originID, proposal)
+		_ = c.pending.Add(originID, block)
 
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
@@ -206,7 +203,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal, inBlockRangeResponse)
+	err = c.processBlockAndDescendants(block, inBlockRangeResponse)
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -225,11 +222,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
-	blockID := proposal.Header.ID()
+func (c *Core) processBlockAndDescendants(block *flow.Block, inRangeBlockResponse bool) error {
+	blockID := block.ID()
 
 	// process block itself
-	err := c.processBlockProposal(proposal, inRangeBlockResponse)
+	err := c.processBlockProposal(block, inRangeBlockResponse)
 	// child is outdated by the time we started processing it
 	// => node was probably behind and is catching up. Log as warning
 	if engine.IsOutdatedInputError(err) {
@@ -257,11 +254,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 		return nil
 	}
 	for _, child := range children {
-		childProposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		cpr := c.processBlockAndDescendants(childProposal, inRangeBlockResponse)
+		cpr := c.processBlockAndDescendants(child.Message, inRangeBlockResponse)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -276,19 +269,18 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRa
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+func (c *Core) processBlockProposal(block *flow.Block, inRangeBlockResponse bool) error {
+	header := block.Header
+
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("proposer", proposal.Header.ProposerID.String()),
-		)
-	}
+	span, ctx := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.ConCompProcessBlockProposal)
+	span.SetAttributes(
+		attribute.String("proposer", header.ProposerID.String()),
+	)
 	defer span.End()
 
-	header := proposal.Header
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -303,10 +295,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	block := &flow.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
 	err := c.state.Extend(ctx, block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
@@ -350,12 +338,10 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 // OnBlockVote handles incoming block votes.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("origin_id", originID.String()),
-		)
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
+	span.SetAttributes(
+		attribute.String("origin_id", originID.String()),
+	)
 	defer span.End()
 
 	v := &model.Vote{

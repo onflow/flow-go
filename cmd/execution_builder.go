@@ -43,8 +43,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -76,7 +76,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 const (
@@ -131,7 +133,7 @@ type ExecutionNode struct {
 	finalizedHeader         *synchronization.FinalizedHeaderCache
 	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
 	diskWAL                 *wal.DiskWAL
-	blockDataUploaders      []uploader.Uploader
+	blockDataUploader       *uploader.Manager
 	executionDataStore      execution_data.ExecutionDataStore
 	toTriggerCheckpoint     *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl             *ingestion.StopControl // stop the node at given block height
@@ -162,7 +164,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
-			return uploaderCommands.NewToggleUploaderCommand()
+			return uploaderCommands.NewToggleUploaderCommand(exeNode.blockDataUploader)
 		}).
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
@@ -191,9 +193,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
-		Component("provider engine", exeNode.LoadProviderEngine).
+		Component("blob service", exeNode.LoadBlobService).
+		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
+		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -234,6 +238,22 @@ func (exeNode *ExecutionNode) LoadSystemSpecs(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	exeNode.collector = metrics.NewExecutionCollector(node.Tracer)
+
+	// report the highest executed block height as soon as possible
+	// this is guaranteed to exist because LoadBootstrapper has inserted
+	// the root block as executed block
+	var height uint64
+	var blockID flow.Identifier
+	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	if err != nil {
+		// database has not been bootstrapped yet
+		if errors.Is(err, storageerr.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 	return nil
 }
 
@@ -256,104 +276,7 @@ func (exeNode *ExecutionNode) LoadPendingBlockCache(node *NodeConfig) error {
 	return nil
 }
 
-func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	// Since RetryableAsyncUploaderWrapper relies on executionDataService so we should create
-	// it after execution data service is fully setup.
-	if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.gcpBucketName != "" {
-		logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
-		gcpBucketUploader, err := uploader.NewGCPBucketUploader(
-			context.Background(),
-			exeNode.exeConf.gcpBucketName,
-			logger,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
-		}
-
-		asyncUploader := uploader.NewAsyncUploader(
-			gcpBucketUploader,
-			blockdataUploaderRetryTimeout,
-			blockDataUploaderMaxRetry,
-			logger,
-			exeNode.collector,
-		)
-
-		// Setting up RetryableUploader for GCP uploader
-		retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
-			asyncUploader,
-			node.Storage.Blocks,
-			node.Storage.Commits,
-			node.Storage.Collections,
-			exeNode.events,
-			exeNode.results,
-			exeNode.txResults,
-			storage.NewComputationResultUploadStatus(node.DB),
-			execution_data.NewDownloader(exeNode.blobService),
-			exeNode.collector)
-		if retryableUploader == nil {
-			return nil, errors.New("failed to create ComputationResult upload status store")
-		}
-
-		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, retryableUploader)
-
-		return retryableUploader, nil
-	}
-
-	// Since we don't have conditional component creation, we just use Noop one.
-	// It's functions will be once per startup/shutdown - non-measurable performance penalty
-	// blockDataUploader will stay nil and disable calling uploader at all
-	return &module.NoopReadyDoneAware{}, nil
-}
-
-func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	if exeNode.exeConf.enableBlockDataUpload && exeNode.exeConf.s3BucketName != "" {
-		logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
-
-		ctx := context.Background()
-		config, err := awsconfig.LoadDefaultConfig(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
-		}
-
-		client := s3.NewFromConfig(config)
-		s3Uploader := uploader.NewS3Uploader(
-			ctx,
-			client,
-			exeNode.exeConf.s3BucketName,
-			logger,
-		)
-		asyncUploader := uploader.NewAsyncUploader(
-			s3Uploader,
-			blockdataUploaderRetryTimeout,
-			blockDataUploaderMaxRetry,
-			logger,
-			exeNode.collector,
-		)
-
-		// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
-		// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
-		exeNode.blockDataUploaders = append(exeNode.blockDataUploaders, asyncUploader)
-
-		return asyncUploader, nil
-	}
-
-	// Since we don't have conditional component creation, we just use Noop one.
-	// It's functions will be once per startup/shutdown - non-measurable performance penalty
-	// blockDataUploader will stay nil and disable calling uploader at all
-	return &module.NoopReadyDoneAware{}, nil
-}
-
-func (exeNode *ExecutionNode) LoadProviderEngine(
+func (exeNode *ExecutionNode) LoadBlobService(
 	node *NodeConfig,
 ) (
 	module.ReadyDoneAware,
@@ -413,6 +336,128 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	// this configures peer manager to wait for the blobservice to be ready before starting
 	exeNode.blobserviceDependable.Init(bs)
 
+	// blob service's lifecycle is managed by the network layer
+	return &module.NoopReadyDoneAware{}, nil
+}
+
+func (exeNode *ExecutionNode) LoadBlockUploaderManager(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// blockDataUploader isn't a component, but needs to be initialized after the tracer, which is
+	// a component.
+	exeNode.blockDataUploader = uploader.NewManager(exeNode.builder.Tracer)
+	return &module.NoopReadyDoneAware{}, nil
+}
+
+func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// Since RetryableAsyncUploaderWrapper relies on executionDataService so we should create
+	// it after execution data service is fully setup.
+	if !exeNode.exeConf.enableBlockDataUpload || exeNode.exeConf.gcpBucketName == "" {
+		// Since we don't have conditional component creation, we just use Noop one.
+		// It's functions will be once per startup/shutdown - non-measurable performance penalty
+		// blockDataUploader will stay nil and disable calling uploader at all
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
+	gcpBucketUploader, err := uploader.NewGCPBucketUploader(
+		context.Background(),
+		exeNode.exeConf.gcpBucketName,
+		logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
+	}
+
+	asyncUploader := uploader.NewAsyncUploader(
+		gcpBucketUploader,
+		blockdataUploaderRetryTimeout,
+		blockDataUploaderMaxRetry,
+		logger,
+		exeNode.collector,
+	)
+
+	// Setting up RetryableUploader for GCP uploader
+	retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
+		asyncUploader,
+		node.Storage.Blocks,
+		node.Storage.Commits,
+		node.Storage.Collections,
+		exeNode.events,
+		exeNode.results,
+		exeNode.txResults,
+		storage.NewComputationResultUploadStatus(node.DB),
+		execution_data.NewDownloader(exeNode.blobService),
+		exeNode.collector)
+	if retryableUploader == nil {
+		return nil, errors.New("failed to create ComputationResult upload status store")
+	}
+
+	exeNode.blockDataUploader.AddUploader(retryableUploader)
+
+	return retryableUploader, nil
+}
+
+func (exeNode *ExecutionNode) LoadS3BlockDataUploader(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if !exeNode.exeConf.enableBlockDataUpload || exeNode.exeConf.s3BucketName == "" {
+		// Since we don't have conditional component creation, we just use Noop one.
+		// It's functions will be once per startup/shutdown - non-measurable performance penalty
+		// blockDataUploader will stay nil and disable calling uploader at all
+		return &module.NoopReadyDoneAware{}, nil
+	}
+	logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
+
+	ctx := context.Background()
+	config, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
+	}
+
+	client := s3.NewFromConfig(config)
+	s3Uploader := uploader.NewS3Uploader(
+		ctx,
+		client,
+		exeNode.exeConf.s3BucketName,
+		logger,
+	)
+	asyncUploader := uploader.NewAsyncUploader(
+		s3Uploader,
+		blockdataUploaderRetryTimeout,
+		blockDataUploaderMaxRetry,
+		logger,
+		exeNode.collector,
+	)
+
+	// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
+	// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
+	exeNode.blockDataUploader.AddUploader(asyncUploader)
+
+	return asyncUploader, nil
+}
+
+func (exeNode *ExecutionNode) LoadProviderEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if exeNode.blobService == nil {
+		return nil, errors.New("blob service is not initialized")
+	}
+
 	var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
 	if node.MetricsEnabled {
 		providerMetrics = metrics.NewExecutionDataProviderCollector()
@@ -422,7 +467,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.Logger,
 		providerMetrics,
 		execution_data.DefaultSerializer,
-		bs,
+		exeNode.blobService,
 		exeNode.executionDataTracker,
 	)
 
@@ -437,7 +482,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.State,
 		vmCtx,
 		ledgerViewCommitter,
-		exeNode.blockDataUploaders,
 		executionDataProvider,
 		exeNode.exeConf.computationConfig,
 	)
@@ -631,10 +675,6 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
-	if exeNode.exeConf.outputCheckpointV5 {
-		exeNode.diskWAL.UseCheckpointVersion5()
-	}
-
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
 		"ledger").Logger(), ledger.DefaultPathFinderVersion)
 	return exeNode.ledgerStorage, err
@@ -747,7 +787,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	if err == nil {
 		node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 		preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-	} else if err != nil && exeNode.exeConf.preferredExeNodeIDStr != "" {
+	} else if exeNode.exeConf.preferredExeNodeIDStr != "" {
 		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 	}
 
@@ -774,7 +814,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.exeConf.syncFast,
 		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
-		exeNode.blockDataUploaders,
+		exeNode.blockDataUploader,
 		exeNode.stopControl,
 	)
 

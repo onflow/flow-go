@@ -12,6 +12,8 @@ import (
 
 	common "github.com/onflow/cadence/runtime/common"
 
+	derived "github.com/onflow/flow-go/fvm/derived"
+
 	flow "github.com/onflow/flow-go/model/flow"
 
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
@@ -21,8 +23,6 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
-
-	programs "github.com/onflow/flow-go/fvm/programs"
 
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
@@ -34,6 +34,8 @@ import (
 
 	trace "github.com/onflow/flow-go/module/trace"
 
+	tracing "github.com/onflow/flow-go/fvm/tracing"
+
 	zerolog "github.com/rs/zerolog"
 )
 
@@ -42,13 +44,34 @@ type Environment struct {
 	mock.Mock
 }
 
-// AccountsStorageCapacity provides a mock function with given fields: addresses
-func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error) {
-	ret := _m.Called(addresses)
+// AccountKeysCount provides a mock function with given fields: address
+func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AccountsStorageCapacity provides a mock function with given fields: addresses, payer, maxTxFees
+func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer common.Address, maxTxFees uint64) (cadence.Value, error) {
+	ret := _m.Called(addresses, payer, maxTxFees)
 
 	var r0 cadence.Value
-	if rf, ok := ret.Get(0).(func([]common.Address) cadence.Value); ok {
-		r0 = rf(addresses)
+	if rf, ok := ret.Get(0).(func([]common.Address, common.Address, uint64) cadence.Value); ok {
+		r0 = rf(addresses, payer, maxTxFees)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(cadence.Value)
@@ -56,8 +79,8 @@ func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cade
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]common.Address) error); ok {
-		r1 = rf(addresses)
+	if rf, ok := ret.Get(1).(func([]common.Address, common.Address, uint64) error); ok {
+		r1 = rf(addresses, payer, maxTxFees)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -125,13 +148,13 @@ func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, e
 	return r0, r1
 }
 
-// BLSAggregatePublicKeys provides a mock function with given fields: keys
-func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
-	ret := _m.Called(keys)
+// BLSAggregatePublicKeys provides a mock function with given fields: publicKeys
+func (_m *Environment) BLSAggregatePublicKeys(publicKeys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
+	ret := _m.Called(publicKeys)
 
 	var r0 *stdlib.PublicKey
 	if rf, ok := ret.Get(0).(func([]*stdlib.PublicKey) *stdlib.PublicKey); ok {
-		r0 = rf(keys)
+		r0 = rf(publicKeys)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*stdlib.PublicKey)
@@ -140,7 +163,7 @@ func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func([]*stdlib.PublicKey) error); ok {
-		r1 = rf(keys)
+		r1 = rf(publicKeys)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -148,13 +171,13 @@ func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib
 	return r0, r1
 }
 
-// BLSAggregateSignatures provides a mock function with given fields: sigs
-func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
-	ret := _m.Called(sigs)
+// BLSAggregateSignatures provides a mock function with given fields: signatures
+func (_m *Environment) BLSAggregateSignatures(signatures [][]byte) ([]byte, error) {
+	ret := _m.Called(signatures)
 
 	var r0 []byte
 	if rf, ok := ret.Get(0).(func([][]byte) []byte); ok {
-		r0 = rf(sigs)
+		r0 = rf(signatures)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -163,7 +186,7 @@ func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func([][]byte) error); ok {
-		r1 = rf(sigs)
+		r1 = rf(signatures)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -171,20 +194,20 @@ func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return r0, r1
 }
 
-// BLSVerifyPOP provides a mock function with given fields: pk, s
-func (_m *Environment) BLSVerifyPOP(pk *stdlib.PublicKey, s []byte) (bool, error) {
-	ret := _m.Called(pk, s)
+// BLSVerifyPOP provides a mock function with given fields: publicKey, signature
+func (_m *Environment) BLSVerifyPOP(publicKey *stdlib.PublicKey, signature []byte) (bool, error) {
+	ret := _m.Called(publicKey, signature)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(*stdlib.PublicKey, []byte) bool); ok {
-		r0 = rf(pk, s)
+		r0 = rf(publicKey, signature)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(*stdlib.PublicKey, []byte) error); ok {
-		r1 = rf(pk, s)
+		r1 = rf(publicKey, signature)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -206,6 +229,29 @@ func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	}
 
 	return r0
+}
+
+// CheckPayerBalanceAndGetMaxTxFees provides a mock function with given fields: payer, inclusionEffort, executionEffort
+func (_m *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
+	ret := _m.Called(payer, inclusionEffort, executionEffort)
+
+	var r0 cadence.Value
+	if rf, ok := ret.Get(0).(func(flow.Address, uint64, uint64) cadence.Value); ok {
+		r0 = rf(payer, inclusionEffort, executionEffort)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Address, uint64, uint64) error); ok {
+		r1 = rf(payer, inclusionEffort, executionEffort)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ComputationIntensities provides a mock function with given fields:
@@ -338,15 +384,15 @@ func (_m *Environment) Events() []flow.Event {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() (programs.TransactionInvalidator, error) {
+func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, error) {
 	ret := _m.Called()
 
-	var r0 programs.TransactionInvalidator
-	if rf, ok := ret.Get(0).(func() programs.TransactionInvalidator); ok {
+	var r0 derived.TransactionInvalidator
+	if rf, ok := ret.Get(0).(func() derived.TransactionInvalidator); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(programs.TransactionInvalidator)
+			r0 = ret.Get(0).(derived.TransactionInvalidator)
 		}
 	}
 
@@ -601,6 +647,22 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	}
 
 	return r0, r1
+}
+
+// GetInterpreterSharedState provides a mock function with given fields:
+func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
+	ret := _m.Called()
+
+	var r0 *interpreter.SharedState
+	if rf, ok := ret.Get(0).(func() *interpreter.SharedState); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*interpreter.SharedState)
+		}
+	}
+
+	return r0
 }
 
 // GetProgram provides a mock function with given fields: _a0
@@ -1014,6 +1076,11 @@ func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) err
 	return r0
 }
 
+// SetInterpreterSharedState provides a mock function with given fields: state
+func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
+	_m.Called(state)
+}
+
 // SetProgram provides a mock function with given fields: _a0, _a1
 func (_m *Environment) SetProgram(_a0 common.Location, _a1 *interpreter.Program) error {
 	ret := _m.Called(_a0, _a1)
@@ -1058,17 +1125,22 @@ func (_m *Environment) SigningAccounts() []common.Address {
 	return r0
 }
 
-// StartSpanFromRoot provides a mock function with given fields: name
-func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
-	ret := _m.Called(name)
+// StartChildSpan provides a mock function with given fields: name, options
+func (_m *Environment) StartChildSpan(name trace.SpanName, options ...oteltrace.SpanStartOption) tracing.TracerSpan {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
-	var r0 oteltrace.Span
-	if rf, ok := ret.Get(0).(func(trace.SpanName) oteltrace.Span); ok {
-		r0 = rf(name)
+	var r0 tracing.TracerSpan
+	if rf, ok := ret.Get(0).(func(trace.SpanName, ...oteltrace.SpanStartOption) tracing.TracerSpan); ok {
+		r0 = rf(name, options...)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(oteltrace.Span)
-		}
+		r0 = ret.Get(0).(tracing.TracerSpan)
 	}
 
 	return r0

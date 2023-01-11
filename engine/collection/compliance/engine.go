@@ -128,8 +128,7 @@ func NewEngine(
 				msg = &engine.Message{
 					OriginID: msg.OriginID,
 					Payload: &messages.ClusterBlockProposal{
-						Header:  syncedBlock.Block.Header,
-						Payload: syncedBlock.Block.Payload,
+						Block: syncedBlock.Block,
 					},
 				}
 				return msg, true
@@ -401,10 +400,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		go e.core.hotstuff.SubmitProposal(header, parent.View)
 
 		// create the proposal message for the collection
-		msg := &messages.ClusterBlockProposal{
+		block := &cluster.Block{
 			Header:  header,
 			Payload: payload,
 		}
+		msg := messages.NewClusterBlockProposal(block)
 
 		err := e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
@@ -418,10 +418,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		log.Info().Msg("cluster proposal proposed")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-		block := &cluster.Block{
-			Header:  header,
-			Payload: payload,
-		}
 		e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
 

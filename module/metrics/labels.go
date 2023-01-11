@@ -1,24 +1,22 @@
 package metrics
 
 const (
-	LabelChannel         = "topic"
-	LabelChain           = "chain"
-	LabelProposer        = "proposer"
-	EngineLabel          = "engine"
-	LabelResource        = "resource"
-	LabelMessage         = "message"
-	LabelNodeID          = "nodeid"
-	LabelNodeAddress     = "nodeaddress"
-	LabelNodeRole        = "noderole"
-	LabelNodeInfo        = "nodeinfo"
-	LabelNodeVersion     = "nodeversion"
-	LabelPriority        = "priority"
-	LabelComputationKind = "computationKind"
-)
-
-const (
-	ChannelOneToOne         = "OneToOne"
-	ChannelOneToOneUnstaked = "OneToOneUnstaked"
+	LabelChannel             = "topic"
+	LabelChain               = "chain"
+	LabelProposer            = "proposer"
+	EngineLabel              = "engine"
+	LabelResource            = "resource"
+	LabelProtocol            = "protocol"
+	LabelMessage             = "message"
+	LabelNodeID              = "nodeid"
+	LabelNodeAddress         = "nodeaddress"
+	LabelNodeRole            = "noderole"
+	LabelNodeInfo            = "nodeinfo"
+	LabelNodeVersion         = "nodeversion"
+	LabelPriority            = "priority"
+	LabelComputationKind     = "computationKind"
+	LabelConnectionDirection = "direction"
+	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 )
 
 const (

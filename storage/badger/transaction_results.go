@@ -201,7 +201,7 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 	return &transactionResult, nil
 }
 
-// ByBlockIDIndex returns the runtime transaction result for the given block ID and transaction index
+// ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
 func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
@@ -236,4 +236,10 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 // RemoveByBlockID removes transaction results by block ID
 func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 	return tr.db.Update(operation.RemoveTransactionResultsByBlockID(blockID))
+}
+
+// BatchRemoveByBlockID batch removes transaction results by block ID
+func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
 }

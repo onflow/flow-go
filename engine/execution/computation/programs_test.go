@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -43,7 +43,12 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(
+		vm,
+		ledger,
+		derived.NewEmptyDerivedBlockData(),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -106,6 +111,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -118,10 +125,18 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(10)
+	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -194,7 +209,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(
+		vm,
+		ledger,
+		derived.NewEmptyDerivedBlockData(),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	account := accounts[0]
@@ -202,6 +222,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -214,10 +236,18 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(10)
+	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
