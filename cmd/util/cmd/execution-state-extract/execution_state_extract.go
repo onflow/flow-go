@@ -2,10 +2,12 @@ package extract
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
-	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -25,13 +27,16 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
+	chain flow.Chain,
 	migrate bool,
 	report bool,
-	cleanupStorage bool,
+	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
+	log.Info().Msg("init WAL")
+
 	diskWal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
+		log,
 		nil,
 		metrics.NewNoopCollector(),
 		dir,
@@ -42,9 +47,8 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
+
+	log.Info().Msg("init ledger")
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -56,47 +60,71 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	migrations := []ledger.Migration{}
-	reporters := []ledger.Reporter{}
+	const (
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
+	log.Info().Msg("init compactor")
+
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	if err != nil {
+		return fmt.Errorf("cannot create compactor: %w", err)
+	}
+
+	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
+	var migrations []ledger.Migration
+	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
+	newState := ledger.State(targetHash)
 
 	if migrate {
-		storageFormatV5Migration := mgr.StorageFormatV5Migration{
-			Log:            log,
-			OutputDir:      outputDir,
-			CleanupStorage: cleanupStorage,
-		}
-
-		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
-
+		// add migration here
 		migrations = []ledger.Migration{
-			mgr.PruneMigration,
-			storageFormatV5Migration.Migrate,
-			storageUsedUpdateMigration.Migrate,
+			// the following migration calculate the storage usage and update the storage for each account
+			// mig.MigrateAccountUsage,
 		}
 	}
+	// generating reports at the end, so that the checkpoint file can be used
+	// for sporking as soon as it's generated.
 	if report {
-		reporters = []ledger.Reporter{
-			mgr.ContractReporter{
-				Log:       log,
-				OutputDir: outputDir,
+		log.Info().Msgf("preparing reporter files")
+		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
+
+		preCheckpointReporters = []ledger.Reporter{
+			// report epoch counter which is needed for finalizing root block
+			reporters.NewExportReporter(log,
+				chain,
+				func() flow.StateCommitment { return targetHash },
+			),
+		}
+
+		postCheckpointReporters = []ledger.Reporter{
+			&reporters.AccountReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
 			},
-			mgr.StorageReporter{
-				Log:       log,
-				OutputDir: outputDir,
+			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			&reporters.AtreeReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
 			},
-			//&mgr.BalanceReporter{
-			//	Log:       log,
-			//	OutputDir: outputDir,
-			//},
 		}
 	}
-	newState, err := led.ExportCheckpointAt(
-		ledger.State(targetHash),
+
+	migratedState, err := led.ExportCheckpointAt(
+		newState,
 		migrations,
-		reporters,
+		preCheckpointReporters,
+		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
@@ -107,8 +135,8 @@ func extractExecutionState(
 
 	log.Info().Msgf(
 		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
+		migratedState.String(),
+		migratedState.Base64(),
 	)
 
 	return nil

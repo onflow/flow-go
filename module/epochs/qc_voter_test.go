@@ -3,7 +3,7 @@ package epochs_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"testing"
 
@@ -13,6 +13,7 @@ import (
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	flowmodule "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	module "github.com/onflow/flow-go/module/mock"
@@ -44,7 +45,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.New(io.Discard)
 	suite.local = new(module.Local)
 	suite.signer = new(hotstuff.Signer)
 	suite.client = new(module.QCContractClient)
@@ -76,7 +77,7 @@ func (suite *Suite) SetupTest() {
 
 	var err error
 	assignments := unittest.ClusterAssignment(2, suite.nodes)
-	suite.clustering, err = flow.NewClusterList(assignments, suite.nodes)
+	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes)
 	suite.Require().Nil(err)
 
 	suite.epoch.On("Counter").Return(suite.counter, nil)

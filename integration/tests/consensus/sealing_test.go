@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,11 +28,14 @@ func TestExecutionStateSealing(t *testing.T) {
 
 type SealingSuite struct {
 	suite.Suite
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
 	exeID  flow.Identifier
+	exe2ID flow.Identifier
 	exeSK  crypto.PrivateKey
+	exe2SK crypto.PrivateKey
 	verID  flow.Identifier
 	verSK  crypto.PrivateKey
 	reader *client.FlowMessageStreamReader
@@ -40,19 +43,28 @@ type SealingSuite struct {
 
 func (ss *SealingSuite) Execution() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.exeID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
+	require.NoError(ss.T(), err, "could not get ghost client")
+	return client
+}
+
+func (ss *SealingSuite) Execution2() *client.GhostClient {
+	ghost := ss.net.ContainerByID(ss.exe2ID)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Verification() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.verID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) SetupTest() {
+	ss.log = unittest.LoggerForTest(ss.Suite.T(), zerolog.InfoLevel)
+	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -67,25 +79,30 @@ func (ss *SealingSuite) SetupTest() {
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
-	ss.T().Logf("consensus IDs: %v\n", ss.conIDs)
+	ss.log.Info().Msgf("consensus IDs: %v\n", ss.conIDs)
 
 	// need one controllable execution node (used ghost)
 	ss.exeID = unittest.IdentifierFixture()
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exeID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
+	// need another controllable execution node (used ghost) in order to
+	// send matching execution receipts
+	ss.exe2ID = unittest.IdentifierFixture()
+	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exe2ID), testnet.AsGhost())
+	nodeConfigs = append(nodeConfigs, exe2Config)
+
 	// need one controllable verification node (used ghost)
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
-	ss.T().Logf("verification ID: %v\n", ss.verID)
+	ss.log.Info().Msgf("verification ID: %v\n", ss.verID)
 
 	nodeConfigs = append(nodeConfigs,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
@@ -93,11 +110,15 @@ func (ss *SealingSuite) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("consensus_execution_state_sealing", nodeConfigs)
 
 	// initialize the network
-	ss.net = testnet.PrepareFlowNetwork(ss.T(), netConfig)
+	ss.net = testnet.PrepareFlowNetwork(ss.T(), netConfig, flow.Localnet)
 
 	keys, err := ss.net.ContainerByID(ss.exeID).Config.NodeInfo.PrivateKeys()
 	require.NoError(ss.T(), err)
 	ss.exeSK = keys.StakingKey
+
+	keys, err = ss.net.ContainerByID(ss.exe2ID).Config.NodeInfo.PrivateKeys()
+	require.NoError(ss.T(), err)
+	ss.exe2SK = keys.StakingKey
 
 	keys, err = ss.net.ContainerByID(ss.verID).Config.NodeInfo.PrivateKeys()
 	require.NoError(ss.T(), err)
@@ -122,14 +143,18 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
+	ss.log.Info().Msg("================> Start TearDownTest")
 	ss.net.Remove()
 	ss.cancel()
+	ss.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (ss *SealingSuite) TestBlockSealCreation() {
+	ss.log.Info().Msg("================> RUNNING TESTING")
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
+	ss.log.Info().Msgf("seal creation deadline %s", deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)
@@ -151,9 +176,10 @@ SearchLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// make sure we skip duplicates
-		proposalID := proposal.Header.ID()
+		proposalID := block.Header.ID()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -161,8 +187,13 @@ SearchLoop:
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
-		parentID := proposal.Header.ParentID
+		parentID := block.Header.ParentID
 		parents[proposalID] = parentID
+
+		ss.T().Logf("received block proposal height %v, view %v, id %v",
+			block.Header.Height,
+			block.Header.View,
+			proposalID)
 
 		// we add one confirmation for each ancestor
 		for {
@@ -236,20 +267,39 @@ SearchLoop:
 
 	receipt.ExecutorSignature = sig
 
-	// keep trying to send execution receipt to the first consensus node
+	// keep trying to send 2 matching execution receipt to the first consensus node
+	receipt2 := flow.ExecutionReceipt{
+		ExecutorID:        ss.exe2ID, // our fake execution node
+		ExecutionResult:   result,    // result for target block
+		Spocks:            nil,       // ignored
+		ExecutorSignature: crypto.Signature{},
+	}
+
+	id = receipt2.ID()
+	sig2, err := ss.exe2SK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	require.NoError(ss.T(), err)
+
+	receipt2.ExecutorSignature = sig2
+
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, id[:], exeUtils.NewExecutionReceiptHasher())
+	require.NoError(ss.T(), err)
+	require.True(ss.T(), valid)
+
 ReceiptLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, engine.PushReceipts, &receipt, ss.conIDs...)
+		err1 := ss.Execution().Send(ctx, channels.PushReceipts, &receipt, ss.conIDs...)
+		err2 := ss.Execution2().Send(ctx, channels.PushReceipts, &receipt2, ss.conIDs...)
 		cancel()
-		if err != nil {
-			ss.T().Logf("could not send execution receipt: %s\n", err)
+		if err1 != nil || err2 != nil {
+			ss.T().Logf("could not send execution receipt: %s/%s\n", err1, err2)
 			continue
 		}
 		break ReceiptLoop
 	}
 
 	ss.T().Logf("execution receipt submitted (receipt: %x, result: %x)\n", receipt.ID(), receipt.ExecutionResult.ID())
+	ss.T().Logf("execution receipt submitted (receipt2: %x, result: %x)\n", receipt2.ID(), receipt2.ExecutionResult.ID())
 
 	// attestation
 	atst := flow.Attestation{
@@ -286,7 +336,7 @@ ReceiptLoop:
 ApprovalLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Verification().Send(ctx, engine.PushApprovals, &approval, ss.conIDs...)
+		err := ss.Verification().Send(ctx, channels.PushApprovals, &approval, ss.conIDs...)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send result approval: %s\n", err)
@@ -314,10 +364,11 @@ SealingLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// log the proposal details
-		proposalID := proposal.Header.ID()
-		seals := proposal.Payload.Seals
+		proposalID := block.Header.ID()
+		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we
 		// monitor for confirmations

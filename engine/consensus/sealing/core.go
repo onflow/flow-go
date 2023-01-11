@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
@@ -25,39 +26,15 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
-
-// DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
-// for subsequent inclusion in block.
-// when set to 1, it requires at least 1 approval to build a seal
-// when set to 0, it can build seal without any approval
-const DefaultRequiredApprovalsForSealConstruction = 1
-
-// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
-// to make fire fighting easier while seal & verification is under development.
-const DefaultEmergencySealingActive = false
-
-// Config is a structure of values that configure behavior of sealing engine
-type Config struct {
-	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	RequiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
-	ApprovalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
-}
-
-func DefaultConfig() Config {
-	return Config{
-		EmergencySealingActive:               DefaultEmergencySealingActive,
-		RequiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
-		ApprovalRequestsThreshold:            10,
-	}
-}
 
 // Core is an implementation of SealingCore interface
 // This struct is responsible for:
-// 	- collecting approvals for execution results
-// 	- processing multiple incorporated results
-// 	- pre-validating approvals (if they are outdated or non-verifiable)
-// 	- pruning already processed collectorTree
+//   - collecting approvals for execution results
+//   - processing multiple incorporated results
+//   - pre-validating approvals (if they are outdated or non-verifiable)
+//   - pruning already processed collectorTree
 type Core struct {
 	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
@@ -74,7 +51,7 @@ type Core struct {
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
-	config                     Config
+	sealingConfigsGetter       module.SealingConfigsGetter        // used to access configs for sealing conditions
 }
 
 func NewCore(
@@ -88,10 +65,10 @@ func NewCore(
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
-	verifier module.Verifier,
+	signatureHasher hash.Hasher,
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
-	config Config,
+	sealingConfigsGetter module.SealingConfigsGetter,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -112,14 +89,15 @@ func NewCore(
 		state:                      state,
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
-		config:                     config,
 		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
+		sealingConfigsGetter:       sealingConfigsGetter,
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+		requiredApprovalsForSealConstruction := sealingConfigsGetter.RequireApprovalsForSealConstructionDynamicValue()
 		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
-			assigner, sealsMempool, verifier,
-			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
+			assigner, sealsMempool, signatureHasher,
+			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 		if err != nil {
 			return nil, fmt.Errorf("could not create base collector: %w", err)
 		}
@@ -146,7 +124,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork.
-	latestSeal, err := c.seals.ByBlockID(finalizedID)
+	latestSeal, err := c.seals.HighestInFork(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
 	}
@@ -155,6 +133,20 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	latestSealedBlock, err := c.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
+	}
+
+	// Get the root block of our local state - we allow references to unknown
+	// blocks below the root height
+	rootHeader, err := c.state.Params().Root()
+	if err != nil {
+		return fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	// Determine the list of unknown blocks referenced within the sealing segment
+	// if we are initializing with a latest sealed block below the root height
+	outdatedBlockIDs, err := c.getOutdatedBlockIDsFromRootSealingSegment(rootHeader)
+	if err != nil {
+		return fmt.Errorf("could not get outdated block IDs from root segment: %w", err)
 	}
 
 	blocksProcessed := uint64(0)
@@ -169,6 +161,16 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		}
 
 		for _, result := range payload.Results {
+			// skip results referencing blocks before the root sealing segment
+			_, isOutdated := outdatedBlockIDs[result.BlockID]
+			if isOutdated {
+				c.log.Debug().
+					Hex("container_block_id", logging.ID(blockID)).
+					Hex("result_id", logging.ID(result.ID())).
+					Hex("executed_block_id", logging.ID(result.BlockID)).
+					Msg("skipping outdated block referenced in root sealing segment")
+				continue
+			}
 			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
@@ -301,8 +303,8 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 
-	span, _, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
-	defer span.Finish()
+	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
+	defer span.End()
 
 	err := c.processIncorporatedResult(result)
 	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
@@ -350,12 +352,12 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 		Str("verifier_id", approval.Body.ApproverID.String()).
 		Msg("processing result approval")
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
-	if isSampled {
-		span.LogFields(log.String("approverId", approval.Body.ApproverID.String()))
-		span.LogFields(log.Uint64("chunkIndex", approval.Body.ChunkIndex))
-	}
-	defer span.Finish()
+	span, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	span.SetAttributes(
+		attribute.String("approverId", approval.Body.ApproverID.String()),
+		attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
+	)
+	defer span.End()
 
 	startTime := time.Now()
 	err := c.processApproval(approval)
@@ -421,25 +423,50 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 	return nil
 }
 
-func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if !c.config.EmergencySealingActive {
+// checkEmergencySealing triggers the AssignmentCollectors to check whether satisfy the conditions to
+// generate an emergency seal. To limit performance impact of these checks, we limit emergency sealing
+// to the 100 lowest finalized blocks that are still unsealed.
+// Inputs:
+//   - `observer` for tracking and reporting the current internal state of the local sealing logic
+//   - `lastFinalizedHeight` is the height of the latest block that is finalized
+//   - `lastHeightWithFinalizedSeal` is the height of the latest block that is finalized and in addition
+//
+// No errors are expected during normal operations.
+func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastHeightWithFinalizedSeal, lastFinalizedHeight uint64) error {
+	// if emergency sealing is not activated, then exit
+	if !c.sealingConfigsGetter.EmergencySealingActiveConst() {
 		return nil
 	}
 
-	emergencySealingHeight := lastSealedHeight + approvals.DefaultEmergencySealingThreshold
+	// calculate total number of finalized blocks that are still unsealed
+	if lastHeightWithFinalizedSeal > lastFinalizedHeight { // sanity check; protects calculation of `unsealedFinalizedCount` from underflow
+		return fmt.Errorf(
+			"latest finalized block must have height (%d) ≥ latest finalized _and_ sealed block (%d)", lastFinalizedHeight, lastHeightWithFinalizedSeal)
+	}
+	unsealedFinalizedCount := lastFinalizedHeight - lastHeightWithFinalizedSeal
 
-	// we are interested in all collectors that match condition:
-	// lastSealedBlock + sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight
-	// in other words we should check for emergency sealing only if threshold was reached
-	if emergencySealingHeight >= lastFinalizedHeight {
+	// We are checking emergency sealing only if there are more than approvals.DefaultEmergencySealingThresholdForFinalization
+	// number of unsealed finalized blocks.
+	if unsealedFinalizedCount <= approvals.DefaultEmergencySealingThresholdForFinalization {
 		return nil
 	}
 
-	delta := lastFinalizedHeight - emergencySealingHeight
+	// we will check all the unsealed finalized height except the last approvals.DefaultEmergencySealingThresholdForFinalization
+	// number of finalized heights
+	heightCountForCheckingEmergencySealing := unsealedFinalizedCount - approvals.DefaultEmergencySealingThresholdForFinalization
+
+	// If there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
+	// instead, only check for at most 100 blocks. This limits computation cost.
+	// Note: the block builder also limits the max number of seals that can be included in a new block to `maxSealCount`.
+	// While `maxSealCount` doesn't have to be the same value as the limit below, there is little benefit of our limit
+	// exceeding `maxSealCount`.
+	if heightCountForCheckingEmergencySealing > 100 {
+		heightCountForCheckingEmergencySealing = 100
+	}
 	// if block is emergency sealable depends on it's incorporated block height
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
-	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastHeightWithFinalizedSeal, lastHeightWithFinalizedSeal+heightCountForCheckingEmergencySealing) {
 		err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
 		if err != nil {
 			return err
@@ -476,8 +503,8 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
-	processFinalizedBlockSpan, _, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
-	defer processFinalizedBlockSpan.Finish()
+	processFinalizedBlockSpan, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+	defer processFinalizedBlockSpan.End()
 
 	// STEP 0: Collect auxiliary information
 	// ------------------------------------------------------------------------
@@ -491,42 +518,42 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return nil
 	}
 
-	// retrieve latest seal in the fork with head finalizedBlock and update last
+	// retrieve latest _finalized_ seal in the fork with head finalizedBlock and update last
 	// sealed height; we do _not_ bail, because we want to re-request approvals
 	// especially, when sealing is stuck, i.e. last sealed height does not increase
-	seal, err := c.seals.ByBlockID(finalizedBlockID)
+	finalizedSeal, err := c.seals.HighestInFork(finalizedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
+		return fmt.Errorf("could not retrieve finalizedSeal for finalized block %s", finalizedBlockID)
 	}
-	lastSealed, err := c.headers.ByBlockID(seal.BlockID)
+	lastBlockWithFinalizedSeal, err := c.headers.ByBlockID(finalizedSeal.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve last sealed block %v: %w", seal.BlockID, err)
+		return fmt.Errorf("could not retrieve last sealed block %v: %w", finalizedSeal.BlockID, err)
 	}
-	c.counterLastSealedHeight.Set(lastSealed.Height)
+	c.counterLastSealedHeight.Set(lastBlockWithFinalizedSeal.Height)
 
 	// STEP 1: Pruning
 	// ------------------------------------------------------------------------
-	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
-	err = c.prune(processFinalizedBlockSpan, finalized, lastSealed)
+	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastBlockWithFinalizedSeal.Height)
+	err = c.prune(processFinalizedBlockSpan, finalized, lastBlockWithFinalizedSeal)
 	if err != nil {
-		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
+		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastBlockWithFinalizedSeal.ID(), err)
 	}
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
 	// ------------------------------------------------------------------------
-	sealingObservation := c.sealingTracker.NewSealingObservation(finalized, seal, lastSealed)
+	sealingObservation := c.sealingTracker.NewSealingObservation(finalized, finalizedSeal, lastBlockWithFinalizedSeal)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
-	err = c.checkEmergencySealing(sealingObservation, lastSealed.Height, finalized.Height)
-	checkEmergencySealingSpan.Finish()
+	err = c.checkEmergencySealing(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
+	checkEmergencySealingSpan.End()
 	if err != nil {
 		return fmt.Errorf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
-	err = c.requestPendingApprovals(sealingObservation, lastSealed.Height, finalized.Height)
-	requestPendingApprovalsSpan.Finish()
+	err = c.requestPendingApprovals(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
+	requestPendingApprovalsSpan.End()
 	if err != nil {
 		return fmt.Errorf("internal error while requesting pending approvals: %w", err)
 	}
@@ -548,9 +575,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // Furthermore, it  removes obsolete entries from AssignmentCollectorTree, RequestTracker
 // and IncorporatedResultSeals mempool.
 // We do _not_ expect any errors during normal operations.
-func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.Header) error {
+func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Header) error {
 	pruningSpan := c.tracer.StartSpanFromParent(parentSpan, trace.CONSealingPruning)
-	defer pruningSpan.Finish()
+	defer pruningSpan.End()
 
 	err := c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
 	if err != nil {
@@ -577,19 +604,19 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 // request approvals if the block incorporating the result is below the
 // threshold.
 //
-//                                   threshold
-//                              |                   |
-// ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
-//       sealed       maxHeightForRequesting      final
+//	                                  threshold
+//	                             |                   |
+//	... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
+//	      sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(observation consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
+	if lastSealedHeight+c.sealingConfigsGetter.ApprovalRequestsThresholdConst() >= lastFinalizedHeight {
 		return nil
 	}
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
+	maxHeightForRequesting := lastFinalizedHeight - c.sealingConfigsGetter.ApprovalRequestsThresholdConst()
 
 	pendingApprovalRequests := uint(0)
 	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)
@@ -611,4 +638,36 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 	}
 
 	return nil
+}
+
+// getOutdatedBlockIDsFromRootSealingSegment finds all references to unknown blocks
+// by execution results within the sealing segment. In general we disallow references
+// to unknown blocks, but execution results incorporated within the sealing segment
+// are an exception to this rule.
+//
+// For example, given the sealing segment A...E, B contains an ER referencing Z, but
+// since Z is prior to sealing segment, the node cannot valid the ER. Therefore, we
+// ignore these block references.
+//
+//	     [  sealing segment       ]
+//	Z <- A <- B(RZ) <- C <- D <- E
+func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
+
+	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not get root sealing segment: %w", err)
+	}
+
+	knownBlockIDs := make(map[flow.Identifier]struct{}) // track block IDs in the sealing segment
+	var outdatedBlockIDs flow.IdentifierList
+	for _, block := range rootSealingSegment.Blocks {
+		knownBlockIDs[block.ID()] = struct{}{}
+		for _, result := range block.Payload.Results {
+			_, known := knownBlockIDs[result.BlockID]
+			if !known {
+				outdatedBlockIDs = append(outdatedBlockIDs, result.BlockID)
+			}
+		}
+	}
+	return outdatedBlockIDs.Lookup(), nil
 }

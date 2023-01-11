@@ -43,3 +43,18 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	assert.Equal(t, proposerAddress, signatureA.Address)
 	assert.Equal(t, authorizerAddress, signatureB.Address)
 }
+
+func TestTransaction_Status(t *testing.T) {
+	statuses := map[flow.TransactionStatus]string{
+		flow.TransactionStatusUnknown:   "UNKNOWN",
+		flow.TransactionStatusPending:   "PENDING",
+		flow.TransactionStatusFinalized: "FINALIZED",
+		flow.TransactionStatusExecuted:  "EXECUTED",
+		flow.TransactionStatusSealed:    "SEALED",
+		flow.TransactionStatusExpired:   "EXPIRED",
+	}
+
+	for status, value := range statuses {
+		assert.Equal(t, status.String(), value)
+	}
+}

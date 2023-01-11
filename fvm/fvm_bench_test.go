@@ -2,17 +2,31 @@ package fvm_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
+
+	flow2 "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
@@ -20,12 +34,19 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -41,7 +62,6 @@ type TestBenchBlockExecutor interface {
 	ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult
 	Chain(tb testing.TB) flow.Chain
 	ServiceAccount(tb testing.TB) *TestBenchAccount
-	ResetProgramCache(tb testing.TB)
 }
 
 type TestBenchAccount struct {
@@ -76,27 +96,74 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 }
 
+func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
+	serviceAccount := blockExec.ServiceAccount(b)
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(`
+		transaction(list: [String]) {
+		  prepare(acct: AuthAccount) {
+			acct.load<[String]>(from: /storage/test)
+			acct.save(list, to: /storage/test)
+		  }
+		  execute {}
+		}
+		`)).
+		AddAuthorizer(account.Address)
+
+	cadenceArrayValues := make([]cadence.Value, len(list))
+	for i, item := range list {
+		cadenceArrayValues[i] = cadence.String(item)
+	}
+	cadenceArray, err := jsoncdc.Encode(cadence.NewArray(cadenceArrayValues))
+	require.NoError(b, err)
+	txBody.AddArgument(cadenceArray)
+
+	txBody.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
+	txBody.SetPayer(serviceAccount.Address)
+
+	if account.Address != serviceAccount.Address {
+		err = testutil.SignPayload(txBody, account.Address, account.PrivateKey)
+		require.NoError(b, err)
+	}
+
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+	require.NoError(b, err)
+
+	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+}
+
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.Programs
+	derivedChainData      *derived.DerivedChainData
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
+	onStopFunc            func()
 }
 
-func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
-	logger := zerolog.Nop()
+func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
+	vm := fvm.NewVirtualMachine()
+
+	// a big interaction limit since that is not what's being tested.
+	interactionLimit := fvm.DefaultMaxInteractionSize * uint64(1000)
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
+		fvm.WithMaxStateInteractionSize(interactionLimit),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				computation.ReusableCadenceRuntimePoolSize,
+				runtime.Config{},
+			),
+		),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -105,6 +172,14 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor 
 
 	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(tb, err)
+
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+
+	onStopFunc := func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}
 
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
@@ -126,19 +201,50 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor 
 	)
 	require.NoError(tb, err)
 
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	me := new(moduleMock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommitter,
+		me,
+		prov)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
+	require.NoError(tb, err)
+
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyPrograms(),
+		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
+		onStopFunc:            onStopFunc,
 	}
 }
 
@@ -146,22 +252,22 @@ func (b *BasicBlockExecutor) Chain(_ testing.TB) flow.Chain {
 	return b.chain
 }
 
-func (b *BasicBlockExecutor) ResetProgramCache(tb testing.TB) {
-	b.programCache = programs.NewEmptyPrograms()
-}
-
 func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 	return b.serviceAccount
 }
 
 func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult {
-	executableBlock := unittest.ExecutableBlockFromTransactions(collections)
+	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
+	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
+		executableBlock.ID(),
+		executableBlock.ParentID())
+
+	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
+	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
 	require.NoError(tb, err)
 	b.activeStateCommitment = endState
 
@@ -172,29 +278,24 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	accounts := make([]TestBenchAccount, 0)
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
-	accontCreationScript := `
-		transaction(publicKey: [UInt8]) {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-				acct.addPublicKey(publicKey)
-			}
-		}
-	`
-
 	for _, privateKey := range privateKeys {
-		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
-		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+		accountKey := flow2.NewAccountKey().
+			FromPrivateKey(privateKey.PrivateKey).
+			SetWeight(fvm.AccountKeyWeightThreshold).
+			SetHashAlgo(privateKey.HashAlgo).
+			SetSigAlgo(privateKey.SignAlgo)
+
+		sdkTX, err := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		require.NoError(tb, err)
 
 		txBody := flow.NewTransactionBody().
-			SetScript([]byte(accontCreationScript)).
-			AddArgument(encCadAccountKey).
+			SetScript(sdkTX.Script).
+			SetArguments(sdkTX.Arguments).
 			AddAuthorizer(serviceAddress).
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
 			SetPayer(serviceAddress)
 
-		err := testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
@@ -205,7 +306,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		for _, eventList := range computationResult.Events {
 			for _, event := range eventList {
 				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(event.Payload)
+					data, err := jsoncdc.Decode(nil, event.Payload)
 					if err != nil {
 						tb.Fatal("setup account failed, error decoding events")
 					}
@@ -223,23 +324,88 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	return accounts
 }
 
+type logExtractor struct {
+	TimeSpent       map[string]uint64
+	InteractionUsed map[string]uint64
+}
+
+type txWeights struct {
+	TXHash                string `json:"tx_id"`
+	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
+	ComputationUsed       uint   `json:"computationUsed"`
+	MemoryEstimate        uint   `json:"memoryEstimate"`
+}
+
+type txSuccessfulLog struct {
+	TxID          string `json:"tx_id"`
+	TimeSpentInMS uint64 `json:"timeSpentInMS"`
+}
+
+func (l *logExtractor) Write(p []byte) (n int, err error) {
+	if strings.Contains(string(p), "transaction execution data") {
+		w := txWeights{}
+		err := json.Unmarshal(p, &w)
+
+		if err != nil {
+			fmt.Println(err)
+			return len(p), nil
+		}
+
+		l.InteractionUsed[w.TXHash] = w.LedgerInteractionUsed
+	}
+	if strings.Contains(string(p), "transaction executed successfully") {
+		w := txSuccessfulLog{}
+		err := json.Unmarshal(p, &w)
+
+		if err != nil {
+			fmt.Println(err)
+			return len(p), nil
+		}
+		l.TimeSpent[w.TxID] = w.TimeSpentInMS
+	}
+	return len(p), nil
+
+}
+
+var _ io.Writer = &logExtractor{}
+
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+
 	transactionsPerBlock := 10
+
+	longString := strings.Repeat("0", 1000)
 
 	chain := flow.Testnet.Chain()
 
+	logE := &logExtractor{
+		TimeSpent:       map[string]uint64{},
+		InteractionUsed: map[string]uint64{},
+	}
+
 	benchTransaction := func(b *testing.B, tx string) {
 
-		blockExecutor := NewBasicBlockExecutor(b, chain)
-		serviceAccount := blockExecutor.ServiceAccount(b)
+		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
+
+		blockExecutor := NewBasicBlockExecutor(b, chain, logger)
+		defer func() {
+			blockExecutor.onStopFunc()
+		}()
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(b, err)
 
 		accounts := blockExecutor.SetupAccounts(b, privateKeys)
+
+		addrs := []flow.Address{}
+		for _, account := range accounts {
+			addrs = append(addrs, account.Address)
+		}
+		// fund all accounts so not to run into storage problems
+		fundAccounts(b, blockExecutor, cadence.UFix64(10_000_000_000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {
@@ -254,35 +420,42 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 			`)
 
+		accounts[0].AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
+
 		btx := []byte(tx)
+
+		benchmarkAccount := &accounts[0]
 
 		b.ResetTimer() // setup done, lets start measuring
 		for i := 0; i < b.N; i++ {
 			transactions := make([]*flow.TransactionBody, transactionsPerBlock)
 			for j := 0; j < transactionsPerBlock; j++ {
-
 				txBody := flow.NewTransactionBody().
 					SetScript(btx).
-					AddAuthorizer(serviceAccount.Address).
-					SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-					SetPayer(serviceAccount.Address)
+					AddAuthorizer(benchmarkAccount.Address).
+					SetProposalKey(benchmarkAccount.Address, 0, benchmarkAccount.RetAndIncSeqNumber()).
+					SetPayer(benchmarkAccount.Address)
 
-				err := testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+				err = testutil.SignEnvelope(txBody, benchmarkAccount.Address, benchmarkAccount.PrivateKey)
 				require.NoError(b, err)
 
 				transactions[j] = txBody
 			}
 
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
+			totalInteractionUsed := uint64(0)
+			totalComputationUsed := uint64(0)
 			for j := 0; j < transactionsPerBlock; j++ {
 				require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+				totalInteractionUsed += logE.InteractionUsed[computationResult.TransactionResults[j].ID().String()]
+				totalComputationUsed += computationResult.TransactionResults[j].ComputationUsed
 			}
+			b.ReportMetric(float64(totalInteractionUsed/uint64(transactionsPerBlock)), "interactions")
+			b.ReportMetric(float64(totalComputationUsed/uint64(transactionsPerBlock)), "computation")
 		}
 	}
 
-	longString := strings.Repeat("0", 1000)
-
-	templateTx := func(prepare string) string {
+	templateTx := func(rep int, prepare string) string {
 		return fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
@@ -291,80 +464,121 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			transaction(){
 				prepare(signer: AuthAccount){
 					var i = 0
-					while i < 100 {
+					while i < %d {
 						i = i + 1
 			%s
 					}
 				}
-			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", prepare)
+			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rep, prepare)
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
-		benchTransaction(b, templateTx(""))
+		benchTransaction(b, templateTx(100, ""))
 	})
 	b.Run("convert int to string", func(b *testing.B) {
-		benchTransaction(b, templateTx(`i.toString()`))
+		benchTransaction(b, templateTx(100, `i.toString()`))
 	})
 	b.Run("convert int to string and concatenate it", func(b *testing.B) {
-		benchTransaction(b, templateTx(`"x".concat(i.toString())`))
+		benchTransaction(b, templateTx(100, `"x".concat(i.toString())`))
 	})
 	b.Run("get signer address", func(b *testing.B) {
-		benchTransaction(b, templateTx(`signer.address`))
+		benchTransaction(b, templateTx(100, `signer.address`))
 	})
 	b.Run("get public account", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address)`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address)`))
 	})
 	b.Run("get account and get balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).balance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).balance`))
 	})
 	b.Run("get account and get available balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).availableBalance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).availableBalance`))
 	})
 	b.Run("get account and get storage used", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).storageUsed`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`))
 	})
 	b.Run("get account and get storage capacity", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).storageCapacity`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
 	})
 	b.Run("get signer vault", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
+		benchTransaction(
+			b,
+			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let receiverRef =  getAccount(signer.address)
+		benchTransaction(
+			b,
+			templateTx(100, `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`))
+				.borrow<&{FungibleToken.Receiver}>()!`),
+		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
-		benchTransaction(b, templateTx(`
-			let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!
-			
-			let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let receiverRef =  getAccount(signer.address)
+					.getCapability(/public/flowTokenReceiver)
+					.borrow<&{FungibleToken.Receiver}>()!
 
-			receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
-			`))
+				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+
+				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
+			`),
+		)
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(`
+		benchTransaction(
+			b,
+			templateTx(100, `
 				signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
-			`))
+			`),
+		)
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(fmt.Sprintf(`
+		benchTransaction(
+			b,
+			templateTx(100, fmt.Sprintf(`
 				signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
-			`, longString)))
+			`, longString)),
+		)
 	})
 	b.Run("create new account", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let acct = AuthAccount(payer: signer)`))
+		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
 	})
 	b.Run("call empty contract function", func(b *testing.B) {
-		benchTransaction(b, templateTx(`TestContract.empty()`))
+		benchTransaction(b, templateTx(100, `TestContract.empty()`))
 	})
 	b.Run("emit event", func(b *testing.B) {
-		benchTransaction(b, templateTx(`TestContract.emit()`))
+		benchTransaction(b, templateTx(100, `TestContract.emit()`))
+	})
+	b.Run("borrow array from storage", func(b *testing.B) {
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.borrow<&[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
+	})
+	b.Run("copy array from storage", func(b *testing.B) {
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.copy<[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
 	})
 }
 
@@ -393,7 +607,10 @@ const TransferTxTemplate = `
 
 // BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
-	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain())
+	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain(), zerolog.Nop())
+	defer func() {
+		blockExecutor.onStopFunc()
+	}()
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
@@ -769,7 +986,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						pre {
 							BatchNFT.sets[setID] != nil: "Cannot borrow Set: The Set doesn't exist"
 						}
-						return &BatchNFT.sets[setID] as &Set
+						return (&BatchNFT.sets[setID] as &Set?)!
 					}
 
 					pub fun startNewSeries(): UInt32 {
@@ -850,12 +1067,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 
 					pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-						return &self.ownedNFTs[id] as &NonFungibleToken.NFT
+						return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
 					}
 
 					pub fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
 						if self.ownedNFTs[id] != nil {
-							let ref = &self.ownedNFTs[id] as auth &NonFungibleToken.NFT
+							let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
 							return ref as! &BatchNFT.NFT
 						} else {
 							return nil

@@ -7,13 +7,14 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
 // Typically, this would be used to convert a database-backed snapshot to
 // one that can easily be serialized to disk or to network.
-//
+// TODO error docs
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	var (
@@ -34,6 +35,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal: %w", err)
 	}
+
 	snap.SealingSegment, err = from.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
@@ -74,10 +76,46 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		snap.Epochs.Next = &next.enc
 	}
 
+	// convert global state parameters
+	params, err := FromParams(from.Params())
+	if err != nil {
+		return nil, fmt.Errorf("could not get params: %w", err)
+	}
+	snap.Params = params.enc
+
 	return &Snapshot{snap}, nil
 }
 
+// FromParams converts any protocol.GlobalParams to a memory-backed Params.
+// TODO error docs
+func FromParams(from protocol.GlobalParams) (*Params, error) {
+
+	var (
+		params EncodableParams
+		err    error
+	)
+
+	params.ChainID, err = from.ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain id: %w", err)
+	}
+	params.SporkID, err = from.SporkID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork id: %w", err)
+	}
+	params.ProtocolVersion, err = from.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
+
+	return &Params{params}, nil
+}
+
 // FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	var (
@@ -147,7 +185,8 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	return &Epoch{epoch}, nil
 }
 
-// FromCluster converts any protocol.Cluster to a memory-backed Cluster
+// FromCluster converts any protocol.Cluster to a memory-backed Cluster.
+// No errors are expected during normal operation.
 func FromCluster(from protocol.Cluster) (*Cluster, error) {
 	cluster := EncodableCluster{
 		Counter:   from.EpochCounter(),
@@ -162,6 +201,8 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 // FromDKG converts any protocol.DKG to a memory-backed DKG.
 //
 // The given participant list must exactly match the DKG members.
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 	var dkg EncodableDKG
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
@@ -189,6 +230,18 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
+	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
+}
+
+// SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState
+// with a caller-specified protocol version.
+func SnapshotFromBootstrapStateWithProtocolVersion(
+	root *flow.Block,
+	result *flow.ExecutionResult,
+	seal *flow.Seal,
+	qc *flow.QuorumCertificate,
+	version uint,
+) (*Snapshot, error) {
 
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -199,6 +252,27 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		return nil, fmt.Errorf("invalid commit event type (%T)", result.ServiceEvents[1].Event)
 	}
 
+	clustering, err := ClusteringFromSetupEvent(setup)
+	if err != nil {
+		return nil, fmt.Errorf("setup event has invalid clustering: %w", err)
+	}
+
+	// sanity check the commit event has the same number of cluster QC as the number clusters
+	if len(clustering) != len(commit.ClusterQCs) {
+		return nil, fmt.Errorf("mismatching number of ClusterQCs, expect %v but got %v",
+			len(clustering), len(commit.ClusterQCs))
+	}
+
+	// sanity check the QC in the commit event, which should be found in the identities in
+	// the setup event
+	for i, cluster := range clustering {
+		rootQCVoteData := commit.ClusterQCs[i]
+		_, err = signature.EncodeSignersToIndices(cluster.NodeIDs(), rootQCVoteData.VoterIDs)
+		if err != nil {
+			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
+		}
+	}
+
 	current, err := NewCommittedEpoch(setup, commit)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
@@ -207,15 +281,27 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		Current: current.enc,
 	}
 
+	params := EncodableParams{
+		ChainID:         root.Header.ChainID, // chain ID must match the root block
+		SporkID:         root.ID(),           // use root block ID as the unique spork identifier
+		ProtocolVersion: version,             // major software version for this spork
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
-		Head:              root.Header,
-		Identities:        setup.Participants,
-		LatestSeal:        seal,
-		LatestResult:      result,
-		SealingSegment:    []*flow.Block{root},
+		Head:         root.Header,
+		Identities:   setup.Participants,
+		LatestSeal:   seal,
+		LatestResult: result,
+		SealingSegment: &flow.SealingSegment{
+			Blocks:           []*flow.Block{root},
+			ExecutionResults: flow.ExecutionResultList{result},
+			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
+			FirstSeal:        seal,
+		},
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,
 		Epochs:            epochs,
+		Params:            params,
 	})
 	return snap, nil
 }

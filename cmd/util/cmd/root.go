@@ -9,13 +9,20 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
+	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
+	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
+	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
+	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
@@ -30,6 +37,8 @@ var rootCmd = &cobra.Command{
 		setLogLevel()
 	},
 }
+
+var Cmd = rootCmd
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -53,11 +62,18 @@ func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
+	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
 	rootCmd.AddCommand(truncate_database.Cmd)
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)
+	rootCmd.AddCommand(edbs.RootCmd)
+	rootCmd.AddCommand(index_er.RootCmd)
+	rootCmd.AddCommand(rollback_executed_height.Cmd)
+	rootCmd.AddCommand(read_execution_state.Cmd)
+	rootCmd.AddCommand(snapshot.Cmd)
+	rootCmd.AddCommand(export_json_transactions.Cmd)
 }
 
 func initConfig() {

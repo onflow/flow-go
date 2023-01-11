@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -100,7 +100,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
 	var result []*flow.Block
 	var block *flow.Block
@@ -142,57 +142,58 @@ func (r *ReadProtocolStateBlocksCommand) Handler(ctx context.Context, req *admin
 	return resultList, err
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return errors.New("wrong input format")
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
-	block, ok := input["block"]
+	inBlock, ok := input["block"]
 	if !ok {
-		return errors.New("the \"block\" field is required")
+		return admin.NewInvalidAdminReqErrorf("missing 'block' field")
 	}
 
-	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": %v", block)
 	data := &requestData{}
 
-	switch block := block.(type) {
+	switch block := inBlock.(type) {
 	case string:
 		block = strings.ToLower(strings.TrimSpace(block))
-		if block == "final" {
+		if block == storageCommands.FINAL {
 			data.requestType = Final
-		} else if block == "sealed" {
+		} else if block == storageCommands.SEALED {
 			data.requestType = Sealed
 		} else if len(block) == 2*flow.IdentifierLen {
 			b, err := hex.DecodeString(block)
 			if err != nil {
-				return errInvalidBlockValue
+				return admin.NewInvalidAdminReqParameterError("block", "block ID must be 64-char hex string", inBlock)
 			}
 			data.requestType = ID
 			data.blockID = flow.HashToID(b)
 		} else {
-			return errInvalidBlockValue
+			return admin.NewInvalidAdminReqParameterError("block", "must be 'final', 'sealed', or block ID hex", inBlock)
 		}
 	case float64:
 		if block < 0 || math.Trunc(block) != block {
-			return errInvalidBlockValue
+			return admin.NewInvalidAdminReqParameterError("block", "block height must be >=0 and integral", inBlock)
 		}
 		data.requestType = Height
 		data.blockHeight = uint64(block)
 	default:
-		return errInvalidBlockValue
+		return admin.NewInvalidAdminReqParameterError("block", "must be string or number", inBlock)
 	}
 
-	if n, ok := input["n"]; ok {
-		n, ok := n.(float64)
+	if inN, ok := input["n"]; ok {
+		n, ok := inN.(float64)
 		if !ok {
-			return fmt.Errorf("invalid value for \"n\": %v", n)
+			return admin.NewInvalidAdminReqParameterError("n", "must be number", inN)
 		}
 		if math.Trunc(n) != n {
-			return fmt.Errorf("\"n\" must be an integer")
+			return admin.NewInvalidAdminReqParameterError("n", "must be integral", inN)
 		}
 		if n < 1 {
-			return fmt.Errorf("\"n\" must be at least 1")
+			return admin.NewInvalidAdminReqParameterError("n", "must be >=1", inN)
 		}
 		data.numBlocksToQuery = uint(n)
 	} else {

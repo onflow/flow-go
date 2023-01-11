@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -15,22 +16,27 @@ import (
 // receiptValidator holds all needed context for checking
 // receipt validity against current protocol state.
 type receiptValidator struct {
-	headers  storage.Headers
-	seals    storage.Seals
-	state    protocol.State
-	index    storage.Index
-	results  storage.ExecutionResults
-	verifier module.Verifier
+	headers         storage.Headers
+	seals           storage.Seals
+	state           protocol.State
+	index           storage.Index
+	results         storage.ExecutionResults
+	signatureHasher hash.Hasher
 }
 
-func NewReceiptValidator(state protocol.State, headers storage.Headers, index storage.Index, results storage.ExecutionResults, seals storage.Seals, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State,
+	headers storage.Headers,
+	index storage.Index,
+	results storage.ExecutionResults,
+	seals storage.Seals,
+) *receiptValidator {
 	rv := &receiptValidator{
-		state:    state,
-		headers:  headers,
-		index:    index,
-		results:  results,
-		verifier: verifier,
-		seals:    seals,
+		state:           state,
+		headers:         headers,
+		index:           index,
+		results:         results,
+		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
+		seals:           seals,
 	}
 
 	return rv
@@ -38,7 +44,7 @@ func NewReceiptValidator(state protocol.State, headers storage.Headers, index st
 
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
 	id := receipt.ID()
-	valid, err := v.verifier.Verify(id[:], receipt.ExecutorSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}
@@ -141,16 +147,17 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 
 // Validate verifies that the ExecutionReceipt satisfies
 // the following conditions:
-// 	* is from Execution node with positive weight
-//	* has valid signature
-//	* chunks are in correct format
-// 	* execution result has a valid parent and satisfies the subgraph check
+//   - is from Execution node with positive weight
+//   - has valid signature
+//   - chunks are in correct format
+//   - execution result has a valid parent and satisfies the subgraph check
+//
 // Returns nil if all checks passed successfully.
 // Expected errors during normal operations:
-// * engine.InvalidInputError
-//   if receipt violates protocol condition
-// * engine.UnverifiableInputError
-//   if receipt's parent result is unknown
+//   - engine.InvalidInputError
+//     if receipt violates protocol condition
+//   - engine.UnverifiableInputError
+//     if receipt's parent result is unknown
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	// TODO: this can be optimized by checking if result was already stored and validated.
 	// This needs to be addressed later since many tests depend on this behavior.
@@ -178,20 +185,22 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 // ValidatePayload verifies the ExecutionReceipts and ExecutionResults
 // in the payload for compliance with the protocol:
 // Receipts:
-// 	* are from Execution node with positive weight
-//	* have valid signature
-//	* chunks are in correct format
-//  * no duplicates in fork
+//   - are from Execution node with positive weight
+//   - have valid signature
+//   - chunks are in correct format
+//   - no duplicates in fork
+//
 // Results:
-// 	* have valid parents and satisfy the subgraph check
-//  * extend the execution tree, where the tree root is the latest
-//    finalized block and only results from this fork are included
-//  * no duplicates in fork
+//   - have valid parents and satisfy the subgraph check
+//   - extend the execution tree, where the tree root is the latest
+//     finalized block and only results from this fork are included
+//   - no duplicates in fork
+//
 // Expected errors during normal operations:
-// * engine.InvalidInputError
-//   if some receipts in the candidate block violate protocol condition
-// * engine.UnverifiableInputError
-//   if for some of the receipts, their respective parent result is unknown
+//   - engine.InvalidInputError
+//     if some receipts in the candidate block violate protocol condition
+//   - engine.UnverifiableInputError
+//     if for some of the receipts, their respective parent result is unknown
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -203,7 +212,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.ByBlockID(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
 	}
@@ -351,9 +360,9 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 			err)
 	}
 
-	err = ensureStakedNodeWithRole(identity, flow.RoleExecution)
+	err = ensureNodeHasWeightAndRole(identity, flow.RoleExecution)
 	if err != nil {
-		return fmt.Errorf("staked node invalid: %w", err)
+		return fmt.Errorf("node is not authorized execution node: %w", err)
 	}
 
 	err = v.verifySignature(receipt, identity)

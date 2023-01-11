@@ -11,10 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
@@ -23,6 +26,12 @@ import (
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func doneChan() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
+}
 
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(ComplianceCoreSuite))
@@ -35,17 +44,18 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB map[flow.Identifier]*cluster.Block
 
-	pendingDB  map[flow.Identifier]*cluster.PendingBlock
-	childrenDB map[flow.Identifier][]*cluster.PendingBlock
+	pendingDB  map[flow.Identifier]flow.Slashable[cluster.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[cluster.Block]
 
 	// mocked dependencies
-	state    *clusterstate.MutableState
-	snapshot *clusterstate.Snapshot
-	metrics  *metrics.NoopCollector
-	headers  *storage.Headers
-	pending  *module.PendingClusterBlockBuffer
-	hotstuff *module.HotStuff
-	sync     *module.BlockRequester
+	state          *clusterstate.MutableState
+	snapshot       *clusterstate.Snapshot
+	metrics        *metrics.NoopCollector
+	headers        *storage.Headers
+	pending        *module.PendingClusterBlockBuffer
+	hotstuff       *module.HotStuff
+	sync           *module.BlockRequester
+	voteAggregator *hotstuff.VoteAggregator
 
 	// engine under test
 	core *Core
@@ -60,8 +70,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
-	cs.pendingDB = make(map[flow.Identifier]*cluster.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*cluster.PendingBlock)
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[cluster.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[cluster.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = cs.head
@@ -111,7 +121,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *cluster.PendingBlock {
+		func(blockID flow.Identifier) flow.Slashable[cluster.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -120,7 +130,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*cluster.PendingBlock {
+		func(blockID flow.Identifier) []flow.Slashable[cluster.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -130,7 +140,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -141,19 +151,30 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
 
+	cs.voteAggregator = &hotstuff.VoteAggregator{}
+
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
-	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
+	cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Return(nil)
 	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending)
+	core, err := NewCore(
+		unittest.Logger(),
+		cs.metrics,
+		cs.metrics,
+		cs.metrics,
+		cs.headers,
+		cs.state,
+		cs.pending,
+		cs.voteAggregator,
+	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
-	cs.core = e
+	cs.core = core
 	// assign engine with consensus & synchronization
 	cs.core.hotstuff = cs.hotstuff
 	cs.core.sync = cs.sync
@@ -165,15 +186,12 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.ClusterBlockWithParent(cs.head)
 
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := messages.NewClusterBlockProposal(&block)
 
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -183,6 +201,22 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
+func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockFixture()
+	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ClusterProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
+}
+
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
@@ -190,16 +224,13 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := messages.NewClusterBlockProposal(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -219,10 +250,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
+	proposal := messages.NewClusterBlockProposal(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -252,19 +280,14 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.ClusterBlockWithParent(cs.head)
-	proposal := &messages.ClusterBlockProposal{
-		Header:  parent.Header,
-		Payload: parent.Payload,
-	}
 	block1 := unittest.ClusterBlockWithParent(&parent)
 	block2 := unittest.ClusterBlockWithParent(&parent)
 	block3 := unittest.ClusterBlockWithParent(&parent)
 
-	pendingFromBlock := func(block *cluster.Block) *cluster.PendingBlock {
-		return &cluster.PendingBlock{
+	pendingFromBlock := func(block *cluster.Block) flow.Slashable[cluster.Block] {
+		return flow.Slashable[cluster.Block]{
 			OriginID: block.Header.ProposerID,
-			Header:   block.Header,
-			Payload:  block.Payload,
+			Message:  block,
 		}
 	}
 
@@ -282,13 +305,13 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal)
+	err := cs.core.processBlockAndDescendants(&parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -299,7 +322,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.ClusterBlockVote{
@@ -308,13 +330,18 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 		SigData: unittest.SignatureFixture(),
 	}
 
-	cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+	cs.voteAggregator.On("AddVote", &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}).Return()
 
 	// execute the vote submission
 	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
@@ -343,17 +370,14 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	for _, block := range proposals {
 
 		// check that we request the ancestor block each time
-		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
+		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
 				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
 			},
 		)
 
-		proposal := &messages.ClusterBlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
+		proposal := messages.NewClusterBlockProposal(block)
 
 		// process and make sure no error occurs (as they are unverifiable)
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -379,12 +403,9 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 			index++
 			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
 		},
-	)
+	).Return(doneChan())
 
-	missingProposal := &messages.ClusterBlockProposal{
-		Header:  missing.Header,
-		Payload: missing.Payload,
-	}
+	missingProposal := messages.NewClusterBlockProposal(missing)
 
 	proposalsLookup[missing.ID()] = missing
 

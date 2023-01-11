@@ -1,12 +1,12 @@
 package sealing
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -38,8 +40,19 @@ const defaultSealingEngineWorkers = 8
 // by assignment collector state machine to do transitions
 const defaultAssignmentCollectorsWorkerPoolCapacity = 4
 
-// defaultIncorporatedBlockQueueCapacity maximum capacity of block incorporated events queue
-const defaultIncorporatedBlockQueueCapacity = 1000
+// defaultIncorporatedBlockQueueCapacity maximum capacity for queuing incorporated blocks
+// Caution: We cannot drop incorporated blocks, as there is no way that results included in the block
+// can be re-added later once dropped. Missing any incorporated result can undermine sealing liveness!
+// Therefore, the queue capacity should be large _and_ there should be logic for crashing the node
+// in case queueing an incorporated block fails.
+const defaultIncorporatedBlockQueueCapacity = 10000
+
+// defaultIncorporatedResultQueueCapacity maximum capacity for queuing incorporated results
+// Caution: We cannot drop incorporated results, as there is no way that an incorporated result
+// can be re-added later once dropped. Missing incorporated results can undermine sealing liveness!
+// Therefore, the queue capacity should be large _and_ there should be logic for crashing the node
+// in case queueing an incorporated result fails.
+const defaultIncorporatedResultQueueCapacity = 80000
 
 type (
 	EventSink chan *Event // Channel to push pending events
@@ -88,9 +101,8 @@ func NewEngine(log zerolog.Logger,
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
-	verifier module.Verifier,
 	sealsMempool mempool.IncorporatedResultSeals,
-	options Config,
+	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader, err := state.Params().Root()
 	if err != nil {
@@ -117,24 +129,25 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}
 
-	err = e.setupMessageHandler(options.RequiredApprovalsForSealConstruction)
+	err = e.setupMessageHandler(requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ReceiveApprovals, e)
+	_, err = net.Register(channels.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
 	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	approvalConduit, err := net.Register(channels.RequestApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	signatureHasher := msig.NewBLSHasher(msig.ResultApprovalTag)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -157,23 +170,22 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	e.finalizationEventsNotifier = engine.NewNotifier()
 	e.blockIncorporatedNotifier = engine.NewNotifier()
 	var err error
-	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
+	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue(defaultIncorporatedResultQueueCapacity)
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
-	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(defaultIncorporatedBlockQueueCapacity)
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
 	return nil
 }
 
 // setupMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED INPUTS.
-func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) error {
+func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGetter) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
+		defaultApprovalQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -185,7 +197,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 
 	// FiFo queue for requested approvals
 	pendingRequestedApprovalsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultApprovalResponseQueueCapacity),
+		defaultApprovalResponseQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -209,7 +221,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -227,7 +239,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -246,8 +258,16 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 }
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
@@ -370,7 +390,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.messageHandler.Process(e.me.NodeID(), event)
+	err := e.ProcessLocal(event)
 	if err != nil {
 		// receiving an input of incompatible type from a trusted internal component is fatal
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -380,19 +400,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.messageHandler.Process(e.me.NodeID(), event)
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+	err := e.Process(channel, originID, event)
 	if err != nil {
-		lg := e.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -421,24 +432,32 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Informs sealing.Core about finalization of respective block.
+// (1) Informs sealing.Core about finalization of respective block.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
 // OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
-//  (1) Processes all execution results that were incorporated in parent block payload.
+// (1) Processes all execution results that were incorporated in parent block payload.
+//
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+	added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
+	if !added {
+		// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the
+		// queue capacity is depleted. However, we cannot drop incorporated blocks, because there
+		// is no way that any contained incorporated result would be re-added later once dropped.
+		e.log.Fatal().Msgf("failed to queue incorporated block %v", incorporatedBlock.BlockID)
+	}
 	e.blockIncorporatedNotifier.Notify()
 }
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
-// for further processing to sealing core.
+// for further processing to sealing core. No errors expected during normal operations.
 func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) error {
 	// In order to process a block within the sealing engine, we need the block's source of
 	// randomness (to compute the chunk assignment). The source of randomness can be taken from _any_
@@ -448,7 +467,7 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 
 	incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
+		return fmt.Errorf("could not retrieve header for block %v", incorporatedBlockID)
 	}
 
 	e.log.Info().Msgf("processing incorporated block %v at height %d", incorporatedBlockID, incorporatedBlock.Height)
@@ -473,7 +492,7 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 		added := e.pendingIncorporatedResults.Push(incorporatedResult)
 		if !added {
 			// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
-			// queue capacity is depleted. However, we cannot dropped the incorporated result, because there
+			// queue capacity is depleted. However, we cannot drop incorporated results, because there
 			// is no way that an incorporated result can be re-added later once dropped.
 			return fmt.Errorf("failed to queue incorporated result")
 		}
@@ -483,6 +502,7 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 }
 
 // processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
+// No errors expected during normal operations.
 func (e *Engine) processBlockIncorporatedEvents() error {
 	for {
 		select {

@@ -1,0 +1,9 @@
+integration/localnet/bootstrap/
+integration/localnet/profiler/
+integration/localnet/data/
+integration/localnet/trie/
+integration/localnet/docker-compose.nodes.yml
+integration/localnet/targets.nodes.json
+
+go.work
+go.work.sum

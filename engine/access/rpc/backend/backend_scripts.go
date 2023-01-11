@@ -2,6 +2,10 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
+	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -9,10 +13,15 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
+const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
 	headers           storage.Headers
@@ -20,6 +29,8 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
+	metrics           module.BackendScriptsMetrics
+	loggedScripts     *lru.Cache
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -60,7 +71,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		err = convertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -79,7 +90,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	arguments [][]byte,
 ) ([]byte, error) {
 
-	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
@@ -88,36 +99,85 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
+	// encode to MD5 as low compute/memory lookup key
+	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
+	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
+	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
+		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
-			b.log.Debug().
+			if b.log.GetLevel() == zerolog.DebugLevel {
+				executionTime := time.Now()
+				if b.shouldLogScript(executionTime, insecureScriptHash) {
+					b.log.Debug().
+						Str("execution_node", execNode.String()).
+						Hex("block_id", blockID[:]).
+						Hex("script_hash", insecureScriptHash[:]).
+						Str("script", string(script)).
+						Msg("Successfully executed script")
+					b.loggedScripts.Add(insecureScriptHash, executionTime)
+				}
+			}
+
+			// log execution time
+			b.metrics.ScriptExecuted(
+				time.Since(execStartTime),
+				len(script),
+			)
+
+			return result, nil
+		}
+		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
+		if status.Code(err) == codes.InvalidArgument {
+			b.log.Debug().Err(err).
 				Str("execution_node", execNode.String()).
 				Hex("block_id", blockID[:]).
+				Hex("script_hash", insecureScriptHash[:]).
 				Str("script", string(script)).
-				Msg("Successfully executed script")
-			return result, nil
+				Msg("script failed to execute on the execution node")
+			return nil, err
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors.ErrorOrNil()
+	errToReturn := errors.ErrorOrNil()
+	if errToReturn != nil {
+		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
+	}
+	return nil, errToReturn
 }
 
-func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+// shouldLogScript checks if the script hash is unique in the time window
+func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte) bool {
+	rawTimestamp, seen := b.loggedScripts.Get(scriptHash)
+	if !seen || rawTimestamp == nil {
+		return true
+	} else {
+		// safe cast
+		timestamp := rawTimestamp.(time.Time)
+		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
+	}
+}
+
+func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
 	}
 	defer closer.Close()
-	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
+
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil
 }

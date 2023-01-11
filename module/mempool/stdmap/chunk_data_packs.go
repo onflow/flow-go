@@ -30,9 +30,9 @@ func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
 	return added
 }
 
-// Rem will remove chunk data pack by ID
-func (c *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
-	removed := c.Backend.Rem(chunkID)
+// Remove will remove chunk data pack by ID
+func (c *ChunkDataPacks) Remove(chunkID flow.Identifier) bool {
+	removed := c.Backend.Remove(chunkID)
 	return removed
 }
 
@@ -59,9 +59,4 @@ func (c *ChunkDataPacks) All() []*flow.ChunkDataPack {
 		chunkDataPack = append(chunkDataPack, entity.(*flow.ChunkDataPack))
 	}
 	return chunkDataPack
-}
-
-// Hash will return a hash of the contents of the memory pool.
-func (c *ChunkDataPacks) Hash() flow.Identifier {
-	return c.Backend.Hash()
 }

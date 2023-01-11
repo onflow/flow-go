@@ -1,25 +1,31 @@
 package rlp
 
 import (
+	"io"
+
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/onflow/flow-go/model/encoding"
 )
 
-type Encoder struct{}
+var _ encoding.Marshaler = (*Marshaler)(nil)
 
-func NewEncoder() *Encoder {
-	return &Encoder{}
+type Marshaler struct{}
+
+func NewMarshaler() *Marshaler {
+	return &Marshaler{}
 }
 
-func (e *Encoder) Encode(val interface{}) ([]byte, error) {
+func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
 	return rlp.EncodeToBytes(val)
 }
 
-func (e *Encoder) Decode(b []byte, val interface{}) error {
+func (m *Marshaler) Unmarshal(b []byte, val interface{}) error {
 	return rlp.DecodeBytes(b, val)
 }
 
-func (e *Encoder) MustEncode(val interface{}) []byte {
-	b, err := e.Encode(val)
+func (m *Marshaler) MustMarshal(val interface{}) []byte {
+	b, err := m.Marshal(val)
 	if err != nil {
 		panic(err)
 	}
@@ -27,9 +33,37 @@ func (e *Encoder) MustEncode(val interface{}) []byte {
 	return b
 }
 
-func (e *Encoder) MustDecode(b []byte, val interface{}) {
-	err := e.Decode(b, val)
+func (m *Marshaler) MustUnmarshal(b []byte, val interface{}) {
+	err := m.Unmarshal(b, val)
 	if err != nil {
 		panic(err)
 	}
+}
+
+var _ encoding.Codec = (*Codec)(nil)
+
+type Codec struct{}
+
+func (c *Codec) NewEncoder(w io.Writer) encoding.Encoder {
+	return &Encoder{w}
+}
+
+func (c *Codec) NewDecoder(r io.Reader) encoding.Decoder {
+	return &Decoder{r}
+}
+
+type Encoder struct {
+	w io.Writer
+}
+
+func (e *Encoder) Encode(v interface{}) error {
+	return rlp.Encode(e.w, v)
+}
+
+type Decoder struct {
+	r io.Reader
+}
+
+func (e *Decoder) Decode(v interface{}) error {
+	return rlp.Decode(e.r, v)
 }

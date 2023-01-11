@@ -43,11 +43,13 @@ func init() {
 func addDeployCmdFlags() {
 	deployCmd.Flags().StringVar(&flagFungibleTokenAddress, "fungible-token-addr", "", "the hex address of the FungibleToken contract")
 	deployCmd.Flags().StringVar(&flagFlowTokenAddress, "flow-token-addr", "", "the hex address of the FlowToken contract")
+	deployCmd.Flags().StringVar(&flagFlowTokenAddress, "flow-fees-addr", "", "the hex address of the FlowFees contract")
 	deployCmd.Flags().StringVar(&flagIDTableAddress, "id-table-addr", "", "the hex address of the IDTable contract")
 	deployCmd.Flags().StringVar(&flagFlowSupplyIncreasePercentage, "flow-supply-increase-percentage", "0.0", "the FLOW supply increase percentage")
 
 	_ = deployCmd.MarkFlagRequired("fungible-token-addr")
 	_ = deployCmd.MarkFlagRequired("flow-token-addr")
+	_ = deployCmd.MarkFlagRequired("flow-fees-addr")
 	_ = deployCmd.MarkFlagRequired("id-table-addr")
 	_ = deployCmd.MarkFlagRequired("flow-supply-increase-percentage")
 }
@@ -264,6 +266,7 @@ func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
 		flagIDTableAddress,
 		systemContracts.ClusterQC.Address.Hex(),
 		systemContracts.DKG.Address.Hex(),
+		flagFlowFeesAddress,
 	)
 
 	// convert the epoch contract code to an [UInt8] literal string that can be

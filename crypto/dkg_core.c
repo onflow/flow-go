@@ -11,7 +11,7 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_t a, const int a_size, const byte x){
+void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_size, const byte x){
     bn_t image;
     bn_new(image);
     Zr_polynomialImage(image, y, a, a_size, x);
@@ -73,8 +73,8 @@ static void G2_polynomialImage(ep2_t y, const ep2_st* A, const int len_A,
     bn_free(bn_x);
 }
 
-// compute the nodes public keys from the verification vector
-// y[i] = Q(i+1) for all nodes i, with:
+// compute the participants public keys from the verification vector
+// y[i] = Q(i+1) for all participants i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 void G2_polynomialImages(ep2_st *y, const int len_y, const ep2_st* A, const int len_A) {
     // order r
@@ -99,13 +99,16 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     }
 }
 
-// imports an array of ep2_st from an array of bytes
-// the length matching is supposed to be already done
+// The function imports an array of ep2_st from an array of bytes
+// the length matching is supposed to be already done.
+//
+// It returns RLC_OK if reading all the vector succeeded and RLC_ERR 
+// otherwise.
 int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     const int size = (G2_BYTES/(G2_SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        int read_ret = ep2_read_bin_compact(&A[i], p, size);
+        int read_ret = ep2_read_bin_compact(&A[i], p, size); // returns RLC_OK or RLC_ERR
         if (read_ret != RLC_OK)
             return read_ret;
         p += size;

@@ -39,6 +39,7 @@ import "unsafe"
 // A storageBuf is an aligned array of maxRate bytes.
 type storageBuf [maxRate / 8]uint64
 
+//go:nocheckptr ignore "pointer arithmetic result points to invalid allocation"
 func (b *storageBuf) asBytes() *[maxRate]byte {
 	// re-using a trick from https://github.com/golang/go/blob/master/src/runtime/stubs.go#L178:
 	// to hide the input pointer from escape analysis and avoid
@@ -50,7 +51,7 @@ func (b *storageBuf) asBytes() *[maxRate]byte {
 
 // xorIn uses unaligned reads and writes to update d.a to contain d.a
 // XOR buf.
-func xorIn(d *sha3State, buf []byte) {
+func xorIn(d *spongeState, buf []byte) {
 	n := len(buf)
 	bw := (*[maxRate / 8]uint64)(unsafe.Pointer(&buf[0]))[: n/8 : n/8]
 
@@ -75,7 +76,7 @@ func xorIn(d *sha3State, buf []byte) {
 	}
 }
 
-func copyOut(buf []byte, d *sha3State) {
+func copyOut(buf []byte, d *spongeState) {
 	ab := (*[maxRate]uint8)(unsafe.Pointer(&d.a[0]))
 	copy(buf, ab[:])
 }

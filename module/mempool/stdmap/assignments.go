@@ -40,10 +40,10 @@ func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.A
 	return a.Backend.Add(chunkmodels.NewAssignmentDataPack(fingerprint, assignment))
 }
 
-// Rem will remove the given Assignment from the memory pool; it will
+// Remove will remove the given Assignment from the memory pool; it will
 // return true if the Assignment was known and removed.
-func (a *Assignments) Rem(assignmentID flow.Identifier) bool {
-	return a.Backend.Rem(assignmentID)
+func (a *Assignments) Remove(assignmentID flow.Identifier) bool {
+	return a.Backend.Remove(assignmentID)
 }
 
 // Size will return the current size of the memory pool.

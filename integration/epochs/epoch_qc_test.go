@@ -2,9 +2,10 @@ package epochs
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"testing"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -17,11 +18,10 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -73,14 +73,14 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 		s.Require().NoError(err)
 
-		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, nodeID, address.String(), 0, s.qcAddress.String(), signer)
+		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, nodeID, address.String(), 0, s.qcAddress.String(), signer)
 		s.Require().NoError(err)
 
 		local := &modulemock.Local{}
 		local.On("NodeID").Return(nodeID)
 
 		// create valid signature
-		hasher := crypto.NewBLSKMAC(encoding.CollectorVoteTag)
+		hasher := signature.NewBLSHasher(signature.CollectorVoteTag)
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
 
@@ -107,12 +107,12 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		s.Require().NoError(err)
 	}
 
-	// stop voting
-	s.StopVoting()
-
 	// check if each node has voted
 	for _, node := range nodes {
 		hasVoted := s.NodeHasVoted(node.NodeID)
 		s.Assert().True(hasVoted)
 	}
+
+	// stop voting
+	s.StopVoting()
 }

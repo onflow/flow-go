@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -36,7 +36,7 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 	// extract the TLSConfig from it which will contain the generated x509 certificate
 	// (ignore the public key that is returned - it is the public key of the private key used to generate the ID)
-	libp2pTlsConfig, _ := id.ConfigForAny()
+	libp2pTlsConfig, _ := id.ConfigForPeer("")
 
 	// verify that exactly one certificate was generated for the given key
 	certCount := len(libp2pTlsConfig.Certificates)

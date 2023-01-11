@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,21 +19,23 @@ import (
 // against happy path of verification nodes.
 type Suite struct {
 	suite.Suite
-	common.TestnetStateTracker                      // used to track messages over testnet
-	cancel                     context.CancelFunc   // used to tear down the testnet
-	net                        *testnet.FlowNetwork // used to keep an instance of testnet
-	nodeConfigs                []testnet.NodeConfig // used to keep configuration of nodes in testnet
-	nodeIDs                    []flow.Identifier    // used to keep identifier of nodes in testnet
-	ghostID                    flow.Identifier      // represents id of ghost node
-	exe1ID                     flow.Identifier
-	exe2ID                     flow.Identifier
-	verID                      flow.Identifier // represents id of verification node
+	log                     zerolog.Logger
+	lib.TestnetStateTracker                      // used to track messages over testnet
+	cancel                  context.CancelFunc   // used to tear down the testnet
+	net                     *testnet.FlowNetwork // used to keep an instance of testnet
+	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
+	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
+	ghostID                 flow.Identifier      // represents id of ghost node
+	exe1ID                  flow.Identifier
+	exe2ID                  flow.Identifier
+	verID                   flow.Identifier // represents id of verification node
+	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (s *Suite) Ghost() *client.GhostClient {
 	ghost := s.net.ContainerByID(s.ghostID)
-	cli, err := common.GetGhostClient(ghost)
+	cli, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return cli
 }
@@ -58,18 +60,16 @@ func (s *Suite) MetricsPort() string {
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
-// - One execution node
+// - two execution node
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log.Info().Msg("================> SetupTest")
+
 	blockRateFlag := "--block-rate-delay=1ms"
 
-	// setup two access nodes, minimum needed for LN/SN access API and fallback
-	anConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-	}
-	s.nodeConfigs = append(s.nodeConfigs, anConfigs...)
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -89,20 +89,26 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.WarnLevel))
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -136,7 +142,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithViewsInEpoch(100_000),
 	)
 
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
@@ -148,8 +154,8 @@ func (s *Suite) SetupSuite() {
 
 // TearDownSuite tears down the test network of Flow
 func (s *Suite) TearDownSuite() {
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msg("================> Finish TearDownTest")
 }

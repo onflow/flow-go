@@ -1,28 +1,28 @@
 package main
 
 import (
+	"github.com/onflow/flow-go/cmd"
 	nodebuilder "github.com/onflow/flow-go/cmd/access/node_builder"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func main() {
-	anb := nodebuilder.FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+	builder := nodebuilder.FlowAccessNode(cmd.FlowNode(flow.RoleAccess.String()))
 
-	anb.PrintBuildVersionDetails()
+	builder.PrintBuildVersionDetails()
 
 	// parse all the command line args
-	anb.ParseFlags()
-
-	// choose a staked or an unstaked node builder based on anb.staked
-	var nodeBuilder nodebuilder.AccessNodeBuilder
-	if anb.IsStaked() {
-		nodeBuilder = nodebuilder.NewStakedAccessNodeBuilder(anb)
-	} else {
-		nodeBuilder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
+	if err := builder.ParseFlags(); err != nil {
+		builder.Logger.Fatal().Err(err).Send()
 	}
 
-	if err := nodeBuilder.Initialize(); err != nil {
-		anb.Logger.Fatal().Err(err).Send()
+	if err := builder.Initialize(); err != nil {
+		builder.Logger.Fatal().Err(err).Send()
 	}
 
-	nodeBuilder.Build().Run()
+	node, err := builder.Build()
+	if err != nil {
+		builder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }

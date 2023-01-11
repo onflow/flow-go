@@ -1,19 +1,18 @@
 package complete_test
 
 import (
-	"io/ioutil"
+	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
@@ -22,37 +21,45 @@ import (
 
 // GENERAL COMMENT:
 // running this test with
-//   go test -bench=.  -benchmem
+//
+//	go test -bench=.  -benchmem
+//
 // will track the heap allocations for the Benchmarks
 func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 
 // BenchmarkStorage benchmarks the performance of the storage layer
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
-	numInsPerStep := 1000
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 32
+	const (
+		numInsPerStep      = 1000
+		keyNumberOfParts   = 10
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 32
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	rand.Seed(time.Now().UnixNano())
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
 	totalUpdateTimeMS := 0
 	totalReadTimeMS := 0
 	totalProofTimeMS := 0
@@ -63,8 +70,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
-		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 		totalRegOperation += len(keys)
 
@@ -107,7 +114,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalProofSize += len(proof)
 
 		start = time.Now()
-		p, _ := encoding.DecodeTrieBatchProof(proof)
+		p, _ := ledger.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
 		_, err = ptrie.NewPSMT(ledger.RootHash(newState), p)
@@ -137,35 +144,41 @@ func benchmarkStorage(steps int, b *testing.B) {
 // BenchmarkTrieUpdate benchmarks the performance of a trie update
 func BenchmarkTrieUpdate(b *testing.B) {
 	// key updates per iteration
-	numInsPerStep := 10000
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 32
+	const (
+		numInsPerStep      = 10000
+		keyNumberOfParts   = 3
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 32
+		capacity           = 101
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
-	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -185,35 +198,41 @@ func BenchmarkTrieUpdate(b *testing.B) {
 // BenchmarkTrieUpdate benchmarks the performance of a trie read
 func BenchmarkTrieRead(b *testing.B) {
 	// key updates per iteration
-	numInsPerStep := 10000
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 32
+	const (
+		numInsPerStep      = 10000
+		keyNumberOfParts   = 10
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 32
+		capacity           = 101
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	dir := b.TempDir()
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
-	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -240,38 +259,123 @@ func BenchmarkTrieRead(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkTrieUpdate benchmarks the performance of a trie prove
-func BenchmarkTrieProve(b *testing.B) {
+func BenchmarkLedgerGetOneValue(b *testing.B) {
 	// key updates per iteration
-	numInsPerStep := 10000
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 32
+	const (
+		numInsPerStep      = 10000
+		keyNumberOfParts   = 10
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 32
+		capacity           = 101
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	defer os.RemoveAll(dir)
+	dir := b.TempDir()
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
+
+	state := led.InitialState()
+
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
-	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
-
-	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	newState, _, err := led.Set(update)
 	if err != nil {
-		b.Fatal("can't create a new complete ledger")
+		b.Fatal(err)
 	}
+
+	b.Run("batch get", func(b *testing.B) {
+		query, err := ledger.NewQuery(newState, []ledger.Key{keys[0]})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = led.Get(query)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("single get", func(b *testing.B) {
+		query, err := ledger.NewQuerySingleValue(newState, keys[0])
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = led.GetSingleValue(query)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkTrieUpdate benchmarks the performance of a trie prove
+func BenchmarkTrieProve(b *testing.B) {
+	// key updates per iteration
+	const (
+		numInsPerStep      = 10000
+		keyNumberOfParts   = 10
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 32
+		capacity           = 101
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
+	rand.Seed(1)
+
+	dir := b.TempDir()
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
 
 	state := led.InitialState()
 
-	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {

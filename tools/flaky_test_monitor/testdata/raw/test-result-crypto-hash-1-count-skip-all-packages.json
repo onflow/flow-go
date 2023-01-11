@@ -1,8 +1,0 @@
-{"Time":"2021-10-12T15:41:49.740579-04:00","Action":"output","Package":"github.com/onflow/flow-go/utils/unittest","Output":"?   \tgithub.com/onflow/flow-go/utils/unittest\t[no test files]\n"}
-{"Time":"2021-10-12T15:41:49.74092-04:00","Action":"skip","Package":"github.com/onflow/flow-go/utils/unittest","Elapsed":0}
-{"Time":"2021-10-12T15:41:49.740955-04:00","Action":"output","Package":"github.com/onflow/flow-go/utils/unittest/generator","Output":"?   \tgithub.com/onflow/flow-go/utils/unittest/generator\t[no test files]\n"}
-{"Time":"2021-10-12T15:41:49.740967-04:00","Action":"skip","Package":"github.com/onflow/flow-go/utils/unittest/generator","Elapsed":0}
-{"Time":"2021-10-12T15:41:49.783254-04:00","Action":"output","Package":"github.com/onflow/flow-go/utils/unittest/mocks","Output":"?   \tgithub.com/onflow/flow-go/utils/unittest/mocks\t[no test files]\n"}
-{"Time":"2021-10-12T15:41:49.783307-04:00","Action":"skip","Package":"github.com/onflow/flow-go/utils/unittest/mocks","Elapsed":0}
-{"Time":"2021-10-12T15:41:49.783408-04:00","Action":"output","Package":"github.com/onflow/flow-go/utils/unittest/network","Output":"?   \tgithub.com/onflow/flow-go/utils/unittest/network\t[no test files]\n"}
-{"Time":"2021-10-12T15:41:49.783418-04:00","Action":"skip","Package":"github.com/onflow/flow-go/utils/unittest/network","Elapsed":0}

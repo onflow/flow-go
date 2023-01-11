@@ -2,26 +2,31 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/mocknetwork"
-
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/component"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -47,12 +52,19 @@ type Suite struct {
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
+	seals        *storage.Seals
+	downloader   *downloadermock.Downloader
 
-	eng *Engine
+	eng    *Engine
+	cancel context.CancelFunc
 }
 
 func TestIngestEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
+}
+
+func (suite *Suite) TearDownTest() {
+	suite.cancel()
 }
 
 func (suite *Suite) SetupTest() {
@@ -73,7 +85,7 @@ func (suite *Suite) SetupTest() {
 
 	net := new(mocknetwork.Network)
 	conduit := new(mocknetwork.Conduit)
-	net.On("Register", engine.ReceiveReceipts, mock.Anything).
+	net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)
@@ -92,25 +104,51 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
+	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
+		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0,
+		0, false, false, nil, nil)
+	require.NoError(suite.T(), err)
+	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
+	require.NoError(suite.T(), err)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	suite.eng = eng
+	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 
+	ctx, cancel := context.WithCancel(context.Background())
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	eng.ComponentManager.Start(irrecoverableCtx)
+	<-eng.Ready()
+
+	suite.eng = eng
+	suite.cancel = cancel
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
+	suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil).Once()
 
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	refBlockID := unittest.IdentifierFixture()
+	for _, guarantee := range block.Payload.Guarantees {
+		guarantee.ReferenceBlockID = refBlockID
+		// guarantee signers must be cluster committee members, so that access will fetch collection from
+		// the signers that are specified by guarantee.SignerIndices
+		indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+		require.NoError(suite.T(), err)
+		guarantee.SignerIndices = indices
+	}
+
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
@@ -124,44 +162,53 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
+	suite.results.On("Index", mock.Anything, mock.Anything).Return(nil)
 
 	// for each of the guarantees, we should request the corresponding collection once
 	needed := make(map[flow.Identifier]struct{})
 	for _, guarantee := range block.Payload.Guarantees {
 		needed[guarantee.ID()] = struct{}{}
 	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+
 	suite.request.On("EntityByID", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			collID := args.Get(0).(flow.Identifier)
 			_, pending := needed[collID]
 			suite.Assert().True(pending, "collection should be pending (%x)", collID)
 			delete(needed, collID)
+			wg.Done()
 		},
 	)
 
 	// process the block through the finalized callback
 	suite.eng.OnFinalizedBlock(&hotstuffBlock)
-
-	// wait for engine shutdown
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
+	suite.Assertions.Eventually(func() bool {
+		wg.Wait()
+		return true
+	}, time.Millisecond*20, time.Millisecond)
 
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
 	suite.request.AssertNumberOfCalls(suite.T(), "EntityByID", len(block.Payload.Guarantees))
+	suite.request.AssertNumberOfCalls(suite.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (suite *Suite) TestOnCollection() {
-
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
@@ -185,24 +232,13 @@ func (suite *Suite) TestOnCollection() {
 	// process the block through the collection callback
 	suite.eng.OnCollection(originID, &collection)
 
-	// wait for engine to be done processing
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
-
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
 }
 
-// TestExecutionResultsAreIndexed checks that execution results are properly indexedd
-func (suite *Suite) TestExecutionResultsAreIndexed() {
+// TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
+func (suite *Suite) TestExecutionReceiptsAreIndexed() {
 
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
@@ -210,6 +246,11 @@ func (suite *Suite) TestExecutionResultsAreIndexed() {
 
 	// we should store the light collection and index its transactions
 	suite.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	block := &flow.Block{
+		Header:  &flow.Header{Height: 0},
+		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
+	}
+	suite.blocks.On("ByID", mock.Anything).Return(block, nil)
 
 	// for each transaction in the collection, we should store it
 	needed := make(map[flow.Identifier]struct{})
@@ -227,11 +268,9 @@ func (suite *Suite) TestExecutionResultsAreIndexed() {
 	er2 := unittest.ExecutionReceiptFixture()
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	err := suite.eng.handleExecutionReceipt(originID, er1)
@@ -272,17 +311,6 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 	// process the block through the collection callback
 	suite.eng.OnCollection(originID, &collection)
 
-	// wait for engine to be done processing
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
-
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
@@ -296,12 +324,17 @@ func (suite *Suite) TestRequestMissingCollections() {
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
+	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
 		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
 		))
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
@@ -310,6 +343,13 @@ func (suite *Suite) TestRequestMissingCollections() {
 		heightMap[height] = &block
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
+			c.ReferenceBlockID = refBlockID
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			c.SignerIndices = indices
 		}
 	}
 
@@ -364,6 +404,16 @@ func (suite *Suite) TestRequestMissingCollections() {
 	// force should be called once
 	suite.request.On("Force").Return()
 
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
 	assertExpectations := func() {
 		suite.request.AssertExpectations(suite.T())
 		suite.collections.AssertExpectations(suite.T())
@@ -416,6 +466,10 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
+	refBlockID := unittest.IdentifierFixture()
 	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
@@ -424,7 +478,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			collMap[coll.ID()] = &coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
+				cg.ReferenceBlockID = refBlockID
 			})
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			cg.SignerIndices = indices
 			guarantees[j] = cg
 		}
 		block := unittest.BlockFixture()
@@ -454,6 +515,16 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 			return storerr.ErrNotFound
 		})
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
 	// blkMissingColl controls which collections are reported as missing by the collections storage mock
 	blkMissingColl := make([]bool, blkCnt)
@@ -518,13 +589,42 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
-	suite.Run("missing collections are requested", func() {
+	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
+		// root block is the last complete block
+		rtnErr = nil
+		lastFullBlockHeight = rootBlkHeight
+
+		// lower the block threshold to request missing collections
+		defaultMissingCollsForBlkThreshold = 2
+
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+			// setup receive engine expectations
+			for _, cg := range blocks[i].Payload.Guarantees {
+				suite.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
+			}
+		}
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		// assert that missing collections are requested
+		suite.request.AssertExpectations(suite.T())
+
+		// last full blk index is not advanced
+		suite.blocks.AssertExpectations(suite.T()) // no new call to UpdateLastFullBlockHeight should be made
+	})
+
+	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
 		// root block is the last complete block
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
 		// lower the height threshold to request missing collections
-		defaultMissingCollsForBlkThreshold = 2
+		defaultMissingCollsForAgeThreshold = 1
+
+		// raise the block threshold to ensure it does not trigger missing collection request
+		defaultMissingCollsForBlkThreshold = blkCnt + 1
 
 		// mark all blocks beyond the root block as incomplete
 		for i := 1; i < blkCnt; i++ {
@@ -543,12 +643,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// last full blk index is not advanced
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
-	suite.Run("missing collections are not requested if threshold not reached", func() {
+
+	suite.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
 		// root block is the last complete block
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
-		// raise the height threshold to avoid requesting missing collections
+		// raise the thresholds to avoid requesting missing collections
+		defaultMissingCollsForAgeThreshold = 3
 		defaultMissingCollsForBlkThreshold = 3
 
 		// mark all blocks beyond the root block as incomplete
@@ -564,4 +666,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// last full blk index is not advanced
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
+}
+
+func (suite *Suite) TestComponentShutdown() {
+	// start then shut down the engine
+	unittest.AssertClosesBefore(suite.T(), suite.eng.Ready(), 10*time.Millisecond)
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.eng.Done(), 10*time.Millisecond)
+
+	err := suite.eng.ProcessLocal(&flow.ExecutionReceipt{})
+	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }

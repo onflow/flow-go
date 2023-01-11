@@ -15,30 +15,30 @@ func TestViewGet(t *testing.T) {
 	registerID := "fruit"
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		b, err := v.Get(registerID, "", "")
+		b, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Nil(t, b)
 	})
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
 
 			return nil, nil
 		})
-		b, err := v.Get(registerID, "", "")
+		b, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -46,10 +46,10 @@ func TestViewGet(t *testing.T) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
-		b, err := v.Get(registerID, "", "")
+		b, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b)
 	})
@@ -58,43 +58,43 @@ func TestViewGet(t *testing.T) {
 func TestViewSet(t *testing.T) {
 	registerID := "fruit"
 
-	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
-	err := v.Set(registerID, "", "", flow.RegisterValue("apple"))
+	err := v.Set(registerID, "", flow.RegisterValue("apple"))
 	assert.NoError(t, err)
 
-	b1, err := v.Get(registerID, "", "")
+	b1, err := v.Get(registerID, "")
 	assert.NoError(t, err)
 	assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-	err = v.Set(registerID, "", "", flow.RegisterValue("orange"))
+	err = v.Set(registerID, "", flow.RegisterValue("orange"))
 	assert.NoError(t, err)
 
-	b2, err := v.Get(registerID, "", "")
+	b2, err := v.Get(registerID, "")
 	assert.NoError(t, err)
 	assert.Equal(t, flow.RegisterValue("orange"), b2)
 
 	t.Run("AfterDelete", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = v.Delete(registerID, "", "")
+		err = v.Delete(registerID, "")
 		assert.NoError(t, err)
-		err = v.Set(registerID, "", "", flow.RegisterValue("orange"))
+		err = v.Set(registerID, "", flow.RegisterValue("orange"))
 		assert.NoError(t, err)
 
-		b, err := v.Get(registerID, "", "")
+		b, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("SpockSecret", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -102,7 +102,7 @@ func TestViewSet(t *testing.T) {
 			assert.Equal(t, v.SpockSecret(), v.Interactions().SpockSecret)
 		})
 
-		v = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -111,7 +111,7 @@ func TestViewSet(t *testing.T) {
 		registerID3 := "reg3"
 
 		// prepare the registerID bytes
-		register := flow.NewRegisterID("", "", "")
+		register := flow.NewRegisterID("", "")
 		register.Owner = registerID1
 		registerID1Bytes := register.Bytes()
 		register.Owner = registerID2
@@ -122,44 +122,44 @@ func TestViewSet(t *testing.T) {
 		// this part checks that spocks ordering be based
 		// on update orders and not registerIDs
 		expSpock := hash.NewSHA3_256()
-		err = v.Set(registerID2, "", "", flow.RegisterValue("1"))
+		err = v.Set(registerID2, "", flow.RegisterValue("1"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID2Bytes)
 		hashIt(t, expSpock, []byte("1"))
 
-		err = v.Set(registerID3, "", "", flow.RegisterValue("2"))
+		err = v.Set(registerID3, "", flow.RegisterValue("2"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID3Bytes)
 		hashIt(t, expSpock, []byte("2"))
 
-		err = v.Set(registerID1, "", "", flow.RegisterValue("3"))
+		err = v.Set(registerID1, "", flow.RegisterValue("3"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID1Bytes)
 		hashIt(t, expSpock, []byte("3"))
 
-		_, err := v.Get(registerID1, "", "")
+		_, err := v.Get(registerID1, "")
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID1Bytes)
 
 		// this part uses the delete functionality
 		// to check that only the register ID is written to the spock secret
-		err = v.Delete(registerID1, "", "")
+		err = v.Delete(registerID1, "")
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID1Bytes)
 
 		// this part checks that it always update the
 		// intermediate values and not just the final values
-		err = v.Set(registerID1, "", "", flow.RegisterValue("4"))
+		err = v.Set(registerID1, "", flow.RegisterValue("4"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID1Bytes)
 		hashIt(t, expSpock, []byte("4"))
 
-		err = v.Set(registerID1, "", "", flow.RegisterValue("5"))
+		err = v.Set(registerID1, "", flow.RegisterValue("5"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID1Bytes)
 		hashIt(t, expSpock, []byte("5"))
 
-		err = v.Set(registerID3, "", "", flow.RegisterValue("6"))
+		err = v.Set(registerID3, "", flow.RegisterValue("6"))
 		require.NoError(t, err)
 		hashIt(t, expSpock, registerID3Bytes)
 		hashIt(t, expSpock, []byte("6"))
@@ -177,24 +177,24 @@ func TestView_Delete(t *testing.T) {
 	registerID := "fruit"
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		b1, err := v.Get(registerID, "", "")
+		b1, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Nil(t, b1)
 
-		err = v.Delete(registerID, "", "")
+		err = v.Delete(registerID, "")
 		assert.NoError(t, err)
 
-		b2, err := v.Get(registerID, "", "")
+		b2, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -202,17 +202,17 @@ func TestView_Delete(t *testing.T) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
-		b1, err := v.Get(registerID, "", "")
+		b1, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		err = v.Delete(registerID, "", "")
+		err = v.Delete(registerID, "")
 		assert.NoError(t, err)
 
-		b2, err := v.Get(registerID, "", "")
+		b2, err := v.Get(registerID, "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
 	})
@@ -226,146 +226,146 @@ func TestViewMergeView(t *testing.T) {
 	registerID3 := "diary"
 
 	t.Run("EmptyView", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		chView := v.NewChild()
-		err := chView.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := chView.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b1, err := v.Get(registerID1, "", "")
+		b1, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(registerID2, "", "")
+		b2, err := v.Get(registerID2, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
 
 	t.Run("EmptyDelta", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = v.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = v.Set(registerID2, "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b1, err := v.Get(registerID1, "", "")
+		b1, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(registerID2, "", "")
+		b2, err := v.Get(registerID2, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
 
 	t.Run("NoCollisions", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b1, err := v.Get(registerID1, "", "")
+		b1, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(registerID2, "", "")
+		b2, err := v.Get(registerID2, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		err = chView.Set(registerID1, "", flow.RegisterValue("orange"))
 		assert.NoError(t, err)
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b, err := v.Get(registerID1, "", "")
+		b, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = v.Delete(registerID1, "", "")
+		err = v.Delete(registerID1, "")
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		err = chView.Set(registerID1, "", flow.RegisterValue("orange"))
 		assert.NoError(t, err)
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b, err := v.Get(registerID1, "", "")
+		b, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = chView.Delete(registerID1, "", "")
+		err = chView.Delete(registerID1, "")
 		assert.NoError(t, err)
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
 
-		b, err := v.Get(registerID1, "", "")
+		b, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 		assert.Nil(t, b)
 	})
 	t.Run("SpockDataMerge", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		register := flow.NewRegisterID("", "", "")
+		register := flow.NewRegisterID("", "")
 		register.Owner = registerID1
 		registerID1Bytes := register.Bytes()
 		register.Owner = registerID2
 		registerID2Bytes := register.Bytes()
 
 		expSpock1 := hash.NewSHA3_256()
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 		hashIt(t, expSpock1, registerID1Bytes)
 		hashIt(t, expSpock1, []byte("apple"))
@@ -373,7 +373,7 @@ func TestViewMergeView(t *testing.T) {
 
 		expSpock2 := hash.NewSHA3_256()
 		chView := v.NewChild()
-		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", flow.RegisterValue("carrot"))
 		require.NoError(t, err)
 		hashIt(t, expSpock2, registerID2Bytes)
 		hashIt(t, expSpock2, []byte("carrot"))
@@ -389,17 +389,17 @@ func TestViewMergeView(t *testing.T) {
 	})
 
 	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := v.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
-		err = chView.Set(registerID3, "", "", flow.RegisterValue("milk"))
+		err = chView.Set(registerID3, "", flow.RegisterValue("milk"))
 		assert.NoError(t, err)
 
 		err = v.MergeView(chView)
@@ -409,14 +409,14 @@ func TestViewMergeView(t *testing.T) {
 
 		require.Len(t, reads, 3)
 
-		r1 := flow.NewRegisterID(registerID1, "", "")
-		r2 := flow.NewRegisterID(registerID2, "", "")
-		r3 := flow.NewRegisterID(registerID3, "", "")
+		r1 := flow.NewRegisterID(registerID1, "")
+		r2 := flow.NewRegisterID(registerID2, "")
+		r3 := flow.NewRegisterID(registerID3, "")
 
-		assert.Equal(t, map[string]flow.RegisterID{
-			r1.String(): r1,
-			r2.String(): r2,
-			r3.String(): r3,
+		assert.Equal(t, map[flow.RegisterID]struct{}{
+			r1: struct{}{},
+			r2: struct{}{},
+			r3: struct{}{},
 		}, reads)
 	})
 
@@ -426,7 +426,7 @@ func TestView_RegisterTouches(t *testing.T) {
 	registerID1 := "fruit"
 	registerID2 := "vegetable"
 
-	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
@@ -436,7 +436,7 @@ func TestView_RegisterTouches(t *testing.T) {
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == registerID1 {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -448,10 +448,10 @@ func TestView_RegisterTouches(t *testing.T) {
 			return nil, nil
 		})
 
-		_, err := v.Get(registerID1, "", "")
+		_, err := v.Get(registerID1, "")
 		assert.NoError(t, err)
 
-		err = v.Set(registerID2, "", "", flow.RegisterValue("apple"))
+		err = v.Set(registerID2, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		touches := v.Interactions().RegisterTouches()
@@ -460,7 +460,7 @@ func TestView_RegisterTouches(t *testing.T) {
 }
 
 func TestView_AllRegisters(t *testing.T) {
-	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
@@ -470,7 +470,7 @@ func TestView_AllRegisters(t *testing.T) {
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == "a" {
 				return flow.RegisterValue("a_value"), nil
 			}
@@ -481,28 +481,28 @@ func TestView_AllRegisters(t *testing.T) {
 			return nil, nil
 		})
 
-		_, err := v.Get("a", "", "")
+		_, err := v.Get("a", "")
 		assert.NoError(t, err)
 
-		_, err = v.Get("b", "", "")
+		_, err = v.Get("b", "")
 		assert.NoError(t, err)
 
-		err = v.Set("c", "", "", flow.RegisterValue("c_value"))
+		err = v.Set("c", "", flow.RegisterValue("c_value"))
 		assert.NoError(t, err)
 
-		err = v.Set("d", "", "", flow.RegisterValue("d_value"))
+		err = v.Set("d", "", flow.RegisterValue("d_value"))
 		assert.NoError(t, err)
 
-		err = v.Touch("e", "", "")
+		err = v.Touch("e", "")
 		assert.NoError(t, err)
-		err = v.Touch("f", "", "")
+		err = v.Touch("f", "")
 		assert.NoError(t, err)
 
 		allRegs := v.Interactions().AllRegisters()
 		assert.Len(t, allRegs, 6)
 	})
 	t.Run("With Merge", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if owner == "a" {
 				return flow.RegisterValue("a_value"), nil
 			}
@@ -514,20 +514,20 @@ func TestView_AllRegisters(t *testing.T) {
 		})
 
 		vv := v.NewChild()
-		_, err := vv.Get("a", "", "")
+		_, err := vv.Get("a", "")
 		assert.NoError(t, err)
 
-		_, err = vv.Get("b", "", "")
+		_, err = vv.Get("b", "")
 		assert.NoError(t, err)
 
-		err = vv.Set("c", "", "", flow.RegisterValue("c_value"))
+		err = vv.Set("c", "", flow.RegisterValue("c_value"))
 		assert.NoError(t, err)
-		err = vv.Set("d", "", "", flow.RegisterValue("d_value"))
+		err = vv.Set("d", "", flow.RegisterValue("d_value"))
 		assert.NoError(t, err)
 
-		err = vv.Touch("e", "", "")
+		err = vv.Touch("e", "")
 		assert.NoError(t, err)
-		err = vv.Touch("f", "", "")
+		err = vv.Touch("f", "")
 		assert.NoError(t, err)
 
 		err = v.MergeView(vv)
@@ -541,7 +541,7 @@ func TestView_Reads(t *testing.T) {
 	registerID1 := "fruit"
 	registerID2 := "vegetable"
 
-	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
@@ -551,28 +551,28 @@ func TestView_Reads(t *testing.T) {
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		_, err := v.Get(registerID2, "", "")
+		_, err := v.Get(registerID2, "")
 		assert.NoError(t, err)
 
-		_, err = v.Get(registerID1, "", "")
+		_, err = v.Get(registerID1, "")
 		assert.NoError(t, err)
 
-		_, err = v.Get(registerID2, "", "")
+		_, err = v.Get(registerID2, "")
 		assert.NoError(t, err)
 
 		touches := v.Interactions().Reads
 		require.Len(t, touches, 2)
 
-		r1 := flow.NewRegisterID(registerID1, "", "")
-		r2 := flow.NewRegisterID(registerID2, "", "")
+		r1 := flow.NewRegisterID(registerID1, "")
+		r2 := flow.NewRegisterID(registerID2, "")
 
-		assert.Equal(t, map[string]flow.RegisterID{
-			r1.String(): r1,
-			r2.String(): r2,
+		assert.Equal(t, map[flow.RegisterID]struct{}{
+			r1: struct{}{},
+			r2: struct{}{},
 		}, touches)
 	})
 }

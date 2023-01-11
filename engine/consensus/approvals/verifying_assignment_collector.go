@@ -17,16 +17,24 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
-// sealing.
-const DefaultEmergencySealingThreshold = 100
+// **Emergency-sealing parameters**
+
+// DefaultEmergencySealingThresholdForFinalization is the minimal number of unsealed but finalized descendants that a
+// block must have in order to be eligible for emergency sealing (further conditions apply for emergency sealing).
+const DefaultEmergencySealingThresholdForFinalization = 100
+
+// DefaultEmergencySealingThresholdForVerification is the minimal number of finalized descendants
+// that the block _incorporating_ an Execution Result [ER] must have for the ER to be eligible for
+// emergency sealing (further conditions apply for emergency sealing).
+const DefaultEmergencySealingThresholdForVerification = 25
 
 // VerifyingAssignmentCollector
 // Context:
-//  * When the same result is incorporated in multiple different forks,
-//    unique verifier assignment is determined for each fork.
-//  * The assignment collector is intended to encapsulate the known
-//    assignments for a particular execution result.
+//   - When the same result is incorporated in multiple different forks,
+//     unique verifier assignment is determined for each fork.
+//   - The assignment collector is intended to encapsulate the known
+//     assignments for a particular execution result.
+//
 // VerifyingAssignmentCollector has a strict ordering of processing, before processing
 // approvals at least one incorporated result has to be processed.
 // VerifyingAssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
@@ -72,14 +80,19 @@ func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID f
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
-	// Criterion for emergency sealing:
-	// there must be at least DefaultEmergencySealingThreshold number of blocks between
-	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
+	// Criterion for emergency sealing, both of the following condition need to be true for trigger emergency sealing:
+	// 1. There must be at least DefaultEmergencySealingThresholdForFinalization number of blocks between
+	//    the executed block and the latest finalized block
+	// 2. there must be at least DefaultEmergencySealingThresholdForVerification number of blocks between
+	//    the block that _incorporates_ result and the latest finalized block
+	return collector.executedBlock.Height+DefaultEmergencySealingThresholdForFinalization <= finalizedBlockHeight &&
+		collector.IncorporatedBlock().Height+DefaultEmergencySealingThresholdForVerification <= finalizedBlockHeight
 }
 
 // CheckEmergencySealing checks the managed assignments whether their result can be emergency
 // sealed. Seals the results where possible.
+// It returns error when running into any exception
+// It returns nil when it's done the checking regardless whether there is any results being emergency sealed or not
 func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
@@ -103,8 +116,8 @@ func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
 // ProcessIncorporatedResult starts tracking the approval for IncorporatedResult.
 // Method is idempotent.
 // Error Returns:
-//  * no errors expected during normal operation;
-//    errors might be symptoms of bugs or internal state corruption (fatal)
+//   - no errors expected during normal operation;
+//     errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	ac.log.Debug().
 		Str("result_id", incorporatedResult.Result.ID().String()).
@@ -192,7 +205,7 @@ func (ac *VerifyingAssignmentCollector) allCollectors() []*ApprovalCollector {
 
 func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
 	id := approval.Attestation.ID()
-	valid, err := ac.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(approval.AttestationSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify attestation signature: %w", err)
 	}
@@ -206,7 +219,7 @@ func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flo
 
 func (ac *VerifyingAssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
 	id := approval.Body.ID()
-	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(approval.VerifierSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify approval signature: %w", err)
 	}
@@ -267,9 +280,9 @@ func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultAp
 // ProcessApproval ingests Result Approvals and triggers sealing of execution result
 // when sufficient approvals have arrived.
 // Error Returns:
-//  * nil in case of success (outdated approvals might be silently discarded)
-//  * engine.InvalidInputError if the result approval is invalid
-//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
+//   - nil in case of success (outdated approvals might be silently discarded)
+//   - engine.InvalidInputError if the result approval is invalid
+//   - any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	ac.log.Debug().
 		Str("result_id", approval.Body.ExecutionResultID.String()).
@@ -371,15 +384,15 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
 // The method returns the set of all node IDs that:
-//   * are authorized members of the network at the given block and
-//   * have the Verification role and
-//   * have _positive_ weight and
-//   * are not ejected
+//   - are authorized members of the network at the given block and
+//   - have the Verification role and
+//   - have _positive_ weight and
+//   - are not ejected
 func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
+			filter.HasWeight(true),
 			filter.Not(filter.Ejected),
 		))
 	if err != nil {

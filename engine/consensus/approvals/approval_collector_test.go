@@ -34,7 +34,7 @@ func (s *ApprovalCollectorTestSuite) SetupTest() {
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
 
 	var err error
-	s.collector, err = NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, &s.IncorporatedBlock, &s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+	s.collector, err = NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, s.IncorporatedBlock, s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
 

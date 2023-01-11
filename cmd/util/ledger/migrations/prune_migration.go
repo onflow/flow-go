@@ -9,7 +9,7 @@ import (
 func PruneMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	newPayload := make([]ledger.Payload, 0, len(payload))
 	for _, p := range payload {
-		if len(p.Value) > 0 {
+		if len(p.Value()) > 0 {
 			newPayload = append(newPayload, p)
 		}
 	}

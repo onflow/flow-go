@@ -23,7 +23,7 @@ func TestRetrieveWithoutStore(t *testing.T) {
 		_, err := store.ByID(unittest.IdentifierFixture())
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 
-		_, err = store.ByBlockID(unittest.IdentifierFixture())
+		_, err = store.HighestInFork(unittest.IdentifierFixture())
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
@@ -47,7 +47,8 @@ func TestSealStoreRetrieve(t *testing.T) {
 }
 
 // TestSealIndexAndRetrieve verifies that:
-//  * for a block, we can store (aka index) the latest sealed block along this fork.
+//   - for a block, we can store (aka index) the latest sealed block along this fork.
+//
 // Note: indexing the seal for a block is currently implemented only through a direct
 // Badger operation. The Seals mempool only supports retrieving the latest sealed block.
 func TestSealIndexAndRetrieve(t *testing.T) {
@@ -63,11 +64,37 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the seal ID for the heighest sealed block in this fork
-		err = operation.RetryOnConflict(db.Update, operation.IndexBlockSeal(blockID, expectedSeal.ID()))
+		err = operation.RetryOnConflict(db.Update, operation.IndexLatestSealAtBlock(blockID, expectedSeal.ID()))
 		require.NoError(t, err)
 
 		// retrieve latest seal
-		seal, err := store.ByBlockID(blockID)
+		seal, err := store.HighestInFork(blockID)
+		require.NoError(t, err)
+		require.Equal(t, expectedSeal, seal)
+	})
+}
+
+// TestSealedBlockIndexAndRetrieve checks after indexing a seal by a sealed block ID, it can be
+// retrieved by the sealed block ID
+func TestSealedBlockIndexAndRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewSeals(metrics, db)
+
+		expectedSeal := unittest.Seal.Fixture()
+		blockID := unittest.IdentifierFixture()
+		expectedSeal.BlockID = blockID
+
+		// store the seal first
+		err := store.Store(expectedSeal)
+		require.NoError(t, err)
+
+		// index the seal ID for the highest sealed block in this fork
+		err = operation.RetryOnConflict(db.Update, operation.IndexFinalizedSealByBlockID(expectedSeal.BlockID, expectedSeal.ID()))
+		require.NoError(t, err)
+
+		// retrieve latest seal
+		seal, err := store.FinalizedSealForBlock(blockID)
 		require.NoError(t, err)
 		require.Equal(t, expectedSeal, seal)
 	})

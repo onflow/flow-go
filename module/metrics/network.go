@@ -6,6 +6,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -16,147 +19,236 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize             *prometheus.HistogramVec
-	inboundMessageSize              *prometheus.HistogramVec
-	duplicateMessagesDropped        *prometheus.CounterVec
-	queueSize                       *prometheus.GaugeVec
-	queueDuration                   *prometheus.HistogramVec
-	inboundProcessTime              *prometheus.CounterVec
-	outboundConnectionCount         prometheus.Gauge
-	inboundConnectionCount          prometheus.Gauge
-	dnsLookupDuration               prometheus.Histogram
-	dnsCacheMissCount               prometheus.Counter
-	dnsCacheHitCount                prometheus.Counter
-	dnsCacheInvalidationCount       prometheus.Counter
-	unstakedOutboundConnectionCount prometheus.Gauge
-	unstakedInboundConnectionCount  prometheus.Gauge
+	*LibP2PResourceManagerMetrics
+	*GossipSubMetrics
+	outboundMessageSize          *prometheus.HistogramVec
+	inboundMessageSize           *prometheus.HistogramVec
+	duplicateMessagesDropped     *prometheus.CounterVec
+	queueSize                    *prometheus.GaugeVec
+	queueDuration                *prometheus.HistogramVec
+	numMessagesProcessing        *prometheus.GaugeVec
+	numDirectMessagesSending     *prometheus.GaugeVec
+	inboundProcessTime           *prometheus.CounterVec
+	outboundConnectionCount      prometheus.Gauge
+	inboundConnectionCount       prometheus.Gauge
+	dnsLookupDuration            prometheus.Histogram
+	dnsCacheMissCount            prometheus.Counter
+	dnsCacheHitCount             prometheus.Counter
+	dnsCacheInvalidationCount    prometheus.Counter
+	dnsLookupRequestDroppedCount prometheus.Counter
+	routingTableSize             prometheus.Gauge
+
+	// authorization, rate limiting metrics
+	unAuthorizedMessagesCount       *prometheus.CounterVec
+	rateLimitedUnicastMessagesCount *prometheus.CounterVec
+
+	prefix string
 }
 
-func NewNetworkCollector() *NetworkCollector {
+var _ module.NetworkMetrics = (*NetworkCollector)(nil)
 
-	nc := &NetworkCollector{
+type NetworkCollectorOpt func(*NetworkCollector)
 
-		outboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
+	return func(nc *NetworkCollector) {
+		if prefix != "" {
+			nc.prefix = prefix + "_"
+		}
+	}
+}
+
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
+	nc := &NetworkCollector{}
+
+	for _, opt := range opts {
+		opt(nc)
+	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
+	nc.GossipSubMetrics = NewGossipSubMetrics(nc.prefix)
+
+	nc.outboundMessageSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "outbound_message_size_bytes",
+			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
+	)
 
-		inboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+	nc.inboundMessageSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "inbound_message_size_bytes",
+			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
+	)
 
-		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+	nc.duplicateMessagesDropped = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "duplicate_messages_dropped",
+			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
+	)
 
-		dnsLookupDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+	nc.dnsLookupDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_lookup_duration_ms",
+			Name:      nc.prefix + "dns_lookup_duration_ms",
 			Buckets:   []float64{1, 10, 100, 500, 1000, 2000},
 			Help:      "the time spent on resolving a dns lookup (including cache hits)",
-		}),
+		},
+	)
 
-		dnsCacheMissCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheMissCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_miss_total",
+			Name:      nc.prefix + "dns_cache_miss_total",
 			Help:      "the number of dns lookups that miss the cache and made through network",
-		}),
+		},
+	)
 
-		dnsCacheInvalidationCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheInvalidationCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_invalidation_total",
+			Name:      nc.prefix + "dns_cache_invalidation_total",
 			Help:      "the number of times dns cache is invalidated for an entry",
-		}),
+		},
+	)
 
-		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheHitCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_hit_total",
+			Name:      nc.prefix + "dns_cache_hit_total",
 			Help:      "the number of dns cache hits",
-		}),
+		},
+	)
 
-		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
+	nc.dnsLookupRequestDroppedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "dns_lookup_requests_dropped_total",
+			Help:      "the number of dns lookup requests dropped",
+		},
+	)
+
+	nc.queueSize = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_size",
+			Name:      nc.prefix + "message_queue_size",
 			Help:      "the number of elements in the message receive queue",
-		}, []string{LabelPriority}),
+		}, []string{LabelPriority},
+	)
 
-		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+	nc.queueDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_duration_seconds",
+			Name:      nc.prefix + "message_queue_duration_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
-		}, []string{LabelPriority}),
+		}, []string{LabelPriority},
+	)
 
-		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
+	nc.numMessagesProcessing = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "engine_message_processing_time_seconds",
+			Name:      nc.prefix + "current_messages_processing",
+			Help:      "the number of messages currently being processed",
+		}, []string{LabelChannel},
+	)
+
+	nc.numDirectMessagesSending = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "direct_messages_in_progress",
+			Help:      "the number of direct messages currently in the process of sending",
+		}, []string{LabelChannel},
+	)
+
+	nc.inboundProcessTime = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      nc.prefix + "engine_message_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
-		}, []string{LabelChannel}),
+		}, []string{LabelChannel},
+	)
 
-		outboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.outboundConnectionCount = promauto.NewGauge(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "outbound_connection_count",
+			Name:      nc.prefix + "outbound_connection_count",
 			Help:      "the number of outbound connections of this node",
-		}),
+		},
+	)
 
-		inboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.inboundConnectionCount = promauto.NewGauge(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "inbound_connection_count",
+			Name:      nc.prefix + "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
-		}),
+		},
+	)
 
-		unstakedOutboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.routingTableSize = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name:      nc.prefix + "routing_table_size",
 			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
-			Name:      "unstaked_outbound_connection_count",
-			Help:      "the number of outbound connections to unstaked nodes",
-		}),
+			Subsystem: subsystemDHT,
+			Help:      "the size of the DHT routing table",
+		},
+	)
 
-		unstakedInboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.unAuthorizedMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
-			Name:      "unstaked_inbound_connection_count",
-			Help:      "the number of inbound connections from unstaked nodes",
-		}),
-	}
+			Subsystem: subsystemAuth,
+			Name:      nc.prefix + "unauthorized_messages_count",
+			Help:      "number of messages that failed authorization validation",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
+	)
+
+	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemRateLimiting,
+			Name:      nc.prefix + "rate_limited_unicast_messages_count",
+			Help:      "number of messages sent via unicast that have been rate limited",
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
+	)
 
 	return nc
 }
 
-// NetworkMessageSent tracks the message size of the last message sent out on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
-	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// OutboundMessageSent collects metrics related to a message sent by the node.
+func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic, protocol, messageType string) {
+	nc.outboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkMessageReceived tracks the message size of the last message received on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
-	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// InboundMessageReceived collects metrics related to a message received by the node.
+func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic, protocol, messageType string) {
+	nc.inboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
-func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
-	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
+// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, messageType string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic, protocol, messageType).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
@@ -171,8 +263,33 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
-// InboundProcessDuration tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
-func (nc *NetworkCollector) InboundProcessDuration(topic string, duration time.Duration) {
+// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
+func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
+	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
+}
+
+// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingStarted(topic string) {
+	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
+}
+
+// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingCompleted(topic string) {
+	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
+}
+
+func (nc *NetworkCollector) RoutingTablePeerAdded() {
+	nc.routingTableSize.Inc()
+}
+
+func (nc *NetworkCollector) RoutingTablePeerRemoved() {
+	nc.routingTableSize.Dec()
+}
+
+// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+// the number of messages being processed by the node.
+func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
+	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
 }
 
@@ -207,10 +324,17 @@ func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
 }
 
-func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
-	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
+// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
+func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
+	nc.dnsLookupRequestDroppedCount.Inc()
 }
 
-func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
-	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
+// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense string) {
+	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
+}
+
+// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
+func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }

@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -24,7 +25,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	require.NoError(t, err)
 
 	// generate a SPoCK proof
-	kmac := NewBLSKMAC("spock test")
+	kmac := NewExpandMsgXOFKMAC128("spock test")
 	s, err := SPOCKProve(sk, data, kmac)
 	require.NoError(t, err)
 	pk := sk.PublicKey()
@@ -63,7 +64,17 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		wrongSk := invalidSK(t)
 		result, err := SPOCKVerifyAgainstData(wrongSk.PublicKey(), s, data, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
+		assert.False(t, result)
+	})
+
+	// test with an identity public key
+	t.Run("identity proof", func(t *testing.T) {
+		// verifying with a pair of (proof, publicKey) equal to (identity_signature, identity_key) should
+		// return false
+		identityProof := identityBLSSignature
+		result, err := SPOCKVerifyAgainstData(IdentityBLSPublicKey(), identityProof, data, kmac)
+		assert.NoError(t, err)
 		assert.False(t, result)
 	})
 }
@@ -92,7 +103,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	// generate SPoCK proofs
-	kmac := NewBLSKMAC("spock test")
+	kmac := NewExpandMsgXOFKMAC128("spock test")
 	pr1, err := SPOCKProve(sk1, data, kmac)
 	require.NoError(t, err)
 	pr2, err := SPOCKProve(sk2, data, kmac)
@@ -140,17 +151,35 @@ func TestSPOCKProveVerify(t *testing.T) {
 
 		pr, err := SPOCKProve(wrongSk, data, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, pr)
 
 		result, err := SPOCKVerify(wrongSk.PublicKey(), pr1, sk2.PublicKey(), pr2)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, result)
 
 		result, err = SPOCKVerify(sk1.PublicKey(), pr1, wrongSk.PublicKey(), pr2)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsNotBLSKeyError(err))
+		assert.False(t, result)
+	})
+
+	// test with identity public key and proof
+	t.Run("identity proof", func(t *testing.T) {
+		// verifying with either pair of (proof, publicKey) equal to (identity_signature, identity_key) should
+		// return falsen with any other (proof, key) pair.
+		identityProof := identityBLSSignature
+		result, err := SPOCKVerify(IdentityBLSPublicKey(), identityProof, sk2.PublicKey(), pr2)
+		assert.NoError(t, err)
+		assert.False(t, result)
+
+		result, err = SPOCKVerify(sk1.PublicKey(), pr1, IdentityBLSPublicKey(), identityProof)
+		assert.NoError(t, err)
+		assert.False(t, result)
+
+		result, err = SPOCKVerify(IdentityBLSPublicKey(), identityProof, IdentityBLSPublicKey(), identityProof)
+		assert.NoError(t, err)
 		assert.False(t, result)
 	})
 }

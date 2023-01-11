@@ -203,7 +203,7 @@ func (ms *MatchingSuite) TestOnUnverifiableReceipt() {
 }
 
 // TestRequestPendingReceipts tests sealing.Core.requestPendingReceipts():
-//   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
+//   - generate n=100 consecutive blocks, where the first one is sealed and the last one is final
 func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// create blocks
 	n := 100
@@ -211,9 +211,9 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock.Header)
-		ms.Extend(&block)
-		orderedBlocks = append(orderedBlocks, block)
-		parentBlock = block
+		ms.Extend(block)
+		orderedBlocks = append(orderedBlocks, *block)
+		parentBlock = *block
 	}
 
 	// progress latest sealed and latest finalized:
@@ -237,11 +237,12 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 
 // TestRequestSecondPendingReceipt verifies that a second receipt is re-requested
 // Situation A:
-//  * we have _once_ receipt for an unsealed finalized block in storage
-//  * Expected: Method Core.requestPendingReceipts() should re-request a second receipt
+//   - we have _once_ receipt for an unsealed finalized block in storage
+//   - Expected: Method Core.requestPendingReceipts() should re-request a second receipt
+//
 // Situation B:
-//  * we have _two_ receipts for an unsealed finalized block storage
-//  * Expected: Method Core.requestPendingReceipts() should _not_ request another receipt
+//   - we have _two_ receipts for an unsealed finalized block storage
+//   - Expected: Method Core.requestPendingReceipts() should _not_ request another receipt
 //
 // TODO: this test is temporarily requires as long as sealing.Core requires _two_ receipts from different ENs to seal
 func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {

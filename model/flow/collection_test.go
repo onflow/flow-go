@@ -16,7 +16,7 @@ func TestLightCollectionFingerprint(t *testing.T) {
 	colID := col.ID()
 	data := fingerprint.Fingerprint(col.Light())
 	var decoded flow.LightCollection
-	rlp.NewEncoder().MustDecode(data, &decoded)
+	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	decodedID := decoded.ID()
 	assert.Equal(t, colID, decodedID)
 	assert.Equal(t, col.Light(), decoded)

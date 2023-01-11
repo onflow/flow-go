@@ -36,7 +36,7 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 	c := &Commits{
 		db: db,
 		cache: newCache(collector, metrics.ResourceCommit,
-			withLimit(100),
+			withLimit(1000),
 			withStore(store),
 			withRetrieve(retrieve),
 		),
@@ -74,4 +74,8 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 	tx := c.db.NewTransaction(false)
 	defer tx.Discard()
 	return c.retrieveTx(blockID)(tx)
+}
+
+func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
+	return c.db.Update(operation.SkipNonExist(operation.RemoveStateCommitment(blockID)))
 }

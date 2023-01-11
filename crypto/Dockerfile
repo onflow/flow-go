@@ -1,9 +1,8 @@
 # gcr.io/dl-flow/golang-cmake
 
-FROM golang:1.15-buster
+FROM golang:1.19-buster
 RUN apt-get update
-RUN apt-get -y install cmake zip sudo
-RUN go get github.com/axw/gocov/gocov
-RUN go get github.com/matm/gocov-html
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN apt-get -y install cmake zip
+RUN go install github.com/axw/gocov/gocov@latest
+RUN go install github.com/matm/gocov-html@latest
 WORKDIR /go/src/flow

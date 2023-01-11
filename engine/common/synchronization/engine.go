@@ -3,7 +3,6 @@
 package synchronization
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -13,15 +12,15 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	identifier "github.com/onflow/flow-go/module/id"
+	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -45,10 +44,10 @@ type Engine struct {
 	pollInterval         time.Duration
 	scanInterval         time.Duration
 	core                 module.SyncCore
-	participantsProvider identifier.IdentifierProvider
+	participantsProvider module.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
-	requestHandler *RequestHandlerEngine // component responsible for handling requests
+	requestHandler *RequestHandler // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -65,7 +64,7 @@ func New(
 	comp network.Engine,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
-	participantsProvider identifier.IdentifierProvider,
+	participantsProvider module.IdentifierProvider,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -100,21 +99,20 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.SyncCommittee, e)
+	con, err := net.Register(channels.SyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
 
 // setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
 func (e *Engine) setupResponseMessageHandler() error {
-	syncResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(defaultSyncResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for sync responses: %w", err)
 	}
@@ -123,8 +121,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(defaultBlockResponseQueueCapacity)
 	if err != nil {
 		return fmt.Errorf("failed to create queue for block responses: %w", err)
 	}
@@ -200,19 +197,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.process(originID, event)
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+	err := e.Process(channel, originID, event)
 	if err != nil {
-		lg := e.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -223,14 +211,22 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the synchronization engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -293,18 +289,24 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
+	if len(res.Blocks) == 0 {
+		e.log.Debug().Msg("received empty block response")
+		return
+	}
+
+	first := res.Blocks[0].Header.Height
+	last := res.Blocks[len(res.Blocks)-1].Header.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
+
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(block.Header) {
+		if !e.core.HandleBlock(&block.Header) {
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
-		synced := &events.SyncedBlock{
-			OriginID: originID,
-			Block:    block,
-		}
-		e.comp.SubmitLocal(synced)
 	}
+
+	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
@@ -366,7 +368,7 @@ func (e *Engine) pollHeight() {
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Range, batches []flow.Batch) {
+func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
 	for _, ran := range ranges {

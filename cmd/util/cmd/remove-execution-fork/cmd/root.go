@@ -13,22 +13,22 @@ var (
 )
 
 // run with `./remove-execution-fork --datadir /var/flow/data/protocol`
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use:   "remove-execution-fork",
 	Short: "remove execution fork",
 	Run:   run,
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Println("error", err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
-	_ = rootCmd.MarkPersistentFlagRequired("datadir")
+	RootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	_ = RootCmd.MarkPersistentFlagRequired("datadir")
 
 	cobra.OnInitialize(initConfig)
 }

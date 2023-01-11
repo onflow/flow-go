@@ -7,6 +7,6 @@ We really appreciate the community's help. Responsible disclosure of vulnerabili
 
 If you care about making a difference, please follow the guidelines below.
 
-# **Guidelines For Responsible Disclosure**
+# **Guidelines For Responsible Disclosure**
 
-We ask that all researchers adhere to these guidelines [here](https://docs.onflow.org/bounties/responsible-disclosure/)
+We ask that all researchers adhere to these guidelines [here](https://docs.onflow.org/bounties/responsible-disclosure/)

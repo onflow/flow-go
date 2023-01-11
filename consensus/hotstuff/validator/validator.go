@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -17,6 +16,8 @@ type Validator struct {
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
+
+var _ hotstuff.Validator = (*Validator)(nil)
 
 // New creates a new Validator instance
 func New(
@@ -31,9 +32,12 @@ func New(
 	}
 }
 
-// ValidateQC validates the QC
-// qc - the qc to be validated
-// block - the block that the qc is pointing to
+// ValidateQC checks the validity of a QC for a given block. Inputs:
+//   - qc - the qc to be validated
+//   - block - the block that the qc is pointing to
+//
+// During normal operations, the following error returns are expected:
+//   - model.InvalidBlockError if the QC is invalid
 func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	if qc.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic
@@ -44,32 +48,47 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
-	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
+	allParticipants, err := v.committee.Identities(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
-	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) != len(qc.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Errorf("some qc signers are duplicated or invalid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
+
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
+	if err != nil {
+		if signature.IsInvalidSignerIndicesError(err) {
+			return newInvalidBlockError(block, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
-	// determine whether signers reach minimally required stake threshold for consensus
-	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake()) // compute required stake threshold
-	if signers.TotalStake() < threshold {
-		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold))
+	// determine whether signers reach minimally required weight threshold for consensus
+	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
+	if signers.TotalWeight() < threshold {
+		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
-	if errors.Is(err, signature.ErrInvalidFormat) {
-		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
-	}
+	err = v.verifier.VerifyQC(signers, qc.SigData, block)
 	if err != nil {
-		return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
-	}
-	if !valid {
-		return newInvalidBlockError(block, fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
+		// Considerations about other errors that `VerifyQC` could return:
+		//  * model.InvalidSignerError: for the time being, we assume that _every_ HotStuff participant
+		//    is also a member of the random beacon committee. Consequently, `InvalidSignerError` should
+		//    not occur atm.
+		//    TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+		//          we expect `model.InvalidSignerError` here during normal operations.
+		// * model.InsufficientSignaturesError: we previously checked the total weight of all signers
+		//   meets the supermajority threshold, which is a _positive_ number. Hence, there must be at
+		//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
+		switch {
+		case model.IsInvalidFormatError(err):
+			return newInvalidBlockError(block, fmt.Errorf("QC's signature data has an invalid structure: %w", err))
+		case errors.Is(err, model.ErrInvalidSignature):
+			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
+		default:
+			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
+		}
 	}
 
 	return nil
@@ -136,7 +155,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
-	if errors.Is(err, model.ErrInvalidSigner) {
+	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {
@@ -144,19 +163,17 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
+	err = v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
-		switch {
-		case errors.Is(err, signature.ErrInvalidFormat):
+		// Theoretically, `VerifyVote` could also return a `model.InvalidSignerError`. However,
+		// for the time being, we assume that _every_ HotStuff participant is also a member of
+		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
+		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+		//       we expect `model.InvalidSignerError` here during normal operations.
+		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
-		case errors.Is(err, model.ErrInvalidSigner):
-			return nil, newInvalidVoteError(vote, err)
-		default:
-			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 		}
-	}
-	if !valid {
-		return nil, newInvalidVoteError(vote, model.ErrInvalidSignature)
+		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 	}
 
 	return voter, nil

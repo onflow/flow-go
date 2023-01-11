@@ -4,46 +4,45 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/bootstrap"
-
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go-sdk/client"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/flow-go/module/mempool/queue"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/engine/collection/rpc"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/chainsync"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -58,7 +57,10 @@ func main() {
 		maxCollectionSize                      uint
 		maxCollectionByteSize                  uint64
 		maxCollectionTotalGas                  uint64
+		maxCollectionRequestCacheSize          uint32 // collection provider engine
+		collectionProviderWorkers              uint   // collection provider engine
 		builderExpiryBuffer                    uint
+		builderPayerRateLimitDryRun            bool
 		builderPayerRateLimit                  float64
 		builderUnlimitedPayers                 []string
 		hotstuffTimeout                        time.Duration
@@ -70,9 +72,10 @@ func main() {
 		startupTimeString                      string
 		startupTime                            time.Time
 
-		followerState protocol.MutableState
-		ingestConf    ingest.Config
-		ingressConf   ingress.Config
+		followerState           protocol.MutableState
+		ingestConf              = ingest.DefaultConfig()
+		rpcConf                 rpc.Config
+		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -81,7 +84,7 @@ func main() {
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
-		mainChainSyncCore *synchronization.Core
+		mainChainSyncCore *chainsync.Core
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -91,15 +94,17 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+		apiRatelimits      map[string]int
+		apiBurstlimits     map[string]int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.UintVar(&txLimit, "tx-limit", 50000,
+		flags.UintVar(&txLimit, "tx-limit", 50_000,
 			"maximum number of transactions in the memory pool")
-		flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
+		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
-		flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
+		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
 			"maximum per-transaction computation limit (gas limit)")
@@ -113,10 +118,10 @@ func main() {
 			"expiry buffer for inbound transactions")
 		flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 			"how many additional cluster members we propagate transactions to")
-		flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 10_000_000,
-			"the maximum address index allowed in transactions")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
+		flags.BoolVar(&builderPayerRateLimitDryRun, "builder-rate-limit-dry-run", false,
+			"determines whether rate limit configuration should be enforced (false), or only logged (true)")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
@@ -142,11 +147,17 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
+			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
-
+		flags.Uint32Var(&maxCollectionRequestCacheSize, "max-collection-provider-cache-size", provider.DefaultEntityRequestCacheSize, "maximum number of collection requests to cache for collection provider")
+		flags.UintVar(&collectionProviderWorkers, "collection-provider-workers", provider.DefaultRequestProviderWorkers, "number of workers to use for collection provider")
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
+		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
+
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -163,7 +174,8 @@ func main() {
 	}
 
 	nodeBuilder.
-		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		PreInit(cmd.DynamicStartPreInit).
+		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -180,29 +192,39 @@ func main() {
 			)
 			return err
 		}).
-		Module("transactions mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+		Module("transactions mempool", func(node *cmd.NodeConfig) error {
+			create := func(epoch uint64) mempool.Transactions {
+				var heroCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+				if node.BaseConfig.HeroCacheMetricsEnable {
+					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch)
+				}
+				return herocache.NewTransactions(
+					uint32(txLimit),
+					node.Logger,
+					heroCacheMetricsCollector)
+			}
+
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("pending block cache", func(node *cmd.NodeConfig) error {
 			followerBuffer = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("metrics", func(node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
-		Module("main chain sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+		Module("main chain sync core", func(node *cmd.NodeConfig) error {
+			mainChainSyncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("machine account config", func(node *cmd.NodeConfig) error {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
-		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
@@ -215,23 +237,29 @@ func main() {
 
 			return nil
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
+			// disable balance checks for transient networks, which do not have transaction fees
+			var opts []epochs.MachineAccountValidatorConfigOption
+			if node.RootChainID.Transient() {
+				opts = append(opts, epochs.WithoutBalanceChecks)
+			}
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				opts...,
 			)
 
 			return validator, err
 		}).
-		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -239,11 +267,6 @@ func main() {
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			// initialize the staking & beacon verifiers, signature joiner
-			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -253,8 +276,9 @@ func main() {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
 
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 
@@ -294,6 +318,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
+				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -301,7 +326,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -309,7 +334,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("main chain sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
@@ -329,12 +354,13 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				colMetrics,
 				node.Me,
 				node.RootChainID.Chain(),
@@ -343,22 +369,43 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing, node.RootChainID)
+		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			server := rpc.New(
+				rpcConf,
+				ing,
+				node.Logger,
+				node.RootChainID,
+				apiRatelimits,
+				apiBurstlimits,
+			)
 			return server, nil
 		}).
-		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
 			}
-			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.ProvideCollections,
+
+			var collectionRequestMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				collectionRequestMetrics = metrics.CollectionRequestsQueueMetricFactory(node.MetricsRegisterer)
+			}
+			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
+
+			return provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				collectionRequestQueue,
+				collectionProviderWorkers,
+				channels.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)
 		}).
-		Component("pusher engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("pusher engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
 				node.Network,
@@ -373,7 +420,7 @@ func main() {
 		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
-		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("epoch manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -392,10 +439,12 @@ func main() {
 				node.Tracer,
 				colMetrics,
 				push,
+				node.Logger,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
+				builder.WithRateLimitDryRun(builderPayerRateLimitDryRun),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
 			)
@@ -412,6 +461,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
+				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, err
@@ -422,7 +472,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -431,7 +481,6 @@ func main() {
 			createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 				return metrics.NewHotstuffCollector(chainID)
 			}
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
@@ -449,7 +498,6 @@ func main() {
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
-				staking,
 				node.DB,
 				node.State,
 				createMetrics,
@@ -459,7 +507,7 @@ func main() {
 				return nil, err
 			}
 
-			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			signer := verification.NewStakingSigner(node.Me)
 
 			// construct QC contract client
 			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientConfigs)
@@ -505,12 +553,17 @@ func main() {
 			node.ProtocolEvents.AddConsumer(manager)
 
 			return manager, err
-		}).
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -525,10 +578,14 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
 }
@@ -543,7 +600,7 @@ func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}
 
-		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
 		}

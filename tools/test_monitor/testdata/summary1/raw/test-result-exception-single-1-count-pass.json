@@ -1,0 +1,6 @@
+{"Time":"2021-10-25T19:22:52.667919-04:00","Action":"run","Package":"github.com/onflow/flow-go/model/encodable","Test":"TestEncodableRandomBeaconPrivKeyMsgPack"}
+{"Time":"2021-10-25T19:22:52.668893-04:00","Action":"output","Package":"github.com/onflow/flow-go/model/encodable","Test":"TestEncodableRandomBeaconPrivKeyMsgPack","Output":"=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"}
+{"Time":"2021-10-25T19:22:52.670655-04:00","Action":"output","Package":"github.com/onflow/flow-go/model/encodable","Test":"TestEncodableRandomBeaconPrivKeyMsgPack","Output":"bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+{"Time":"2021-10-25T19:22:52.670741-04:00","Action":"output","Package":"github.com/onflow/flow-go/model/encodable","Output":"PASS\n"}
+{"Time":"2021-10-25T19:22:52.672315-04:00","Action":"output","Package":"github.com/onflow/flow-go/model/encodable","Output":"ok  \tgithub.com/onflow/flow-go/model/encodable\t0.209s\n"}
+{"Time":"2021-10-25T19:22:52.672371-04:00","Action":"pass","Package":"github.com/onflow/flow-go/model/encodable","Elapsed":0.209}

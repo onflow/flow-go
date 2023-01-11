@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,17 +20,13 @@ import (
 const fileMode = os.FileMode(0644)
 
 var (
-	FilenameTransitKeyPub      = "transit-key.pub.%v"
-	FilenameTransitKeyPriv     = "transit-key.priv.%v"
+
+	// FilenameTransitKeyPub transit key pub file name that consensus nodes will upload (to securely transport DKG in phase 2)
+	FilenameTransitKeyPub  = "transit-key.pub.%v"
+	FilenameTransitKeyPriv = "transit-key.priv.%v"
+
+	// FilenameRandomBeaconCipher consensus node additionally gets the random beacon file
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
-
-	// default files to upload for all role type
-	filesToUpload = []string{
-		bootstrap.PathNodeInfoPub,
-	}
-
-	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
-	filesToUploadConsensus = FilenameTransitKeyPub
 
 	// default folder to download for all role type
 	folderToDownload = bootstrap.DirnamePublicBootstrap
@@ -62,15 +57,6 @@ func getAdditionalFilesToDownload(role flow.Role, nodeID string) []string {
 		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeID)}
 	}
 	return make([]string, 0)
-}
-
-func getFilesToUpload(role flow.Role) []string {
-	switch role {
-	case flow.RoleConsensus:
-		return append(filesToUpload, filesToUploadConsensus)
-	default:
-		return filesToUpload
-	}
 }
 
 func getFileSHA256(file string) (string, error) {
@@ -202,7 +188,7 @@ func unWrapFile(bootDir string, nodeID string) error {
 		return fmt.Errorf("failed to decrypt random beacon key using private key from file: %s", privKeyPath)
 	}
 
-	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
+	err = os.WriteFile(plaintextPath, plaintext, fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write the decrypted file %s: %w", plaintextPath, err)
 	}
@@ -235,7 +221,7 @@ func wrapFile(bootDir string, nodeID string) error {
 		return fmt.Errorf("could not encrypt file: %w", err)
 	}
 
-	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
+	err = os.WriteFile(ciphertextPath, ciphertext, fileMode)
 	if err != nil {
 		return fmt.Errorf("error writing ciphertext: %w", err)
 	}
@@ -263,13 +249,13 @@ func generateKeys(bootDir string, nodeID string) error {
 	}
 
 	// Write private key file
-	err = ioutil.WriteFile(privPath, priv[:], fileMode)
+	err = os.WriteFile(privPath, priv[:], fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write pivate key file: %w", err)
 	}
 
 	// Write public key file
-	err = ioutil.WriteFile(pubPath, pub[:], fileMode)
+	err = os.WriteFile(pubPath, pub[:], fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to write public key file: %w", err)
 	}

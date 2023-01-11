@@ -37,8 +37,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Events: nil,
 	}
 
-	backend := New(
-		suite.state,
+	backend := New(suite.state,
 		nil,
 		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
 		suite.blocks,
@@ -55,6 +54,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// Successfully return the transaction from the historical node
@@ -94,8 +94,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 		Transaction: convert.TransactionToMessage(*transactionBody),
 	}
 
-	backend := New(
-		suite.state,
+	backend := New(suite.state,
 		nil,
 		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
 		suite.blocks,
@@ -112,6 +111,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// Successfully return the transaction from the historical node

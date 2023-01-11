@@ -12,6 +12,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -74,9 +75,9 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	ldg := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 
-		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
+		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, key))
 		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
@@ -89,17 +90,17 @@ func run(*cobra.Command, []string) {
 			},
 		}
 
-		payload, err := forest.Read(read)
+		values, err := forest.Read(read)
 		if err != nil {
 			return nil, err
 		}
 
-		return payload[0].Value, nil
+		return values[0], nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(ldg))
-	accounts := state.NewAccounts(sth)
-	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
+	txnState := state.NewTransactionState(ldg, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
+	finalGenerator := environment.NewAddressGenerator(txnState, chain)
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()

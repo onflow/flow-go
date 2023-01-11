@@ -3,7 +3,6 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
@@ -24,6 +22,7 @@ import (
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -65,11 +64,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.approvals.On("Store", mock.Anything).Return(nil)
 	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
+	suite.net.On("Register", channels.PushApprovals, testifymock.Anything).
 		Return(suite.pushCon, nil).
 		Once()
 
-	suite.net.On("Register", engine.ProvideApprovalsByChunk, testifymock.Anything).
+	suite.net.On("Register", channels.ProvideApprovalsByChunk, testifymock.Anything).
 		Return(suite.pullCon, nil).
 		Once()
 
@@ -213,7 +212,7 @@ type ChunkVerifierMock struct {
 
 func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
 	if vc.IsSystemChunk {
-		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
+		return nil, nil, nil
 	}
 
 	switch vc.Chunk.Index {
@@ -247,11 +246,4 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte,
 		return nil, nil, nil
 	}
 
-}
-
-func (v ChunkVerifierMock) SystemChunkVerify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
-	if !vc.IsSystemChunk {
-		return nil, nil, fmt.Errorf("wrong method invoked for verifying non-system chunk")
-	}
-	return nil, nil, nil
 }

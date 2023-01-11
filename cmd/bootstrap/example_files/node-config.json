@@ -2,66 +2,66 @@
   {
     "Role": "collection",
     "Address": "123.0.1.10",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "collection",
     "Address": "123.0.1.11",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "collection",
     "Address": "123.0.1.12",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "collection",
     "Address": "123.0.1.13",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "collection",
     "Address": "123.0.1.14",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "collection",
     "Address": "123.0.1.15",
-    "Stake": 110
+    "Weight": 110
   },
   {
     "Role": "consensus",
     "Address": "123.0.2.10",
-    "Stake": 220
+    "Weight": 220
   },
   {
     "Role": "consensus",
     "Address": "123.0.2.20",
-    "Stake": 220
+    "Weight": 220
   },
   {
     "Role": "consensus",
     "Address": "123.0.2.30",
-    "Stake": 220
+    "Weight": 220
   },
   {
     "Role": "execution",
     "Address": "123.0.3.10",
-    "Stake": 310
+    "Weight": 310
   },
   {
     "Role": "verification",
     "Address": "123.0.4.10",
-    "Stake": 420
+    "Weight": 420
   },
   {
     "Role": "verification",
     "Address": "123.0.4.20",
-    "Stake": 420
+    "Weight": 420
   },
   {
     "Role": "access",
     "Address": "123.0.5.20",
-    "Stake": 430
+    "Weight": 430
   }
 ]

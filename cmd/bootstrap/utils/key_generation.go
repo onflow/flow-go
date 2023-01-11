@@ -7,6 +7,10 @@ import (
 	gohash "hash"
 	"io"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow-go/model/encodable"
+
 	"golang.org/x/crypto/hkdf"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -67,10 +71,10 @@ func drawUnstakedKey(seed []byte) (crypto.PrivateKey, error) {
 	return key, nil
 }
 
-// GenerateUnstakedNetworkingKey draws ECDSASecp256k1 keys until finding a suitable one.
+// GeneratePublicNetworkingKey draws ECDSASecp256k1 keys until finding a suitable one.
 // though this will return fast, this is not constant-time and will leak ~1 bit of information through its runtime
-func GenerateUnstakedNetworkingKey(seed []byte) (key crypto.PrivateKey, err error) {
-	hkdf := hkdf.New(func() gohash.Hash { return sha256.New() }, seed, nil, []byte("unstaked network"))
+func GeneratePublicNetworkingKey(seed []byte) (key crypto.PrivateKey, err error) {
+	hkdf := hkdf.New(func() gohash.Hash { return sha256.New() }, seed, nil, []byte("public network"))
 	round_seed := make([]byte, len(seed))
 	max_iterations := 20 // 1/(2^20) failure chance
 	for i := 0; i < max_iterations; i++ {
@@ -94,7 +98,7 @@ func GenerateUnstakedNetworkingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey,
 
 	var err error
 	for i, seed := range seeds {
-		if keys[i], err = GenerateUnstakedNetworkingKey(seed); err != nil {
+		if keys[i], err = GeneratePublicNetworkingKey(seed); err != nil {
 			return nil, err
 		}
 	}
@@ -156,7 +160,7 @@ type WriteFileFunc func(relativePath string, data []byte) error
 // WriteMachineAccountFiles writes machine account key files for a set of nodeInfos.
 // Assumes that machine accounts have been created using the default execution state
 // bootstrapping. Further assumes that the order of nodeInfos is the same order that
-// nodes were staked during execution state bootstrapping.
+// nodes were registered during execution state bootstrapping.
 //
 // Only applicable for transient test networks.
 func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
@@ -223,6 +227,29 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func WriteMachineAccountFile(
+	nodeID flow.Identifier,
+	accountAddress sdk.Address,
+	accountKey encodable.MachineAccountPrivKey,
+	write WriteJSONFileFunc) error {
+
+	info := bootstrap.NodeMachineAccountInfo{
+		Address:           fmt.Sprintf("0x%s", accountAddress.Hex()),
+		EncodedPrivateKey: accountKey.Encode(),
+		KeyIndex:          0,
+		SigningAlgorithm:  accountKey.Algorithm(),
+		HashAlgorithm:     sdkcrypto.SHA3_256,
+	}
+
+	path := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID)
+	err := write(path, info)
+	if err != nil {
+		return err
 	}
 
 	return nil

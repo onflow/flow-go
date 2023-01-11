@@ -2,16 +2,15 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -32,10 +31,21 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
+// DefaultSnapshotHistoryLimit the amount of blocks to look back in state
+// when recursively searching for a valid snapshot
+const DefaultSnapshotHistoryLimit = 50
+
+// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
+// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
+const DefaultLoggedScriptsCacheSize = 1_000_000
+
+// DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
+const DefaultConnectionPoolSize = 250
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 
-// Backends implements the Access API.
+// Backend implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
 //
@@ -55,6 +65,7 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 	backendExecutionResults
+	backendNetwork
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -81,10 +92,16 @@ func New(
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
+	snapshotHistoryLimit int,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
 		retry.Activate()
+	}
+
+	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
 	b := &Backend{
@@ -96,6 +113,8 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			metrics:           transactionMetrics,
+			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -138,6 +157,11 @@ func New(
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
 		},
+		backendNetwork: backendNetwork{
+			state:                state,
+			chainID:              chainID,
+			snapshotHistoryLimit: snapshotHistoryLimit,
+		},
 		collections:       collections,
 		executionReceipts: executionReceipts,
 		connFactory:       connFactory,
@@ -146,7 +170,6 @@ func New(
 
 	retry.SetBackend(b)
 
-	var err error
 	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
@@ -211,7 +234,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
-		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -224,28 +247,16 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	}
 }
 
+// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
 func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	data, err := convert.SnapshotToBytes(b.state.Sealed())
+	snapshot := b.state.Final()
+
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	return data, nil
-}
-
-func convertStorageError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if status.Code(err) == codes.NotFound {
-		// Already converted
-		return err
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	}
-
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
+	return convert.SnapshotToBytes(validSnapshot)
 }
 
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
@@ -259,8 +270,6 @@ func executionNodesForBlockID(
 	log zerolog.Logger) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
-	var err error
-	attempt := 0
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
@@ -277,11 +286,10 @@ func executionNodesForBlockID(
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
 		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-		for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-
+		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 			if err != nil {
-				return flow.IdentityList{}, err
+				return nil, err
 			}
 
 			if len(executorIDs) >= minExecutionNodesCnt {
@@ -299,16 +307,20 @@ func executionNodesForBlockID(
 
 			select {
 			case <-ctx.Done():
-				return flow.IdentityList{}, err
+				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
 				//retry after an exponential backoff
 			}
 		}
 
 		receiptCnt := len(executorIDs)
-		// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
+		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			return flow.IdentityList{}, InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCnt}
+			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			if err != nil {
+				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			}
+			executorIDs = newExecutorIDs.NodeIDs()
 		}
 	}
 
@@ -322,8 +334,7 @@ func executionNodesForBlockID(
 	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	if len(executionIdentitiesRandom) == 0 {
-		return flow.IdentityList{},
-			fmt.Errorf("no matching execution node could for block ID %v", blockID)
+		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
 	return executionIdentitiesRandom, nil
@@ -336,7 +347,7 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger) (flow.IdentifierList, error) {
 
-	// lookup the receipts storage with the block ID
+	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)

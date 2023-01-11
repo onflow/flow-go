@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
-	metrics "github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -59,7 +60,7 @@ func (suite *Suite) SetupTest() {
 	suite.headers.On("Store", mock.Anything).Return(nil)
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
 	suite.state.On("Final").Return(suite.snapshot)
-	suite.cache.On("PruneByHeight", mock.Anything).Return()
+	suite.cache.On("PruneByView", mock.Anything).Return()
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
 	metrics := metrics.NewNoopCollector()
@@ -95,20 +96,20 @@ func (suite *Suite) TestHandlePendingBlock() {
 	block.Header.Height = 12
 
 	// not in cache
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
-	suite.snapshot.On("Head").Return(head.Header, nil).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.snapshot.On("Head").Return(head.Header, nil)
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
-	suite.sync.On("RequestBlock", block.Header.ParentID).Return().Once()
+	suite.sync.On("RequestBlock", block.Header.ParentID, block.Header.Height-1).Return().Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -127,12 +128,12 @@ func (suite *Suite) TestHandleProposal() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil)
 	// we should be able to extend the state with the block
 	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
@@ -140,14 +141,39 @@ func (suite *Suite) TestHandleProposal() {
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(<-chan struct{}))
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
+}
+
+func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
+
+	// mock latest finalized state
+	final := unittest.BlockHeaderFixture()
+	suite.snapshot.On("Head").Return(final, nil)
+
+	originID := unittest.IdentifierFixture()
+	block := unittest.BlockFixture()
+
+	block.Header.Height = final.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+
+	// not in cache or storage
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+
+	// submit the block
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(channels.ReceiveBlocks, originID, proposal)
+	assert.NoError(suite.T(), err)
+
+	// block should be dropped - not added to state or cache
+	suite.state.AssertNotCalled(suite.T(), "Extend", mock.Anything)
+	suite.cache.AssertNotCalled(suite.T(), "Add", originID, mock.Anything)
 }
 
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
@@ -170,8 +196,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// both parent and child not in cache
 	// suite.cache.On("ByID", child.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
@@ -181,15 +207,14 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
-	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(<-chan struct{}))
+	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once().Return(make(<-chan struct{}))
 
 	// we have one pending child cached
-	pending := []*flow.PendingBlock{
+	pending := []flow.Slashable[flow.Block]{
 		{
 			OriginID: originID,
-			Header:   child.Header,
-			Payload:  child.Payload,
+			Message:  &child,
 		},
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
@@ -198,7 +223,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

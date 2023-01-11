@@ -8,8 +8,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 )
 
-var ()
-
 // versionCmd prints the current versioning information about the Transit CLI
 var versionCmd = &cobra.Command{
 	Use:   "version",

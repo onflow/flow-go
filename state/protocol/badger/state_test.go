@@ -8,15 +8,18 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/stretchr/testify/assert"
+	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	mock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	storutil "github.com/onflow/flow-go/storage/util"
@@ -49,6 +52,8 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
 		require.NoError(t, err)
@@ -123,6 +128,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
 		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
 		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
+		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -149,38 +156,20 @@ func TestBootstrapNonRoot(t *testing.T) {
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	// should be able to bootstrap from snapshot after building one block
-	// ROOT <- B1 <- CHILD
-	t.Run("with one block built", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
-			child := unittest.BlockWithParentFixture(block1.Header)
-			buildBlock(t, state, &child)
-
-			return state.AtBlockID(block1.ID())
-		})
-
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
-			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
-		})
-	})
-
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
+			buildBlock(t, state, block1)
 
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			buildBlock(t, state, &block2)
+			buildBlock(t, state, block2)
 
 			child := unittest.BlockWithParentFixture(block2.Header)
-			buildBlock(t, state, &child)
+			buildBlock(t, state, child)
 
 			return state.AtBlockID(block2.ID())
 		})
@@ -271,9 +260,9 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		})
 	})
 
-	t.Run("zero stake", func(t *testing.T) {
-		zeroStakeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithStake(0))
-		participants := unittest.CompleteIdentitySet(zeroStakeIdentity)
+	t.Run("zero weight", func(t *testing.T) {
+		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
+		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -283,7 +272,6 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 	t.Run("missing role", func(t *testing.T) {
 		requiredRoles := []flow.Role{
 			flow.RoleConsensus,
-			flow.RoleCollection,
 			flow.RoleExecution,
 			flow.RoleVerification,
 		}
@@ -330,7 +318,33 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable := rootSnapshot.Encodable()
 	// add an un-connected tail block to the sealing segment
 	tail := unittest.BlockFixture()
-	encodable.SealingSegment = append([]*flow.Block{&tail}, encodable.SealingSegment...)
+	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
+func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the required first seal
+	encodable.SealingSegment.FirstSeal = nil
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
+func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the result referenced by the root seal
+	encodable.SealingSegment.ExecutionResults = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
@@ -421,4 +435,63 @@ func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
 	require.NoError(t, err)
 	err = state.MarkValid(block.ID())
 	require.NoError(t, err)
+}
+
+// assertSealingSegmentBlocksQueryable bootstraps the state with the given
+// snapshot, then verifies that all sealing segment blocks are queryable.
+func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
+	bootstrap(t, snapshot, func(state *bprotocol.State, err error) {
+		require.NoError(t, err)
+
+		segment, err := state.Final().SealingSegment()
+		assert.NoError(t, err)
+
+		// for each block in the sealing segment we should be able to query:
+		// * Head
+		// * SealedResult
+		// * Commit
+		for _, block := range segment.Blocks {
+			blockID := block.ID()
+			snap := state.AtBlockID(blockID)
+			header, err := snap.Head()
+			assert.NoError(t, err)
+			assert.Equal(t, blockID, header.ID())
+			_, seal, err := snap.SealedResult()
+			assert.NoError(t, err)
+			assert.Equal(t, segment.LatestSeals[blockID], seal.ID())
+			commit, err := snap.Commit()
+			assert.NoError(t, err)
+			assert.Equal(t, seal.FinalState, commit)
+		}
+		// for all blocks but the head, we should be unable to query SealingSegment:
+		for _, block := range segment.Blocks[:len(segment.Blocks)-1] {
+			snap := state.AtBlockID(block.ID())
+			_, err := snap.SealingSegment()
+			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
+		}
+	})
+}
+
+// BenchmarkFinal benchmarks retrieving the latest finalized block from storage.
+func BenchmarkFinal(b *testing.B) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			header, err := state.Final().Head()
+			assert.NoError(b, err)
+			assert.NotNil(b, header)
+		}
+	})
+}
+
+// BenchmarkFinal benchmarks retrieving the block by height from storage.
+func BenchmarkByHeight(b *testing.B) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			header, err := state.AtHeight(0).Head()
+			assert.NoError(b, err)
+			assert.NotNil(b, header)
+		}
+	})
 }

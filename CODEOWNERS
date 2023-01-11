@@ -4,17 +4,16 @@
 /protobuf/services/collection/** @jordanschalm
 
 # Consensus Stream
-/cmd/consensus/** @AlexHentschel @awishformore @zhangchiqing
-/engine/consensus/** @AlexHentschel @awishformore @zhangchiqing
+/cmd/consensus/** @AlexHentschel @durkmurder @jordanschalm
+/engine/consensus/** @AlexHentschel @durkmurder @jordanschalm
 
 # Execution Stream
 /cmd/execution/** @m4ksio @ramtinms
 /engine/execution/** @m4ksio @ramtinms
 
-# Observation Stream
-/cmd/observation/** @psiemens
-/engine/observation/** @psiemens
-/protobuf/services/observation/** @psiemens
+# Access Stream
+/cmd/access/** @vishalchangrani
+/engine/access/** @vishalchangrani
 
 # Verification Stream
 /cmd/verification/** @ramtinms @yhassanzadeh13
@@ -26,13 +25,26 @@
 /ledger/** @ramtinms @m4ksio @AlexHentschel
 
 # FVM Stream 
-/fvm/**  @ramtinms @janezpodhostnik
+/fvm/**  @ramtinms @janezpodhostnik @pattyshack
 
 # Networking Stream
 /network/** @yhassanzadeh13 @vishalchangrani
 
 # Cryptography Stream
-/crypto/** @tarakby @huitseeker
+/crypto/** @tarakby
 
 # Bootstrap and transit scripts
-/cmd/bootstrap/** @vishalchangrani @ljk662
+/cmd/bootstrap/** @vishalchangrani
+
+# Dev Tools Stream
+.github/workflows/** @gomisha
+/insecure/** @gomisha @yhassanzadeh13
+/integration/benchnet2/** @gomisha
+/tools/test_monitor/** @gomisha
+
+# Performance Stream
+/integration/benchmark/** @SaveTheRbtz @gomisha
+/integration/localnet/** @SaveTheRbtz
+/module/profiler/** @SaveTheRbtz @pattyshack
+/module/trace/** @SaveTheRbtz @pattyshack
+/module/tracer.go @SaveTheRbtz @pattyshack

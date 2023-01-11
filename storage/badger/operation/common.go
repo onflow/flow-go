@@ -14,10 +14,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// batchInsert will encode the given entity using msgpack and will upsert the resulting
+// batchWrite will encode the given entity using msgpack and will upsert the resulting
 // binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden
-func batchInsert(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
+// in the database it will be overridden.
+// No errors are expected during normal operation.
+func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 
 		// update the maximum key size if the inserted key is bigger
@@ -47,6 +48,10 @@ func batchInsert(key []byte, entity interface{}) func(writeBatch *badger.WriteBa
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
+// Error returns:
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -84,9 +89,12 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// update will encode the given entity with JSON and update the binary data
-// under the given key in the badger DB. It will error if the key does not exist
-// yet.
+// update will encode the given entity with MsgPack and update the binary data
+// under the given key in the badger DB. The key must already exist.
+// Error returns:
+//   - storage.ErrNotFound if the key does not already exist in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -115,8 +123,40 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
+// upsert will encode the given entity with MsgPack and upsert the binary data
+// under the given key in the badger DB.
+func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// update the maximum key size if the inserted key is bigger
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+			err := SetMax(tx)
+			if err != nil {
+				return fmt.Errorf("could not update max tracker: %w", err)
+			}
+		}
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = tx.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not upsert data: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
+// Error returns:
+// * storage.ErrNotFound if the key to delete does not exist.
+// * generic error in case of unexpected database error
 func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
@@ -133,9 +173,36 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
+// removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
+// if no key matches, this is a no-op
+// No errors are expected during normal operation.
+func removeByPrefix(prefix []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := tx.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -174,6 +241,7 @@ type createFunc func() interface{}
 // handleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
+// No errors are expected during normal operation. Any errors will halt the iteration.
 type handleFunc func() error
 
 // iterationFunc is a function provided to our low-level iteration function that
@@ -204,27 +272,40 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 	}
 }
 
+// withPrefetchValuesFalse configures a Badger iteration to NOT preemptively load
+// the values when iterating over keys (ie. key-only iteration). Key-only iteration
+// is several order of magnitudes faster than regular iteration, because it involves
+// access to the LSM-tree only, which is usually resident entirely in RAM.
+func withPrefetchValuesFalse(options *badger.IteratorOptions) {
+	options.PrefetchValues = false
+}
+
 // iterate iterates over a range of keys defined by a start and end key. The
 // start key may be higher than the end key, in which case we iterate in
 // reverse order.
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
-//   * have a prefix equal to the start key OR
-//   * have a prefix equal to the end key OR
-//   * have a prefix that is lexicographically between start and end
+//   - have a prefix equal to the start key OR
+//   - have a prefix equal to the end key OR
+//   - have a prefix that is lexicographically between start and end
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
 // TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
-func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
+// No errors are expected during normal operation. Any errors returned by the
+// provided handleFunc will be propagated back to the caller of iterate.
+func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// initialize the default options and comparison modifier for iteration
 		modifier := 1
 		options := badger.DefaultIteratorOptions
+		for _, apply := range opts {
+			apply(&options)
+		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 0xff bytes to the largest of start and end.

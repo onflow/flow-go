@@ -39,6 +39,22 @@ func (p EpochPhase) String() string {
 	}[p]
 }
 
+func GetEpochPhase(phase string) EpochPhase {
+	phases := []EpochPhase{
+		EpochPhaseUndefined,
+		EpochPhaseStaking,
+		EpochPhaseSetup,
+		EpochPhaseCommitted,
+	}
+	for _, p := range phases {
+		if p.String() == phase {
+			return p
+		}
+	}
+
+	return EpochPhaseUndefined
+}
+
 // EpochSetupRandomSourceLength is the required length of the random source
 // included in an EpochSetup service event.
 const EpochSetupRandomSourceLength = 16
@@ -134,14 +150,14 @@ func (c *ClusterQCVoteData) EqualTo(other *ClusterQCVoteData) bool {
 // ClusterQCVoteDataFromQC converts a quorum certificate to the representation
 // used by the smart contract, essentially discarding the block ID and view
 // (which are protocol-defined given the EpochSetup event).
-func ClusterQCVoteDataFromQC(qc *QuorumCertificate) ClusterQCVoteData {
+func ClusterQCVoteDataFromQC(qc *QuorumCertificateWithSignerIDs) ClusterQCVoteData {
 	return ClusterQCVoteData{
 		SigData:  qc.SigData,
 		VoterIDs: qc.SignerIDs,
 	}
 }
 
-func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificate) []ClusterQCVoteData {
+func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificateWithSignerIDs) []ClusterQCVoteData {
 	qcVotes := make([]ClusterQCVoteData, 0, len(qcs))
 	for _, qc := range qcs {
 		qcVotes = append(qcVotes, ClusterQCVoteDataFromQC(qc))
@@ -189,8 +205,8 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	}
 }
 
-func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(encodableFromCommit(commit))
+func (commit EpochCommit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(encodableFromCommit(&commit))
 }
 
 func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
@@ -438,6 +454,7 @@ func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, 
 }
 
 // Check checks that the status is well-formed, returning an error if it is not.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Check() error {
 
 	if es == nil {
@@ -459,6 +476,7 @@ func (es *EpochStatus) Check() error {
 }
 
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
+// All errors indicate a malformed EpochStatus.
 func (es *EpochStatus) Phase() (EpochPhase, error) {
 
 	err := es.Check()

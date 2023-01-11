@@ -1,0 +1,32 @@
+[
+    {
+        "mode": "NULLABLE",
+        "name": "test",
+        "type": "STRING"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "skip_reason",
+        "type": "STRING"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "package",
+        "type": "STRING"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "commit_date",
+        "type": "TIMESTAMP"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "commit_sha",
+        "type": "STRING"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "category",
+        "type": "STRING"
+    }
+]

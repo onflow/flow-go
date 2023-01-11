@@ -14,7 +14,7 @@ import (
 // a database.
 //
 // DEFINITIONS and CONVENTIONS:
-//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//   - HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the heights of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {
@@ -27,44 +27,51 @@ func (p *PSMT) RootHash() ledger.RootHash {
 	return ledger.RootHash(p.root.Hash())
 }
 
+// GetSinglePayload returns payload of a given path
+func (p *PSMT) GetSinglePayload(path ledger.Path) (*ledger.Payload, error) {
+	node, found := p.pathLookUp[path]
+	if !found {
+		return nil, &ErrMissingPath{Paths: []ledger.Path{path}}
+	}
+	return node.payload, nil
+}
+
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
 // TODO return list of indecies instead of paths
 func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	var failedPaths []ledger.Path
-	payloads := make([]*ledger.Payload, 0)
-	for _, path := range paths {
+	payloads := make([]*ledger.Payload, len(paths))
+	for i, path := range paths {
 		// lookup the path for the payload
 		node, found := p.pathLookUp[path]
 		if !found {
-			payloads = append(payloads, nil)
 			failedPaths = append(failedPaths, path)
 			continue
 		}
-		payloads = append(payloads, node.payload)
+		payloads[i] = node.payload
 	}
 	if len(failedPaths) > 0 {
 		return nil, &ErrMissingPath{Paths: failedPaths}
 	}
-	// after updating all the nodes, compute the value recursively only once
 	return payloads, nil
 }
 
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
 func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (ledger.RootHash, error) {
-	var failedKeys []ledger.Key
+	var failedPaths []ledger.Path
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
 		node, found := p.pathLookUp[path]
 		if !found {
-			failedKeys = append(failedKeys, payload.Key)
+			failedPaths = append(failedPaths, path)
 			continue
 		}
-		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
+		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), node.height)
 	}
-	if len(failedKeys) > 0 {
-		return ledger.RootHash(hash.DummyHash), &ledger.ErrMissingKeys{Keys: failedKeys}
+	if len(failedPaths) > 0 {
+		return ledger.RootHash(hash.DummyHash), &ErrMissingPath{Paths: failedPaths}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return ledger.RootHash(p.root.forceComputeHash()), nil
@@ -88,20 +95,20 @@ func NewPSMT(
 		payload := pr.Payload
 
 		// we process the path, bit by bit, until we reach the end of the proof (due to compactness)
-		prValueIndex := 0        // we keep track of our progress through proofs by proofIndex
+		prValueIndex := 0        // we keep track of our progress through proofs by prValueIndex
 		currentNode := psmt.root // start from the rootNode and walk down the tree
 		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
 			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
-			flag := bitutils.Bit(pr.Flags, j)
+			flag := bitutils.ReadBit(pr.Flags, j)
 			if flag == 1 {
-				// use the proof at index proofIndex
+				// use the proof at index prValueIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := bitutils.Bit(path[:], j)
+			bit := bitutils.ReadBit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
@@ -131,7 +138,7 @@ func NewPSMT(
 		currentNode.payload = payload
 		// update node's hash value only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
+			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[path] = currentNode

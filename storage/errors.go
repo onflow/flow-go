@@ -1,6 +1,8 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	// Note: there is another not found error: badger.ErrKeyNotFound. The difference between

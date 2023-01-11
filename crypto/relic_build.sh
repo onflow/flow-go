@@ -36,9 +36,13 @@ CC_VAL=${CC_VAL:-"$(which cc)"}
 CC_VERSION_STR="$($CC_VAL --version)"
 
 # we use uname to record which arch we are running on
-ARCH=$(uname -m 2>/dev/null ||true)
+ARCH=$(uname -m 2>/dev/null || true)
 
-if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]; then
+if [[ "$ARCH" =~ "x86_64" ]]; then
+    # Compile as westmere arch to avoid cross-compilation issues on machines not supporting AVX extensions.
+    # Relic performance as used in flow crypto library is not impacted by whether it is compiled with "native" or "westmere", as proven by benchmark results.  
+    MARCH="-march=westmere"
+elif [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]; then
     #  the "-march=native" option is not supported with clang on ARM
     MARCH=""
 else
@@ -57,11 +61,11 @@ ARITH=(-DARITH=EASY)
 PRIME=(-DFP_PRIME=381)
 
 #
-BN_METH=(-DBN_KARAT=0 -DBN_METHD="COMBA;COMBA;MONTY;SLIDE;STEIN;STRON")
-FP_METH=(-DFP_KARAT=0 -DFP_METHD="INTEG;INTEG;INTEG;MONTY;LOWER;SLIDE")
+BN_METH=(-DBN_KARAT=0 -DBN_METHD="COMBA;COMBA;MONTY;SLIDE;BINAR;BASIC")
+FP_METH=(-DFP_KARAT=0 -DFP_METHD="INTEG;INTEG;INTEG;MONTY;MONTY;JMPDS;SLIDE")
 PRIMES=(-DFP_PMERS=OFF -DFP_QNRES=ON -DFP_WIDTH=2)
 FPX_METH=(-DFPX_METHD="INTEG;INTEG;LAZYR")
-EP_METH=(-DEP_MIXED=ON -DEP_PLAIN=OFF -DEP_SUPER=OFF -DEP_DEPTH=4 -DEP_WIDTH=2 \
+EP_METH=(-DEP_MIXED=ON -DEP_PLAIN=OFF -DEP_ENDOM=ON -DEP_SUPER=OFF -DEP_DEPTH=4 -DEP_WIDTH=2 \
     -DEP_CTMAP=ON -DEP_METHD="JACOB;LWNAF;COMBS;INTER")
 PP_METH=(-DPP_METHD="LAZYR;OATEP")
 

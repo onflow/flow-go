@@ -13,19 +13,11 @@ import (
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
-
-// IsClosed checks whether a channel is closed
-func IsClosed(c <-chan struct{}) bool {
-	select {
-	case <-c:
-		return true
-	default:
-		return false
-	}
-}
+const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 25 * time.Millisecond
 
 type WorkerState int
 
@@ -225,12 +217,12 @@ func ComponentWorker(t *rapid.T, id int, next WSTProvider) component.ComponentWo
 		state = WorkerStartingUp
 		switch transition := next(state); transition {
 		case WorkerCheckCtxAndExit:
-			if IsClosed(ctx.Done()) {
+			if util.CheckClosed(ctx.Done()) {
 				goto startupCanceled
 			}
 			goto startingUp
 		case WorkerCheckCtxAndShutdown:
-			if IsClosed(ctx.Done()) {
+			if util.CheckClosed(ctx.Done()) {
 				goto startupShuttingDown
 			}
 			goto startingUp
@@ -274,12 +266,12 @@ func ComponentWorker(t *rapid.T, id int, next WSTProvider) component.ComponentWo
 		state = WorkerRunning
 		switch transition := next(state); transition {
 		case WorkerCheckCtxAndExit:
-			if IsClosed(ctx.Done()) {
+			if util.CheckClosed(ctx.Done()) {
 				goto canceled
 			}
 			goto running
 		case WorkerCheckCtxAndShutdown:
-			if IsClosed(ctx.Done()) {
+			if util.CheckClosed(ctx.Done()) {
 				goto shuttingDown
 			}
 			goto running
@@ -631,8 +623,35 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 }
 
 func TestComponentManager(t *testing.T) {
-	// skip because this test takes too long
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skip because this test takes too long")
 
 	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
+}
+
+func TestComponentManagerShutdown(t *testing.T) {
+	mgr := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-ctx.Done()
+		}).Build()
+
+	parent, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parent)
+
+	mgr.Start(ctx)
+	unittest.AssertClosesBefore(t, mgr.Ready(), 10*time.Millisecond)
+	cancel()
+
+	// ShutdownSignal indicates we have started shutdown, Done indicates we have completed
+	// shutdown. If we have completed shutdown, we must have started shutdown.
+	unittest.AssertClosesBefore(t, mgr.Done(), 10*time.Millisecond)
+	closed := util.CheckClosed(mgr.ShutdownSignal())
+	assert.True(t, closed)
+}
+
+// run the test many times to reproduce consistently
+func TestComponentManagerShutdown_100(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		TestComponentManagerShutdown(t)
+	}
 }

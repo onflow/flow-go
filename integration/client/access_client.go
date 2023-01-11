@@ -6,10 +6,8 @@ package client
 import (
 	"context"
 
-	//sdk "github.com/onflow/flow-go-sdk"
-	//sdkConvert "github.com/onflow/flow-go-sdk/client/convert"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
@@ -28,7 +26,7 @@ type AccessClient struct {
 //
 // An error will be returned if the host is unreachable.
 func NewAccessClient(addr string) (*AccessClient, error) {
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

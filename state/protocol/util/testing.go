@@ -49,14 +49,14 @@ func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 			if len(candidate.Payload.Seals) > 0 {
 				return candidate.Payload.Seals[0]
 			}
-			last, _ := sealsDB.ByBlockID(candidate.Header.ParentID)
+			last, _ := sealsDB.HighestInFork(candidate.Header.ParentID)
 			return last
 		},
 		func(candidate *flow.Block) error {
 			if len(candidate.Payload.Seals) > 0 {
 				return nil
 			}
-			_, err := sealsDB.ByBlockID(candidate.Header.ParentID)
+			_, err := sealsDB.HighestInFork(candidate.Header.ParentID)
 			return err
 		}).Maybe()
 	return validator
@@ -75,6 +75,22 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.MutableState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		consumer := events.NewNoop()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+		receiptValidator := MockReceiptValidator()
+		sealValidator := MockSealValidator(seals)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+		f(db, fullState)
+	})
+}
+
+func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, f func(*badger.DB, *pbadger.MutableState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		tracer := trace.NewNoopTracer()
 		consumer := events.NewNoop()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)

@@ -1,23 +1,28 @@
 package compliance
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -32,20 +37,23 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit           *engine.Unit
-	lm             *lifecycle.LifecycleManager
-	log            zerolog.Logger
-	metrics        module.EngineMetrics
-	me             module.Local
-	headers        storage.Headers
-	payloads       storage.ClusterPayloads
-	state          protocol.State
-	core           *Core
-	pendingBlocks  engine.MessageStore
-	pendingVotes   engine.MessageStore
-	messageHandler *engine.MessageHandler
-	con            network.Conduit
-	cluster        flow.IdentityList // consensus participants in our cluster
+	unit                       *engine.Unit
+	lm                         *lifecycle.LifecycleManager
+	log                        zerolog.Logger
+	metrics                    module.EngineMetrics
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.ClusterPayloads
+	state                      protocol.State
+	core                       *Core
+	pendingBlocks              engine.MessageStore
+	pendingVotes               engine.MessageStore
+	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
+	finalizationEventsNotifier engine.Notifier
+	con                        network.Conduit
+	stopHotstuff               context.CancelFunc
+	cluster                    flow.IdentityList // consensus participants in our cluster
 }
 
 func NewEngine(
@@ -71,7 +79,7 @@ func NewEngine(
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) {
 			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockProposalQueue, uint(len))
 		}),
@@ -85,7 +93,7 @@ func NewEngine(
 
 	// FIFO queue for block votes
 	votesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+		defaultVoteQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -120,8 +128,7 @@ func NewEngine(
 				msg = &engine.Message{
 					OriginID: msg.OriginID,
 					Payload: &messages.ClusterBlockProposal{
-						Header:  syncedBlock.Block.Header,
-						Payload: syncedBlock.Block.Payload,
+						Block: syncedBlock.Block,
 					},
 				}
 				return msg, true
@@ -141,20 +148,21 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:           engine.NewUnit(),
-		lm:             lifecycle.NewLifecycleManager(),
-		log:            engineLog,
-		metrics:        core.metrics,
-		me:             me,
-		headers:        core.headers,
-		payloads:       payloads,
-		state:          state,
-		core:           core,
-		pendingBlocks:  pendingBlocks,
-		pendingVotes:   pendingVotes,
-		messageHandler: handler,
-		con:            nil,
-		cluster:        currentCluster,
+		unit:                       engine.NewUnit(),
+		lm:                         lifecycle.NewLifecycleManager(),
+		log:                        engineLog,
+		metrics:                    core.metrics,
+		me:                         me,
+		headers:                    core.headers,
+		payloads:                   payloads,
+		state:                      state,
+		core:                       core,
+		pendingBlocks:              pendingBlocks,
+		pendingVotes:               pendingVotes,
+		messageHandler:             handler,
+		finalizationEventsNotifier: engine.NewNotifier(),
+		con:                        nil,
+		cluster:                    currentCluster,
 	}
 
 	chainID, err := core.state.Params().ChainID()
@@ -163,7 +171,7 @@ func NewEngine(
 	}
 
 	// register network conduit
-	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), eng)
+	conduit, err := net.Register(channels.ConsensusCluster(chainID), eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -195,6 +203,19 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	e.lm.OnStart(func() {
 		e.unit.Launch(e.loop)
+		e.unit.Launch(e.finalizationProcessingLoop)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
+		e.stopHotstuff = cancel
+
+		// TODO: this workaround for handling fatal HotStuff errors is required only
+		//  because this engine and epochmgr do not use the Component pattern yet
+		e.unit.Launch(func() {
+			e.handleHotStuffError(hotstuffErrChan)
+		})
+
+		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
 		<-e.core.hotstuff.Ready()
 	})
@@ -205,9 +226,10 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	e.lm.OnStop(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
+		e.log.Info().Msg("shutting down hotstuff eventloop")
+		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
+		e.log.Info().Msg("all components have been shut down")
 		<-e.unit.Done()
 	})
 	return e.lm.Stopped()
@@ -224,7 +246,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -238,8 +260,16 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 func (e *Engine) loop() {
@@ -336,20 +366,25 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Logger()
-
-	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
-
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not get payload for block: %w", err)
 	}
 
-	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
+	log := e.log.With().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.ID(header.ID())).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("ref_block", payload.ReferenceBlockID[:]).
+		Int("transaction_count", payload.Collection.Len()).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Dur("delay", delay).
+		Logger()
+
+	log.Debug().Msg("processing cluster broadcast request from hotstuff")
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.state.Final().Identities(filter.And(
@@ -365,10 +400,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		go e.core.hotstuff.SubmitProposal(header, parent.View)
 
 		// create the proposal message for the collection
-		msg := &messages.ClusterBlockProposal{
+		block := &cluster.Block{
 			Header:  header,
 			Payload: payload,
 		}
+		msg := messages.NewClusterBlockProposal(block)
 
 		err := e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
@@ -379,15 +415,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
-			Msg("broadcast proposal from hotstuff")
+		log.Info().Msg("cluster proposal proposed")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-		block := &cluster.Block{
-			Header:  header,
-			Payload: payload,
-		}
 		e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
 
@@ -398,4 +428,48 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//
+// (1) Informs sealing.Core about finalization of respective block.
+//
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-finalizationNotifier:
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
+}
+
+// handleHotStuffError accepts the error channel from the HotStuff component and
+// crashes the node if any error is detected.
+//
+// TODO: this function should be removed in favour of refactoring this engine and
+// the epochmgr engine to use the Component pattern, so that irrecoverable errors
+// can be bubbled all the way to the node scaffold
+func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case err := <-hotstuffErrs:
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+			}
+		}
+	}
 }

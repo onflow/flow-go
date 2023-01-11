@@ -49,11 +49,10 @@ const (
 // Delays introduced prior to DKG start and prior to processing the FIRST broadcast
 // message are sampled uniformly from [0,m), where m=b*n^2
 //
-//  b = base delay (from config)
-//  n = size of DKG committee
+//	b = base delay (from config)
+//	n = size of DKG committee
 //
 // Delays introduced prior to processing subsequent broadcast messages are constant.
-//
 type ControllerConfig struct {
 	// BaseStartDelay determines the maximum delay before starting the DKG.
 	BaseStartDelay time.Duration
@@ -286,7 +285,7 @@ func (c *Controller) doBackgroundWork() {
 		select {
 		case msg := <-privateMsgCh:
 			c.dkgLock.Lock()
-			err := c.dkg.HandlePrivateMsg(int(msg.Orig), msg.Data)
+			err := c.dkg.HandlePrivateMsg(int(msg.CommitteeMemberIndex), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG private message")
@@ -318,7 +317,7 @@ func (c *Controller) doBackgroundWork() {
 			}
 
 			c.dkgLock.Lock()
-			err := c.dkg.HandleBroadcastMsg(int(msg.Orig), msg.Data)
+			err := c.dkg.HandleBroadcastMsg(int(msg.CommitteeMemberIndex), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG broadcast message")
@@ -339,7 +338,7 @@ func (c *Controller) start() error {
 	// before starting the DKG, sleep for a random delay to avoid synchronizing
 	// this expensive operation across all consensus nodes
 	delay := c.preStartDelay()
-	c.log.Debug().Msgf("sleeping for %s before processing phase 1 broadcast message", delay)
+	c.log.Debug().Msgf("sleeping for %s before starting DKG", delay)
 	time.Sleep(delay)
 
 	c.dkgLock.Lock()
@@ -431,7 +430,6 @@ func (c *Controller) preStartDelay() time.Duration {
 // the first broadcast message. This delay is used only during phase 1 of the DKG.
 // This prevents synchronization of processing verification vectors (an
 // expensive operation) across the network, which can impact finalization.
-//
 func (c *Controller) preHandleFirstBroadcastDelay() time.Duration {
 	delay := computePreprocessingDelay(c.config.BaseHandleFirstBroadcastDelay, c.dkg.Size())
 	return delay
@@ -443,7 +441,6 @@ func (c *Controller) preHandleFirstBroadcastDelay() time.Duration {
 // The maximum delay is m=b*n^2 where:
 // * b is a configurable base delay
 // * n is the size of the DKG committee
-//
 func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Duration {
 
 	maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)

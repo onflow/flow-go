@@ -1,4 +1,6 @@
+//go:build timesensitivetest
 // +build timesensitivetest
+
 // This file includes a few time sensitive tests. They might pass on your powerful local machine
 // but fail on slow CI machine.
 // For now, these tests are only for local. Run it with the build tag on:

@@ -17,26 +17,26 @@ import (
 
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := flow.Header{
+		expected := &flow.Header{
 			View:               1337,
 			Timestamp:          time.Now().UTC(),
 			ParentID:           flow.Identifier{0x11},
 			PayloadHash:        flow.Identifier{0x22},
-			ParentVoterIDs:     []flow.Identifier{{0x44}},
+			ParentVoterIndices: []byte{0x44},
 			ParentVoterSigData: []byte{0x88},
 			ProposerID:         flow.Identifier{0x33},
 			ProposerSigData:    crypto.Signature{0x77},
 		}
 		blockID := expected.ID()
 
-		err := db.Update(InsertHeader(expected.ID(), &expected))
+		err := db.Update(InsertHeader(expected.ID(), expected))
 		require.Nil(t, err)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(blockID, &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, *expected, actual)
 	})
 }
 

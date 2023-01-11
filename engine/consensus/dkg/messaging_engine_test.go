@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -50,7 +50,6 @@ func TestForwardOutgoingMessages(t *testing.T) {
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
 	expectedMsg := msg.NewDKGMessage(
-		1,
 		[]byte("hello"),
 		"dkg-123",
 	)
@@ -81,7 +80,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	expectedMsg := msg.PrivDKGMessageIn{
-		DKGMessage: msg.NewDKGMessage(1, []byte("hello"), "dkg-123"),
+		DKGMessage: msg.NewDKGMessage([]byte("hello"), "dkg-123"),
 		OriginID:   originID,
 	}
 
@@ -94,7 +93,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 		close(doneCh)
 	}()
 
-	err := e.Process(engine.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	err := e.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")

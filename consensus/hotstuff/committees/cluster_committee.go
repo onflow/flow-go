@@ -31,6 +31,8 @@ type Cluster struct {
 	initialClusterMembers flow.IdentityList
 }
 
+var _ hotstuff.Committee = (*Cluster)(nil)
+
 func NewClusterCommittee(
 	state protocol.State,
 	payloads storage.ClusterPayloads,
@@ -45,18 +47,26 @@ func NewClusterCommittee(
 	}
 
 	com := &Cluster{
-		state:                 state,
-		payloads:              payloads,
-		me:                    me,
-		selection:             selection,
-		clusterMemberFilter:   cluster.Members().Selector(),
+		state:     state,
+		payloads:  payloads,
+		me:        me,
+		selection: selection,
+		clusterMemberFilter: filter.And(
+			cluster.Members().Selector(),
+			filter.Not(filter.Ejected),
+			filter.HasWeight(true),
+		),
 		initialClusterMembers: cluster.Members(),
 	}
 	return com, nil
 }
 
-func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-
+// Identities returns the identities of all cluster members that are authorized to
+// participate at the given block. The order of the identities is the canonical order.
+func (c *Cluster) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	// blockID is a collection block not a block produced by consensus,
+	// to query the identities from protocol state, we need to use the reference block id from the payload
+	//
 	// first retrieve the cluster block payload
 	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
@@ -68,14 +78,12 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 
 	// use the initial cluster members for root block
 	if isRootBlock {
-		return c.initialClusterMembers.Filter(selector), nil
+		return c.initialClusterMembers, nil
 	}
 
 	// otherwise use the snapshot given by the reference block
-	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
-		selector,
-		c.clusterMemberFilter,
-	))
+	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(c.clusterMemberFilter) // remove ejected nodes
+
 	return identities, err
 }
 
@@ -94,7 +102,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	if isRootBlock {
 		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 		if !ok {
-			return nil, model.ErrInvalidSigner
+			return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
 		}
 		return identity, nil
 	}
@@ -102,13 +110,13 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	// otherwise use the snapshot given by the reference block
 	identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
 	if protocol.IsIdentityNotFound(err) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("%v is not a valid node id at block %v: %w", nodeID, payload.ReferenceBlockID, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
 	}
 	if !c.clusterMemberFilter(identity) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff cluster member", nodeID)
 	}
 	return identity, nil
 }

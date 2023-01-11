@@ -10,13 +10,15 @@ import (
 )
 
 type RegisterID struct {
-	Owner      string
-	Controller string
-	Key        string
+	Owner string
+	Key   string
 }
 
+// String returns formatted string representation of the RegisterID.
+// TODO(rbtz): remove after the merge of https://github.com/onflow/flow-emulator/pull/235
+// Deprecated: used only by emultor.
 func (r *RegisterID) String() string {
-	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+	return fmt.Sprintf("%x/%x", r.Owner, r.Key)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
@@ -26,11 +28,10 @@ func (r *RegisterID) Bytes() []byte {
 	return fingerprint.Fingerprint(r)
 }
 
-func NewRegisterID(owner, controller, key string) RegisterID {
+func NewRegisterID(owner, key string) RegisterID {
 	return RegisterID{
-		Owner:      owner,
-		Controller: controller,
-		Key:        key,
+		Owner: owner,
+		Key:   key,
 	}
 }
 
@@ -42,7 +43,7 @@ type RegisterEntry struct {
 	Value RegisterValue
 }
 
-//handy container for sorting
+// handy container for sorting
 type RegisterEntries []RegisterEntry
 
 func (d RegisterEntries) Len() int {
@@ -52,8 +53,6 @@ func (d RegisterEntries) Len() int {
 func (d RegisterEntries) Less(i, j int) bool {
 	if d[i].Key.Owner != d[j].Key.Owner {
 		return d[i].Key.Owner < d[j].Key.Owner
-	} else if d[i].Key.Controller != d[j].Key.Controller {
-		return d[i].Key.Controller < d[j].Key.Controller
 	}
 	return d[i].Key.Key < d[j].Key.Key
 }
@@ -89,8 +88,11 @@ type StateCommitment hash.Hash
 // although it can represent a valid state commitment.
 var DummyStateCommitment = StateCommitment(hash.DummyHash)
 
-// ToStateCommitment converts a byte slice into a StateComitment.
+// ToStateCommitment converts a byte slice into a StateCommitment.
 // It returns an error if the slice has an invalid length.
+// The returned error indicates that the given byte slice is not a
+// valid root hash of an execution state.  As the function is
+// side-effect free, all failures are simply a no-op.
 func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	var state StateCommitment
 	if len(stateBytes) != len(state) {
@@ -105,6 +107,16 @@ func (s StateCommitment) MarshalJSON() ([]byte, error) {
 }
 
 func (s *StateCommitment) UnmarshalJSON(data []byte) error {
+	// first, attempt to unmarshal assuming data is a hex string representation
+	err := s.unmarshalJSONHexString(data)
+	if err == nil {
+		return nil
+	}
+	// fallback to unmarshalling as [32]byte
+	return s.unmarshalJSONByteArr(data)
+}
+
+func (s *StateCommitment) unmarshalJSONHexString(data []byte) error {
 	var stateCommitmentHex string
 	if err := json.Unmarshal(data, &stateCommitmentHex); err != nil {
 		return err
@@ -118,5 +130,14 @@ func (s *StateCommitment) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = StateCommitment(h)
+	return nil
+}
+
+func (s *StateCommitment) unmarshalJSONByteArr(data []byte) error {
+	var stateCommitment [32]byte
+	if err := json.Unmarshal(data, &stateCommitment); err != nil {
+		return err
+	}
+	*s = stateCommitment
 	return nil
 }

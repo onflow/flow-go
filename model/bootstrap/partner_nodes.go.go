@@ -6,7 +6,7 @@ import (
 )
 
 // PartnerNodeInfoPub represents public information about a partner/external
-// node. It is identical to NodeInfoPub, but without stake information, as this
+// node. It is identical to NodeInfoPub, but without weight information, as this
 // is determined externally to the process that generates this information.
 type PartnerNodeInfoPub struct {
 	Role          flow.Role

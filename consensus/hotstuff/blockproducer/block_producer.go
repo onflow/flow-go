@@ -11,14 +11,14 @@ import (
 
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
-	signer    hotstuff.SignerVerifier
+	signer    hotstuff.Signer
 	committee hotstuff.Committee
 	builder   module.Builder
 }
 
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
-func New(signer hotstuff.SignerVerifier, committee hotstuff.Committee, builder module.Builder) (*BlockProducer, error) {
+func New(signer hotstuff.Signer, committee hotstuff.Committee, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		committee: committee,
@@ -33,7 +33,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {
 		header.View = view
-		header.ParentVoterIDs = qc.SignerIDs
+		header.ParentVoterIndices = qc.SignerIndices
 		header.ParentVoterSigData = qc.SigData
 		header.ProposerID = bp.committee.Self()
 

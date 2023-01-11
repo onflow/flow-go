@@ -46,6 +46,14 @@ func (p *Params) ChainID() (flow.ChainID, error) {
 	return p.state.root.Header.ChainID, nil
 }
 
+func (p *Params) SporkID() (flow.Identifier, error) {
+	return flow.ZeroID, fmt.Errorf("not implemented")
+}
+
+func (p *Params) ProtocolVersion() (uint, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
 func (p *Params) Root() (*flow.Header, error) {
 	return p.state.root.Header, nil
 }
@@ -101,6 +109,13 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 	snapshot.On("Head").Return(final.Header, nil)
 	finalID := final.ID()
 	mocked := snapshot.On("Descendants")
+	mocked.RunFn = func(args mock.Arguments) {
+		// not concurrent safe
+		pendings := pending(ps, finalID)
+		mocked.ReturnArguments = mock.Arguments{pendings, nil}
+	}
+
+	mocked = snapshot.On("ValidDescendants")
 	mocked.RunFn = func(args mock.Arguments) {
 		// not concurrent safe
 		pendings := pending(ps, finalID)

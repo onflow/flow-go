@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"os"
-
 	"path/filepath"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -14,15 +13,15 @@ import (
 )
 
 // WritePartnerFiles writes the all partner public node info into `bootDir/partners/public-root-information/`
-// also writes a map containing each of the nodes stakes mapped to the NodeID
+// also writes a map containing each of the nodes weights mapped by NodeID
 func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, string, error) {
 
 	// convert to public nodeInfos and map stkes
 	nodePubInfos := make([]model.NodeInfoPub, len(nodeInfos))
-	stakes := make(map[flow.Identifier]uint64)
+	weights := make(map[flow.Identifier]uint64)
 	for i, node := range nodeInfos {
 		nodePubInfos[i] = node.Public()
-		stakes[node.NodeID] = node.Stake
+		weights[node.NodeID] = node.Weight
 	}
 
 	// write node public infos to partner dir
@@ -41,18 +40,18 @@ func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, stri
 		}
 	}
 
-	// write partner stakes
-	stakesPath := filepath.Join(bootDir, "partner-stakes.json")
-	err = io.WriteJSON(stakesPath, stakes)
+	// write partner weights
+	weightsPath := filepath.Join(bootDir, model.FileNamePartnerWeights)
+	err = io.WriteJSON(weightsPath, weights)
 	if err != nil {
-		return "", "", fmt.Errorf("could not write partner stakes info: %w", err)
+		return "", "", fmt.Errorf("could not write partner weights info: %w", err)
 	}
 
-	return filepath.Join(partnersDir, model.DirnamePublicBootstrap), stakesPath, nil
+	return filepath.Join(partnersDir, model.DirnamePublicBootstrap), weightsPath, nil
 }
 
 // WriteInternalFiles writes the internal private node info into `bootDir/private-root-information/`
-// also writes a map containing each of the nodes stakes mapped to the node's networking address
+// also writes a map containing each of the nodes weights mapped by the node's networking address
 func WriteInternalFiles(nodeInfos []model.NodeInfo, bootDir string) (string, string, error) {
 
 	// convert to private nodeInfos and node configuration map
@@ -79,7 +78,7 @@ func WriteInternalFiles(nodeInfos []model.NodeInfo, bootDir string) (string, str
 		configs[i] = model.NodeConfig{
 			Role:    node.Role,
 			Address: node.Address,
-			Stake:   node.Stake,
+			Weight:  node.Weight,
 		}
 	}
 
@@ -109,35 +108,35 @@ func GenerateNodeInfos(consensus, collection, execution, verification, access in
 	// CONSENSUS = 1
 	consensusNodes := unittest.NodeInfosFixture(consensus,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	nodes = append(nodes, consensusNodes...)
 
 	// COLLECTION = 1
 	collectionNodes := unittest.NodeInfosFixture(collection,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	nodes = append(nodes, collectionNodes...)
 
 	// EXECUTION = 1
 	executionNodes := unittest.NodeInfosFixture(execution,
 		unittest.WithRole(flow.RoleExecution),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	nodes = append(nodes, executionNodes...)
 
 	// VERIFICATION = 1
 	verificationNodes := unittest.NodeInfosFixture(verification,
 		unittest.WithRole(flow.RoleVerification),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	nodes = append(nodes, verificationNodes...)
 
 	// ACCESS = 1
 	accessNodes := unittest.NodeInfosFixture(access,
 		unittest.WithRole(flow.RoleAccess),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	nodes = append(nodes, accessNodes...)
 

@@ -84,6 +84,14 @@ func (tb TransactionBody) ByteSize() uint {
 	return uint(size)
 }
 
+// InclusionEffort returns the inclusion effort of the transaction
+func (tb TransactionBody) InclusionEffort() uint64 {
+	// Hardcoded inclusion effort (of 1.0 UFix).
+	// Eventually this will be dynamic and will depend on the transaction properties
+	inclusionEffort := uint64(100_000_000)
+	return inclusionEffort
+}
+
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
@@ -239,7 +247,7 @@ func (tb *TransactionBody) SignPayload(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	sig, err := tb.SignMessageWithTag(tb.PayloadMessage(), TransactionDomainTag[:], privateKey, hasher)
+	sig, err := tb.Sign(tb.PayloadMessage(), privateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
@@ -262,7 +270,7 @@ func (tb *TransactionBody) SignEnvelope(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	sig, err := tb.SignMessageWithTag(tb.EnvelopeMessage(), TransactionDomainTag[:], privateKey, hasher)
+	sig, err := tb.Sign(tb.EnvelopeMessage(), privateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
@@ -273,16 +281,18 @@ func (tb *TransactionBody) SignEnvelope(
 	return nil
 }
 
-// SignMessageWithTag signs the message (tag + message) with the specified account key.
+// Sign signs the data (transaction_tag + message) with the specified private key
+// and hasher.
 //
-// This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignMessageWithTag(
+// This function returns an error if:
+//   - crypto.InvalidInputsError if the private key cannot sign with the given hasher
+//   - other error if an unexpected error occurs
+func (tb *TransactionBody) Sign(
 	message []byte,
-	tag []byte,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) ([]byte, error) {
-	message = append(tag[:], message...)
+	message = append(TransactionDomainTag[:], message...)
 	sig, err := privateKey.Sign(message, hasher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
@@ -409,7 +419,7 @@ const (
 
 // String returns the string representation of a transaction status.
 func (s TransactionStatus) String() string {
-	return [...]string{"PENDING", "FINALIZED", "REVERTED", "SEALED"}[s]
+	return [...]string{"UNKNOWN", "PENDING", "FINALIZED", "EXECUTED", "SEALED", "EXPIRED"}[s]
 }
 
 // TransactionField represents a required transaction field.
@@ -453,11 +463,6 @@ type TransactionSignature struct {
 func (s TransactionSignature) String() string {
 	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s",
 		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
-}
-
-// UniqueKeyString returns constructs an string with combination of address and key
-func (s TransactionSignature) UniqueKeyString() string {
-	return fmt.Sprintf("%s-%d", s.Address.String(), s.KeyIndex)
 }
 
 // ByteSize returns the byte size of the transaction signature

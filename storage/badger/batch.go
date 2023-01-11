@@ -1,11 +1,15 @@
 package badger
 
 import (
+	"sync"
+
 	"github.com/dgraph-io/badger/v2"
 )
 
 type Batch struct {
-	writer    *badger.WriteBatch
+	writer *badger.WriteBatch
+
+	lock      sync.RWMutex
 	callbacks []func()
 }
 
@@ -26,6 +30,8 @@ func (b *Batch) GetWriter() *badger.WriteBatch {
 // useful for implementing the cache where we will only cache
 // after the batch has been successfully flushed
 func (b *Batch) OnSucceed(callback func()) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	b.callbacks = append(b.callbacks, callback)
 }
 
@@ -38,6 +44,8 @@ func (b *Batch) Flush() error {
 		return err
 	}
 
+	b.lock.RLock()
+	defer b.lock.RUnlock()
 	for _, callback := range b.callbacks {
 		callback()
 	}

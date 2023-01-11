@@ -121,7 +121,11 @@ func validateMachineAccountAddress(addressStr string) error {
 		return nil
 	}
 	if flow.Testnet.Chain().IsValid(address) {
-		log.Warn().Msgf("Machine account address (%s) is **TESTNET/CANARY** address - ensure this is desired before continuing", address)
+		log.Warn().Msgf("Machine account address (%s) is **TESTNET** address - ensure this is desired before continuing", address)
+		return nil
+	}
+	if flow.Sandboxnet.Chain().IsValid(address) {
+		log.Warn().Msgf("Machine account address (%s) is **STAGINGNET** address - ensure this is desired before continuing", address)
 		return nil
 	}
 	if flow.Localnet.Chain().IsValid(address) {

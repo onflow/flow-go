@@ -66,7 +66,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 			return snapshot
 		},
 	)
-	return &block, snapshot, state, sealedSnapshot
+	return block, snapshot, state, sealedSnapshot
 }
 
 // SealBlock seals a block by building two blocks on it, the first containing
@@ -79,14 +79,14 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	err := st.Extend(context.Background(), &block2)
+	err := st.Extend(context.Background(), block2)
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
 	block3.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
-	err = st.Extend(context.Background(), &block3)
+	err = st.Extend(context.Background(), block3)
 	require.NoError(t, err)
 
 	return block3.Header

@@ -21,8 +21,8 @@ const (
 
 	// Testnet is the chain ID for the testnet chain.
 	Testnet ChainID = "flow-testnet"
-	// Canary is the chain ID for internal canary chain.
-	Canary ChainID = "flow-canary"
+	// Sandboxnet is the chain ID for internal sandboxnet chain.
+	Sandboxnet ChainID = "flow-sandboxnet"
 
 	// Transient test networks
 
@@ -32,6 +32,8 @@ const (
 	Localnet ChainID = "flow-localnet"
 	// Emulator is the chain ID for the emulated chain.
 	Emulator ChainID = "flow-emulator"
+	// BftTestnet is the chain ID for testing attack vector scenarios.
+	BftTestnet ChainID = "flow-bft-test-net"
 
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
@@ -39,7 +41,7 @@ const (
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
@@ -48,9 +50,11 @@ func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
 		return 0
-	case Testnet, Canary:
+	case Testnet:
 		return invalidCodeTestNetwork
-	case Emulator, Localnet, Benchnet:
+	case Sandboxnet:
+		return invalidCodeSandboxNetwork
+	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
@@ -165,9 +169,15 @@ var testnet = &addressedChain{
 	},
 }
 
-var canary = &addressedChain{
+var bftTestNet = &addressedChain{
 	chainImpl: &linearCodeImpl{
-		chainID: Canary,
+		chainID: BftTestnet,
+	},
+}
+
+var sandboxnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Sandboxnet,
 	},
 }
 
@@ -200,8 +210,8 @@ func (c ChainID) Chain() Chain {
 		return mainnet
 	case Testnet:
 		return testnet
-	case Canary:
-		return canary
+	case Sandboxnet:
+		return sandboxnet
 	case Benchnet:
 		return benchnet
 	case Localnet:
@@ -210,6 +220,8 @@ func (c ChainID) Chain() Chain {
 		return emulator
 	case MonotonicEmulator:
 		return monotonicEmulator
+	case BftTestnet:
+		return bftTestNet
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}

@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -11,19 +10,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestNetwork tests the 1-k messaging at the network layer using the default Flow network topology
 // No real nodes are created, instead only Ghost nodes are used to restrict testing to only the network module
 func TestNetwork(t *testing.T) {
-	t.Skip("flaky")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 
 	// define what nodes and how many instances of each need to be created (role => count e.g. consensus = 3, creates 3 ghost consensus nodes)
 	nodeCounts := map[flow.Role]int{flow.RoleAccess: 1, flow.RoleCollection: 1, flow.RoleConsensus: 3, flow.RoleExecution: 2, flow.RoleVerification: 1}
@@ -49,10 +48,9 @@ func TestNetwork(t *testing.T) {
 
 	conf := testnet.NewNetworkConfig("network_test", nodes)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	net.Start(ctx)
@@ -63,7 +61,7 @@ func TestNetwork(t *testing.T) {
 	targets := ids[1:]
 
 	event := &message.TestMessage{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// kick off a read loop for each of the nodes (except the first)
@@ -74,12 +72,12 @@ func TestNetwork(t *testing.T) {
 
 	// get the sender container and relay an echo message via it to all the other nodes
 	ghostContainer := net.ContainerByID(sender)
-	ghostClient, err := common.GetGhostClient(ghostContainer)
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	require.NoError(t, err)
 
 	// seed a message, it should propagate to all nodes.
 	// (unlike regular nodes, a ghost node subscribes to all topics)
-	err = ghostClient.Send(ctx, engine.PushGuarantees, event, targets...)
+	err = ghostClient.Send(ctx, channels.PushGuarantees, event, targets...)
 	require.NoError(t, err)
 
 	// wait for all read loops to finish
@@ -100,7 +98,7 @@ func launchReadLoop(
 	ghostContainer := net.ContainerByID(id)
 
 	// get a ghost client connected to the ghost node
-	ghostClient, err := common.GetGhostClient(ghostContainer)
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	require.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive

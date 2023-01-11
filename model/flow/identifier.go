@@ -9,11 +9,13 @@ import (
 	"math/rand"
 	"reflect"
 
+	"github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const IdentifierLen = 32
@@ -23,6 +25,9 @@ type Identifier [IdentifierLen]byte
 
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
+
+// IdentifierOrder is a sort for identifier
+type IdentifierOrder func(Identifier, Identifier) bool
 
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.
@@ -70,8 +75,11 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 // IsSampled is a utility method to sample entities based on their ids
 // the range is from [0, 64].
 // 0 is 100% (all data will be collected)
-// 32 is ~50%
-// 64 is ~0% (no data will be collected)
+// 1 is ~50%
+// 2 is ~25%
+// 3 is ~12.5%
+// ...
+// >64 is 0% (no data will be collected)
 func (id Identifier) IsSampled(sensitivity uint) bool {
 	if sensitivity > 64 {
 		return false
@@ -107,13 +115,16 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
-	//bs1 := binstat.EnterTime(binstat.BinMakeID + ".??lock.Fingerprint")
+	// collect fingerprint of the entity
 	data := fingerprint.Fingerprint(entity)
-	//binstat.LeaveVal(bs1, int64(len(data)))
-	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
+	// make ID from fingerprint
+	return MakeIDFromFingerPrint(data)
+}
+
+// MakeIDFromFingerPrint is similar to MakeID but skipping fingerprinting step.
+func MakeIDFromFingerPrint(fingerPrint []byte) Identifier {
 	var id Identifier
-	hash.ComputeSHA3_256((*[32]byte)(&id), data)
-	//binstat.Leave(bs2)
+	hash.ComputeSHA3_256((*[hash.HashLenSHA3_256]byte)(&id), fingerPrint)
 	return id
 }
 
@@ -126,27 +137,23 @@ func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 }
 
 // GetIDs gets the IDs for a slice of entities.
-func GetIDs(value interface{}) []Identifier {
-	v := reflect.ValueOf(value)
-	if v.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("non-slice value (%T)", value))
+func GetIDs[T Entity](entities []T) IdentifierList {
+	ids := make([]Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.ID())
 	}
-	slice := make([]Identifier, 0, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		entity, ok := v.Index(i).Interface().(Entity)
-		if !ok {
-			panic(fmt.Sprintf("slice contains non-entity (%T)", v.Index(i).Interface()))
-		}
-		slice = append(slice, entity.ID())
-	}
-	return slice
+	return ids
 }
 
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
-	tree := merkle.NewTree()
-	for _, id := range ids {
-		tree.Put(id[:], nil)
+	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this paramter
+	for i, id := range ids {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i))
+		_, _ = tree.Put(id[:], val) // Tree copies keys and values internally
+		// `Put` only errors for keys whose length does not conform to the pre-configured length. As
+		// Identifiers are fixed-sized arrays, errors are impossible here, which we also verify in a unit test.
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
@@ -173,7 +180,7 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 }
 
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
 func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)
@@ -187,4 +194,62 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+func CidToId(c cid.Cid) (Identifier, error) {
+	decoded, err := mh.Decode(c.Hash())
+	if err != nil {
+		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
+	}
+
+	if decoded.Code != mh.SHA2_256 {
+		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
+	}
+	if decoded.Length != IdentifierLen {
+		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
+	}
+
+	return HashToID(decoded.Digest), nil
+}
+
+func IdToCid(f Identifier) cid.Cid {
+	hash, _ := mh.Encode(f[:], mh.SHA2_256)
+	return cid.NewCidV0(hash)
+}
+
+func ByteSliceToId(b []byte) (Identifier, error) {
+	var id Identifier
+	if len(b) != IdentifierLen {
+		return id, fmt.Errorf("illegal length for a flow identifier %x: got: %d, expected: %d", b, len(b), IdentifierLen)
+	}
+
+	copy(id[:], b[:])
+
+	return id, nil
+}
+
+func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
+	total := len(b)
+	ids := make(IdentifierList, total)
+
+	for i := 0; i < total; i++ {
+		id, err := ByteSliceToId(b[i])
+		if err != nil {
+			return nil, err
+		}
+
+		ids[i] = id
+	}
+
+	return ids, nil
+}
+
+func IdsToBytes(identifiers []Identifier) [][]byte {
+	var byteIds [][]byte
+	for _, id := range identifiers {
+		tempID := id // avoid capturing loop variable
+		byteIds = append(byteIds, tempID[:])
+	}
+
+	return byteIds
 }

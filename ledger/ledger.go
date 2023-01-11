@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/module"
@@ -22,6 +24,12 @@ type Ledger interface {
 
 	// InitialState returns the initial state of the ledger
 	InitialState() State
+
+	// HasState returns true if the given state exists inside the ledger
+	HasState(state State) bool
+
+	// GetSingleValue returns value for a given key at specific state
+	GetSingleValue(query *QuerySingleValue) (value Value, err error)
 
 	// Get returns values for the given slice of keys at specific state
 	Get(query *Query) (values []Value, err error)
@@ -44,7 +52,7 @@ func NewEmptyQuery(sc State) (*Query, error) {
 	return &Query{state: sc}, nil
 }
 
-// NewQuery constructs a new ledger  query
+// NewQuery constructs a new ledger query
 func NewQuery(sc State, keys []Key) (*Query, error) {
 	return &Query{state: sc, keys: keys}, nil
 }
@@ -67,6 +75,27 @@ func (q *Query) State() State {
 // SetState sets the state part of the query
 func (q *Query) SetState(s State) {
 	q.state = s
+}
+
+// QuerySingleValue contains ledger query for a single value
+type QuerySingleValue struct {
+	state State
+	key   Key
+}
+
+// NewQuerySingleValue constructs a new ledger query for a single value
+func NewQuerySingleValue(sc State, key Key) (*QuerySingleValue, error) {
+	return &QuerySingleValue{state: sc, key: key}, nil
+}
+
+// Key returns key of the query
+func (q *QuerySingleValue) Key() Key {
+	return q.key
+}
+
+// State returns the state part of the query
+func (q *QuerySingleValue) State() State {
+	return q.state
 }
 
 // Update holds all data needed for a ledger update
@@ -184,14 +213,36 @@ func (k *Key) Size() int {
 }
 
 // CanonicalForm returns a byte slice describing the key
-// Warning, Changing this has an impact on how leaf hashes are computed
+// Warning: Changing this has an impact on how leaf hashes are computed!
 // don't use this to reconstruct the key later
 func (k *Key) CanonicalForm() []byte {
-	ret := ""
+	// calculate the size of the byte array
+
+	// the maximum size of a uint16 is 5 characters, so
+	// this is using 10 for the estimate, to include the two '/'
+	// characters and an extra 3 characters for padding safety
+
+	constant := 10
+
+	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
+		requiredLen += len(kp.Value)
 	}
-	return []byte(ret)
+
+	retval := make([]byte, 0, requiredLen)
+
+	for _, kp := range k.KeyParts {
+		typeNumber := strconv.Itoa(int(kp.Type))
+
+		retval = append(retval, byte('/'))
+		retval = append(retval, []byte(typeNumber)...)
+		retval = append(retval, byte('/'))
+		retval = append(retval, kp.Value...)
+	}
+
+	// create a byte slice with the correct size and copy
+	// the estimated string into it.
+	return retval
 }
 
 func (k *Key) String() string {
@@ -200,15 +251,19 @@ func (k *Key) String() string {
 
 // DeepCopy returns a deep copy of the key
 func (k *Key) DeepCopy() Key {
-	newKPs := make([]KeyPart, 0, len(k.KeyParts))
-	for _, kp := range k.KeyParts {
-		newKPs = append(newKPs, *kp.DeepCopy())
+	newKPs := make([]KeyPart, len(k.KeyParts))
+	for i, kp := range k.KeyParts {
+		newKPs[i] = *kp.DeepCopy()
 	}
 	return Key{KeyParts: newKPs}
 }
 
 // Equals compares this key to another key
+// A nil key is equivalent to an empty key.
 func (k *Key) Equals(other *Key) bool {
+	if k == nil || len(k.KeyParts) == 0 {
+		return other == nil || len(other.KeyParts) == 0
+	}
 	if other == nil {
 		return false
 	}
@@ -247,12 +302,12 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, 0, len(kp.Value))
-	newV = append(newV, kp.Value...)
+	newV := make([]byte, len(kp.Value))
+	copy(newV, kp.Value)
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
-func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+func (kp KeyPart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type  uint16
 		Value string
@@ -260,6 +315,28 @@ func (kp *KeyPart) MarshalJSON() ([]byte, error) {
 		Type:  kp.Type,
 		Value: hex.EncodeToString(kp.Value),
 	})
+}
+
+// UnmarshalJSON unmarshals a JSON value of KeyPart.
+func (kp *KeyPart) UnmarshalJSON(b []byte) error {
+	if kp == nil {
+		return errors.New("UnmarshalJSON on nil KeyPart")
+	}
+	var v struct {
+		Type  uint16
+		Value string
+	}
+	err := json.Unmarshal(b, &v)
+	if err != nil {
+		return err
+	}
+	data, err := hex.DecodeString(v.Value)
+	if err != nil {
+		return err
+	}
+	kp.Type = v.Type
+	kp.Value = data
+	return nil
 }
 
 // Value holds the value part of a ledger key value pair
@@ -276,16 +353,14 @@ func (v Value) String() string {
 
 // DeepCopy returns a deep copy of the value
 func (v Value) DeepCopy() Value {
-	newV := make([]byte, 0, len(v))
-	newV = append(newV, []byte(v)...)
+	newV := make([]byte, len(v))
+	copy(newV, v)
 	return newV
 }
 
 // Equals compares a ledger Value to another one
+// A nil value is equivalent to an empty value.
 func (v Value) Equals(other Value) bool {
-	if other == nil {
-		return false
-	}
 	return bytes.Equal(v, other)
 }
 
@@ -293,10 +368,31 @@ func (v Value) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(v))
 }
 
+// UnmarshalJSON unmarshals a JSON value of Value.
+func (v *Value) UnmarshalJSON(b []byte) error {
+	if v == nil {
+		return errors.New("UnmarshalJSON on nil Value")
+	}
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	data, err := hex.DecodeString(s)
+	if err != nil {
+		return err
+	}
+	*v = data
+	return nil
+}
+
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads
 type Migration func(payloads []Payload) ([]Payload, error)
 
-// Reporter accepts slice ledger payloads and reports the state of the ledger
+// Reporter reports on data from the state
 type Reporter interface {
-	Report(payloads []Payload) error
+	// Name returns the name of the reporter. Only used for logging.
+	Name() string
+	// Report accepts slice ledger payloads and reports the state of the ledger
+	Report(payloads []Payload, statecommitment State) error
 }

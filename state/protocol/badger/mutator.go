@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -30,8 +31,9 @@ var errIncompleteEpochConfiguration = errors.New("block beyond epoch boundary")
 // Instead, the FollowerState relies on the consensus nodes to run the full
 // payload check. Consequently, a block B should only be considered valid, if
 // a child block with a valid header is known. The child block's header
-// includes quorum certificate, which proves that a supermajority of consensus
-// nodes consider block B a valid.
+// includes quorum certificate, which proves that a super-majority of consensus
+// nodes consider block B as valid.
+//
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks
 // the non-consensus nodes have to perform.
@@ -109,18 +111,18 @@ func NewFullConsensusState(
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// find the last seal at the parent block
 	last, err := m.lastSealed(candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -137,31 +139,31 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header does not compliance the chain state: %w", err)
+		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload guarantee(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
+		return fmt.Errorf("payload receipt(s) not compliant with chain state: %w", err)
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized
 	// state
 	lastSeal, err := m.sealExtend(ctx, candidate)
 	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
@@ -238,8 +240,8 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 			// for instance:
 			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
 			//                  ^- G             ^- H             ^- I
-			// block G is not a valid block, because it does not include C which has been finalized.
-			// block H and I are a valid, because its their includes C.
+			// block G is not a valid block, because it does not have C (which has been finalized) as an ancestor
+			// block H and I are valid, because they do have C as an ancestor
 			return state.NewOutdatedExtensionErrorf(
 				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
 				header.Height, ancestor.Height, finalizedHeight)
@@ -256,7 +258,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer span.Finish()
+	defer span.End()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -313,6 +315,9 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// get the reference block to check expiry
 		ref, err := m.headers.ByBlockID(guarantee.ReferenceBlockID)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("could not get reference block %x: %w", guarantee.ReferenceBlockID, err)
+			}
 			return fmt.Errorf("could not get reference block (%x): %w", guarantee.ReferenceBlockID, err)
 		}
 
@@ -320,6 +325,17 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		if ref.Height < limit {
 			return state.NewInvalidExtensionErrorf("payload includes expired guarantee (height: %d, limit: %d)",
 				ref.Height, limit)
+		}
+
+		// check the guarantors are correct
+		_, err = protocol.FindGuarantors(m, guarantee)
+		if err != nil {
+			if signature.IsInvalidSignerIndicesError(err) ||
+				errors.Is(err, protocol.ErrEpochNotCommitted) ||
+				errors.Is(err, protocol.ErrClusterNotFound) {
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+			}
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
 	}
 
@@ -331,7 +347,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
-	defer span.Finish()
+	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -342,15 +358,16 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 }
 
 // receiptExtend checks the compliance of the receipt payload.
-//   * Receipts should pertain to blocks on the fork
-//   * Receipts should not appear more than once on a fork
-//   * Receipts should pass the ReceiptValidator check
-//   * No seal has been included for the respective block in this particular fork
+//   - Receipts should pertain to blocks on the fork
+//   - Receipts should not appear more than once on a fork
+//   - Receipts should pass the ReceiptValidator check
+//   - No seal has been included for the respective block in this particular fork
+//
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -378,7 +395,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	payload := candidate.Payload
 
 	// getting the last sealed block
-	last, err := m.seals.ByBlockID(header.ParentID)
+	last, err := m.seals.HighestInFork(header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
@@ -408,7 +425,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := candidate.ID()
 
@@ -437,7 +454,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		}
 
 		// index the latest sealed block in this fork
-		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
+		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
@@ -472,7 +489,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
-	defer span.Finish()
+	defer span.End()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
@@ -498,7 +515,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// SECOND: We also want to update the last sealed height. Retrieve the block
 	// seal indexed for the block and retrieve the block that was sealed by it.
-	last, err := m.seals.ByBlockID(blockID)
+	last, err := m.seals.HighestInFork(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
@@ -530,9 +547,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
 	}
 
+	// EECC - check whether the epoch emergency fallback flag has been set
+	// in the database. If so, skip updating any epoch-related metrics.
+	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+	}
+
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range parent.Payload.Seals {
+		// skip updating epoch-related metrics if EECC is triggered
+		if epochFallbackTriggered {
+			break
+		}
+
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -573,31 +602,34 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not get parent epoch final view: %w", err)
 	}
 
-	if header.View > parentEpochFinalView {
-		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION [EECC]
-		//
-		// If we have triggered emergency chain continuation as a result of a
-		// failed epoch, these events would be emitted for every block. Instead,
-		// we will skip them.
-		//
-		// We detect EECC here by checking for two blocks spanning what should
-		// be an epoch transition having the same epoch counter. This indicates
-		// that the last epoch was continued past its specified end time.
-		parentCounter, err := parentBlocksEpoch.Counter()
-		if err != nil {
-			return fmt.Errorf("could not check parent counter to skip events in fallback epoch: %w", err)
-		}
-		if parentCounter != currentEpochSetup.Counter {
-			events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+	// When this block's view exceeds the parent epoch's final view, this block
+	// represents the first block of the next epoch. Therefore we update metrics
+	// related to the epoch transition here.
+	//
+	// We skip updating these metrics when EECC has been triggered
+	if header.View > parentEpochFinalView && !epochFallbackTriggered {
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 
-			// set current epoch counter corresponding to new epoch
-			events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
-			// set epoch phase - since we are starting a new epoch we begin in the staking phase
-			events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
-		}
+		// set current epoch counter corresponding to new epoch
+		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+		// set epoch phase - since we are starting a new epoch we begin in the staking phase
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		// set current epoch view values
+		events = append(
+			events,
+			func() { m.metrics.CurrentEpochFinalView(currentEpochSetup.FinalView) },
+			func() { m.metrics.CurrentDKGPhase1FinalView(currentEpochSetup.DKGPhase1FinalView) },
+			func() { m.metrics.CurrentDKGPhase2FinalView(currentEpochSetup.DKGPhase2FinalView) },
+			func() { m.metrics.CurrentDKGPhase3FinalView(currentEpochSetup.DKGPhase3FinalView) },
+		)
 	}
 
-	// FIFTH: Persist updates in data base
+	// if EECC is triggered, update metric
+	if epochFallbackTriggered {
+		m.metrics.EpochEmergencyFallbackTriggered()
+	}
+
+	// FIFTH: Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
 	// * Update the largest finalized height to this block's height.
 	// * Update the largest height of sealed and finalized block.
@@ -616,20 +648,34 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
+
+		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
+		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
+		// each block ID the ID of its _finalized_ seal.
+		for _, seal := range block.Payload.Seals {
+			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
+			}
+		}
+
+		// emit protocol events within the scope of the Badger transaction to
+		// guarantee at-least-once delivery
+		m.consumer.BlockFinalized(header)
+		for _, emit := range events {
+			emit()
+		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not execute finalization: %w", err)
 	}
 
-	// FINALLY: emit notification events and update metrics
+	// FINALLY: update metrics
 	m.metrics.FinalizedHeight(header.Height)
 	m.metrics.SealedHeight(sealed.Height)
 	m.metrics.BlockFinalized(block)
-	m.consumer.BlockFinalized(header)
-	for _, emit := range events {
-		emit()
-	}
+
 	for _, seal := range block.Payload.Seals {
 		sealedBlock, err := m.blocks.ByID(seal.BlockID)
 		if err != nil {
@@ -647,16 +693,17 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epoch in its respective fork. We do this by comparing the block's view to
 // the Epoch data from its parent. If the block's view is _larger_ than the
 // final View of the parent's epoch, the block starts a new Epoch.
-// case (a): block is in same Epoch as parent.
-//           the parent's EpochStatus.CurrentEpoch also applies for the current block
-// case (b): block starts new Epoch in its respective fork.
-//           the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//   - case (a): block is in same Epoch as parent.
+//     the parent's EpochStatus.CurrentEpoch also applies for the current block
+//   - case (b): block starts new Epoch in its respective fork.
+//     the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+//
 // As the parent was a valid extension of the chain, by induction, the parent satisfies all
 // consistency requirements of the protocol.
 //
 // Returns:
-// * errIncompleteEpochConfiguration if the epoch has ended before processing
-//   both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
+//   - errIncompleteEpochConfiguration if the epoch has ended before processing
+//     both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
 func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
@@ -719,10 +766,11 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // operations to insert service events for blocks that include them.
 //
 // Return values:
-//  * ops: pending data base operations to persist this processing step
-//  * error: no errors expected during normal operations
+//   - ops: pending database operations to persist this processing step
+//   - error: no errors expected during normal operations
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 	var ops []func(*transaction.Tx) error
+	blockID := block.ID()
 
 	// Determine epoch status for block's CURRENT epoch.
 	//
@@ -741,12 +789,16 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		// by the protocol state to fall in the same epoch as its parent.
 		//
 		// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
-		fmt.Printf("handleServiceEvents: emergency epoch chain continuation triggered at block id: %x, height: %d\n", block.ID(), block.Header.Height)
 		parentStatus, err := m.epoch.statuses.ByBlockID(block.Header.ParentID)
 		if err != nil {
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
 		}
-		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
+		ops = append(ops, m.epoch.statuses.StoreTx(blockID, parentStatus.Copy()))
+		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
+		ops = append(ops, func(tx *transaction.Tx) error {
+			tx.OnSucceed(m.metrics.EpochEmergencyFallbackTriggered)
+			return nil
+		})
 		return ops, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
@@ -756,7 +808,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
-	counter := activeSetup.Counter
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(block.Header.ParentID)
@@ -770,6 +821,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
+SealLoop:
 	for _, seal := range parent.Payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
@@ -781,30 +833,13 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 
-				// We should only have a single epoch setup event per epoch.
-				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
-					// true iff EpochSetup event for NEXT epoch was already included before
-					return nil, state.NewInvalidExtensionError("duplicate epoch setup service event")
-				}
-
-				// The setup event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return nil, state.NewInvalidExtensionErrorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// The first view needs to be exactly one greater than the current epoch final view
-				if ev.FirstView != activeSetup.FinalView+1 {
-					return nil, state.NewInvalidExtensionErrorf(
-						"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
-						ev.FirstView,
-						activeSetup.FinalView,
-					)
-				}
-
-				// Finally, the epoch setup event must contain all necessary information.
-				err = isValidEpochSetup(ev)
-				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
+				// validate the service event
+				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
+				if protocol.IsInvalidServiceEventError(err) {
+					// EECC - we have observed an invalid service event, which is
+					// an unrecoverable failure. Flag this in the DB and exit
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
+					break SealLoop
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -815,30 +850,17 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 
 			case *flow.EpochCommit:
 
-				// We should only have a single epoch commit event per epoch.
-				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
-					// true iff EpochCommit event for NEXT epoch was already included before
-					return nil, state.NewInvalidExtensionError("duplicate epoch commit service event")
-				}
-
-				// The epoch setup event needs to happen before the commit.
-				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					return nil, state.NewInvalidExtensionError("missing epoch setup for epoch commit")
-				}
-
-				// The commit event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return nil, state.NewInvalidExtensionErrorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// Finally, the commit should commit all the necessary information.
-				setup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
-				err = isValidEpochCommit(ev, setup)
-				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
+				// validate the service event
+				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
+				if protocol.IsInvalidServiceEventError(err) {
+					// EECC - we have observed an invalid service event, which is
+					// an unrecoverable failure. Flag this in the DB and exit
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
+					break SealLoop
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -861,7 +883,8 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 
 // MarkValid marks the block as valid in protocol state, and triggers
 // `BlockProcessable` event to notify that its parent block is processable.
-// why the parent block is processable, not the block itself?
+//
+// Why is the parent block processable, not the block itself?
 // because a block having a child block means it has been verified
 // by the majority of consensus participants.
 // Hence, if a block has passed the header validity check, its parent block
@@ -871,6 +894,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 // the consensus participants have done a complete check on its parent block,
 // so consensus followers can trust consensus nodes did the right job, and start
 // processing the parent block.
+//
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
@@ -889,31 +913,36 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 		return fmt.Errorf("can only mark block as valid whose parent is valid")
 	}
 
-	err = operation.RetryOnConflict(
-		m.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
-
-	// root blocks and blocks below the root block are considered as "processed",
-	// so we don't want to trigger `BlockProcessable` event for them.
 	parent, err := m.headers.ByBlockID(parentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
 	var rootHeight uint64
 	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block's height: %w", err)
 	}
-	if rootHeight >= parent.Height {
+
+	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+		// insert block validity for this block
+		err = operation.SkipDuplicates(operation.InsertBlockValidity(blockID, true))(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
+		}
+
+		// trigger BlockProcessable for parent blocks above root height
+		if parent.Height > rootHeight {
+			// emit protocol event within the scope of the Badger transaction to
+			// guarantee at-least-once delivery
+			m.consumer.BlockProcessable(parent)
+		}
 		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}
-	m.consumer.BlockProcessable(parent)
 
 	return nil
 }

@@ -8,13 +8,14 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
-	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 )
@@ -78,9 +79,8 @@ func NewRequestHandlerEngine(
 
 // SubmitLocal submits an event originating on the local node.
 func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
-	err := r.process(r.me.NodeID(), event)
+	err := r.ProcessLocal(event)
 	if err != nil {
-		// receiving an input of incompatible type from a trusted internal component is fatal
 		r.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
@@ -88,19 +88,10 @@ func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (r *RequestHandlerEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := r.process(originID, event)
+func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+	err := r.Process(channel, originID, event)
 	if err != nil {
-		lg := r.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		r.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -111,21 +102,24 @@ func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return r.process(originID, event)
+func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := r.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the synchronization request handler engine.
 // Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+//   - IncompatibleInputTypeError if input has unexpected type
+//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandlerEngine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		return r.requestMessageHandler.Process(originID, event)
-	default:
-		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
-	}
+	return r.requestMessageHandler.Process(originID, event)
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
@@ -207,6 +201,8 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
+	// get the latest final state to know if we can fulfill the request
 	head, err := r.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
@@ -217,8 +213,28 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		return nil
 	}
 
+	// enforce client-side max request size
+	var maxSize uint
+	// TODO: clean up this logic
+	if core, ok := r.core.(*chainsync.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = chainsync.DefaultConfig().MaxSize
+	}
+	maxHeight := req.FromHeight + uint64(maxSize)
+	if maxHeight < req.ToHeight {
+		r.log.Warn().
+			Uint64("from", req.FromHeight).
+			Uint64("to", req.ToHeight).
+			Uint64("size", (req.ToHeight-req.FromHeight)+1).
+			Uint("max_size", maxSize).
+			Msg("range request is too large")
+
+		req.ToHeight = maxHeight
+	}
+
 	// get all of the blocks, one by one
-	blocks := make([]*clustermodel.Block, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]messages.UntrustedClusterBlock, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -228,7 +244,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, block)
+		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -254,19 +270,40 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
+	}
+
+	// TODO: clean up this logic
+	var maxSize uint
+	if core, ok := r.core.(*chainsync.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = chainsync.DefaultConfig().MaxSize
+	}
+
+	if len(req.BlockIDs) > int(maxSize) {
+		r.log.Warn().
+			Int("size", len(req.BlockIDs)).
+			Uint("max_size", maxSize).
+			Msg("batch request is too large")
 	}
 
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
 		blockIDs[blockID] = struct{}{}
+
+		// enforce client-side max request size
+		if len(blockIDs) == int(maxSize) {
+			break
+		}
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]*clustermodel.Block, 0, len(blockIDs))
+	blocks := make([]messages.UntrustedClusterBlock, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -276,7 +313,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, block)
+		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
 	}
 
 	// if there are no blocks to send, skip network message

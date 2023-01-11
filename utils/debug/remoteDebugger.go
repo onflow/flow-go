@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,23 +16,17 @@ type RemoteDebugger struct {
 
 // Warning : make sure you use the proper flow-go version, same version as the network you are collecting registers
 // from, otherwise the execution might differ from the way runs on the network
-// TODO wire to blockHeader from access node (*flow.Header) to the context
 func NewRemoteDebugger(grpcAddress string,
 	chain flow.Chain,
 	logger zerolog.Logger) *RemoteDebugger {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
 	ctx := fvm.NewContext(
-		logger,
+		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionAccountFrozenChecker(),
-			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionAccountFrozenEnabler(),
-			fvm.NewTransactionInvoker(logger),
-		),
+		fvm.WithAuthorizationChecksEnabled(false),
 	)
 
 	return &RemoteDebugger{
@@ -43,14 +36,12 @@ func NewRemoteDebugger(grpcAddress string,
 	}
 }
 
-// TODO add options, if no blockID provided just collect the latest one
-// TODO change the rpc endpoint to access node one maybe
-
 // RunTransaction runs the transaction given the latest sealed block data
 func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress)
+	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
+	err := d.vm.Run(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -63,11 +54,14 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 // if regCachePath is empty, the register values won't be cached
 func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	defer view.Done()
+
+	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	if len(regCachePath) > 0 {
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
+	err := d.vm.Run(blockCtx, tx, view)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +74,9 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 
 func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value cadence.Value, scriptError, processError error) {
 	view := NewRemoteView(d.grpcAddress)
+	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(d.ctx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.Run(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,8 +85,9 @@ func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value caden
 
 func (d *RemoteDebugger) RunScriptAtBlockID(code []byte, arguments [][]byte, blockID flow.Identifier) (value cadence.Value, scriptError, processError error) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(d.ctx, script, view, programs.NewEmptyPrograms())
+	err := d.vm.Run(scriptCtx, script, view)
 	if err != nil {
 		return nil, nil, err
 	}

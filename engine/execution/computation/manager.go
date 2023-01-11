@@ -4,34 +4,57 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
+const (
+	DefaultScriptLogThreshold       = 1 * time.Second
+	DefaultScriptExecutionTimeLimit = 10 * time.Second
+
+	MaxScriptErrorMessageSize = 1000 // 1000 chars
+
+	ReusableCadenceRuntimePoolSize = 1000
+)
+
+var uploadEnabled = true
+
+func SetUploaderEnabled(enabled bool) {
+	uploadEnabled = enabled
+
+	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+}
+
+func GetUploaderEnabled() bool {
+	return uploadEnabled
 }
 
 type ComputationManager interface {
-	ExecuteScript([]byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -40,22 +63,37 @@ type ComputationManager interface {
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
-var DefaultScriptLogThreshold = 1 * time.Second
+type ComputationConfig struct {
+	CadenceTracing           bool
+	ExtensiveTracing         bool
+	DerivedDataCacheSize     uint
+	ScriptLogThreshold       time.Duration
+	ScriptExecutionTimeLimit time.Duration
 
-const MaxScriptErrorMessageSize = 1000 // 1000 chars
+	// When NewCustomVirtualMachine is nil, the manager will create a standard
+	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
+	// will create a virtual machine using this function.
+	//
+	// Note that this is primarily used for testing.
+	NewCustomVirtualMachine func() computer.VirtualMachine
+}
 
 // Manager manages computation and execution
 type Manager struct {
-	log                zerolog.Logger
-	metrics            module.ExecutionMetrics
-	me                 module.Local
-	protoState         protocol.State
-	vm                 VirtualMachine
-	vmCtx              fvm.Context
-	blockComputer      computer.BlockComputer
-	programsCache      *ProgramsCache
-	scriptLogThreshold time.Duration
-	uploaders          []uploader.Uploader
+	log                      zerolog.Logger
+	tracer                   module.Tracer
+	metrics                  module.ExecutionMetrics
+	me                       module.Local
+	protoState               protocol.State
+	vm                       computer.VirtualMachine
+	vmCtx                    fvm.Context
+	blockComputer            computer.BlockComputer
+	derivedChainData         *derived.DerivedChainData
+	scriptLogThreshold       time.Duration
+	scriptExecutionTimeLimit time.Duration
+	uploaders                []uploader.Uploader
+	rngLock                  *sync.Mutex
+	rng                      *rand.Rand
 }
 
 func New(
@@ -64,14 +102,34 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm VirtualMachine,
 	vmCtx fvm.Context,
-	programsCacheSize uint,
 	committer computer.ViewCommitter,
-	scriptLogThreshold time.Duration,
 	uploaders []uploader.Uploader,
+	executionDataProvider *provider.Provider,
+	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	var vm computer.VirtualMachine
+	if params.NewCustomVirtualMachine != nil {
+		vm = params.NewCustomVirtualMachine()
+	} else {
+		vm = fvm.NewVirtualMachine()
+	}
+
+	options := []fvm.Option{
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled: params.CadenceTracing,
+				})),
+	}
+	if params.ExtensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
@@ -80,50 +138,78 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		me,
+		executionDataProvider,
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := NewProgramsCache(programsCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(params.DerivedDataCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create programs cache: %w", err)
+		return nil, fmt.Errorf("cannot create derived data cache: %w", err)
 	}
 
 	e := Manager{
-		log:                log,
-		metrics:            metrics,
-		me:                 me,
-		protoState:         protoState,
-		vm:                 vm,
-		vmCtx:              vmCtx,
-		blockComputer:      blockComputer,
-		programsCache:      programsCache,
-		scriptLogThreshold: scriptLogThreshold,
-		uploaders:          uploaders,
+		log:                      log,
+		tracer:                   tracer,
+		metrics:                  metrics,
+		me:                       me,
+		protoState:               protoState,
+		vm:                       vm,
+		vmCtx:                    vmCtx,
+		blockComputer:            blockComputer,
+		derivedChainData:         derivedChainData,
+		scriptLogThreshold:       params.ScriptLogThreshold,
+		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
+		uploaders:                uploaders,
+		rngLock:                  &sync.Mutex{},
+		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
 }
 
-func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
-	blockPrograms := e.programsCache.Get(blockID)
-	if blockPrograms == nil {
-		return programs.NewEmptyPrograms()
-	}
-	return blockPrograms.ChildPrograms()
+func (e *Manager) VM() computer.VirtualMachine {
+	return e.vm
 }
 
-func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(
+	ctx context.Context,
+	code []byte,
+	arguments [][]byte,
+	blockHeader *flow.Header,
+	view state.View,
+) ([]byte, error) {
 
 	startedAt := time.Now()
+	memAllocBefore := debug.GetHeapAllocsBytes()
 
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	// allocate a random ID to be able to track this script when its done,
+	// scripts might not be unique so we use this extra tracker to follow their logs
+	// TODO: this is a temporary measure, we could remove this in the future
+	if e.log.Debug().Enabled() {
+		e.rngLock.Lock()
+		trackerID := e.rng.Uint32()
+		e.rngLock.Unlock()
 
-	script := fvm.Script(code).WithArguments(arguments...)
+		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
+		trackedLogger.Debug().Msg("script is sent for execution")
+		defer func() {
+			trackedLogger.Debug().Msg("script execution is complete")
+		}()
+	}
 
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
+	defer cancel()
+
+	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -133,13 +219,13 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 			prepareLog := func() *zerolog.Event {
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
 				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
+					Str("args", strings.Join(args, ","))
 			}
 
 			elapsed := time.Since(start)
@@ -159,7 +245,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 			}
 		}()
 
-		return e.vm.Run(blockCtx, script, view, programs)
+		return e.vm.Run(blockCtx, script, view)
 	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
@@ -184,7 +270,8 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
+	memAllocAfter := debug.GetHeapAllocsBytes()
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
 	return encodedValue, nil
 }
@@ -199,16 +286,11 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	var blockPrograms *programs.Programs
-	fromCache := e.programsCache.Get(block.ParentID())
+	derivedBlockData := e.derivedChainData.GetOrCreateDerivedBlockData(
+		block.ID(),
+		block.ParentID())
 
-	if fromCache == nil {
-		blockPrograms = programs.NewEmptyPrograms()
-	} else {
-		blockPrograms = fromCache.ChildPrograms()
-	}
-
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, derivedBlockData)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -217,28 +299,25 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
-	toInsert := blockPrograms
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Msg("block result computed / derived data cache updated")
 
-	// if we have item from cache and there were no changes
-	// insert it under new block, to prevent long chains
-	if fromCache != nil && !blockPrograms.HasChanges() {
-		toInsert = fromCache
-	}
-
-	e.programsCache.Set(block.ID(), toInsert)
-
-	if len(e.uploaders) > 0 {
-		var g errgroup.Group
+	if uploadEnabled {
+		var group errgroup.Group
 
 		for _, uploader := range e.uploaders {
 			uploader := uploader
 
-			g.Go(func() error {
+			group.Go(func() error {
+				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
+				defer span.End()
+
 				return uploader.Upload(result)
 			})
 		}
 
-		err := g.Wait()
+		err = group.Wait()
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to upload block result: %w", err)
@@ -253,11 +332,13 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
-
-	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
+	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}

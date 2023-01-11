@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -54,7 +55,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.PushBlocks, e)
+	con, err := net.Register(channels.PushBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -90,7 +91,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -108,7 +109,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -128,12 +129,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	block := proposal.Block.ToInternal()
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", logging.Entity(proposal.Header)).
-		Hex("parent_id", proposal.Header.ParentID[:]).
-		Hex("signer", proposal.Header.ProposerID[:]).
+		Uint64("block_view", block.Header.View).
+		Hex("block_id", logging.Entity(block.Header)).
+		Hex("parent_id", block.Header.ParentID[:]).
+		Hex("signer", block.Header.ProposerID[:]).
 		Logger()
 
 	log.Info().Msg("block proposal submitted for propagation")

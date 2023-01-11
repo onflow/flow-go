@@ -8,8 +8,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -120,7 +120,7 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 	}
 
 	childReceipts := c.pendingReceipts.ByPreviousResultID(resultID)
-	c.pendingReceipts.Rem(receipt.ID())
+	c.pendingReceipts.Remove(receipt.ID())
 
 	for _, childReceipt := range childReceipts {
 		// recursively processing the child receipts
@@ -137,33 +137,40 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 
 // processReceipt checks validity of the given receipt and adds it to the node's validated information.
 // Returns:
-// * bool: true iff receipt is new (previously unknown), and its validity can be confirmed
-// * error: any error indicates an unexpected problem in the protocol logic. The node's
-//   internal state might be corrupted. Hence, returned errors should be treated as fatal.
+//   - bool: true iff receipt is new (previously unknown), and its validity can be confirmed
+//   - error: any error indicates an unexpected problem in the protocol logic. The node's
+//     internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
+	// setup logger to capture basic information about the receipt
+	log := c.log.With().
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
+		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
+		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
+		Hex("executor_id", receipt.ExecutorID[:]).
+		Logger()
+
+	if c.receipts.HasReceipt(receipt) {
+		log.Debug().Msg("skipping processing of already known receipt")
+		return false, nil
+	}
+
 	startTime := time.Now()
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 	}()
 
-	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
-	if isSampled {
-		receiptSpan.LogFields(log.String("result_id", receipt.ExecutionResult.ID().String()))
-		receiptSpan.LogFields(log.String("executor", receipt.ExecutorID.String()))
-	}
-	defer receiptSpan.Finish()
+	receiptSpan, _ := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
+	receiptSpan.SetAttributes(
+		attribute.String("result_id", receipt.ExecutionResult.ID().String()),
+		attribute.String("executor", receipt.ExecutorID.String()),
+	)
+	defer receiptSpan.End()
 
-	// setup logger to capture basic information about the receipt
-	log := c.log.With().
-		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
-		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
-		Hex("executor_id", receipt.ExecutorID[:]).
-		Logger()
 	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
-		if errors.Is(err, flow.NoChunksError) {
+		if errors.Is(err, flow.ErrNoChunks) {
 			log.Error().Err(err).Msg("discarding malformed receipt")
 			return false, nil
 		}
@@ -185,7 +192,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Uint64("block_view", executedBlock.View).
 		Uint64("block_height", executedBlock.Height).
 		Logger()
-	log.Debug().Msg("execution receipt received")
+	log.Info().Msg("execution receipt received")
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
@@ -200,7 +207,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchProcessReceiptVal)
 	err = c.receiptValidator.Validate(receipt)
-	childSpan.Finish()
+	childSpan.End()
 
 	if engine.IsUnverifiableInputError(err) {
 		// If previous result is missing, we can't validate this receipt.
@@ -229,20 +236,21 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	_, err = c.storeReceipt(receipt, executedBlock)
+	added, err := c.storeReceipt(receipt, executedBlock)
 	if err != nil {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
+	if added {
+		log.Info().Msg("execution result processed and stored")
+	}
 
-	log.Info().Msg("execution result processed and stored")
-
-	return true, nil
+	return added, nil
 }
 
 // storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
 // Return values:
-//  * bool to indicate whether the receipt is stored.
-//  * exception in case something (unexpected) went wrong
+//   - bool to indicate whether the receipt is stored.
+//   - exception in case something (unexpected) went wrong
 func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
@@ -383,8 +391,8 @@ func (c *Core) OnBlockFinalization() error {
 
 // getStartAndEndStates returns the pair: (start state commitment; final state commitment)
 // Error returns:
-//  * NoChunksError: if there are no chunks, i.e. the ExecutionResult is malformed
-//  * all other errors are unexpected and symptoms of node-internal problems
+//   - ErrNoChunks: if there are no chunks, i.e. the ExecutionResult is malformed
+//   - all other errors are unexpected and symptoms of node-internal problems
 func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
 	initialState, err = receipt.ExecutionResult.InitialStateCommit()
 	if err != nil {

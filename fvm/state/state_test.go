@@ -2,27 +2,39 @@ package state_test
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/atree"
+
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+func createByteArray(size int) []byte {
+	bytes := make([]byte, size)
+	for i := range bytes {
+		bytes[i] = 255
+	}
+	return bytes
+}
+
 func TestState_ChildMergeFunctionality(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view)
+	st := state.NewState(view, state.DefaultParameters())
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := "key1"
 		value := createByteArray(1)
 		// set key1 on parent
-		err := st.Set("address", "controller", key, value)
+		err := st.Set("address", key, value, true)
 		require.NoError(t, err)
 
 		// read key1 on child
 		stChild := st.NewChild()
-		v, err := stChild.Get("address", "controller", key)
+		v, err := stChild.Get("address", key, true)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
@@ -33,11 +45,11 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		stChild := st.NewChild()
 
 		// set key2 on child
-		err := stChild.Set("address", "controller", key, value)
+		err := stChild.Set("address", key, value, true)
 		require.NoError(t, err)
 
 		// read key2 on parent
-		v, err := st.Get("address", "controller", key)
+		v, err := st.Get("address", key, true)
 		require.NoError(t, err)
 		require.Equal(t, len(v), 0)
 	})
@@ -48,11 +60,11 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		stChild := st.NewChild()
 
 		// set key3 on child
-		err := stChild.Set("address", "controller", key, value)
+		err := stChild.Set("address", key, value, true)
 		require.NoError(t, err)
 
 		// read before merge
-		v, err := st.Get("address", "controller", key)
+		v, err := st.Get("address", key, true)
 		require.NoError(t, err)
 		require.Equal(t, len(v), 0)
 
@@ -61,7 +73,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		// read key3 on parent
-		v, err = st.Get("address", "controller", key)
+		v, err = st.Get("address", key, true)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
@@ -70,141 +82,136 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		key := "key4"
 		value := createByteArray(4)
 		// set key4 on parent
-		err := st.Set("address", "controller", key, value)
+		err := st.Set("address", key, value, true)
 		require.NoError(t, err)
 
 		// now should be part of the ledger
-		v, err := view.Get("address", "controller", key)
+		v, err := view.Get("address", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
 
 }
 
-func TestState_InteractionMeasuring(t *testing.T) {
-	view := utils.NewSimpleView()
-	st := state.NewState(view)
-
-	key := "key1"
-	value := createByteArray(1)
-	err := st.Set("address", "controller", key, value)
-	keySize := uint64(len("address") + len("controller") + len(key))
-	size := keySize + uint64(len(value))
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), st.ReadCounter)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-	require.Equal(t, uint64(1), st.WriteCounter)
-	require.Equal(t, size, st.TotalBytesWritten)
-
-	// should read from the delta
-	// should not impact totalBytesRead
-	v, err := st.Get("address", "controller", key)
-	require.NoError(t, err)
-	require.Equal(t, v, value)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
-
-	// non existing key
-	// should be counted towards reading from the ledger
-	key2 := "key2"
-	_, err = st.Get("address", "controller", key2)
-	require.NoError(t, err)
-	require.Equal(t, keySize, st.TotalBytesRead)
-}
-
 func TestState_MaxValueSize(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.WithMaxValueSizeAllowed(6))
+	st := state.NewState(view, state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
 	// update should pass
 	value := createByteArray(5)
-	err := st.Set("address", "controller", "key", value)
+	err := st.Set("address", "key", value, true)
 	require.NoError(t, err)
 
 	// update shouldn't pass
 	value = createByteArray(7)
-	err = st.Set("address", "controller", "key", value)
+	err = st.Set("address", "key", value, true)
 	require.Error(t, err)
 }
 
 func TestState_MaxKeySize(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.WithMaxKeySizeAllowed(6))
+	st := state.NewState(view, state.DefaultParameters().WithMaxKeySizeAllowed(4))
 
 	// read
-	_, err := st.Get("1", "2", "3")
+	_, err := st.Get("1", "2", true)
 	require.NoError(t, err)
 
 	// read
-	_, err = st.Get("123", "234", "345")
+	_, err = st.Get("123", "234", true)
 	require.Error(t, err)
 
 	// update
-	err = st.Set("1", "2", "3", []byte{})
+	err = st.Set("1", "2", []byte{}, true)
 	require.NoError(t, err)
 
 	// read
-	err = st.Set("123", "234", "345", []byte{})
+	err = st.Set("123", "234", []byte{}, true)
 	require.Error(t, err)
 
 }
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.WithMaxInteractionSizeAllowed(12))
+	st := state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(12)))
 
-	// read - interaction 3
-	_, err := st.Get("1", "2", "3")
-	require.Equal(t, st.InteractionUsed(), uint64(3))
+	// read - interaction 2
+	_, err := st.Get("1", "2", true)
+	require.Equal(t, st.InteractionUsed(), uint64(2))
 	require.NoError(t, err)
 
-	// read - interaction 12
-	_, err = st.Get("123", "234", "345")
-	require.Equal(t, st.InteractionUsed(), uint64(12))
+	// read - interaction 8
+	_, err = st.Get("123", "234", true)
+	require.Equal(t, st.InteractionUsed(), uint64(8))
 	require.NoError(t, err)
 
-	// read - interaction 21
-	_, err = st.Get("234", "345", "456")
-	require.Equal(t, st.InteractionUsed(), uint64(21))
+	// read - interaction 14
+	_, err = st.Get("234", "345", true)
+	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
-	st = state.NewState(view, state.WithMaxInteractionSizeAllowed(9))
+	st = state.NewState(
+		view,
+		state.DefaultParameters().
+			WithMeterParameters(
+				meter.DefaultParameters().WithStorageInteractionLimit(6)))
 	stChild := st.NewChild()
 
 	// update - 0
-	err = stChild.Set("1", "2", "3", []byte{'A'})
+	err = stChild.Set("1", "2", []byte{'A'}, true)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
 	err = st.MergeState(stChild)
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(4))
+	require.Equal(t, st.InteractionUsed(), uint64(3))
 
-	// read - interaction 4 (already in read cache)
-	_, err = st.Get("1", "2", "3")
+	// read - interaction 3 (already in read cache)
+	_, err = st.Get("1", "2", true)
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(4))
+	require.Equal(t, st.InteractionUsed(), uint64(3))
+
+	// read - interaction 5
+	_, err = st.Get("2", "3", true)
+	require.NoError(t, err)
+	require.Equal(t, st.InteractionUsed(), uint64(5))
 
 	// read - interaction 7
-	_, err = st.Get("2", "3", "4")
-	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(7))
-
-	// read - interaction 10
-	_, err = st.Get("3", "4", "5")
+	_, err = st.Get("3", "4", true)
 	require.Error(t, err)
+
 }
 
 func TestState_IsFVMStateKey(t *testing.T) {
-	require.True(t, state.IsFVMStateKey("", "", "uuid"))
-	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyPublicKeyCount))
-	require.True(t, state.IsFVMStateKey("Address", "Address", "public_key_12"))
-	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyContractNames))
-	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyContractNames))
-	require.True(t, state.IsFVMStateKey("Address", "Address", "code.MYCODE"))
-	require.True(t, state.IsFVMStateKey("Address", "", state.KeyExists))
-	require.True(t, state.IsFVMStateKey("Address", "", state.KeyStorageUsed))
-	require.True(t, state.IsFVMStateKey("Address", "", state.KeyAccountFrozen))
+	require.True(t, state.IsFVMStateKey("", state.UUIDKey))
+	require.True(t, state.IsFVMStateKey("", state.AddressStateKey))
+	require.False(t, state.IsFVMStateKey("", "other"))
+	require.False(t, state.IsFVMStateKey("Address", state.UUIDKey))
+	require.False(t, state.IsFVMStateKey("Address", state.AddressStateKey))
+	require.True(t, state.IsFVMStateKey("Address", "public_key_12"))
+	require.True(t, state.IsFVMStateKey("Address", state.ContractNamesKey))
+	require.True(t, state.IsFVMStateKey("Address", "code.MYCODE"))
+	require.True(t, state.IsFVMStateKey("Address", state.AccountStatusKey))
+	require.False(t, state.IsFVMStateKey("Address", "anything else"))
+}
 
-	require.False(t, state.IsFVMStateKey("Address", "", "anything else"))
+func TestAccounts_PrintableKey(t *testing.T) {
+	// slab with 189 should result in \\xbd
+	slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
+	key := string(atree.SlabIndexToLedgerKey(slabIndex))
+	require.False(t, utf8.ValidString(key))
+	printable := state.PrintableKey(key)
+	require.True(t, utf8.ValidString(printable))
+	require.Equal(t, "$189", printable)
+
+	// non slab invalid utf-8
+	key = "a\xc5z"
+	require.False(t, utf8.ValidString(key))
+	printable = state.PrintableKey(key)
+	require.True(t, utf8.ValidString(printable))
+	require.Equal(t, "#61c57a", printable)
 }

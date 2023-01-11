@@ -25,13 +25,13 @@ func (suite *BackendSuite) SetupTest() {
 
 func (suite *BackendSuite) Item() *item {
 	parent := unittest.BlockHeaderFixture()
-	return suite.ItemWithParent(&parent)
+	return suite.ItemWithParent(parent)
 }
 
 func (suite *BackendSuite) ItemWithParent(parent *flow.Header) *item {
 	header := unittest.BlockHeaderWithParentFixture(parent)
 	return &item{
-		header:   &header,
+		header:   header,
 		payload:  unittest.IdentifierFixture(),
 		originID: unittest.IdentifierFixture(),
 	}
@@ -98,7 +98,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 	})
 }
 
-func (suite *BackendSuite) TestPruneByHeight() {
+func (suite *BackendSuite) TestPruneByView() {
 
 	const N = 100 // number of items we're testing with
 	items := make([]*item, 0, N)
@@ -124,16 +124,16 @@ func (suite *BackendSuite) TestPruneByHeight() {
 	}
 
 	// pick a height to prune that's guaranteed to prune at least one item
-	pruneAt := items[rand.Intn(len(items))].header.Height
-	suite.backend.pruneByHeight(pruneAt)
+	pruneAt := items[rand.Intn(len(items))].header.View
+	suite.backend.pruneByView(pruneAt)
 
 	for _, item := range items {
-		height := item.header.Height
+		view := item.header.View
 		id := item.header.ID()
 		parentID := item.header.ParentID
 
-		// check that items below the prune height were removed
-		if height <= pruneAt {
+		// check that items below the prune view were removed
+		if view <= pruneAt {
 			_, exists := suite.backend.byID(id)
 			suite.Assert().False(exists)
 			_, exists = suite.backend.byParentID(parentID)
@@ -141,7 +141,7 @@ func (suite *BackendSuite) TestPruneByHeight() {
 		}
 
 		// check that other items were not removed
-		if height > item.header.Height {
+		if view > item.header.View {
 			_, exists := suite.backend.byID(id)
 			suite.Assert().True(exists)
 			_, exists = suite.backend.byParentID(parentID)

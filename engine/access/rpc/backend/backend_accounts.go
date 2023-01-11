@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -41,6 +42,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 
 	account, err := b.getAccountAtBlockID(ctx, address, latestBlockID)
 	if err != nil {
+		b.log.Error().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
 		return nil, err
 	}
 
@@ -55,7 +57,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -76,7 +78,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 	blockID flow.Identifier,
 ) (*flow.Account, error) {
 
-	exeReq := execproto.GetAccountAtBlockIDRequest{
+	exeReq := &execproto.GetAccountAtBlockIDRequest{
 		Address: address.Bytes(),
 		BlockId: blockID[:],
 	}
@@ -89,6 +91,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 	var exeRes *execproto.GetAccountAtBlockIDResponse
 	exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 	if err != nil {
+		b.log.Error().Err(err).Msg("failed to get account from execution nodes")
 		return nil, err
 	}
 
@@ -108,7 +111,7 @@ func getAccountError(err error) error {
 	return status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
 }
 
-func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var errors *multierror.Error // captures all error except
 	for _, execNode := range execNodes {
 		// TODO: use the GRPC Client interceptor
@@ -146,18 +149,22 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 		}
 	}
 
-	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those error
+	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those errors
 	return nil, status.Errorf(codes.NotFound, "failed to get account from the execution node: %v", errToReturn)
 }
 
-func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
-	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
+
+	resp, err := execRPCClient.GetAccountAtBlockID(ctx, req)
 	if err != nil {
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, nil

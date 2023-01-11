@@ -6,9 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,8 +18,8 @@ import (
 func TestTransactionSequenceNumProcess(t *testing.T) {
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
-		accounts := state.NewAccounts(sth)
+		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		accounts := environment.NewAccounts(txnState)
 
 		// create an account
 		address := flow.HexToAddress("1234")
@@ -31,8 +32,11 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 0)
 		proc := fvm.Transaction(&tx, 0)
 
-		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
+		seqChecker := fvm.TransactionSequenceNumberChecker{}
+		err = seqChecker.CheckAndIncrementSequenceNumber(
+			tracing.NewTracerSpan(),
+			proc,
+			txnState)
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
@@ -42,8 +46,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
-		accounts := state.NewAccounts(sth)
+		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		accounts := environment.NewAccounts(txnState)
 
 		// create an account
 		address := flow.HexToAddress("1234")
@@ -57,10 +61,13 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 2)
 		proc := fvm.Transaction(&tx, 0)
 
-		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
+		seqChecker := fvm.TransactionSequenceNumberChecker{}
+		err = seqChecker.CheckAndIncrementSequenceNumber(
+			tracing.NewTracerSpan(),
+			proc,
+			txnState)
 		require.Error(t, err)
-		require.Equal(t, err.(errors.Error).Code(), errors.ErrCodeInvalidProposalSeqNumberError)
+		require.True(t, errors.HasErrorCode(err, errors.ErrCodeInvalidProposalSeqNumberError))
 
 		// get fetch the sequence number and check it to be  unchanged
 		key, err := accounts.GetPublicKey(address, 0)
@@ -69,8 +76,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid address", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
-		accounts := state.NewAccounts(sth)
+		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		accounts := environment.NewAccounts(txnState)
 
 		// create an account
 		address := flow.HexToAddress("1234")
@@ -85,7 +92,10 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
+		err = seqChecker.CheckAndIncrementSequenceNumber(
+			tracing.NewTracerSpan(),
+			proc,
+			txnState)
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged
@@ -93,5 +103,4 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
-
 }

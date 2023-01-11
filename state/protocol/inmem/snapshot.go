@@ -7,10 +7,11 @@ import (
 )
 
 var (
-	_ protocol.Snapshot   = new(Snapshot)
-	_ protocol.EpochQuery = new(Epochs)
-	_ protocol.Epoch      = new(Epoch)
-	_ protocol.Cluster    = new(Cluster)
+	_ protocol.Snapshot     = new(Snapshot)
+	_ protocol.GlobalParams = new(Params)
+	_ protocol.EpochQuery   = new(Epochs)
+	_ protocol.Epoch        = new(Epoch)
+	_ protocol.Cluster      = new(Cluster)
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
@@ -48,7 +49,7 @@ func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return s.enc.LatestResult, s.enc.LatestSeal, nil
 }
 
-func (s Snapshot) SealingSegment() ([]*flow.Block, error) {
+func (s Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return s.enc.SealingSegment, nil
 }
 
@@ -66,12 +67,16 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }
 
-func (s Snapshot) Seed(indices ...uint32) ([]byte, error) {
-	return seed.FromParentSignature(indices, s.enc.QuorumCertificate.SigData)
+func (s Snapshot) RandomSource() ([]byte, error) {
+	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {
 	return Epochs{s.enc.Epochs}
+}
+
+func (s Snapshot) Params() protocol.GlobalParams {
+	return Params{s.enc.Params}
 }
 
 func (s Snapshot) Encodable() EncodableSnapshot {

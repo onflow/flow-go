@@ -34,7 +34,7 @@ func TestEventFingerprint(t *testing.T) {
 
 	data := fingerprint.Fingerprint(evt)
 	var decoded eventWrapper
-	rlp.NewEncoder().MustDecode(data, &decoded)
+	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	assert.Equal(t, wrapEvent(evt), decoded)
 }
 
@@ -79,19 +79,42 @@ func TestEventsList(t *testing.T) {
 		eventC,
 	}
 
-	ABHash, err := flow.EventsListHash(listAB)
+	ABHash, err := flow.EventsMerkleRootHash(listAB)
 	assert.NoError(t, err)
-	ACHash, err := flow.EventsListHash(listAC)
+	ACHash, err := flow.EventsMerkleRootHash(listAC)
 	assert.NoError(t, err)
-	BAHash, err := flow.EventsListHash(listBA)
+	BAHash, err := flow.EventsMerkleRootHash(listBA)
 	assert.NoError(t, err)
 
 	t.Run("different events have different hash", func(t *testing.T) {
-
 		assert.NotEqual(t, ABHash, ACHash)
 	})
 
-	t.Run("order does matter", func(t *testing.T) {
-		assert.NotEqual(t, ABHash, BAHash)
+	t.Run("insertion order does not matter", func(t *testing.T) {
+		assert.Equal(t, ABHash, BAHash)
 	})
+}
+
+func TestEventsMerkleRootHash(t *testing.T) {
+	eventA := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       2,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
+
+	eventB := flow.Event{
+		Type:             "eventTypeString",
+		TransactionIndex: 1,
+		EventIndex:       3,
+		Payload:          []byte("cadence-json encoded data"),
+		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
+	}
+
+	expectedRootHashHex := "355446d7b2b9653403abe28ccc405f46c059d2059cb7863f4964c401ee1aa83b"
+
+	ABHash, err := flow.EventsMerkleRootHash([]flow.Event{eventA, eventB})
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRootHashHex, ABHash.String())
 }

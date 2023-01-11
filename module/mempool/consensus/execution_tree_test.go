@@ -29,35 +29,37 @@ func (et *ExecutionTreeTestSuite) SetupTest() {
 
 // addReceiptForest creates an Execution Tree for testing purposes and stores it in the ResultForest.
 // Nomenclature:
-//  * `r[A]` Execution Result for block A
+//   - `r[A]` Execution Result for block A
 //     if we have multiple _different_ results for block A,
 //     we denote them as `r[A]_1`, `r[A]_2` ...
-//  * `ER[r]` Execution Receipt committing to result `r`
+//   - `ER[r]` Execution Receipt committing to result `r`
 //     if we have multiple _different_ receipts committing to the same result `r`,
 //     we denote them as `ER[r]_1`, `ER[r]_2` ...
-//  * Multiple Execution Receipts for the same result form an Equivalence Class, e.g. {`ER[r]_1`, `ER[r]_2`, ...}
-//    For brevity, we denote the Equivalence Class as `r{ER_1, ER_2, ...}`
+//   - Multiple Execution Receipts for the same result form an Equivalence Class, e.g. {`ER[r]_1`, `ER[r]_2`, ...}
+//     For brevity, we denote the Equivalence Class as `r{ER_1, ER_2, ...}`
 //
 // We consider the following forest of blocks where the number indicates the block height:
-//   : <- A10 <- A11
-//   :
-//   : <- B10 <- B11 <- B12
-//   :       ^-- C11 <- C12 <- C13
-//   :
-//   :                      ?<- D13
-//   pruned height
+//
+//	: <- A10 <- A11
+//	:
+//	: <- B10 <- B11 <- B12
+//	:       ^-- C11 <- C12 <- C13
+//	:
+//	:                      ?<- D13
+//	pruned height
 //
 // We construct the following Execution Tree:
-//   :
-//   : <- r[A10]{ER} <- r[A11]{ER}
-//   :
-//   : <- r[B10]{ER} <- r[B11]_1 {ER_1, ER_2} <- r[B12]_1 {ER}
-//   :              ^-- r[B11]_2 {ER}         <- r[B12]_2 {ER}
-//   :             ^
-//   :             └-- r[C11] {ER_1, ER_2}    < . . .  ? ? ? ? . .   <- r[C13] {ER}
-//   :
-//   :                                                       ? ? ? ? <- r[C13] {ER}
-//   pruned height
+//
+//	:
+//	: <- r[A10]{ER} <- r[A11]{ER}
+//	:
+//	: <- r[B10]{ER} <- r[B11]_1 {ER_1, ER_2} <- r[B12]_1 {ER}
+//	:              ^-- r[B11]_2 {ER}         <- r[B12]_2 {ER}
+//	:             ^
+//	:             └-- r[C11] {ER_1, ER_2}    < . . .  ? ? ? ? . .   <- r[C13] {ER}
+//	:
+//	:                                                       ? ? ? ? <- r[C13] {ER}
+//	pruned height
 func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
 	// Make blocks
 	blocks := make(map[string]*flow.Block)
@@ -386,8 +388,7 @@ func makeBlockWithHeight(height uint64) *flow.Block {
 }
 
 func makeChildBlock(parent *flow.Block) *flow.Block {
-	block := unittest.BlockWithParentFixture(parent.Header)
-	return &block
+	return unittest.BlockWithParentFixture(parent.Header)
 }
 
 func (et *ExecutionTreeTestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {

@@ -2,7 +2,7 @@
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 #ifndef _REL_MISC_INCLUDE_H
 #define _REL_MISC_INCLUDE_H
@@ -25,11 +25,12 @@ typedef uint8_t byte;
 #define Fp_BITS   381
 #define Fr_BITS   255
 #define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
+#define Fp2_BYTES (2*Fp_BYTES)
 #define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
 #define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
 
 #define G1_BYTES (2*Fp_BYTES)
-#define G2_BYTES (4*Fp_BYTES)
+#define G2_BYTES (2*Fp2_BYTES)
 
 // Compressed and uncompressed points
 #define COMPRESSED      1
@@ -45,7 +46,7 @@ typedef uint8_t byte;
 
 
 // constants used in the optimized SWU hash to curve
-#if (hashToPoint == OPSWU)
+#if (hashToPoint == LOCAL_SSWU)
     #define ELLP_Nx_LEN 12
     #define ELLP_Dx_LEN 10
     #define ELLP_Ny_LEN 16
@@ -55,23 +56,25 @@ typedef uint8_t byte;
 
 // Structure of precomputed data
 typedef struct prec_ {
-    #if (hashToPoint == OPSWU)
+    #if (hashToPoint == LOCAL_SSWU)
+    // constants needed in optimized SSWU
     bn_st p_3div4;
-    fp_st fp_p_1div2; 
-    // coefficients of E1(Fp)
-    fp_st a1;
-    fp_st b1; 
+    fp_st sqrt_z;
+    // related hardcoded constants for faster access,
+    // where a1 is the coefficient of isogenous curve E1
+    fp_st minus_a1;
+    fp_st a1z;
     // coefficients of the isogeny map
     fp_st iso_Nx[ELLP_Nx_LEN];
-    fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
-    fp_st iso_Dy[ELLP_Dy_LEN];
     #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;
     #endif
+    // other field-related constants
     bn_st p_1div2;
+    fp_t r;   // Montgomery multiplication constant
 } prec_st;
 
 // BLS based SPoCK
@@ -96,7 +99,8 @@ int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
 void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
 int      bn_read_Zr_bin(bn_t, const uint8_t *, int );
 
-void     ep_mult_gen(ep_t, const bn_t);
+void     ep_mult_gen_bench(ep_t, const bn_t);
+void     ep_mult_generic_bench(ep_t, const bn_t);
 void     ep_mult(ep_t, const ep_t, const bn_t);
 void     ep2_mult_gen(ep2_t, const bn_t);
 
@@ -110,16 +114,20 @@ void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 
-int check_membership_G1(const ep_t p);
-int simple_subgroup_check_G1(const ep_t);
-int simple_subgroup_check_G2(const ep2_t);
-void ep_rand_G1(ep_t);
-void ep_rand_G1complement( ep_t);
+// membership checks
+int      check_membership_G1(const ep_t);
+int      check_membership_G2(const ep2_t);
+int      check_membership_Zr_star(const bn_t);
+
+int      simple_subgroup_check_G1(const ep_t);
+int      simple_subgroup_check_G2(const ep2_t);
+void     ep_rand_G1(ep_t);
+void     ep_rand_G1complement( ep_t);
+void     ep2_rand_G2(ep2_t);
+void     ep2_rand_G2complement( ep2_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-int bowe_subgroup_check_G1(const ep_t);
+int      bowe_subgroup_check_G1(const ep_t);
 #endif
-int subgroup_check_G1_test(int, int);
-int subgroup_check_G1_bench();
 
 // utility testing function
 void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);

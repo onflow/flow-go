@@ -35,7 +35,7 @@ type BuilderSuite struct {
 	// test helpers
 	firstID           flow.Identifier                               // first block in the range we look at
 	finalID           flow.Identifier                               // last finalized block
-	parentID          flow.Identifier                               // parent block we build on
+	parentID          flow.Identifier                               //	Parent block we build on
 	finalizedBlockIDs []flow.Identifier                             // blocks between first and final
 	pendingBlockIDs   []flow.Identifier                             // blocks between final and parent
 	resultForBlock    map[flow.Identifier]*flow.ExecutionResult     // map: BlockID -> Execution Result
@@ -123,7 +123,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 	)
 
 	result := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&block),
+		unittest.WithBlock(block),
 		unittest.WithPreviousResult(*previousResult),
 	)
 
@@ -133,14 +133,14 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 	bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 
 	// record block in dbs
-	bs.storeBlock(&block)
+	bs.storeBlock(block)
 
 	if candidateSealForParent {
 		// seal the parentBlock block with the result included in this block.
 		bs.chainSeal(incorporatedResultForPrevBlock)
 	}
 
-	return &block
+	return block
 }
 
 // Create a seal for the result's block. The corresponding
@@ -158,12 +158,15 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 }
 
 // SetupTest constructs the following chain of blocks:
-//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
+//
+//	[first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
+//
 // Where block
-//   * [first] is sealed and finalized
-//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
+//   - [first] is sealed and finalized
+//   - [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
+//   - [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
+//   - [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
+//
 // Each block incorporates the result for its immediate parent.
 //
 // Note: In the happy path, the blocks [A3] and [parent] will not have candidate seal for the following reason:
@@ -280,7 +283,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", mock.Anything).Return(bs.lastSeal, nil)
+	bs.sealDB.On("HighestInFork", mock.Anything).Return(bs.lastSeal, nil)
 
 	bs.headerDB = &storage.Headers{}
 	bs.headerDB.On("ByBlockID", mock.Anything).Return(
@@ -498,7 +501,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	// create 4 expired guarantees
 	header := unittest.BlockHeaderFixture()
 	header.Height = bs.headers[bs.finalID].Height - 12
-	bs.headers[header.ID()] = &header
+	bs.headers[header.ID()] = header
 	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.ID()))
 
 	// add all guarantees to the pool
@@ -509,21 +512,24 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 }
 
 // TestPayloadSeals_AllValid checks that builder seals as many blocks as possible (happy path):
-//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
+//
+//	[first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
+//
 // Where block
-//   * [first] is sealed and finalized
-//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
+//   - [first] is sealed and finalized
+//   - [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
+//   - [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
+//   - [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
+//
 // Expected behaviour:
-//  * builder should include seals [F0], ..., [A4]
-//  * note: Block [A3] will not have a seal in the happy path for the following reason:
-//    In our example, the result for block A3 is incorporated in block A4. But, for the verifiers to start
-//    their work, they need a child block of A4, because the child contains the source of randomness for
-//    A4. But we are just constructing this child right now. Hence, the verifiers couldn't have checked
-//    the result for A3.
+//   - builder should include seals [F0], ..., [A4]
+//   - note: Block [A3] will not have a seal in the happy path for the following reason:
+//     In our example, the result for block A3 is incorporated in block A4. But, for the verifiers to start
+//     their work, they need a child block of A4, because the child contains the source of randomness for
+//     A4. But we are just constructing this child right now. Hence, the verifiers couldn't have checked
+//     the result for A3.
 func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
-	// populate seals mempool with valid chain of seals for blocks [F0], ..., [A2]
+	//	Populate seals mempool with valid chain of seals for blocks [F0], ..., [A2]
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -583,31 +589,37 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 // and the block sealing the result. Without this gap, some nodes might not be able to compute the Verifier
 // assignment for the seal and therefore reject the block. This edge case only occurs in a very specific situation:
 //
-//                                                                        ┌---- [A5] (orphaned fork)
-//                                                                        v
-// ...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- ░newBlock░
+//	                                                                       ┌---- [A5] (orphaned fork)
+//	                                                                       v
+//	...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- ░newBlock░
 //
 // SCENARIO:
-// * block B0 is sealed
-// Proposer for ░newBlock░:
-//  * Knows block A5. Hence, it knows a QC for block B4, which contains the Source Of Randomness (SOR) for B4.
-//    Therefore, the proposer can construct the verifier assignment for [B4{incorporates result R for B1}]
-//  * Assume that verification was fast enough, so the proposer has sufficient approvals for result R.
-//    Therefore, the proposer has a candidate seal, sealing result R for block B4, in its mempool.
-// Replica trying to verify ░newBlock░:
-//  * Assume that the replica does _not_ know A5. Therefore, it _cannot_ compute the verifier assignment for B4.
+//   - block B0 is sealed
+//     Proposer for ░newBlock░:
+//   - Knows block A5. Hence, it knows a QC for block B4, which contains the Source Of Randomness (SOR) for B4.
+//     Therefore, the proposer can construct the verifier assignment for [B4{incorporates result R for B1}]
+//   - Assume that verification was fast enough, so the proposer has sufficient approvals for result R.
+//     Therefore, the proposer has a candidate seal, sealing result R for block B4, in its mempool.
 //
-// Problem:  If the proposer included the seal for B1, the replica could not check it.
+// Replica trying to verify ░newBlock░:
+//
+//   - Assume that the replica does _not_ know A5. Therefore, it _cannot_ compute the verifier assignment for B4.
+//
+//     Problem:  If the proposer included the seal for B1, the replica could not check it.
+//
 // Solution: There must be a gap between the block incorporating the result (here B4) and
-//           the block sealing the result. A gap of one block is sufficient.
-//                                                                        ┌---- [A5] (orphaned fork)
-//                                                                        v
-// ...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- [B5] <- [B6{seals B1}]
-//                                                                            ~~~~~~
-//                                                                             gap
+// the block sealing the result. A gap of one block is sufficient.
+//
+//	                                                                     ┌---- [A5] (orphaned fork)
+//	                                                                     v
+//	...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- [B5] <- [B6{seals B1}]
+//	                                                                           ~~~~~~
+//	                                                                             gap
+//
 // We test the two distinct cases:
-//   (i) Builder does _not_ include seal for B1 when constructing block B5
-//  (ii) Builder _includes_ seal for B1 when constructing block B6
+//
+//	 (i) Builder does _not_ include seal for B1 when constructing block B5
+//	(ii) Builder _includes_ seal for B1 when constructing block B6
 func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	// we use bs.parentID as block B0
 	b0result := bs.resultForBlock[bs.parentID]
@@ -629,7 +641,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.Header)
-	for _, b := range append(bchain, &a5) {
+	for _, b := range append(bchain, a5) {
 		bs.storeBlock(b)
 	}
 
@@ -642,7 +654,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.build.seals = bs.sealDB
 
 	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
-		bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
+		bs.sealDB.On("HighestInFork", b4.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b4.ID(), bs.setter)
 		require.NoError(t, err)
@@ -652,8 +664,8 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
 		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
-		bs.storeBlock(&b5)
-		bs.sealDB.On("ByBlockID", b5.ID()).Return(b0seal, nil)
+		bs.storeBlock(b5)
+		bs.sealDB.On("HighestInFork", b5.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b5.ID(), bs.setter)
 		require.NoError(t, err)
@@ -664,18 +676,21 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 }
 
 // TestPayloadSeals_Duplicates verifies that the builder does not duplicate seals for already sealed blocks:
-//  ... <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
+//	... <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
 // Where block
-//   * [F0] ... [F3] sealed blocks but their candidate seals are still included in mempool
-//   * [A0] ... [A3] unsealed blocks with candidate seals are included in mempool
+//   - [F0] ... [F3] sealed blocks but their candidate seals are still included in mempool
+//   - [A0] ... [A3] unsealed blocks with candidate seals are included in mempool
+//
 // Expected behaviour:
-//  * builder should only include seals [A0], ..., [A3]
+//   - builder should only include seals [A0], ..., [A3]
 func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
-	// pretend that the first n blocks are already sealed
+	//	Pretend that the first n blocks are already sealed
 	n := 4
 	lastSeal := bs.chain[n-1]
 	mockSealDB := &storage.Seals{}
-	mockSealDB.On("ByBlockID", mock.Anything).Return(lastSeal, nil)
+	mockSealDB.On("HighestInFork", mock.Anything).Return(lastSeal, nil)
 	bs.build.seals = mockSealDB
 
 	// seals for all blocks [F0], ..., [A3] are still in the mempool:
@@ -687,14 +702,17 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 }
 
 // TestPayloadSeals_MissingNextSeal checks how the builder handles the fork
-//    [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
+//	[S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
 // Where block
-//   * [S] is sealed and finalized
-//   * [F0] finalized, unsealed block but _without_ candidate seal in mempool
-//   * [F1] ... [F3] are finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+//   - [S] is sealed and finalized
+//   - [F0] finalized, unsealed block but _without_ candidate seal in mempool
+//   - [F1] ... [F3] are finalized, unsealed blocks with candidate seals are included in mempool
+//   - [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+//
 // Expected behaviour:
-//  * builder should not include any seals as the immediately next seal is not in mempool
+//   - builder should not include any seals as the immediately next seal is not in mempool
 func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 	// remove the seal for block [F0]
 	firstSeal := bs.irsList[0]
@@ -708,14 +726,17 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 }
 
 // TestPayloadSeals_MissingInterimSeal checks how the builder handles the fork
-//   [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
+//	[S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//
 // Where block
-//   * [S] is sealed and finalized
-//   * [F0] ... [F2] are finalized, unsealed blocks with candidate seals are included in mempool
-//   * [F4] finalized, unsealed block but _without_ candidate seal in mempool
-//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+//   - [S] is sealed and finalized
+//   - [F0] ... [F2] are finalized, unsealed blocks with candidate seals are included in mempool
+//   - [F4] finalized, unsealed block but _without_ candidate seal in mempool
+//   - [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+//
 // Expected behaviour:
-//  * builder should only include candidate seals for [F0], [F1], [F2]
+//   - builder should only include candidate seals for [F0], [F1], [F2]
 func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 	// remove a seal for block [F4]
 	seal := bs.irsList[3]
@@ -730,22 +751,31 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 
 // TestValidatePayloadSeals_ExecutionForks checks how the builder's seal-inclusion logic
 // handles execution forks.
-//  * we have the chain in storage:
-//     F <- A{Result[F]_1, Result[F]_2, ReceiptMeta[F]_1, ReceiptMeta[F]_2}
-//           <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
-//             <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
-//                 <- D{Seal for Result[F]_1}
-//     here F is the latest finalized block (with ID bs.finalID)
-//  * Note that we are explicitly testing the handling of an execution fork that
-//    was incorporated _before_ the seal
-//       Blocks:      F  <-----------   A    <-----------   B
-//      Results:   Result[F]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
-//                 Result[F]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
+//
+// we have the chain in storage:
+//
+//	F <- A{Result[F]_1, Result[F]_2, ReceiptMeta[F]_1, ReceiptMeta[F]_2}
+//	      <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
+//	        <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
+//	          <- D{Seal for Result[F]_1}
+//
+// here F is the latest finalized block (with ID bs.finalID)
+//
+// Note that we are explicitly testing the handling of an execution fork that
+// was incorporated _before_ the seal
+//
+//	Blocks:      F  <-----------   A    <-----------   B
+//	Results:   Result[F]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
+//	           Result[F]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
+//
 // The builder is tasked with creating the payload for block X:
-//     F <- A{..} <- B{..} <- C{..} <- D{..} <- X
+//
+//	F <- A{..} <- B{..} <- C{..} <- D{..} <- X
+//
 // We test the two distinct cases:
-//   (i) verify that execution fork conflicting with sealed result is not sealed
-//  (ii) verify that multiple execution forks are properly handled
+//
+// (i) verify that execution fork conflicting with sealed result is not sealed
+// (ii) verify that multiple execution forks are properly handled
 func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
 
@@ -778,7 +808,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	}
 	bs.sealDB = &storage.Seals{}
 	bs.build.seals = bs.sealDB
-	bs.sealDB.On("ByBlockID", mock.Anything).Return(sealF, nil)
+	bs.sealDB.On("HighestInFork", mock.Anything).Return(sealF, nil)
 	bs.resultByID[sealedResult.ID()] = &sealedResult
 
 	bs.T().Run("verify that execution fork conflicting with sealed result is not sealed", func(t *testing.T) {
@@ -805,11 +835,14 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 
 // TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult tests the receipt selection:
 // Expectation: Builder should trigger ExecutionTree to search Execution Tree from
-//              last sealed result on respective fork.
+// last sealed result on respective fork.
+//
 // We test with the following main chain tree
-//                                                ┌-[X0] <- [X1{seals ..F4}]
-//                                                v
-// [lastSeal] <- [F0] <- [F1] <- [F2] <- [F3] <- [F4] <- [A0] <- [A1{seals ..F2}] <- [A2] <- [A3]
+//
+//	                                                ┌-[X0] <- [X1{seals ..F4}]
+//		                                            v
+//	 [lastSeal] <- [F0] <- [F1] <- [F2] <- [F3] <- [F4] <- [A0] <- [A1{seals ..F2}] <- [A2] <- [A3]
+//
 // Where
 // * blocks [lastSeal], [F1], ... [F4], [A0], ... [A4], are created by BuilderSuite
 // * latest sealed block for a specific fork is provided by test-local seals storage mock
@@ -831,21 +864,21 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 	bs.build.recPool = bs.recPool
 
 	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", x0.ID()).Return(bs.lastSeal, nil)
+	bs.sealDB.On("HighestInFork", x0.ID()).Return(bs.lastSeal, nil)
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err := bs.build.BuildOn(x0.ID(), bs.setter)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
 	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", x1.ID()).Return(f4Seal, nil)
+	bs.sealDB.On("HighestInFork", x1.ID()).Return(f4Seal, nil)
 	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(x1.ID(), bs.setter)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
 	// building on top of A3 (with ID bs.parentID): latest finalized block in fork is [F4]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", bs.parentID).Return(f2eal, nil)
+	bs.sealDB.On("HighestInFork", bs.parentID).Return(f2eal, nil)
 	bs.recPool.On("ReachableReceipts", f2eal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -855,14 +888,17 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 // TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork tests the receipt selection:
 // In this test, we check that the Builder provides a BlockFilter which only allows
 // blocks on the fork, which we are extending. We construct the following chain tree:
-//       ┌--[X1]   ┌-[Y2]                                             ┌-- [A6]
-//       v         v                                                  v
-// <- [Final] <- [*B1*] <- [*B2*] <- [*B3*] <- [*B4{seals B1}*] <- [*B5*] <- ░newBlock░
-//                           ^
-//                           └-- [C3] <- [C4]
-//                                  ^--- [D4]
+//
+//	    ┌--[X1]   ┌-[Y2]                                             ┌-- [A6]
+//	    v         v                                                  v
+//	<- [Final] <- [*B1*] <- [*B2*] <- [*B3*] <- [*B4{seals B1}*] <- [*B5*] <- ░newBlock░
+//	                          ^
+//	                          └-- [C3] <- [C4]
+//	                                 ^--- [D4]
+//
 // Expectation: BlockFilter should pass blocks marked with star: B1, ... ,B5
-//              All other blocks should be filtered out.
+// All other blocks should be filtered out.
+//
 // Context:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
@@ -884,7 +920,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	// set last sealed blocks:
 	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", b5.ID()).Return(b1Seal, nil)
+	bs.sealDB.On("HighestInFork", b5.ID()).Return(b1Seal, nil)
 	bs.build.seals = bs.sealDB
 
 	// setup mock to test the BlockFilter provided by Builder
@@ -909,7 +945,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 
 // TestPayloadReceipts_SkipDuplicatedReceipts tests the receipt selection:
 // Expectation: we check that the Builder provides a ReceiptFilter which
-//              filters out duplicated receipts.
+// filters out duplicated receipts.
 // Comment:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
@@ -946,7 +982,8 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 
 // TestPayloadReceipts_SkipReceiptsForSealedBlock tests the receipt selection:
 // Expectation: we check that the Builder provides a ReceiptFilter which
-//              filters out _any_ receipt for the sealed block.
+// filters out _any_ receipt for the sealed block.
+//
 // Comment:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
@@ -977,7 +1014,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 // receipts than the configured maxReceiptCount.
 func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 
-	// populate the mempool with 5 valid receipts
+	// Populate the mempool with 5 valid receipts
 	receipts := []*flow.ExecutionReceipt{}
 	metas := []*flow.ExecutionReceiptMeta{}
 	expectedResults := []*flow.ExecutionResult{}
@@ -1087,8 +1124,8 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 // builder includes receipts that form different valid execution paths contained
 // on the current fork.
 //
-//                                         candidate
-// P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- X[ER{B}, ER{B}']
+//	                                      candidate
+//	P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- X[ER{B}, ER{B}']
 func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork() {
 
 	// A is a block containing a valid receipt for block P
@@ -1101,9 +1138,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 
 	// B is a block containing two valid receipts, with different results, for
 	// block A
-	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
@@ -1111,8 +1148,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
 	})
 
-	bs.storeBlock(&A)
-	bs.storeBlock(&B)
+	bs.storeBlock(A)
+	bs.storeBlock(B)
 
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
@@ -1129,9 +1166,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	// Create two valid receipts for block B which build on different receipts
 	// for the parent block (A); recB1 builds on top of RecA1, whilst recB2
 	// builds on top of RecA2.
-	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA1.ExecutionResult))
+	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA1.ExecutionResult))
 	recB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB1))
-	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
+	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
 
 	// Add recB1 and recB2 to the mempool for inclusion in the next candidate
@@ -1149,23 +1186,23 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 // TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks tests that the
 // builder picks up receipts that were already included in a different fork.
 //
-//                                   candidate
-// P <- A[ER{P}] <- B[ER{A}] <- X[ER{A}',ER{B}, ER{B}']
-//                |
-//                < ------ C[ER{A}']
+//	                                   candidate
+//	P <- A[ER{P}] <- B[ER{A}] <- X[ER{A}',ER{B}, ER{B}']
+//	              |
+//	              < ------ C[ER{A}']
 //
 // Where:
-// - ER{A} and ER{A}' are receipts for block A that don't have the same
-//   result.
-// - ER{B} is a receipt for B with parent result ER{A}
-// - ER{B}' is a receipt for B with parent result ER{A}'
-//
-// ER{P} <- ER{A}  <- ER{B}
-//        |
-//        < ER{A}' <- ER{B}'
+//   - ER{A} and ER{A}' are receipts for block A that don't have the same
+//     result.
+//   - ER{B} is a receipt for B with parent result ER{A}
+//   - ER{B}' is a receipt for B with parent result ER{A}'
 //
 // When buiding on top of B, we expect the candidate payload to contain ER{A}',
 // ER{B}, and ER{B}'
+//
+//	ER{P} <- ER{A}  <- ER{B}
+//	       |
+//	       < ER{A}' <- ER{B}'
 func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
@@ -1176,7 +1213,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	})
 
 	// B is a block that builds on A containing a valid receipt for A
-	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
@@ -1186,7 +1223,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 
 	// C is another block that builds on A containing a valid receipt for A but
 	// different from the receipt contained in B
-	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
 	C := unittest.BlockWithParentFixture(A.Header)
 	C.SetPayload(flow.Payload{
@@ -1194,9 +1231,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 		Results:  []*flow.ExecutionResult{&recA2.ExecutionResult},
 	})
 
-	bs.storeBlock(&A)
-	bs.storeBlock(&B)
-	bs.storeBlock(&C)
+	bs.storeBlock(A)
+	bs.storeBlock(B)
+	bs.storeBlock(C)
 
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
@@ -1212,9 +1249,9 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 
 	// create and add a receipt for block B which builds on top of recA2, which
 	// is not on the same execution fork
-	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA1.ExecutionResult))
+	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA1.ExecutionResult))
 	recB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB1))
-	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
+	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
 
 	_, err := bs.build.recPool.AddReceipt(recB1, B.Header)
@@ -1233,8 +1270,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 // TestIntegration_DuplicateReceipts checks that the builder does not re-include
 // receipts that are already incorporated in blocks on the fork.
 //
-//
-// P <- A(r_P) <- B(r_A) <- X (candidate)
+//	P <- A(r_P) <- B(r_A) <- X (candidate)
 func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
@@ -1245,7 +1281,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	})
 
 	// B is a block that builds on A containing a valid receipt for A
-	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
@@ -1253,8 +1289,8 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
 	})
 
-	bs.storeBlock(&A)
-	bs.storeBlock(&B)
+	bs.storeBlock(A)
+	bs.storeBlock(B)
 
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
@@ -1279,8 +1315,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 // TestIntegration_ResultAlreadyIncorporated checks that the builder includes
 // receipts for results that were already incorporated in blocks on the fork.
 //
-//
-// P <- A(ER[P]) <- X (candidate)
+//	P <- A(ER[P]) <- X (candidate)
 func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
@@ -1292,7 +1327,7 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 
 	recP_B := unittest.ExecutionReceiptFixture(unittest.WithResult(&recP.ExecutionResult))
 
-	bs.storeBlock(&A)
+	bs.storeBlock(A)
 
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
@@ -1329,9 +1364,10 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 // TestIntegration_RepopulateExecutionTreeAtStartup tests that the
 // builder includes receipts for candidate block after fresh start, meaning
 // it will repopulate execution tree in constructor
-// P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- C <- X[ER{B}, ER{B}', ER{C} ]
-//        |
-//     finalized
+//
+//	P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- C <- X[ER{B}, ER{B}', ER{C} ]
+//	       |
+//	   finalized
 func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// setup initial state
 	// A is a block containing a valid receipt for block P
@@ -1344,9 +1380,9 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 
 	// B is a block containing two valid receipts, with different results, for
 	// block A
-	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
-	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(A), unittest.WithPreviousResult(recP.ExecutionResult))
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
@@ -1356,12 +1392,12 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 
 	C := unittest.BlockWithParentFixture(B.Header)
 
-	bs.storeBlock(&A)
-	bs.storeBlock(&B)
-	bs.storeBlock(&C)
+	bs.storeBlock(A)
+	bs.storeBlock(B)
+	bs.storeBlock(C)
 
 	// store execution results
-	for _, block := range []*flow.Block{&A, &B, &C} {
+	for _, block := range []*flow.Block{A, B, C} {
 		// for current block create empty receipts list
 		bs.receiptsByBlockID[block.ID()] = flow.ExecutionReceiptList{}
 
@@ -1408,11 +1444,11 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// Create two valid receipts for block B which build on different receipts
 	// for the parent block (A); recB1 builds on top of RecA1, whilst recB2
 	// builds on top of RecA2.
-	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA1.ExecutionResult))
+	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA1.ExecutionResult))
 	recB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB1))
-	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
+	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
-	resC := unittest.ExecutionResultFixture(unittest.WithBlock(&C), unittest.WithPreviousResult(recB1.ExecutionResult))
+	resC := unittest.ExecutionResultFixture(unittest.WithBlock(C), unittest.WithPreviousResult(recB1.ExecutionResult))
 	recC := unittest.ExecutionReceiptFixture(unittest.WithResult(resC))
 
 	// Add recB1 and recB2 to the mempool for inclusion in the next candidate

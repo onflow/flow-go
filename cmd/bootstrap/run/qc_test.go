@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +33,7 @@ func TestGenerateRootQC(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {
-	identities := unittest.IdentityListFixture(n)
+	identities := unittest.IdentityListFixture(n).Sort(order.Canonical)
 
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
@@ -40,7 +41,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
-	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n,
+	randomBSKs, randomBPKs, groupKey, err := crypto.BLSThresholdKeyGen(n,
 		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
@@ -61,7 +62,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
-			identity.Stake,
+			identity.Weight,
 			networkingKeys[i],
 			stakingKeys[i],
 		)

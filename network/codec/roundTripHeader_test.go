@@ -8,8 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,24 +23,20 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	message := &messages.BlockProposal{Header: block.Header, Payload: block.Payload}
+	message := messages.NewBlockProposal(&block)
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.BlockProposal)
-	assert.Equal(t, message.Header.ProposerSigData, decoded.Header.ProposerSigData)
-	messageHeader := fmt.Sprintf("- .Header=%+v\n", message.Header)
-	decodedHeader := fmt.Sprintf("- .Header=%+v\n", decoded.Header)
+	decodedBlock := decoded.Block.ToInternal()
+	assert.Equal(t, block.Header.ProposerSigData, decodedBlock.Header.ProposerSigData)
+	messageHeader := fmt.Sprintf("- .Header=%+v\n", block.Header)
+	decodedHeader := fmt.Sprintf("- .Header=%+v\n", decodedBlock.Header)
 	assert.Equal(t, messageHeader, decodedHeader)
 }
 
-func TestRoundTripHeaderViaJSON(t *testing.T) {
-	codec := jsoncodec.NewCodec()
-	roundTripHeaderViaCodec(t, codec)
-}
-
 func TestRoundTripHeaderViaCBOR(t *testing.T) {
-	codec := cborcodec.NewCodec()
+	codec := unittest.NetworkCodec()
 	roundTripHeaderViaCodec(t, codec)
 }

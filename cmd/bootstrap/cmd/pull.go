@@ -22,8 +22,8 @@ var (
 // buckets for a specific --network.
 var pullCmd = &cobra.Command{
 	Use:   "pull",
-	Short: "Pull parnter node details for a specific network",
-	Long:  `Pull parnter node details for a specific network from the FLOW Google bucket.`,
+	Short: "Pull partner node details for a specific network",
+	Long:  `Pull partner node details for a specific network from the FLOW Google bucket.`,
 	Run:   pull,
 }
 

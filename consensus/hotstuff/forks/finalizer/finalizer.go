@@ -34,7 +34,7 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 
 func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
-		return nil, &model.ConfigurationError{Msg: "invalid root: root qc is not pointing to root block"}
+		return nil, model.NewConfigurationErrorf("invalid root: root qc is not pointing to root block")
 	}
 
 	fnlzr := Finalizer{
@@ -90,8 +90,9 @@ func (r *Finalizer) IsKnownBlock(block *model.Block) bool {
 // IsProcessingNeeded performs basic checks whether or not block needs processing
 // only considering the block's height and hash
 // Returns false if any of the following conditions applies
-//  * block view is _below_ the most recently finalized block
-//  * known block
+//   - block view is _below_ the most recently finalized block
+//   - known block
+//
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) IsProcessingNeeded(block *model.Block) bool {
 	if block.View < r.lastFinalized.Block.View || r.IsKnownBlock(block) {
@@ -152,8 +153,9 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
-//     * q1.View == q2.View
-//     * q1.BlockID != q2.BlockID
+//   - q1.View == q2.View
+//   - q1.BlockID != q2.BlockID
+//
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
@@ -258,9 +260,6 @@ func (r *Finalizer) getNextAncestryLevel(block *model.Block) (*forks.BlockQC, er
 		return nil, ErrPrunedAncestry
 	}
 
-	if block.QC.View < r.lastFinalized.Block.View {
-		return nil, ErrPrunedAncestry
-	}
 	parentVertex, parentBlockKnown := r.forest.GetVertex(block.QC.BlockID)
 	if !parentBlockKnown {
 		return nil, model.MissingBlockError{View: block.QC.View, BlockID: block.QC.BlockID}
@@ -277,8 +276,9 @@ func (r *Finalizer) getNextAncestryLevel(block *model.Block) (*forks.BlockQC, er
 
 // updateLockedBlock updates `lastLockedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
-//    * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
-//    * The 'Locked Block' is the block in S with the _highest view number_ (newest);
+//   - Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
+//   - The 'Locked Block' is the block in S with the _highest view number_ (newest);
+//
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 	if ancestryChain.twoChain.Block.View <= r.lastLocked.Block.View {
@@ -290,8 +290,9 @@ func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
 // We use the finalization rule from 'Event-driven HotStuff Protocol' where the condition is:
-//    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
-//    * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
+//   - Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
+//   - The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
+//
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	// Note: we assume that all stored blocks pass Finalizer.VerifyBlock(block);

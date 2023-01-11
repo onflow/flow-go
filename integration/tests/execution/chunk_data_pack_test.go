@@ -9,15 +9,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -29,9 +27,9 @@ type ChunkDataPacksSuite struct {
 }
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
-
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
+	currentFinalized := gs.BlockState.HighestFinalizedHeight()
+	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T(), currentFinalized)
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
@@ -45,11 +43,11 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), common.CounterContract)
+	err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, gs.ReceiptState)
+	blockB, _ := lib.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, gs.ReceiptState)
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1
@@ -65,25 +63,25 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// TODO the following is extremely flaky, investigate why and re-activate.
 	// wait for ChunkDataPack pushed from execution node
-	// msg := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
+	// msg := gs.MsgState.WaitForMsgFrom(gs.T(), lib.MsgIsChunkDataPackResponse, gs.exe1ID)
 	// pack := msg.(*messages.ChunkDataResponse)
 	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), pack.ChunkDataPack.ChunkID
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), engine.PushReceipts,
+	err = gs.Ghost().Send(context.Background(), channels.RequestChunks,
 		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
 		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse
-	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID, "chunk data response from execution node")
+	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), lib.MsgIsChunkDataPackResponse, gs.exe1ID, "chunk data response from execution node")
 	pack2 := msg2.(*messages.ChunkDataResponse)
 	require.Equal(gs.T(), chunkID, pack2.ChunkDataPack.ChunkID)
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.ChunkDataPack.StartState)
 
 	// verify state proofs
-	batchProof, err := encoding.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
+	batchProof, err := ledger.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
 	require.NoError(gs.T(), err)
 
 	isValid := proof.VerifyTrieBatchProof(batchProof, ledger.State(erExe1BlockB.ExecutionResult.Chunks[0].StartState))

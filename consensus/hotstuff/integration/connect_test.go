@@ -28,11 +28,10 @@ func Connect(instances []*Instance) {
 			func(header *flow.Header, delay time.Duration) error {
 
 				// sender should always have the parent
-				parentBlob, exists := sender.headers.Load(header.ParentID)
+				parent, exists := sender.headers[header.ParentID]
 				if !exists {
 					return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
-				parent := parentBlob.(*flow.Header)
 
 				// fill in the header chain ID and height
 				header.ChainID = parent.ChainID
@@ -42,8 +41,7 @@ func Connect(instances []*Instance) {
 				proposal := model.ProposalFromFlow(header, parent.View)
 
 				// store locally and loop back to engine for processing
-				sender.headers.Store(header.ID(), header)
-				sender.queue <- proposal
+				sender.ProcessBlock(proposal)
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
@@ -63,11 +61,7 @@ func Connect(instances []*Instance) {
 						return nil
 					}
 
-					// put the proposal header into the receivers map
-					receiver.headers.Store(header.ID(), header)
-
-					// submit the proposal to the receiving event loop (non-blocking)
-					receiver.queue <- proposal
+					receiver.ProcessBlock(proposal)
 				}
 
 				return nil

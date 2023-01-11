@@ -86,10 +86,10 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	}
 
 	qc := &flow.QuorumCertificate{
-		View:      head.View,
-		BlockID:   s.blockID,
-		SignerIDs: child.ParentVoterIDs,
-		SigData:   child.ParentVoterSigData,
+		View:          head.View,
+		BlockID:       s.blockID,
+		SignerIndices: child.ParentVoterIndices,
+		SigData:       child.ParentVoterSigData,
 	}
 
 	return qc, nil
@@ -102,7 +102,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 // return the same child.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
-	var childIDs []flow.Identifier
+	var childIDs flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
@@ -161,9 +161,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// get identities from the current epoch first
-	identities := setup.Participants.Copy()
-	lookup := identities.Lookup()
+	// sort the identities so the 'Exists' binary search works
+	identities := setup.Participants.Sort(order.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -186,7 +185,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range previousSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -203,7 +202,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range nextSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
+
 			// add identity from next epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -214,16 +214,17 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
 	}
 
-	// add the identities from next/last epoch, with stake set to 0
+	// add the identities from next/last epoch, with weight set to 0
 	identities = append(
 		identities,
-		otherEpochIdentities.Map(mapfunc.WithStake(0))...,
+		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
+
 	// apply a deterministic sort to the participants
-	identities = identities.Sort(order.ByNodeIDAsc)
+	identities = identities.Sort(order.Canonical)
 
 	return identities, nil
 }
@@ -246,7 +247,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 // commitment represents the execution state as currently finalized.
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("could not retrieve sealed state commit: %w", err)
 	}
@@ -254,7 +255,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 }
 
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not look up latest seal: %w", err)
 	}
@@ -265,27 +266,55 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return result, seal, nil
 }
 
-func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+// SealingSegment will walk through the chain backward until we reach the block referenced
+// by the latest seal and build a SealingSegment. As we visit each block we check each execution
+// receipt in the block's payload to make sure we have a corresponding execution result, any execution
+// results missing from blocks are stored in the SealingSegment.ExecutionResults field.
+func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
+	var rootHeight uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get root height: %w", err)
+	}
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
+	}
+	if head.Height < rootHeight {
+		return nil, protocol.ErrSealingSegmentBelowRootBlock
+	}
+
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	var segment []*flow.Block
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block: %w", err)
 		}
-		segment = append(segment, block)
+
+		err = builder.AddBlock(block)
+		if err != nil {
+			return fmt.Errorf("could not add block to sealing segment: %w", err)
+		}
+
 		return nil
 	}
+
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+	}
+
+	segment, err := builder.SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not build sealing segment: %w", err)
 	}
 
 	return segment, nil
@@ -316,7 +345,7 @@ func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 }
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children []flow.Identifier
+	var children flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
@@ -379,10 +408,10 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// Seed returns the random seed at the given indices for the current block snapshot.
+// RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
 // * state.NoValidChildBlockError if no valid child is known
-func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
 	root, err := s.state.Params().Root()
@@ -397,11 +426,10 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
 		}
 
-		seed, err := seed.FromParentSignature(indices, rootQC.SigData)
+		seed, err := seed.FromParentQCSignature(rootQC.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
-
 		return seed, nil
 	}
 
@@ -411,7 +439,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
-	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
+	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}
@@ -425,6 +453,10 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 	}
 }
 
+func (s *Snapshot) Params() protocol.GlobalParams {
+	return s.state.Params()
+}
+
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.
 type EpochQuery struct {
 	snap *Snapshot
@@ -433,22 +465,25 @@ type EpochQuery struct {
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
 
+	// all errors returned from storage reads here are unexpected, because all
+	// snapshots reside within a current epoch, which must be queriable
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get current EpochSetup (id=%x) for block %x: %w", status.CurrentEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
 	}
 	return epoch
 }
@@ -458,11 +493,12 @@ func (q *EpochQuery) Next() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 	phase, err := status.Phase()
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// critical error: malformed EpochStatus in storage
+		return invalid.NewEpochf("read malformed EpochStatus from storage: %w", err)
 	}
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
@@ -472,12 +508,14 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
+		// all errors are critical, because we must be able to retrieve EpochSetup when in setup phase
+		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
 		epoch, err := inmem.NewSetupEpoch(nextSetup)
 		if err != nil {
-			return invalid.NewEpoch(err)
+			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
 		}
 		return epoch
 	}
@@ -485,11 +523,13 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in committed phase, return a CommittedEpoch
 	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
+		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
+		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
 	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
 	}
 	return epoch
 }
@@ -501,7 +541,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
@@ -514,16 +554,19 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	// for the previous epoch
 	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all errors are critical, because we must be able to retrieve EpochSetup for previous epoch
+		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", status.PreviousEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all errors are critical, because we must be able to retrieve EpochCommit for previous epoch
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
 	}
 	return epoch
 }

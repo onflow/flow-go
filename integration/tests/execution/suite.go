@@ -1,8 +1,11 @@
 package execution
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -10,14 +13,15 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
-	common.TestnetStateTracker
+	log zerolog.Logger
+	lib.TestnetStateTracker
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
 	nodeConfigs []testnet.NodeConfig
@@ -29,7 +33,7 @@ type Suite struct {
 
 func (s *Suite) Ghost() *client.GhostClient {
 	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
@@ -49,6 +53,56 @@ func (s *Suite) ExecutionClient() *testnet.Client {
 	return client
 }
 
+type AdminCommandRequest struct {
+	CommandName string `json:"commandName"`
+	Data        any    `json:"data"`
+}
+
+type AdminCommandResponse struct {
+	Output any `json:"output"`
+}
+
+// SendExecutionAdminCommand sends admin command to EN. data will be serialized to JSON and sent as data part of the command request.
+// Response will be deserialized into output object.
+// It bubbles up errors from (un)marshalling of data and handling the request
+func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, data any, output any) error {
+	enContainer := s.net.ContainerByID(s.exe1ID)
+
+	request := AdminCommandRequest{
+		CommandName: command,
+		Data:        data,
+	}
+
+	marshal, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("error while marshalling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Ports[testnet.ExeNodeAdminPort]),
+		bytes.NewBuffer(marshal),
+	)
+	if err != nil {
+		return fmt.Errorf("error while building request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error while sending request: %w", err)
+	}
+
+	adminCommandResponse := AdminCommandResponse{
+		Output: output,
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
+	if err != nil {
+		return fmt.Errorf("error while reading/decoding response: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Suite) AccessPort() string {
 	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
 }
@@ -58,11 +112,12 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log.Info().Msg("================> SetupTest")
+
 	blockRateFlag := "--block-rate-delay=1ms"
 
-	// setup two access nodes, minimum needed for LN/SN access API and fallback
-	anConfigs := []testnet.NodeConfig{testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess)}
-	s.nodeConfigs = append(s.nodeConfigs, anConfigs...)
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -110,7 +165,7 @@ func (s *Suite) SetupTest() {
 	)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
@@ -122,8 +177,8 @@ func (s *Suite) SetupTest() {
 }
 
 func (s *Suite) TearDownTest() {
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msg("================> Finish TearDownTest")
 }

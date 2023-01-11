@@ -3,7 +3,7 @@
       "Role": "collection",
       "Address": "10.138.0.6:3569",
       "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
-      "Stake": 1000,
+      "Weight": 1000,
       "NetworkPubKey": "...",
       "StakingPubKey": "..."
     },
@@ -11,7 +11,7 @@
         "Role": "consensus",
         "Address": "10.138.0.6:3569",
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
-        "Stake": 1000,
+        "Weight": 1000,
         "NetworkPubKey": "...",
         "StakingPubKey": "..."
     },
@@ -19,7 +19,7 @@
         "Role": "execution",
         "Address": "10.138.0.6:3569",
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
-        "Stake": 1000,
+        "Weight": 1000,
         "NetworkPubKey": "...",
         "StakingPubKey": "..."
     },
@@ -27,7 +27,7 @@
         "Role": "verification",
         "Address": "10.138.0.6:3569",
         "NodeID": "9bbea0644b5e91ec66b4afddef7083e896da545d530ee52b85c78afa88301556",
-        "Stake": 1000,
+        "Weight": 1000,
         "NetworkPubKey": "...",
         "StakingPubKey": "..."
     }

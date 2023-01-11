@@ -1,14 +1,16 @@
 package flow
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
 	"regexp"
-	"sort"
 	"strconv"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
@@ -18,26 +20,37 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+// DefaultInitialWeight is the default initial weight for a node identity.
+const DefaultInitialWeight = 1000
+
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// Identity represents a node identity.
+// Identity represents the public identity of one network participant (node).
 type Identity struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
-	NodeID  Identifier
+	NodeID Identifier
+	// Address is the network address where the node can be reached.
 	Address string
-	Role    Role
-	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
-	// in escrow during the node's participation) is strictly managed by the
-	// service account. The protocol software strictly considers weight, which
-	// represents how much voting power a given node has.
+	// Role is the node's role in the network and defines its abilities and
+	// responsibilities.
+	Role Role
+	// Weight represents the node's authority to perform certain tasks relative
+	// to other nodes. For example, in the consensus committee, the node's weight
+	// represents the weight assigned to its votes.
 	//
-	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
-	// the process of un-staking, have 0 weight.
+	// A node's weight is distinct from its stake. Stake represents the quantity
+	// of FLOW tokens held by the network in escrow during the course of the node's
+	// participation in the network. The stake is strictly managed by the service
+	// account smart contracts.
 	//
-	// TODO: to be renamed to Weight
-	Stake uint64
+	// Nodes which are registered to join at the next epoch will appear in the
+	// identity table but are considered to have zero weight up until their first
+	// epoch begins. Likewise nodes which were registered in the previous epoch
+	// but have left at the most recent epoch boundary will appear in the identity
+	// table with zero weight.
+	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
 	// network. A node may be ejected for either:
 	// * committing one protocol felony
@@ -64,14 +77,14 @@ func ParseIdentity(identity string) (*Identity, error) {
 	}
 	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
-	stake, _ := strconv.ParseUint(matches[5], 10, 64)
+	weight, _ := strconv.ParseUint(matches[5], 10, 64)
 
 	// create the identity
 	iy := Identity{
 		NodeID:  nodeID,
 		Address: address,
 		Role:    role,
-		Stake:   stake,
+		Weight:  weight,
 	}
 
 	return &iy, nil
@@ -79,7 +92,7 @@ func ParseIdentity(identity string) (*Identity, error) {
 
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
-	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Stake)
+	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
 }
 
 // ID returns a unique identifier for the identity.
@@ -94,25 +107,24 @@ func (iy Identity) Checksum() Identifier {
 
 type encodableIdentity struct {
 	NodeID        Identifier
-	Address       string
+	Address       string `json:",omitempty"`
 	Role          Role
-	Stake         uint64
+	Weight        uint64
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
 
-// stealthIdentity represents a node identity without an address
-type stealthIdentity struct {
-	NodeID        Identifier
-	Address       string `json:"-"`
-	Role          Role
-	Stake         uint64
-	StakingPubKey []byte
-	NetworkPubKey []byte
+// decodableIdentity provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableIdentity struct {
+	encodableIdentity
+	// Stake previously was used in place of the Weight field.
+	// Deprecated: supported in decoding for backward-compatibility
+	Stake uint64
 }
 
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
+	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
@@ -123,20 +135,12 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	var identity interface{}
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
 
-	// if the address is empty, suppress the Address field in the output json
-	if encodable.Address == "" {
-		identity = stealthIdentity(encodable)
-	} else {
-		identity = encodable
-	}
-
-	data, err := json.Marshal(identity)
+	data, err := json.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
 	}
@@ -183,7 +187,7 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
-	identity.Stake = ie.Stake
+	identity.Weight = ie.Weight
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -199,12 +203,19 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 }
 
 func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var encodable encodableIdentity
-	err := json.Unmarshal(b, &encodable)
+	var decodable decodableIdentity
+	err := json.Unmarshal(b, &decodable)
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	err = identityFromEncodable(encodable, iy)
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid identity with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	err = identityFromEncodable(decodable.encodableIdentity, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}
@@ -247,7 +258,7 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	if iy.Role != other.Role {
 		return false
 	}
-	if iy.Stake != other.Stake {
+	if iy.Weight != other.Weight {
 		return false
 	}
 	if iy.Ejected != other.Ejected {
@@ -321,9 +332,17 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
 func (il IdentityList) Copy() IdentityList {
-	return il.Map(func(identity Identity) Identity {
-		return identity
-	})
+	dup := make(IdentityList, 0, len(il))
+
+	lenList := len(il)
+
+	// performance tests show this is faster than 'range'
+	for i := 0; i < lenList; i++ {
+		// copy the object
+		next := *(il[i])
+		dup = append(dup, &next)
+	}
+	return dup
 }
 
 // Selector returns an identity filter function that selects only identities
@@ -345,29 +364,22 @@ func (il IdentityList) Lookup() map[Identifier]*Identity {
 	return lookup
 }
 
-// Sort will sort the list using the given ordering.
+// Sort will sort the list using the given ordering.  This is
+// not recommended for performance.  Expand the 'less' function
+// in place for best performance, and don't use this function.
 func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
-	sort.Slice(dup, func(i int, j int) bool {
-		return less(dup[i], dup[j])
-	})
+	slices.SortFunc(dup, less)
 	return dup
 }
 
 // Sorted returns whether the list is sorted by the input ordering.
 func (il IdentityList) Sorted(less IdentityOrder) bool {
-	for i := 0; i < len(il)-1; i++ {
-		a := il[i]
-		b := il[i+1]
-		if !less(a, b) {
-			return false
-		}
-	}
-	return true
+	return slices.IsSortedFunc(il, less)
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() []Identifier {
+func (il IdentityList) NodeIDs() IdentifierList {
 	nodeIDs := make([]Identifier, 0, len(il))
 	for _, id := range il {
 		nodeIDs = append(nodeIDs, id.NodeID)
@@ -375,15 +387,24 @@ func (il IdentityList) NodeIDs() []Identifier {
 	return nodeIDs
 }
 
+// PublicStakingKeys returns a list with the public staking keys (order preserving).
+func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
+	pks := make([]crypto.PublicKey, 0, len(il))
+	for _, id := range il {
+		pks = append(pks, id.StakingPubKey)
+	}
+	return pks
+}
+
 func (il IdentityList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(il)...)
 }
 
-// TotalStake returns the total stake of all given identities.
-func (il IdentityList) TotalStake() uint64 {
+// TotalWeight returns the total weight of all given identities.
+func (il IdentityList) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.Stake
+		total += identity.Weight
 	}
 	return total
 }
@@ -423,23 +444,27 @@ func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 
 // Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
-	n := uint(len(il))
-	if size > n {
-		size = n
-	}
-	dup := make([]*Identity, 0, n)
-	dup = append(dup, il...)
-	for i := uint(0); i < size; i++ {
-		j := uint(rand.Intn(int(n - i)))
-		dup[i], dup[j+i] = dup[j+i], dup[i]
-	}
-	return dup[:size]
+	return il.sample(size, rand.Intn)
 }
 
 // DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
 func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
-	rand.Seed(seed)
-	return il.Sample(size)
+	rng := rand.New(rand.NewSource(seed))
+	return il.sample(size, rng.Intn)
+}
+
+func (il IdentityList) sample(size uint, intn func(int) int) IdentityList {
+	n := uint(len(il))
+	if size > n {
+		size = n
+	}
+
+	dup := il.Copy()
+	for i := uint(0); i < size; i++ {
+		j := uint(intn(int(n - i)))
+		dup[i], dup[j+i] = dup[j+i], dup[i]
+	}
+	return dup[:size]
 }
 
 // DeterministicShuffle randomly and deterministically shuffles the identity
@@ -476,21 +501,25 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
+// The returned IdentityList is sorted
 func (il IdentityList) Union(other IdentityList) IdentityList {
+	maxLen := len(il) + len(other)
 
-	// stores the output, the union of the two lists
-	union := make(IdentityList, 0, len(il)+len(other))
-	// efficient lookup to avoid duplicates
-	lookup := make(map[Identifier]struct{})
+	union := make(IdentityList, 0, maxLen)
+	set := make(map[Identifier]struct{}, maxLen)
 
-	// add all identities, omitted duplicates
-	for _, identity := range append(il.Copy(), other...) {
-		if _, exists := lookup[identity.NodeID]; exists {
-			continue
+	for _, list := range []IdentityList{il, other} {
+		for _, id := range list {
+			if _, isDuplicate := set[id.NodeID]; !isDuplicate {
+				set[id.NodeID] = struct{}{}
+				union = append(union, id)
+			}
 		}
-		union = append(union, identity)
-		lookup[identity.NodeID] = struct{}{}
 	}
+
+	slices.SortFunc(union, func(a, b *Identity) bool {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
+	})
 
 	return union
 }
@@ -498,13 +527,37 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 // EqualTo checks if the other list if the same, that it contains the same elements
 // in the same order
 func (il IdentityList) EqualTo(other IdentityList) bool {
-	if len(il) != len(other) {
-		return false
+	return slices.EqualFunc(il, other, func(a, b *Identity) bool {
+		return a.EqualTo(b)
+	})
+}
+
+// Exists takes a previously sorted Identity list and searches it for the target value
+// This code is optimized, so the coding style will be different
+// target:  value to search for
+// CAUTION:  The identity list MUST be sorted prior to calling this method
+func (il IdentityList) Exists(target *Identity) bool {
+	return il.IdentifierExists(target.NodeID)
+}
+
+// IdentifierExists takes a previously sorted Identity list and searches it for the target value
+// target:  value to search for
+// CAUTION:  The identity list MUST be sorted prior to calling this method
+func (il IdentityList) IdentifierExists(target Identifier) bool {
+	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, func(a, b *Identity) int {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:])
+	})
+	return ok
+}
+
+// GetIndex returns the index of the identifier in the IdentityList and true
+// if the identifier is found.
+func (il IdentityList) GetIndex(target Identifier) (uint, bool) {
+	i := slices.IndexFunc(il, func(a *Identity) bool {
+		return a.NodeID == target
+	})
+	if i == -1 {
+		return 0, false
 	}
-	for i, identity := range il {
-		if !identity.EqualTo(other[i]) {
-			return false
-		}
-	}
-	return true
+	return uint(i), true
 }

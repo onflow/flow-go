@@ -1,14 +1,16 @@
+//go:build relic
 // +build relic
 
 package crypto
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
-// #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
+// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low
+// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls12381_utils.h"
+// #include "bls_include.h"
 import "C"
 import (
 	"errors"
@@ -73,12 +75,18 @@ func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
 
 // This function is for TEST only
 // Exponentiation of g1 in G1
-func genScalarMultG1(res *pointG1, expo *scalar) {
-	C.ep_mult_gen((*C.ep_st)(res), (*C.bn_st)(expo))
+func generatorScalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.bn_st)(expo))
+}
+
+// This function is for TEST only
+// Generic Exponentiation G1
+func genericScalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.bn_st)(expo))
 }
 
 // Exponentiation of g2 in G2
-func genScalarMultG2(res *pointG2, expo *scalar) {
+func generatorScalarMultG2(res *pointG2, expo *scalar) {
 	C.ep2_mult_gen((*C.ep2_st)(res), (*C.bn_st)(expo))
 }
 
@@ -93,6 +101,17 @@ func (p *pointG2) equals(other *pointG2) bool {
 	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
 }
 
+// Comparison to zero in Zr.
+// Scalar must be already reduced modulo r
+func (x *scalar) isZero() bool {
+	return C.bn_is_zero((*C.bn_st)(x)) == 1
+}
+
+// Comparison to point at infinity in G2.
+func (p *pointG2) isInfinity() bool {
+	return C.ep2_is_infty((*C.ep2_st)(p)) == 1
+}
+
 // returns a random number in Zr
 func randZr(x *scalar) {
 	C.bn_randZr((*C.bn_st)(x))
@@ -103,9 +122,9 @@ func randZrStar(x *scalar) {
 	C.bn_randZr_star((*C.bn_st)(x))
 }
 
-// mapToZr reads a scalar from a slice of bytes and maps it to Zr
+// mapToZrStar reads a scalar from a slice of bytes and maps it to Zr
 // the resulting scalar is in the range 0 < k < r
-func mapToZr(x *scalar, src []byte) error {
+func mapToZrStar(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
 		return invalidInputsErrorf(
 			"input slice length must be less than %d",
@@ -185,39 +204,57 @@ func readPointG1(a *pointG1, src []byte) error {
 	}
 }
 
-// This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
+// checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
-// if inG1 is true, the function tests the membership of a point in G1,
-// otherwise, a point in E1\G1 membership is tested.
-// method is the index of the membership check method as defined in bls12381_utils.h
-func checkG1Test(inG1 int, method int) bool {
-	return C.subgroup_check_G1_test((C.int)(inG1), (C.int)(method)) == valid
+func checkMembershipG1(pt *pointG1) int {
+	return int(C.check_membership_G1((*C.ep_st)(pt)))
 }
 
-// This is only a TEST function.
-// It wraps a call to a subgroup check in G1 since cgo can't be used
+// checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
-func checkInG1Test(pt *pointG1) bool {
-	return C.check_membership_G1((*C.ep_st)(pt)) == valid
+func checkMembershipG2(pt *pointG2) int {
+	return int(C.check_membership_G2((*C.ep2_st)(pt)))
 }
 
-// This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
-// in go test files.
-func benchG1Test() {
-	_ = C.subgroup_check_G1_bench()
+// randPointG1 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G1 and stores it in input point.
+func randPointG1(pt *pointG1) {
+	C.ep_rand_G1((*C.ep_st)(pt))
+}
+
+// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E1\G1 and stores it in input point.
+func randPointG1Complement(pt *pointG1) {
+	C.ep_rand_G1complement((*C.ep_st)(pt))
+}
+
+// randPointG2 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G2 and stores it in input point.
+func randPointG2(pt *pointG2) {
+	C.ep2_rand_G2((*C.ep2_st)(pt))
+}
+
+// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E2\G2 and stores it in input point.
+func randPointG2Complement(pt *pointG2) {
+	C.ep2_rand_G2complement((*C.ep2_st)(pt))
 }
 
 // This is only a TEST function.
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
 // The function uses xmd with SHA256 in the hash-to-field.
 func hashToG1Bytes(data, dst []byte) []byte {
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
+
+	inputLength := len(data)
+	if len(data) == 0 {
+		data = make([]byte, 1)
+	}
+
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
-		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(C.int)(expandMsgOutput),
+		(*C.uchar)(&data[0]), (C.int)(inputLength),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
 	// map the hash to G1

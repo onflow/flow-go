@@ -1,21 +1,21 @@
+//go:build relic
 // +build relic
 
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
-// #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
+// #cgo CFLAGS: -g -Wall -std=c99
+// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "dkg_include.h"
 import "C"
 
 import (
-	"errors"
 	"fmt"
 )
 
 // Implements Joint Feldman (Pedersen) protocol using
 // the BLS set up on the BLS12-381 curve.
 // The protocol runs (n) parallel instances of Feldman vss with
-// the complaints mechanism, each participant being a leader
+// the complaints mechanism, each participant being a dealer
 // once.
 
 // This is a fully distributed generation. The secret is a BLS
@@ -28,11 +28,11 @@ import (
 // t = floor((n-1)/2) to optimize for unforgeability and robustness of the threshold
 // signature scheme using the output keys.
 
-// In each feldman VSS istance, the leader generates a chunk of the
+// In each feldman VSS instance, the dealer generates a chunk of the
 // the private key of a BLS threshold signature scheme.
-// Using the complaints mechanism, each leader is qualified or disqualified
+// Using the complaints mechanism, each dealer is qualified or disqualified
 // from the protocol, and the overall key is taking into account
-// all chunks from qualified leaders.
+// all chunks from qualified dealers.
 
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
@@ -46,27 +46,36 @@ type JointFeldmanState struct {
 	fvss []feldmanVSSQualState
 	// is the group public key
 	jointPublicKey pointG2
-	// Private share of the current node
+	// Private share of the current participant
 	jointx scalar
-	// Public keys of the group nodes, the vector size is (n)
+	// Public keys of the group participants, the vector size is (n)
 	jointy []pointG2
 }
 
 // NewJointFeldman creates a new instance of a Joint Feldman protocol.
 //
-// size if the total number of nodes (n).
+// size if the total number of participants (n).
 // threshold is the threshold parameter (t). the DKG protocol is secure in the
 // presence of up to (t) malicious participants when (t < n/2).
-// currentIndex is the index of the node creating the new DKG instance.
-// processor is the DKGProcessor instance required to connect the node to the
+// myIndex is the index of the participant creating the new DKG instance.
+// processor is the DKGProcessor instance required to connect the participant to the
 // communication channels.
 //
-// An instance is run by a single node and is usable for only one protocol.
+// An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created.
-func NewJointFeldman(size int, threshold int, currentIndex int,
+//
+// The function returns:
+// - (nil, InvalidInputsError) if:
+//   - size if not in [DKGMinSize, DKGMaxSize]
+//   - threshold is not in [MinimumThreshold, size-1]
+//   - myIndex is not in [0, size-1]
+//   - dealerIndex is not in [0, size-1]
+//
+// - (dkgInstance, nil) otherwise
+func NewJointFeldman(size int, threshold int, myIndex int,
 	processor DKGProcessor) (DKGState, error) {
 
-	common, err := newDKGCommon(size, threshold, currentIndex, processor, 0)
+	common, err := newDKGCommon(size, threshold, myIndex, processor, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +92,7 @@ func (s *JointFeldmanState) init() {
 	for i := 0; i < s.size; i++ {
 		fvss := &feldmanVSSstate{
 			dkgCommon:   s.dkgCommon,
-			leaderIndex: index(i),
+			dealerIndex: index(i),
 		}
 		s.fvss[i] = feldmanVSSQualState{
 			feldmanVSSstate: fvss,
@@ -93,13 +102,18 @@ func (s *JointFeldmanState) init() {
 	}
 }
 
-// Start starts running Joint Feldman protocol in the current node
+// Start triggers Joint Feldman protocol start for the current participant.
 // The seed is used to generate the FVSS secret polynomial
 // (including the instance group private key) when the current
-// node is the leader.
+// participant is the dealer.
+//
+// The returned error is :
+//   - dkgInvalidStateTransitionError if the DKG instance is already running.
+//   - error if an unexpected exception occurs
+//   - nil otherwise.
 func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
-		return errors.New("dkg is already running")
+		return dkgInvalidStateTransitionErrorf("dkg is already running")
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -113,10 +127,15 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 	return nil
 }
 
-// NextTimeout sets the next timeout of the protocol if any timeout applies
+// NextTimeout sets the next timeout of the protocol if any timeout applies.
+//
+// The returned error is :
+//   - dkgInvalidStateTransitionError if the DKG instance was not running.
+//   - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//   - nil otherwise.
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -128,15 +147,21 @@ func (s *JointFeldmanState) NextTimeout() error {
 	return nil
 }
 
-// End ends the protocol in the current node
-// It returns the finalized public data and node private key share.
+// End ends the protocol in the current participant
+// It returns the finalized public data and participant private key share.
 // - the group public key corresponding to the group secret key
-// - all the public key shares corresponding to the nodes private
+// - all the public key shares corresponding to the participants private
 // key shares.
-// - the finalized private key which is the current node's own private key share
+// - the finalized private key which is the current participant's own private key share
+//
+// The returned error is:
+//   - dkgFailureError if the disqualified dealers exceeded the threshold
+//   - dkgFailureError if the public key share or group public key is identity.
+//   - dkgInvalidStateTransitionError Start() was not called, or NextTimeout() was not called twice
+//   - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	disqualifiedTotal := 0
@@ -144,11 +169,11 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
+				dkgInvalidStateTransitionErrorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 		}
 
 		// check if a complaint has remained without an answer
-		// a leader is disqualified if a complaint was never answered
+		// a dealer is disqualified if a complaint was never answered
 		if !s.fvss[i].disqualified {
 			for complainer, c := range s.fvss[i].complaints {
 				if c.received && !c.answerReceived {
@@ -168,33 +193,54 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	// check failing dkg
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
-			fmt.Errorf(
-				"DKG failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
+			dkgFailureErrorf(
+				"Joint-Feldman failed because the diqualified participants number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
-	// wrap up the keys from qualified leaders
+	// wrap up the keys from qualified dealers
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
-	// private key of the current node
+	// private key of the current participant
 	x := newPrKeyBLSBLS12381(jointx)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(jointPublicKey)
 
-	// The nodes public keys
+	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
 		y[i] = newPubKeyBLSBLS12381(&p)
 	}
+
+	// check if current public key share or group public key is identity.
+	// In that case all signatures generated by the current private key share or
+	// the group private key are invalid (as stated by the BLS IETF draft)
+	// to avoid equivocation issues.
+	//
+	// Assuming both private keys have entropy from at least one honest dealer, each private
+	// key is initially uniformly distributed over the 2^255 possible values. We can argue that
+	// the known uniformity-bias caused by malicious dealers in Joint-Feldman does not weaken
+	// the likelihood of generating an identity key to practical probabilities.
+	if (jointx).isZero() {
+		return nil, nil, nil, dkgFailureErrorf("private key share is identity and is therefore invalid")
+	}
+	if Y.isIdentity {
+		return nil, nil, nil, dkgFailureErrorf("group private key is identity and is therefore invalid")
+	}
 	return x, Y, y, nil
 }
 
-// HandleBroadcastMsg processes a new broadcasted message received by the current node
+// HandleBroadcastMsg processes a new broadcasted message received by the current participant
 // orig is the message origin index
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
@@ -205,11 +251,16 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// HandlePrivateMsg processes a new private message received by the current node
+// HandlePrivateMsg processes a new private message received by the current participant
 // orig is the message origin index
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)
@@ -225,23 +276,28 @@ func (s *JointFeldmanState) Running() bool {
 	return s.jointRunning
 }
 
-// ForceDisqualify forces a node to get disqualified
+// ForceDisqualify forces a participant to get disqualified
 // for a reason outside of the DKG protocol
-// The caller should make sure all honest nodes call this function,
+// The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
-func (s *JointFeldmanState) ForceDisqualify(node int) error {
+//
+// The function returns:
+//   - dkgInvalidStateTransitionError if the instance is not running
+//   - invalidInputsError if `orig` is not valid (in [0, size-1])
+//   - nil otherwise
+func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	if !s.jointRunning {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
-	// disqualify the node in the fvss instance where they are a leader
-	err := s.fvss[node].ForceDisqualify(node)
+	// disqualify the participant in the fvss instance where they are a dealer
+	err := s.fvss[participant].ForceDisqualify(participant)
 	if err != nil {
 		return fmt.Errorf("force disqualify failed: %w", err)
 	}
 	return nil
 }
 
-// sum up the 3 type of keys from all qualified leaders to end the protocol
+// sum up the 3 type of keys from all qualified dealers to end the protocol
 func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2, []pointG2) {
 	qualifiedx, qualifiedPubKey, qualifiedy := s.getQualifiedKeys(qualified)
 
@@ -263,7 +319,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 	return &jointx, &jointPublicKey, jointy
 }
 
-// get the 3 type of keys from all qualified leaders
+// get the 3 type of keys from all qualified dealers
 func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2, [][]pointG2) {
 	qualifiedx := make([]scalar, 0, qualified)
 	qualifiedPubKey := make([]pointG2, 0, qualified)

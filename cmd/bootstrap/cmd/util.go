@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -14,18 +13,18 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-func GenerateRandomSeeds(n int) [][]byte {
+func GenerateRandomSeeds(n int, seedLen int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, GenerateRandomSeed())
+		seeds = append(seeds, GenerateRandomSeed(seedLen))
 	}
 	return seeds
 }
 
-func GenerateRandomSeed() []byte {
-	seed := make([]byte, randomSeedBytes)
-	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
-		log.Fatal().Err(err).Msg("cannot generate random seeds")
+func GenerateRandomSeed(seedLen int) []byte {
+	seed := make([]byte, seedLen)
+	if _, err := rand.Read(seed); err != nil {
+		log.Fatal().Err(err).Msg("cannot generate random seed")
 	}
 	return seed
 }
@@ -58,7 +57,7 @@ func writeText(path string, data []byte) {
 		log.Fatal().Err(err).Msg("could not create output dir")
 	}
 
-	err = ioutil.WriteFile(path, data, 0644)
+	err = os.WriteFile(path, data, 0644)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write file")
 	}

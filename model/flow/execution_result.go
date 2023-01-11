@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-var NoChunksError = errors.New("execution result has no chunks")
+var ErrNoChunks = errors.New("execution result has no chunks")
 
 // ExecutionResult is cryptographic commitment to the computation
 // result(s) from executing a block
@@ -14,6 +14,7 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
+	ExecutionDataID  Identifier
 }
 
 // ID returns the hash of the execution result body
@@ -38,21 +39,21 @@ func (er ExecutionResult) ValidateChunksLength() bool {
 // FinalStateCommitment returns the Execution Result's commitment to the final
 // execution state of the block, i.e. the last chunk's output state.
 // Error returns:
-//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
+//   - ErrNoChunks: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
-		return DummyStateCommitment, NoChunksError
+		return DummyStateCommitment, ErrNoChunks
 	}
 	return er.Chunks[er.Chunks.Len()-1].EndState, nil
 }
 
 // InitialStateCommit returns a commitment to the execution state used as input
-// for computing the block the block, i.e. the leading chunk's input state.
+// for computing the block, i.e. the leading chunk's input state.
 // Error returns:
-//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
+//   - ErrNoChunks: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
-		return DummyStateCommitment, NoChunksError
+		return DummyStateCommitment, ErrNoChunks
 	}
 	return er.Chunks[0].StartState, nil
 }

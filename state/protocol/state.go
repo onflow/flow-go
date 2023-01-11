@@ -45,6 +45,9 @@ type MutableState interface {
 	// still checking that the given block is a valid extension of the protocol
 	// state. Depending on implementation it might be a lighter version that checks only
 	// block header.
+	// Expected errors during normal operations:
+	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//  * state.InvalidExtensionError if the candidate block is invalid
 	Extend(ctx context.Context, candidate *flow.Block) error
 
 	// Finalize finalizes the block with the given hash.
@@ -53,6 +56,7 @@ type MutableState interface {
 	// to be the last finalized block.
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
+	// TODO error docs
 	Finalize(ctx context.Context, blockID flow.Identifier) error
 
 	// MarkValid marks the block header with the given block hash as valid.
@@ -60,5 +64,6 @@ type MutableState interface {
 	// implies that the parent of the block to be marked as valid
 	// has to be already valid.
 	// It modifies the persistent immutable protocol state accordingly.
+	// TODO error docs
 	MarkValid(blockID flow.Identifier) error
 }

@@ -9,11 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -63,10 +65,9 @@ func (s *MatchingEngineSuite) SetupTest() {
 func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlock := unittest.BlockHeaderFixture()
-	finalizedBlockID := finalizedBlock.ID()
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("OnBlockFinalization").Return(nil).Once()
-	s.engine.OnFinalizedBlock(finalizedBlockID)
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -92,7 +93,7 @@ func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 	}
 	s.index.On("ByBlockID", incorporatedBlockID).Return(index, nil)
 
-	s.engine.OnBlockIncorporated(incorporatedBlockID)
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -121,7 +122,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, receipt := range receipts {
-			err := s.engine.Process(engine.ReceiveReceipts, originID, receipt)
+			err := s.engine.Process(channels.ReceiveReceipts, originID, receipt)
 			s.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
 	}()
@@ -132,4 +133,17 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	time.Sleep(1 * time.Second)
 
 	s.core.AssertExpectations(s.T())
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (s *MatchingEngineSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+	// shouldn't result in error since byzantine inputs are expected
+	require.NoError(s.T(), err)
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err = s.engine.ProcessLocal(invalidEvent)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
 }

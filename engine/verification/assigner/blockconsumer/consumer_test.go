@@ -13,7 +13,9 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -24,7 +26,7 @@ import (
 // and its corresponding job can be converted back to the same block.
 func TestBlockToJob(t *testing.T) {
 	block := unittest.BlockFixture()
-	actual, err := blockconsumer.JobToBlock(blockconsumer.BlockToJob(&block))
+	actual, err := jobqueue.JobToBlock(jobqueue.BlockToJob(&block))
 	require.NoError(t, err)
 	require.Equal(t, &block, actual)
 }
@@ -120,7 +122,7 @@ func withConsumer(
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
-		tracer := &trace.NoopTracer{}
+		tracer := trace.NewNoopTracer()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
@@ -145,7 +147,8 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)

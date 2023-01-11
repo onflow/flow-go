@@ -10,7 +10,7 @@ import (
 )
 
 // GetRegisterFunc is a function that returns the value for a register.
-type GetRegisterFunc func(owner, controller, key string) (flow.RegisterValue, error)
+type GetRegisterFunc func(owner, key string) (flow.RegisterValue, error)
 
 // A View is a read-only view into a ledger stored in an underlying data source.
 //
@@ -18,20 +18,26 @@ type GetRegisterFunc func(owner, controller, key string) (flow.RegisterValue, er
 // underlying data source.
 type View struct {
 	delta       Delta
-	regTouchSet map[string]flow.RegisterID // contains all the registers that have been touched (either read or written to)
-	readsCount  uint64                     // contains the total number of reads
+	regTouchSet map[flow.RegisterID]struct{} // contains all the registers that have been touched (either read or written to)
+	readsCount  uint64                       // contains the total number of reads
 	// spockSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing spockSecret
 	// for views other than collection views to improve performance
 	spockSecret       []byte
-	spockSecretLock   sync.Mutex
+	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
 }
 
 type Snapshot struct {
 	Delta Delta
-	Reads map[string]flow.RegisterID
+	SnapshotStats
+	Reads map[flow.RegisterID]struct{}
+}
+
+type SnapshotStats struct {
+	NumberOfBytesWrittenToRegisters int
+	NumberOfRegistersTouched        int
 }
 
 // Snapshot is state of interactions with the register
@@ -40,7 +46,7 @@ type SpockSnapshot struct {
 	SpockSecret []byte
 }
 
-func AlwaysEmptyGetRegisterFunc(owner, controller, key string) (flow.RegisterValue, error) {
+func AlwaysEmptyGetRegisterFunc(owner, key string) (flow.RegisterValue, error) {
 	return nil, nil
 }
 
@@ -48,7 +54,8 @@ func AlwaysEmptyGetRegisterFunc(owner, controller, key string) (flow.RegisterVal
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:             NewDelta(),
-		regTouchSet:       make(map[string]flow.RegisterID),
+		spockSecretLock:   &sync.Mutex{},
+		regTouchSet:       make(map[flow.RegisterID]struct{}),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
@@ -58,23 +65,29 @@ func NewView(readFunc GetRegisterFunc) *View {
 func (v *View) Interactions() *SpockSnapshot {
 
 	var delta = Delta{
-		Data: make(map[string]flow.RegisterEntry, len(v.delta.Data)),
+		Data: make(map[flow.RegisterID]flow.RegisterValue, len(v.delta.Data)),
 	}
-	var reads = make(map[string]flow.RegisterID, len(v.regTouchSet))
+	var reads = make(map[flow.RegisterID]struct{}, len(v.regTouchSet))
 
-	//copy data
+	bytesWrittenToRegisters := 0
+	// copy data
 	for s, value := range v.delta.Data {
 		delta.Data[s] = value
+		bytesWrittenToRegisters += len(value)
 	}
 
-	for i, id := range v.regTouchSet {
-		reads[i] = id
+	for k := range v.regTouchSet {
+		reads[k] = struct{}{}
 	}
 
 	return &SpockSnapshot{
 		Snapshot: Snapshot{
 			Delta: delta,
 			Reads: reads,
+			SnapshotStats: SnapshotStats{
+				NumberOfBytesWrittenToRegisters: bytesWrittenToRegisters,
+				NumberOfRegistersTouched:        len(reads),
+			},
 		},
 		SpockSecret: v.SpockSecret(),
 	}
@@ -82,15 +95,15 @@ func (v *View) Interactions() *SpockSnapshot {
 
 // AllRegisters returns all the register IDs either in read or delta
 func (r *Snapshot) AllRegisters() []flow.RegisterID {
-	set := make(map[string]flow.RegisterID, len(r.Reads)+len(r.Delta.Data))
-	for _, reg := range r.Reads {
-		set[reg.String()] = reg
+	set := make(map[flow.RegisterID]struct{}, len(r.Reads)+len(r.Delta.Data))
+	for reg := range r.Reads {
+		set[reg] = struct{}{}
 	}
 	for _, reg := range r.Delta.RegisterIDs() {
-		set[reg.String()] = reg
+		set[reg] = struct{}{}
 	}
 	ret := make([]flow.RegisterID, 0, len(set))
-	for _, r := range set {
+	for r := range set {
 		ret = append(ret, r)
 	}
 	return ret
@@ -109,6 +122,7 @@ func (v *View) AllRegisters() []flow.RegisterID {
 	return v.Interactions().AllRegisters()
 }
 
+// RegisterUpdates returns a list of register updates
 func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	return v.Delta().RegisterUpdates()
 }
@@ -117,18 +131,18 @@ func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 //
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
-func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
+func (v *View) Get(owner, key string) (flow.RegisterValue, error) {
 	var err error
-	registerID := flow.NewRegisterID(owner, controller, key)
+	registerID := flow.NewRegisterID(owner, key)
 
-	value, exists := v.delta.Get(owner, controller, key)
+	value, exists := v.delta.Get(owner, key)
 	if !exists {
-		value, err = v.readFunc(owner, controller, key)
+		value, err = v.readFunc(owner, key)
 		if err != nil {
 			return nil, fmt.Errorf("get register failed: %w", err)
 		}
 		// capture register touch
-		v.regTouchSet[registerID.String()] = registerID
+		v.regTouchSet[registerID] = struct{}{}
 		// increase reads
 		v.readsCount++
 	}
@@ -142,18 +156,18 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 }
 
 // Peek reads the value without registering the read, as when used as parent read function
-func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
-	value, exists := v.delta.Get(owner, controller, key)
+func (v *View) Peek(owner, key string) (flow.RegisterValue, error) {
+	value, exists := v.delta.Get(owner, key)
 	if exists {
 		return value, nil
 	}
 
-	return v.readFunc(owner, controller, key)
+	return v.readFunc(owner, key)
 }
 
 // Set sets a register value in this view.
-func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
-	registerID := flow.NewRegisterID(owner, controller, key)
+func (v *View) Set(owner, key string, value flow.RegisterValue) error {
+	registerID := flow.NewRegisterID(owner, key)
 	// every time we write something to delta (order preserving) we update
 	// the spock secret with both the register ID and value.
 
@@ -168,19 +182,19 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) erro
 	}
 
 	// capture register touch
-	v.regTouchSet[registerID.String()] = registerID
+	v.regTouchSet[registerID] = struct{}{}
 	// add key value to delta
-	v.delta.Set(owner, controller, key, value)
+	v.delta.Set(owner, key, value)
 	return nil
 }
 
 // Touch explicitly adds a register to the touched registers set.
-func (v *View) Touch(owner, controller, key string) error {
+func (v *View) Touch(owner, key string) error {
 
-	k := flow.NewRegisterID(owner, controller, key)
+	k := flow.NewRegisterID(owner, key)
 
 	// capture register touch
-	v.regTouchSet[k.String()] = k
+	v.regTouchSet[k] = struct{}{}
 	// increase reads
 	v.readsCount++
 
@@ -188,8 +202,8 @@ func (v *View) Touch(owner, controller, key string) error {
 }
 
 // Delete removes a register in this view.
-func (v *View) Delete(owner, controller, key string) error {
-	return v.Set(owner, controller, key, nil)
+func (v *View) Delete(owner, key string) error {
+	return v.Set(owner, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.
@@ -208,8 +222,8 @@ func (v *View) MergeView(ch state.View) error {
 		return fmt.Errorf("can not merge view: view type mismatch (given: %T, expected:delta.View)", ch)
 	}
 
-	for _, id := range child.Interactions().RegisterTouches() {
-		v.regTouchSet[id.String()] = id
+	for id := range child.Interactions().RegisterTouches() {
+		v.regTouchSet[id] = struct{}{}
 	}
 
 	// SpockSecret is order aware
@@ -229,10 +243,10 @@ func (v *View) MergeView(ch state.View) error {
 }
 
 // RegisterTouches returns the register IDs touched by this view (either read or write)
-func (r *Snapshot) RegisterTouches() map[string]flow.RegisterID {
-	ret := make(map[string]flow.RegisterID, len(r.Reads))
-	for k, v := range r.Reads {
-		ret[k] = v
+func (r *Snapshot) RegisterTouches() map[flow.RegisterID]struct{} {
+	ret := make(map[flow.RegisterID]struct{}, len(r.Reads))
+	for k := range r.Reads {
+		ret[k] = struct{}{}
 	}
 	return ret
 }

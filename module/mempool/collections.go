@@ -17,9 +17,9 @@ type Collections interface {
 	// false if it was already in the mempool.
 	Add(coll *flow.Collection) bool
 
-	// Rem will remove the given collection from the memory pool; it will
+	// Remove will remove the given collection from the memory pool; it will
 	// return true if the collection was known and removed.
-	Rem(collID flow.Identifier) bool
+	Remove(collID flow.Identifier) bool
 
 	// ByID retrieve the collection with the given ID from the memory pool.
 	// It will return false if it was not found in the mempool.
@@ -31,7 +31,4 @@ type Collections interface {
 	// All will retrieve all collections that are currently in the memory pool
 	// as a slice.
 	All() []*flow.Collection
-
-	// Hash will return a hash of the contents of the memory pool.
-	Hash() flow.Identifier
 }

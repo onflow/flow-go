@@ -20,8 +20,9 @@ type RemoteView struct {
 	Parent             *RemoteView
 	Delta              map[string]flow.RegisterValue
 	Cache              registerCache
+	BlockID            []byte
+	BlockHeader        *flow.Header
 	connection         *grpc.ClientConn
-	blockID            []byte
 	executionAPIclient execution.ExecutionAPIClient
 }
 
@@ -42,13 +43,18 @@ func WithCache(cache registerCache) RemoteViewOption {
 // remote view will use the latest sealed block
 func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 	return func(view *RemoteView) *RemoteView {
-		view.blockID = blockID[:]
+		view.BlockID = blockID[:]
+		var err error
+		view.BlockHeader, err = view.getBlockHeader(blockID)
+		if err != nil {
+			panic(err)
+		}
 		return view
 	}
 }
 
 func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +66,7 @@ func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
 		Cache:              newMemRegisterCache(),
 	}
 
-	view.blockID, err = view.getLatestBlockID()
+	view.BlockID, view.BlockHeader, err = view.getLatestBlockID()
 	if err != nil {
 		panic(err)
 	}
@@ -75,17 +81,42 @@ func (v *RemoteView) Done() {
 	v.connection.Close()
 }
 
-func (v *RemoteView) getLatestBlockID() ([]byte, error) {
+func (v *RemoteView) getLatestBlockID() ([]byte, *flow.Header, error) {
 	req := &execution.GetLatestBlockHeaderRequest{
 		IsSealed: true,
 	}
 
 	resp, err := v.executionAPIclient.GetLatestBlockHeader(context.Background(), req)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO set chainID and parentID
+	header := &flow.Header{
+		Height:    resp.Block.Height,
+		Timestamp: resp.Block.Timestamp.AsTime(),
+	}
+
+	return resp.Block.Id, header, nil
+}
+
+func (v *RemoteView) getBlockHeader(blockID flow.Identifier) (*flow.Header, error) {
+	req := &execution.GetBlockHeaderByIDRequest{
+		Id: blockID[:],
+	}
+
+	resp, err := v.executionAPIclient.GetBlockHeaderByID(context.Background(), req)
+	if err != nil {
 		return nil, err
 	}
 
-	return resp.Block.Id, nil
+	// TODO set chainID and parentID
+	header := &flow.Header{
+		Height:    resp.Block.Height,
+		Timestamp: resp.Block.Timestamp.AsTime(),
+	}
+
+	return header, nil
 }
 
 func (v *RemoteView) NewChild() state.View {
@@ -115,36 +146,35 @@ func (v *RemoteView) DropDelta() {
 	v.Delta = make(map[string]flow.RegisterValue)
 }
 
-func (v *RemoteView) Set(owner, controller, key string, value flow.RegisterValue) error {
-	v.Delta[owner+"~"+controller+"~"+key] = value
+func (v *RemoteView) Set(owner, key string, value flow.RegisterValue) error {
+	v.Delta[owner+"~"+key] = value
 	return nil
 }
 
-func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, error) {
+func (v *RemoteView) Get(owner, key string) (flow.RegisterValue, error) {
 
 	// first check the delta
-	value, found := v.Delta[owner+"~"+controller+"~"+key]
+	value, found := v.Delta[owner+"~"+key]
 	if found {
 		return value, nil
 	}
 
 	// then check the read cache
-	value, found = v.Cache.Get(owner, controller, key)
+	value, found = v.Cache.Get(owner, key)
 	if found {
 		return value, nil
 	}
 
 	// then call the parent (if exist)
 	if v.Parent != nil {
-		return v.Parent.Get(owner, controller, key)
+		return v.Parent.Get(owner, key)
 	}
 
 	// last use the grpc api the
 	req := &execution.GetRegisterAtBlockIDRequest{
-		BlockId:            []byte(v.blockID),
-		RegisterOwner:      []byte(owner),
-		RegisterController: []byte(controller),
-		RegisterKey:        []byte(key),
+		BlockId:       []byte(v.BlockID),
+		RegisterOwner: []byte(owner),
+		RegisterKey:   []byte(key),
 	}
 
 	// TODO use a proper context for timeouts
@@ -153,7 +183,7 @@ func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, err
 		return nil, err
 	}
 
-	v.Cache.Set(owner, controller, key, resp.Value)
+	v.Cache.Set(owner, key, resp.Value)
 
 	// append value to the file cache
 
@@ -169,12 +199,12 @@ func (v *RemoteView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 	panic("Not implemented yet")
 }
 
-func (v *RemoteView) Touch(owner, controller, key string) error {
+func (v *RemoteView) Touch(owner, key string) error {
 	// no-op for now
 	return nil
 }
 
-func (v *RemoteView) Delete(owner, controller, key string) error {
-	v.Delta[owner+"~"+controller+"~"+key] = nil
+func (v *RemoteView) Delete(owner, key string) error {
+	v.Delta[owner+"~"+key] = nil
 	return nil
 }

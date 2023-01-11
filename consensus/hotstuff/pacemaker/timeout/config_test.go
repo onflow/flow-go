@@ -16,7 +16,7 @@ func TestConstructor(t *testing.T) {
 	require.Equal(t, float64(0.73), c.VoteAggregationTimeoutFraction)
 	require.Equal(t, float64(1.5), c.TimeoutIncrease)
 	require.Equal(t, float64(0.85), c.TimeoutDecrease)
-	require.Equal(t, float64(1000), c.BlockRateDelayMS)
+	require.Equal(t, float64(1000), c.BlockRateDelayMS.Load())
 
 	// should not allow startReplicaTimeout < minReplicaTimeout
 	_, err = NewConfig(800*time.Millisecond, 1200*time.Millisecond, 0.73, 1.5, 0.85, time.Second)
@@ -55,12 +55,11 @@ func TestDefaultConfig(t *testing.T) {
 	require.Equal(t, float64(0.5), c.VoteAggregationTimeoutFraction)
 	require.Equal(t, float64(2.0), c.TimeoutIncrease)
 	require.True(t, math.Abs(1/math.Sqrt(2)-c.TimeoutDecrease) < 1e-15) // need to allow for some numerical error
-	require.Equal(t, float64(0), c.BlockRateDelayMS)
+	require.Equal(t, float64(0), c.BlockRateDelayMS.Load())
 }
 
 // TestStandardVoteAggregationTimeoutFraction tests the computation of the standard
 // value for `VoteAggregationTimeoutFraction`.
-//
 func TestStandardVoteAggregationTimeoutFraction(t *testing.T) {
 	// test numerical computation for one specific parameter setting
 	f := StandardVoteAggregationTimeoutFraction(1200*time.Millisecond, 500*time.Millisecond)

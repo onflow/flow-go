@@ -94,10 +94,10 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	// RootBlock <- LatestSealedBlock <- LatestFinalizedBlock <- UnfinalizedBlock
 	bc.RootBlock = BlockFixture()
-	bc.LatestSealedBlock = BlockWithParentFixture(bc.RootBlock.Header)
+	bc.LatestSealedBlock = *BlockWithParentFixture(bc.RootBlock.Header)
 	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.Header)
-	bc.LatestFinalizedBlock = &latestFinalizedBlock
-	bc.UnfinalizedBlock = BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
+	bc.LatestFinalizedBlock = latestFinalizedBlock
+	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
 	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
@@ -334,7 +334,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.SealsDB = &storage.Seals{}
-	bc.SealsDB.On("ByBlockID", mock.Anything).Return(
+	bc.SealsDB.On("HighestInFork", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Seal {
 			seal, found := bc.SealsIndex[blockID]
 			if !found {
@@ -357,6 +357,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
+	bc.ReceiptsPL.On("HasReceipt", mock.AnythingOfType("*flow.ExecutionReceipt")).Return(false)
 
 	bc.PendingReceipts = &mempool.PendingReceipts{}
 
@@ -451,16 +452,17 @@ func EntityWithID(expectedID flow.Identifier) interface{} {
 }
 
 // subgraphFixture represents a subgraph of the blockchain:
-//  Result   -----------------------------------> Block
-//    |                                             |
-//    |                                             v
-//    |                                           ParentBlock
-//    v
-//  PreviousResult  ---> PreviousResult.BlockID
+//
+//	Result   -----------------------------------> Block
+//	  |                                             |
+//	  |                                             v
+//	  |                                           ParentBlock
+//	  v
+//	PreviousResult  ---> PreviousResult.BlockID
 //
 // Depending on validity of the subgraph:
-//   *  valid:   PreviousResult.BlockID == ParentBlock.ID()
-//   *  invalid: PreviousResult.BlockID != ParentBlock.ID()
+//   - valid:   PreviousResult.BlockID == ParentBlock.ID()
+//   - invalid: PreviousResult.BlockID != ParentBlock.ID()
 type subgraphFixture struct {
 	Block              *flow.Block
 	ParentBlock        *flow.Block
@@ -473,11 +475,13 @@ type subgraphFixture struct {
 
 // Generates a valid subgraph:
 // let
-//  * R1 be a result which pertains to blockA
-//  * R2 be R1's previous result,
-//    where R2 pertains to blockB
+//   - R1 be a result which pertains to blockA
+//   - R2 be R1's previous result,
+//     where R2 pertains to blockB
+//
 // The execution results form a valid subgraph if and only if:
-//    blockA.ParentID == blockB.ID
+//
+//	blockA.ParentID == blockB.ID
 func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// BLOCKS: <- previousBlock <- block
 	parentBlock := BlockFixture()
@@ -488,7 +492,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// RESULTS for Blocks:
 	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))
 	result := ExecutionResultFixture(
-		WithBlock(&block),
+		WithBlock(block),
 		WithPreviousResult(*previousResult),
 	)
 
@@ -512,7 +516,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	}
 
 	return subgraphFixture{
-		Block:              &block,
+		Block:              block,
 		ParentBlock:        &parentBlock,
 		Result:             result,
 		PreviousResult:     previousResult,

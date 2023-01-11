@@ -10,12 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,6 +34,7 @@ type SealingEngineSuite struct {
 	state   *mockprotocol.State
 	index   *mockstorage.Index
 	results *mockstorage.ExecutionResults
+	myID    flow.Identifier
 
 	// Sealing Engine
 	engine *Engine
@@ -39,13 +42,20 @@ type SealingEngineSuite struct {
 
 func (s *SealingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
-	me := &mockmodule.Local{}
 	s.core = &mockconsensus.SealingCore{}
 	s.state = &mockprotocol.State{}
 	s.index = &mockstorage.Index{}
 	s.results = &mockstorage.ExecutionResults{}
+	s.myID = unittest.IdentifierFixture()
+	me := &mockmodule.Local{}
+	// set up local module mock
+	me.On("NodeID").Return(
+		func() flow.Identifier {
+			return s.myID
+		},
+	)
 
-	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles())).Head()
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{
@@ -64,7 +74,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	// setup inbound queues for trusted inputs and message handler for untrusted inputs
 	err = s.engine.setupTrustedInboundQueues()
 	require.NoError(s.T(), err)
-	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
+	err = s.engine.setupMessageHandler(unittest.NewSealingConfigs(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -77,9 +87,9 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
 
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(finalizedBlockID)
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -91,7 +101,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()
-	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(parentBlock)
 	incorporatedBlockID := incorporatedBlock.ID()
 	// setup payload fixture
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
@@ -108,10 +118,10 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 
 	// setup headers storage
 	headers := &mockstorage.Headers{}
-	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
+	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(incorporatedBlockID)
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -156,7 +166,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -164,7 +174,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range responseApprovals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -183,7 +193,7 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
+	err := s.engine.Process(channels.ReceiveApprovals, originID, approval)
 	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// sealing engine has at least 100ms ticks for processing events
@@ -191,4 +201,17 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 
 	// In both cases, we expect the approval to be rejected without hitting the mempools
 	s.core.AssertNumberOfCalls(s.T(), "ProcessApproval", 0)
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (s *SealingEngineSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+	// shouldn't result in error since byzantine inputs are expected
+	require.NoError(s.T(), err)
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err = s.engine.ProcessLocal(invalidEvent)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
 }

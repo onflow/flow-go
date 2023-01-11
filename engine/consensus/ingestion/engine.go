@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // defaultGuaranteeQueueCapacity maximum capacity of pending events queue, everything above will be dropped
@@ -29,7 +30,7 @@ const defaultIngestionEngineWorkers = 3
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	*component.ComponentManager
+	component.Component
 	log               zerolog.Logger         // used to log relevant actions with context
 	me                module.Local           // used to access local node information
 	con               network.Conduit        // conduit to receive/send guarantees
@@ -50,7 +51,7 @@ func New(
 	logger := log.With().Str("ingestion", "engine").Logger()
 
 	guaranteesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
+		defaultGuaranteeQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceCollectionGuaranteesQueue, uint(len)) }),
 	)
 	if err != nil {
@@ -97,10 +98,10 @@ func New(
 		})
 	}
 
-	e.ComponentManager = componentManagerBuilder.Build()
+	e.Component = componentManagerBuilder.Build()
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ReceiveGuarantees, e)
+	con, err := net.Register(channels.ReceiveGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -119,7 +120,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -133,8 +134,16 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns error only in unexpected scenario.
-func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // processAvailableMessages processes the given ingestion engine event.

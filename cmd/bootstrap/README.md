@@ -29,7 +29,7 @@ The bootstrapping will generate the following information:
   - node role
   - public staking key
   - public networking key
-  - stake
+  - weight
 
 #### Root Block for main consensus
 * Root Block
@@ -80,7 +80,7 @@ go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "cons
      but is not required at node start
 
 
-### Phase 2: Generating final root information
+## Phase 2: Generating final root information
 
 This step will generate the entire root information for all nodes (incl. keys for all Dapper-controlled nodes).
 
@@ -92,8 +92,8 @@ Each input is a config file specified as a command line parameter:
 * parameter with state commitment for the initial execution state (`root-commit`)
 * `json` containing configuration for all Dapper-Controlled nodes (see `./example_files/node-config.json`)
 * folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
-* `json` containing the stake value for all partner nodes (see `./example_files/partner-stakes.json`).
-  Format: ```<NodeID>: <stake value>```
+* `json` containing the weight value for all partner nodes (see `./example_files/partner-weights.json`).
+  Format: ```<NodeID>: <weight value>```
 
 #### Example
 ```bash
@@ -105,7 +105,7 @@ go run -tags relic ./cmd/bootstrap finalize \
   --root-commit 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
   --config ./cmd/bootstrap/example_files/node-config.json \
   --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
-  --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json \
+  --partner-weights ./cmd/bootstrap/example_files/partner-weights.json \
   --epoch-counter 1 \
   -o ./bootstrap/root-infos
 ```
@@ -147,3 +147,13 @@ go run -tags relic ./cmd/bootstrap finalize \
    - root Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
    - REQUIRED at NODE START by all collectors of the respective cluster
    - file can be made accessible to all nodes at boot up (or recovery after crash)
+
+## Generating networking key for Observer
+
+This generates the networking key used by observers to connect to the public libp2p network. It is a different key format than staked nodes and should only be used for Observers.
+
+```bash
+go run -tags relic ./cmd/bootstrap observer-network-key  -f ./path/network-key
+```
+
+This key must be kept secret as it's used to encrypt and sign network requests sent by the observers.

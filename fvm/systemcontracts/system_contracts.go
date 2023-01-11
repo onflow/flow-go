@@ -23,11 +23,13 @@ const (
 
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch      = "FlowEpoch"
-	ContractNameClusterQC  = "FlowClusterQC"
-	ContractNameDKG        = "FlowDKG"
-	ContractServiceAccount = "FlowServiceAccount"
-	ContractStorageFees    = "FlowStorageFees"
+	ContractNameEpoch        = "FlowEpoch"
+	ContractNameClusterQC    = "FlowClusterQC"
+	ContractNameDKG          = "FlowDKG"
+	ContractServiceAccount   = "FlowServiceAccount"
+	ContractNameFlowFees     = "FlowFees"
+	ContractStorageFees      = "FlowStorageFees"
+	ContractDeploymentAudits = "FlowContractAudits"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -36,11 +38,14 @@ const (
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
-	ContractServiceAccountFunction_setupNewAccount           = "setupNewAccount"
-	ContractServiceAccountFunction_defaultTokenBalance       = "defaultTokenBalance"
-	ContractServiceAccountFunction_deductTransactionFee      = "deductTransactionFee"
-	ContractStorageFeesFunction_calculateAccountCapacity     = "calculateAccountCapacity"
-	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
+	ContractServiceAccountFunction_setupNewAccount                            = "setupNewAccount"
+	ContractServiceAccountFunction_defaultTokenBalance                        = "defaultTokenBalance"
+	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
+	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
+	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
+	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
+	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
+	ContractDeploymentAuditsFunction_useVoucherForDeploy                      = "useVoucherForDeploy"
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -149,7 +154,7 @@ var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
 var (
 	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
-	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet and Canary
+	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
 )
 
@@ -173,7 +178,15 @@ func init() {
 		ContractNameDKG:       stakingContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
-	contractAddressesByChainID[flow.Canary] = testnet
+
+	// Sandboxnet test network
+	// All system contracts are deployed to the service account
+	sandboxnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Sandboxnet.Chain().ServiceAddress(),
+	}
+	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
@@ -184,5 +197,7 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient
+	contractAddressesByChainID[flow.BftTestnet] = transient
 	contractAddressesByChainID[flow.Benchnet] = transient
+
 }

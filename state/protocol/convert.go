@@ -3,13 +3,19 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// ToEpochSetup converts an Epoch interface instance to the underlying
-// concrete epoch setup service event.
+// ToEpochSetup converts an Epoch interface instance to the underlying concrete
+// epoch setup service event. The input must be a valid, set up epoch.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -57,6 +63,11 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 
 // ToEpochCommit converts an Epoch interface instance to the underlying
 // concrete epoch commit service event. The epoch must have been committed.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -66,14 +77,26 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
 	}
-	qcs := make([]*flow.QuorumCertificate, 0, len(clustering))
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clustering))
 	for i := range clustering {
 		cluster, err := epoch.Cluster(uint(i))
 		if err != nil {
 			return nil, fmt.Errorf("could not get epoch cluster (index=%d): %w", i, err)
 		}
-		qcs = append(qcs, cluster.RootQC())
+		qc := cluster.RootQC()
+		// TODO: double check cluster.Members returns canonical order
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), qc.SignerIndices)
+		if err != nil {
+			return nil, fmt.Errorf("could not encode signer indices: %w", err)
+		}
+		qcs = append(qcs, &flow.QuorumCertificateWithSignerIDs{
+			View:      qc.View,
+			BlockID:   qc.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   qc.SigData,
+		})
 	}
+
 	participants, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch participants: %w", err)
@@ -98,6 +121,8 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 
 // GetDKGParticipantKeys retrieves the canonically ordered list of DKG
 // participant keys from the DKG.
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
 
 	keys := make([]crypto.PublicKey, 0, len(participants))
@@ -123,6 +148,8 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.Pu
 
 // ToDKGParticipantLookup computes the nodeID -> DKGParticipant lookup for a
 // DKG instance. The participants must exactly match the DKG instance configuration.
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.Identifier]flow.DKGParticipant, error) {
 
 	lookup := make(map[flow.Identifier]flow.DKGParticipant)
@@ -147,6 +174,11 @@ func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.I
 }
 
 // DKGPhaseViews returns the DKG final phase views for an epoch.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
 	phase1FinalView, err = epoch.DKGPhase1FinalView()
 	if err != nil {

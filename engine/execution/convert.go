@@ -5,9 +5,11 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
+	metrics module.ExecutionMetrics,
 	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
 	result *ComputationResult) (
@@ -41,6 +43,8 @@ func GenerateExecutionResultAndChunkDataPacks(
 			collection := completeCollection.Collection()
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
 			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
+			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(completeCollection.Transactions))
+
 		} else {
 			// system chunk
 			// note that system chunk does not have a collection.
@@ -48,6 +52,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
 			// system chunk has a nil collection.
 			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
+			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), 1)
 		}
 
 		// TODO use view.SpockSecret() as an input to spock generator
@@ -55,7 +60,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents)
+	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataID)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -70,6 +75,7 @@ func GenerateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	serviceEvents []flow.Event,
+	executionDataID flow.Identifier,
 ) (*flow.ExecutionResult, error) {
 
 	// convert Cadence service event representation to flow-go representation
@@ -87,6 +93,7 @@ func GenerateExecutionResultForBlock(
 		BlockID:          block.ID(),
 		Chunks:           chunks,
 		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataID:  executionDataID,
 	}
 
 	return er, nil

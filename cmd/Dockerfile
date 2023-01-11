@@ -1,24 +1,14 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.15-buster AS build-setup
+####################################
+## (1) Setup the build environment
+FROM golang:1.19-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install cmake zip sudo
+RUN apt-get -y install cmake zip
 
-## (1) Build Relic first to maximize caching
-FROM build-setup AS build-relic
-
-RUN mkdir /build
-WORKDIR /build
-
-# Copy over the crypto package
-COPY crypto ./crypto
-
-# Build Relic (this places build artifacts in /build/relic/build)
-RUN cd ./crypto/ && go generate
-
-## (2) Build the app binary
+## (2) Setup crypto dependencies
 FROM build-setup AS build-env
 
 # Build the app binary in /app
@@ -31,52 +21,59 @@ ARG VERSION
 
 COPY . .
 
-# Copy over Relic build artifacts
-COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make crypto_setup_gopath
 
+####################################
+## (3) Build the production app binary
 FROM build-env as build-production
 WORKDIR /app
 
+ARG GOARCH=amd64
+
+# TAGS can be overriden to modify the go build tags (e.g. build without netgo)
+ARG TAGS="relic,netgo"
+
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-    -o ./app ./cmd/${TARGET}
+    -o ./app ${TARGET}
 
 RUN chmod a+x /app/app
 
-## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base-debian10 as production
+## (4) Add the statically linked production binary to a distroless image
+FROM gcr.io/distroless/base-debian11 as production
 
 COPY --from=build-production /app/app /bin/app
 
 ENTRYPOINT ["/bin/app"]
 
-
+####################################
+## (3) Build the debug app binary
 FROM build-env as build-debug
 WORKDIR /app
+ARG GOARCH=amd64
 RUN --mount=type=ssh \
-    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-    -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
+    -gcflags="all=-N -l" -o ./app ${TARGET}
 
 RUN chmod a+x /app/app
 
-FROM golang:1.15-buster as debug
+## (4) Add the statically linked debug binary to a distroless image configured for debugging
+FROM golang:1.19-bullseye as debug
 
-RUN go get -u github.com/go-delve/delve/cmd/dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 COPY --from=build-debug /app/app /bin/app
 
 ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app", "--"]
 
-## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base-debian10 as production-transit-nocgo
 
-COPY --from=build-transit-production-nocgo /app/app /bin/app
-
-ENTRYPOINT ["/bin/app"]
+FROM build-setup as environment-clean

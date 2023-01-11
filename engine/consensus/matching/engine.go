@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	sealing "github.com/onflow/flow-go/engine/consensus"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -53,15 +55,14 @@ func NewEngine(
 
 	// FIFO queue for execution receipts
 	receiptsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultReceiptQueueCapacity),
+		defaultReceiptQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
-	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(defaultIncorporatedBlockQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for incorporated block events: %w", err)
 	}
@@ -83,7 +84,7 @@ func NewEngine(
 	}
 
 	// register engine with the receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(channels.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
@@ -118,7 +119,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -132,15 +133,24 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
-// process processes events for the matching engine on the consensus node.
+// process events for the matching engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	receipt, ok := event.(*flow.ExecutionReceipt)
 	if !ok {
-		return fmt.Errorf("input message of incompatible type: %T, origin: %x", event, originID[:])
+		return fmt.Errorf("no matching processor for message of type %T from origin %x: %w", event, originID[:],
+			engine.IncompatibleInputTypeError)
 	}
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
@@ -151,23 +161,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // HandleReceipt ingests receipts from the Requester module.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
-	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-	e.pendingReceipts.Push(receipt)
-	e.inboundEventsNotifier.Notify()
+	err := e.process(originID, receipt)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event from requester module")
+	}
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
 // OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+	e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	e.blockIncorporatedNotifier.Notify()
 }
 
@@ -177,15 +188,16 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 // only from receipts received directly from ENs. sealing Core would not know about
 // Receipts that are incorporated by other nodes in their blocks blocks (but never
 // received directly from the EN).
-func (e *Engine) processIncorporatedBlock(finalizedBlockID flow.Identifier) error {
-	index, err := e.index.ByBlockID(finalizedBlockID)
+// No errors expected during normal operations.
+func (e *Engine) processIncorporatedBlock(blockID flow.Identifier) error {
+	index, err := e.index.ByBlockID(blockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not retrieve payload index for block %v", finalizedBlockID)
+		return fmt.Errorf("could not retrieve payload index for incorporated block %v", blockID)
 	}
 	for _, receiptID := range index.ReceiptIDs {
 		receipt, err := e.receipts.ByID(receiptID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", finalizedBlockID, err)
+			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", blockID, err)
 		}
 		e.pendingReceipts.Push(receipt)
 	}
@@ -209,7 +221,7 @@ func (e *Engine) finalizationProcessingLoop() {
 	}
 }
 
-// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
+// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events.
 func (e *Engine) blockIncorporatedEventsProcessingLoop() {
 	c := e.blockIncorporatedNotifier.Channel()
 
@@ -242,7 +254,8 @@ func (e *Engine) inboundEventsProcessingLoop() {
 	}
 }
 
-// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
+// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events.
+// No errors expected during normal operations.
 func (e *Engine) processBlockIncorporatedEvents() error {
 	for {
 		select {
@@ -267,7 +280,8 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
-// from other nodes as well as internally trusted
+// from other nodes as well as internally trusted.
+// No errors expected during normal operations.
 func (e *Engine) processAvailableEvents() error {
 	for {
 		select {
