@@ -19,13 +19,13 @@ require (
 	github.com/onflow/cadence v0.31.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221216161720-c1b31d5a4722
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722
-	github.com/onflow/flow-emulator v0.38.1
+	github.com/onflow/flow-emulator v0.42.1-0.20230110232744-399decb21158
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20221012204608-ed91c80fee2b
+	github.com/onflow/flow-go v0.28.1-0.20230110053724-eb549a9d362f
 	github.com/onflow/flow-go-sdk v0.31.2
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221130185733-92eb85ead310
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.28.0

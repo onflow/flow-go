@@ -78,6 +78,13 @@ func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
+// BatchRemoveBlockIDByChunkID removes chunkID-to-blockID index entries keyed by a chunkID in a provided batch.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func BatchRemoveBlockIDByChunkID(chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeIndexBlockByChunkID, chunkID))
+}
+
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
 func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
