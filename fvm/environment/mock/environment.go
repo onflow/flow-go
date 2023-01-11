@@ -22,6 +22,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
 	sema "github.com/onflow/cadence/runtime/sema"
@@ -1123,13 +1125,20 @@ func (_m *Environment) SigningAccounts() []common.Address {
 	return r0
 }
 
-// StartChildSpan provides a mock function with given fields: name
-func (_m *Environment) StartChildSpan(name trace.SpanName) tracing.TracerSpan {
-	ret := _m.Called(name)
+// StartChildSpan provides a mock function with given fields: name, options
+func (_m *Environment) StartChildSpan(name trace.SpanName, options ...oteltrace.SpanStartOption) tracing.TracerSpan {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 tracing.TracerSpan
-	if rf, ok := ret.Get(0).(func(trace.SpanName) tracing.TracerSpan); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(trace.SpanName, ...oteltrace.SpanStartOption) tracing.TracerSpan); ok {
+		r0 = rf(name, options...)
 	} else {
 		r0 = ret.Get(0).(tracing.TracerSpan)
 	}

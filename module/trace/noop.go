@@ -2,9 +2,7 @@ package trace
 
 import (
 	"context"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -90,15 +88,6 @@ func (t *NoopTracer) StartSpanFromParent(
 	opts ...trace.SpanStartOption,
 ) trace.Span {
 	return NoopSpan
-}
-
-func (t *NoopTracer) RecordSpanFromParent(
-	span trace.Span,
-	operationName SpanName,
-	duration time.Duration,
-	attrs []attribute.KeyValue,
-	opts ...trace.SpanStartOption,
-) {
 }
 
 func (t *NoopTracer) WithSpanFromContext(
