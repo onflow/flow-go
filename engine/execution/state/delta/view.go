@@ -123,8 +123,8 @@ func (v *View) AllRegisters() []flow.RegisterID {
 }
 
 // RegisterUpdates returns a list of register updates
-func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return v.Delta().RegisterUpdates()
+func (v *View) UpdatedRegisters() flow.RegisterEntries {
+	return v.Delta().UpdatedRegisters()
 }
 
 // Get gets a register value from this view.

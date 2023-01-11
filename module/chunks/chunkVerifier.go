@@ -261,13 +261,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// applying chunk delta (register updates at chunk level) to the partial trie
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
-	regs, values := chunkView.Delta().RegisterUpdates()
+	keys, values := executionState.RegisterEntriesToKeysValues(
+		chunkView.Delta().UpdatedRegisters())
 
 	update, err := ledger.NewUpdate(
 		ledger.State(chunkDataPack.StartState),
-		executionState.RegisterIDSToKeys(regs),
-		executionState.RegisterValuesToValues(values),
-	)
+		keys,
+		values)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
