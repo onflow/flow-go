@@ -41,7 +41,6 @@ type FollowerState struct {
 	tracer     module.Tracer
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
-	cfg        Config
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -69,9 +68,8 @@ func NewFollowerState(
 		tracer:     tracer,
 		consumer:   consumer,
 		blockTimer: blockTimer,
-		cfg:        DefaultConfig(),
 	}
-	state.maxSealingSegmentLength = followerState.cfg.transactionExpiry
+	state.maxSealingSegmentLength = flow.DefaultTransactionExpiry
 	return followerState, nil
 }
 
@@ -266,7 +264,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := header.Height - m.cfg.transactionExpiry
+	limit := header.Height - flow.DefaultTransactionExpiry
 	if limit > header.Height { // overflow check
 		limit = 0
 	}

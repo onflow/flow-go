@@ -383,20 +383,20 @@ func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) er
 	}
 
 	sealingSegmentLength := uint64(len(sealingSegment.AllBlocks()))
-	cfg := DefaultConfig()
+	transactionExpiry := uint64(flow.DefaultTransactionExpiry)
 	blocksInSpork := head.Height - sporkRootBlockHeight
 	// check if head.Height - sporkRootBlockHeight < cfg.transactionExpiry
 	// this is the case where we bootstrap early into the spork and there is simply not enough blocks
-	if blocksInSpork < cfg.transactionExpiry {
+	if blocksInSpork < transactionExpiry {
 		// the distance to spork root is less than transaction expiry, we need all blocks back to the spork root.
 		if sealingSegmentLength != blocksInSpork {
 			return fmt.Errorf("invalid root snapshot length, expecting exactly (%d), got (%d)", blocksInSpork, sealingSegmentLength)
 		}
 	} else {
 		// the distance to spork root is more than transaction expiry, we need at least `transactionExpiry` many blocks
-		if sealingSegmentLength < cfg.transactionExpiry {
+		if sealingSegmentLength < transactionExpiry {
 			return fmt.Errorf("invalid root snapshot length, expecting at least (%d), got (%d)",
-				cfg.transactionExpiry, sealingSegmentLength)
+				transactionExpiry, sealingSegmentLength)
 		}
 	}
 	return nil
