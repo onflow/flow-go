@@ -39,6 +39,8 @@ type TelemetryConsumer struct {
 
 var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
 
+// NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
+// Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
 func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
 	pathHandler := NewPathHandler(log)
 	return &TelemetryConsumer{
@@ -254,6 +256,7 @@ type PathHandler struct {
 
 // NewPathHandler instantiate a new PathHandler.
 // The PathHandler has no currently open path
+// Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
 func NewPathHandler(log zerolog.Logger) *PathHandler {
 	return &PathHandler{
 		log:         log.With().Str("component", "hotstuff.telemetry").Logger(),
