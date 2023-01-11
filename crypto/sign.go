@@ -4,7 +4,6 @@ package crypto
 import (
 	"crypto/elliptic"
 	"fmt"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -27,11 +26,12 @@ const (
 	ECDSAP256
 	// ECDSASecp256k1 is ECDSA on secp256k1 curve
 	ECDSASecp256k1
+	BLSBN256
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1", "BLS_BN256"}[f]
 }
 
 // Signature is a generic type, regardless of the signature scheme
@@ -56,6 +56,8 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 		return p256Instance, nil
 	case ECDSASecp256k1:
 		return secp256k1Instance, nil
+	case BLSBN256:
+		return blsBN256Instance, nil
 	default:
 		return nil, invalidInputsErrorf("the signature scheme %s is not supported", algo)
 	}
@@ -73,6 +75,10 @@ func initNonRelic() {
 	secp256k1Instance = &(ecdsaAlgo{
 		curve: btcec.S256(),
 		algo:  ECDSASecp256k1,
+	})
+
+	blsBN256Instance = &(blsBN256Algo{
+		algo: BLSBN256,
 	})
 }
 
