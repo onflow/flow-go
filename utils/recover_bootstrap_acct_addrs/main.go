@@ -64,6 +64,9 @@ func main() {
 	//  -> can ignore stake
 	idToStakingAddress := make(map[flow.Identifier]flow.Address)
 	addressIndex := uint64(4) // points to the first address BEFORE any machine account or staking account
+
+	// simultaneously construct a list of machine account addresses
+	var machineAccounts []string
 	for _, identity := range identities {
 
 		// increment address index to point to staking account for identity
@@ -76,11 +79,20 @@ func main() {
 		idToStakingAddress[identity.NodeID] = stakingAddress
 
 		if identity.Role == flow.RoleCollection || identity.Role == flow.RoleConsensus {
-			addressIndex += 1 // skip the machine account
+			addressIndex += 1 // increment to point to the machine account
+
+			machineAddr, err := flow.Sandboxnet.Chain().AddressAtIndex(addressIndex)
+			if err != nil {
+				panic(err)
+			}
+			machineAccounts = append(machineAccounts, machineAddr.Hex())
 		}
 	}
 
 	// STEP 2: generate files
+
+	writeJSON("./sandboxnet-machine-account-addresses.json", machineAccounts)
+	return
 
 	type nodeConf struct {
 		Role           string
