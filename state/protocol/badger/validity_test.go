@@ -116,9 +116,21 @@ func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
 		require.Error(t, err)
 	})
-	t.Run("enough-history", func(t *testing.T) {
+	t.Run("enough-history-spork-just-started", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		rootSnapshot.Encodable().Head.Height += DefaultConfig().transactionExpiry // advance height to be not spork root snapshot, but have enough history
+		// advance height to be not spork root snapshot, but still lower than transaction expiry
+		rootSnapshot.Encodable().Head.Height += DefaultConfig().transactionExpiry / 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(DefaultConfig().transactionExpiry/2) - 1)
+		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		require.NoError(t, err)
+	})
+	t.Run("enough-history-long-spork", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		// advance height to be not spork root snapshot
+		rootSnapshot.Encodable().Head.Height += DefaultConfig().transactionExpiry * 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(DefaultConfig().transactionExpiry) - 1)
 		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
 		require.NoError(t, err)
 	})

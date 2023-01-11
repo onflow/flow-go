@@ -354,8 +354,8 @@ func validateClusterQC(cluster protocol.Cluster) error {
 // SanityCheckConsensusNodeRootSnapshotValidity performs a sanity check to make sure root snapshot has enough history
 // to participate in consensus, we require one of next conditions to pass:
 //  1. IsSporkRootSnapshot() == true - this is a snapshot build from a first block of spork.
-//  2. snapshot.Head().Height - snapshot.Params().SporkRootBlockHeight() >= transaction_expiry_limit - such snapshot
-//     has enough history to validate collection guarantees and can safely participate in consensus
+//  2. snapshot.SealingSegment().Len() >= transaction_expiry_limit - such snapshot
+//     has enough history to validate collection guarantees and can safely participate in consensus.
 func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) error {
 	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(snapshot)
 	if err != nil {
@@ -377,11 +377,27 @@ func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) er
 		return fmt.Errorf("could not query spork root block height: %w", err)
 	}
 
-	cfg := DefaultConfig()
-	if head.Height+sporkRootBlockHeight < cfg.transactionExpiry {
-		return fmt.Errorf("invalid root snapshot length, expecting at least %d, got %d",
-			cfg.transactionExpiry, head.Height-sporkRootBlockHeight)
+	sealingSegment, err := snapshot.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("could not query sealing segment: %w", err)
 	}
 
+	sealingSegmentLength := uint64(len(sealingSegment.AllBlocks()))
+	cfg := DefaultConfig()
+	blocksInSpork := head.Height - sporkRootBlockHeight
+	// check if head.Height - sporkRootBlockHeight < cfg.transactionExpiry
+	// this is the case where we bootstrap early into the spork and there is simply not enough blocks
+	if blocksInSpork < cfg.transactionExpiry {
+		// the distance to spork root is less than transaction expiry, we need all blocks back to the spork root.
+		if sealingSegmentLength != blocksInSpork {
+			return fmt.Errorf("invalid root snapshot length, expecting exactly (%d), got (%d)", blocksInSpork, sealingSegmentLength)
+		}
+	} else {
+		// the distance to spork root is more than transaction expiry, we need at least `transactionExpiry` many blocks
+		if sealingSegmentLength < cfg.transactionExpiry {
+			return fmt.Errorf("invalid root snapshot length, expecting at least (%d), got (%d)",
+				cfg.transactionExpiry, sealingSegmentLength)
+		}
+	}
 	return nil
 }
