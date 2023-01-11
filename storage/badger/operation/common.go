@@ -173,6 +173,19 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
+// batchRemove removes entry under a given key in a write-batch.
+// if key doesn't exist, does nothing.
+// No errors are expected during normal operation.
+func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
+	return func(writeBatch *badger.WriteBatch) error {
+		err := writeBatch.Delete(key)
+		if err != nil {
+			return fmt.Errorf("could not batch delete data: %w", err)
+		}
+		return nil
+	}
+}
+
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
 // No errors are expected during normal operation.
@@ -192,6 +205,29 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 			}
 		}
 
+		return nil
+	}
+}
+
+// batchRemoveByPrefix removes all items under the keys match the given prefix in a batch write transaction.
+// no error would be returned if no key was found with the given prefix.
+// all error returned should be exception
+func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
+	return func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
+
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := writeBatch.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }

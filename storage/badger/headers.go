@@ -196,6 +196,14 @@ func (h *Headers) RemoveChunkBlockIndexByChunkID(chunkID flow.Identifier) error 
 	return h.db.Update(operation.RemoveBlockIDByChunkID(chunkID))
 }
 
+// BatchRemoveChunkBlockIndexByChunkID removes block to chunk index entry keyed by a blockID in a provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (h *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveBlockIDByChunkID(chunkID)(writeBatch)
+}
+
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {

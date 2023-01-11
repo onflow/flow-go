@@ -30,6 +30,20 @@ func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Id
 	return r0
 }
 
+// BatchRemoveIndexByBlockID provides a mock function with given fields: blockID, batch
+func (_m *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, batch)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BatchStore provides a mock function with given fields: result, batch
 func (_m *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
 	ret := _m.Called(result, batch)
