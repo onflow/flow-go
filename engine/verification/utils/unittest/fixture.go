@@ -9,6 +9,7 @@ import (
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"

@@ -13,6 +13,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
