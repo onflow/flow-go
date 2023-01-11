@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/message"
+
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -27,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -147,46 +148,6 @@ func PeerIdsFixture(t *testing.T, n int) []peer.ID {
 	return peerIDs
 }
 
-// MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
-func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
-	bz, err := unittest.NetworkCodec().Encode(v)
-	require.NoError(t, err)
-
-	msg := message.Message{
-		ChannelID: channel.String(),
-		Payload:   bz,
-	}
-	data, err := msg.Marshal()
-	require.NoError(t, err)
-
-	return data
-}
-
-// SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
-func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub p2p.Subscription) {
-	received := make(chan struct{})
-	go func() {
-		msg, err := sub.Next(ctx)
-		require.NoError(t, err)
-		require.Equal(t, expectedMessage, msg.Data)
-		close(received)
-	}()
-
-	select {
-	case <-received:
-		return
-	case <-ctx.Done():
-		require.Fail(t, "timeout on receiving expected pubsub message")
-	}
-}
-
-// SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
-func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []p2p.Subscription) {
-	for _, sub := range subs {
-		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
-	}
-}
-
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
 func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription) {
 	timeouted := make(chan struct{})
@@ -249,19 +210,6 @@ func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flo
 	}
 }
 
-// EnsureConnected ensures that the given nodes are connected to each other.
-// It fails the test if any of the nodes is not connected to any other node.
-func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
-	for _, node := range nodes {
-		for _, other := range nodes {
-			if node == other {
-				continue
-			}
-			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
-		}
-	}
-}
-
 // EnsureNotConnected ensures that no connection exists from "from" nodes to "to" nodes.
 func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
 	for _, node := range from {
@@ -280,43 +228,6 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 	EnsureNotConnected(t, ctx, groupA, groupB)
 	// ensure no connection from group B to group A
 	EnsureNotConnected(t, ctx, groupB, groupA)
-}
-
-// EnsurePubsubMessageExchange ensures that the given nodes exchange the given message on the given channel through pubsub.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
-	subs := make([]p2p.Subscription, len(nodes))
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
-	for i, node := range nodes {
-		ps, err := node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.NetworkCodec(),
-				slashingViolationsConsumer,
-				unittest.AllowAllPeerFilter()))
-		require.NoError(t, err)
-		subs[i] = ps
-	}
-
-	// let subscriptions propagate
-	time.Sleep(1 * time.Second)
-
-	channel, ok := channels.ChannelFromTopic(topic)
-	require.True(t, ok)
-
-	for _, node := range nodes {
-		// creates a unique message to be published by the node
-		msg, _ := messageFactory()
-		data := MustEncodeEvent(t, msg, channel)
-		require.NoError(t, node.Publish(ctx, topic, data))
-
-		// wait for the message to be received by all nodes
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		SubsMustReceiveMessage(t, ctx, data, subs)
-		cancel()
-	}
 }
 
 // EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
@@ -452,26 +363,51 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 	}
 }
 
-// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
-func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
-	for _, this := range nodes {
-		for _, other := range nodes {
-			if this == other {
-				continue
-			}
-			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
-			require.NoError(t, err)
-			require.NotNil(t, s)
-		}
-	}
-}
-
 // LongStringMessageFactoryFixture returns a function that creates a long unique string message.
 func LongStringMessageFactoryFixture(t *testing.T) func() string {
 	return func() string {
 		msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors"
 		require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
 		return fmt.Sprintf("%s %d \n", msg, time.Now().UnixNano()) // add timestamp to make sure we don't send the same message twice
+	}
+}
+
+// MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
+func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
+	bz, err := unittest.NetworkCodec().Encode(v)
+	require.NoError(t, err)
+
+	msg := message.Message{
+		ChannelID: channel.String(),
+		Payload:   bz,
+	}
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
+	return data
+}
+
+// SubMustReceiveMessage checks that the subscription have received the given message within the given timeout by the context.
+func SubMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, sub p2p.Subscription) {
+	received := make(chan struct{})
+	go func() {
+		msg, err := sub.Next(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedMessage, msg.Data)
+		close(received)
+	}()
+
+	select {
+	case <-received:
+		return
+	case <-ctx.Done():
+		require.Fail(t, "timeout on receiving expected pubsub message")
+	}
+}
+
+// SubsMustReceiveMessage checks that all subscriptions receive the given message within the given timeout by the context.
+func SubsMustReceiveMessage(t *testing.T, ctx context.Context, expectedMessage []byte, subs []p2p.Subscription) {
+	for _, sub := range subs {
+		SubMustReceiveMessage(t, ctx, expectedMessage, sub)
 	}
 }
