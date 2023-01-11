@@ -130,8 +130,8 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		currentState := processor.Status()
 		err := processor.Process(vote)
 		if err != nil {
-			if model.IsInvalidVoteError(err) {
-				m.notifier.OnInvalidVoteDetected(vote)
+			if invalidVoteErr, ok := model.AsInvalidVoteError(err); ok {
+				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
 			// ATTENTION: due to how our logic is designed this situation is only possible

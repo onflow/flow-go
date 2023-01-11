@@ -207,6 +207,17 @@ func IsInvalidVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// AsInvalidVoteError determines whether the given error is a InvalidVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidVoteError(err error) (*InvalidVoteError, bool) {
+	var e InvalidVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
 func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }

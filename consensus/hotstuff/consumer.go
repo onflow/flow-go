@@ -115,7 +115,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
+	OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate)
 
 	// OnTcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a TC. The arguments specify the tc (first argument), which triggered
@@ -123,7 +123,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
+	OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
@@ -161,7 +161,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier)
+	OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

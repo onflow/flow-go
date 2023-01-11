@@ -117,19 +117,21 @@ func (lc *LogConsumer) OnViewChange(oldView, newView uint64) {
 		Msg("entered new view")
 }
 
-func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (lc *LogConsumer) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
+		Uint64("old_view", oldView).
 		Uint64("new_view", newView).
 		Msg("QC triggered view change")
 }
 
-func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (lc *LogConsumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	lc.log.Debug().
 		Uint64("tc_view", tc.View).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Uint64("new_view", newView).
+		Uint64("old_view", oldView).
 		Msg("TC triggered view change")
 }
 
@@ -153,8 +155,9 @@ func (lc *LogConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
 	log.Debug().Msg("processed valid timeout object")
 }
 
-func (lc *LogConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+func (lc *LogConsumer) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	lc.log.Info().
+		Uint64("view", currentView).
 		Uint64("finalized_view", finalizedView).
 		Hex("current_leader", currentLeader[:]).
 		Msg("current view details")

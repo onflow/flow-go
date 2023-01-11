@@ -375,7 +375,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Uint64("finalized_view", finalizedView).
 		Hex("leader_id", currentLeader[:]).Logger()
 
-	e.notifier.OnCurrentViewDetails(finalizedView, currentLeader)
+	e.notifier.OnCurrentViewDetails(curView, finalizedView, currentLeader)
 
 	// check that I am the primary for this view and that I haven't already proposed; otherwise there is nothing to do
 	if e.committee.Self() != currentLeader {

@@ -142,17 +142,19 @@ func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("OnFinalizedBlock")
 }
 
-func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (t *TelemetryConsumer) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("qc_view", qc.View).
+		Uint64("old_view", oldView).
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcTriggeredViewChange")
 }
 
-func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (t *TelemetryConsumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("tc_view", tc.View).
+		Uint64("old_view", oldView).
 		Uint64("next_view", newView).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
@@ -228,8 +230,9 @@ func (t *TelemetryConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
 	step.Msg("OnTimeoutProcessed")
 }
 
-func (t *TelemetryConsumer) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+func (t *TelemetryConsumer) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	t.pathHandler.NextStep().
+		Uint64("view", currentView).
 		Uint64("finalized_view", finalizedView).
 		Hex("current_leader", currentLeader[:]).
 		Msg("OnCurrentViewDetails")

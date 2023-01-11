@@ -31,7 +31,7 @@ func NewDistributor() *Distributor {
 	return &Distributor{}
 }
 
-// AddConsumer adds an a event consumer to the Distributor
+// AddConsumer adds an event consumer to the Distributor
 func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -94,19 +94,19 @@ func (p *Distributor) OnViewChange(oldView, newView uint64) {
 	}
 }
 
-func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (p *Distributor) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnQcTriggeredViewChange(qc, newView)
+		subscriber.OnQcTriggeredViewChange(oldView, newView, qc)
 	}
 }
 
-func (p *Distributor) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (p *Distributor) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnTcTriggeredViewChange(tc, newView)
+		subscriber.OnTcTriggeredViewChange(oldView, newView, tc)
 	}
 }
 
@@ -134,11 +134,11 @@ func (p *Distributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
 	}
 }
 
-func (p *Distributor) OnCurrentViewDetails(finalizedView uint64, currentLeader flow.Identifier) {
+func (p *Distributor) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnCurrentViewDetails(finalizedView, currentLeader)
+		subscriber.OnCurrentViewDetails(currentView, finalizedView, currentLeader)
 	}
 }
 
@@ -174,11 +174,11 @@ func (p *Distributor) OnDoubleVotingDetected(vote1, vote2 *model.Vote) {
 	}
 }
 
-func (p *Distributor) OnInvalidVoteDetected(vote *model.Vote) {
+func (p *Distributor) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnInvalidVoteDetected(vote)
+		subscriber.OnInvalidVoteDetected(err)
 	}
 }
 
@@ -198,11 +198,11 @@ func (p *Distributor) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altT
 	}
 }
 
-func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
+func (p *Distributor) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnInvalidTimeoutDetected(timeout)
+		subscriber.OnInvalidTimeoutDetected(err)
 	}
 }
 
