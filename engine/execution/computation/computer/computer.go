@@ -92,12 +92,6 @@ type transaction struct {
 	*flow.TransactionBody
 }
 
-// VirtualMachine runs procedures
-type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View) error
-	GetAccount(fvm.Context, flow.Address, state.View) (*flow.Account, error)
-}
-
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
 	ExecuteBlock(
@@ -112,7 +106,7 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm                    VirtualMachine
+	vm                    fvm.VM
 	vmCtx                 fvm.Context
 	metrics               module.ExecutionMetrics
 	tracer                module.Tracer
@@ -140,7 +134,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
-	vm VirtualMachine,
+	vm fvm.VM,
 	vmCtx fvm.Context,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
