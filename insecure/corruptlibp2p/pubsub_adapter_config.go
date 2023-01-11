@@ -58,13 +58,15 @@ func NewCorruptPubSubAdapterConfig(base *p2p.BasePubSubAdapterConfig, opts ...Co
 	config := &CorruptPubSubAdapterConfig{
 		withMessageSigning:              true,
 		withStrictSignatureVerification: true,
+		options:                         make([]corrupt.Option, 0),
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	config.options = defaultCorruptPubsubOptions(base, config.withMessageSigning, config.withStrictSignatureVerification)
+	// Note: we append the default options at the end to make sure that we are not overriding the options provided by the caller.
+	config.options = append(config.options, defaultCorruptPubsubOptions(base, config.withMessageSigning, config.withStrictSignatureVerification)...)
 
 	return config
 }
