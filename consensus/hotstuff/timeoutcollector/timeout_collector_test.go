@@ -119,11 +119,14 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	s.Run("invalid-timeout", func() {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 		s.processor.On("Process", timeout).Return(model.NewInvalidTimeoutErrorf(timeout, "")).Once()
-		s.notifier.On("OnInvalidTimeoutDetected", timeout).Once()
+		s.notifier.On("OnInvalidTimeoutDetected", mock.Anything).Run(func(args mock.Arguments) {
+			invalidTimeoutErr := args.Get(0).(model.InvalidTimeoutError)
+			require.Equal(s.T(), timeout, invalidTimeoutErr.Timeout)
+		}).Once()
 		err := s.collector.AddTimeout(timeout)
 		require.NoError(s.T(), err)
 
-		s.notifier.AssertCalled(s.T(), "OnInvalidTimeoutDetected", timeout)
+		s.notifier.AssertCalled(s.T(), "OnInvalidTimeoutDetected", mock.Anything)
 	})
 	s.Run("process-exception", func() {
 		exception := errors.New("invalid-signature")

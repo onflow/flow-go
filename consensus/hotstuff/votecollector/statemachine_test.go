@@ -8,6 +8,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -152,13 +153,16 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
 		s.notifier.On("OnVoteProcessed", vote).Once()
-		s.notifier.On("OnInvalidVoteDetected", vote).Return(nil).Once()
+		s.notifier.On("OnInvalidVoteDetected", mock.Anything).Run(func(args mock.Arguments) {
+			invalidVoteErr := args.Get(0).(model.InvalidVoteError)
+			require.Equal(s.T(), vote, invalidVoteErr.Vote)
+		}).Return(nil).Once()
 		err := s.collector.AddVote(vote)
 		// in case process returns model.InvalidVoteError we should silently ignore this error
 		require.NoError(t, err)
 
 		// but should get notified about invalid vote
-		s.notifier.AssertCalled(t, "OnInvalidVoteDetected", vote)
+		s.notifier.AssertCalled(t, "OnInvalidVoteDetected", mock.Anything)
 		processor.AssertCalled(t, "Process", vote)
 	})
 	s.T().Run("add-repeated-vote", func(t *testing.T) {
