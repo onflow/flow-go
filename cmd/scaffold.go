@@ -672,10 +672,9 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 			return mempools, nil
 		})
 
-		nodeInfoMetrics := metrics.NewNodeInfoCollector(fnb.MetricsRegisterer)
-
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
+			nodeInfoMetrics := metrics.NewNodeInfoCollector()
 			nodeInfoMetrics.NodeInfo(build.Semver(), build.Commit(), nodeConfig.SporkID.String())
 			return nil
 		})

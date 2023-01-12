@@ -13,7 +13,8 @@ import (
 // TestNodeInfoCollector_NodeInfo tests if node info collector reports desired metrics
 func TestNodeInfoCollector_NodeInfo(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	collector := NewNodeInfoCollector(reg)
+	prometheus.DefaultRegisterer = reg
+	collector := NewNodeInfoCollector()
 	version := "0.29"
 	commit := "63cec231136914941e2358de2054a6ef71ea3c99"
 	sporkID := unittest.IdentifierFixture().String()
