@@ -5,12 +5,12 @@ package mock
 import (
 	context "context"
 
-	execution "github.com/onflow/flow-go/engine/execution"
+	derived "github.com/onflow/flow-go/fvm/derived"
 	entity "github.com/onflow/flow-go/module/mempool/entity"
 
-	mock "github.com/stretchr/testify/mock"
+	execution "github.com/onflow/flow-go/engine/execution"
 
-	programs "github.com/onflow/flow-go/fvm/programs"
+	mock "github.com/stretchr/testify/mock"
 
 	state "github.com/onflow/flow-go/fvm/state"
 )
@@ -21,11 +21,11 @@ type BlockComputer struct {
 }
 
 // ExecuteBlock provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *BlockComputer) ExecuteBlock(_a0 context.Context, _a1 *entity.ExecutableBlock, _a2 state.View, _a3 *programs.BlockPrograms) (*execution.ComputationResult, error) {
+func (_m *BlockComputer) ExecuteBlock(_a0 context.Context, _a1 *entity.ExecutableBlock, _a2 state.View, _a3 *derived.DerivedBlockData) (*execution.ComputationResult, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View, *programs.BlockPrograms) *execution.ComputationResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) *execution.ComputationResult); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {
@@ -34,7 +34,7 @@ func (_m *BlockComputer) ExecuteBlock(_a0 context.Context, _a1 *entity.Executabl
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View, *programs.BlockPrograms) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) error); ok {
 		r1 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r1 = ret.Error(1)

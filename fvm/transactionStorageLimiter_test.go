@@ -10,20 +10,21 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
-func TestTransactionStorageLimiter_Process(t *testing.T) {
+func TestTransactionStorageLimiter(t *testing.T) {
 	owner := flow.HexToAddress("1")
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 		env := &fvmmock.Environment{}
 		env.On("Chain").Return(chain)
 		env.On("LimitAccountStorage").Return(true)
-		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
+		env.On("StartChildSpan", mock.Anything).Return(
+			tracing.NewMockTracerSpan())
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(99), nil)
-		env.On("AccountsStorageCapacity", mock.Anything).Return(
+		env.On("AccountsStorageCapacity", mock.Anything, mock.Anything, mock.Anything).Return(
 			cadence.NewArray([]cadence.Value{
 				bytesToUFix64(100),
 			}),
@@ -31,7 +32,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckStorageLimits(env, []flow.Address{owner}, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -39,9 +40,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("Chain").Return(chain)
 		env.On("LimitAccountStorage").Return(true)
-		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
+		env.On("StartChildSpan", mock.Anything).Return(
+			tracing.NewMockTracerSpan())
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(100), nil)
-		env.On("AccountsStorageCapacity", mock.Anything).Return(
+		env.On("AccountsStorageCapacity", mock.Anything, mock.Anything, mock.Anything).Return(
 			cadence.NewArray([]cadence.Value{
 				bytesToUFix64(100),
 			}),
@@ -49,7 +51,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckStorageLimits(env, []flow.Address{owner}, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -57,9 +59,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("Chain").Return(chain)
 		env.On("LimitAccountStorage").Return(true)
-		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
+		env.On("StartChildSpan", mock.Anything).Return(
+			tracing.NewMockTracerSpan())
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
-		env.On("AccountsStorageCapacity", mock.Anything).Return(
+		env.On("AccountsStorageCapacity", mock.Anything, mock.Anything, mock.Anything).Return(
 			cadence.NewArray([]cadence.Value{
 				bytesToUFix64(100),
 			}),
@@ -67,7 +70,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckStorageLimits(env, []flow.Address{owner}, flow.EmptyAddress, 0)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
@@ -75,10 +78,11 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("Chain").Return(chain)
 		env.On("LimitAccountStorage").Return(false)
-		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
+		env.On("StartChildSpan", mock.Anything).Return(
+			tracing.NewMockTracerSpan())
 		env.On("GetStorageCapacity", mock.Anything).Return(uint64(100), nil)
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
-		env.On("AccountsStorageCapacity", mock.Anything).Return(
+		env.On("AccountsStorageCapacity", mock.Anything, mock.Anything, mock.Anything).Return(
 			cadence.NewArray([]cadence.Value{
 				bytesToUFix64(100),
 			}),
@@ -86,7 +90,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckStorageLimits(env, []flow.Address{owner}, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
@@ -94,9 +98,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("Chain").Return(chain)
 		env.On("LimitAccountStorage").Return(true)
-		env.On("StartSpanFromRoot", mock.Anything).Return(trace.NoopSpan)
+		env.On("StartChildSpan", mock.Anything).Return(
+			tracing.NewMockTracerSpan())
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(0), errors.NewAccountNotFoundError(owner))
-		env.On("AccountsStorageCapacity", mock.Anything).Return(
+		env.On("AccountsStorageCapacity", mock.Anything, mock.Anything, mock.Anything).Return(
 			cadence.NewArray([]cadence.Value{
 				bytesToUFix64(100),
 			}),
@@ -104,7 +109,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckStorageLimits(env, []flow.Address{owner}, flow.EmptyAddress, 0)
 		require.Error(t, err, "check storage used on non existing account (not general registers) should fail")
 	})
 }

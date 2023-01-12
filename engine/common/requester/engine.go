@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,8 +46,12 @@ type Engine struct {
 	selector flow.IdentityFilter
 	create   CreateFunc
 	handle   HandleFunc
-	items    map[flow.Identifier]*Item
-	requests map[uint64]*messages.EntityRequest
+
+	// changing the following state variables must be guarded by unit.Lock()
+	items                 map[flow.Identifier]*Item
+	requests              map[uint64]*messages.EntityRequest
+	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
+	rng                   *rand.Rand
 }
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
@@ -99,18 +104,20 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "requester").Logger(),
-		cfg:      cfg,
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		channel:  channel,
-		selector: selector,
-		create:   create,
-		handle:   nil,
-		items:    make(map[flow.Identifier]*Item),          // holds all pending items
-		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
+		unit:                  engine.NewUnit(),
+		log:                   log.With().Str("engine", "requester").Logger(),
+		cfg:                   cfg,
+		metrics:               metrics,
+		me:                    me,
+		state:                 state,
+		channel:               channel,
+		selector:              selector,
+		create:                create,
+		handle:                nil,
+		items:                 make(map[flow.Identifier]*Item),          // holds all pending items
+		requests:              make(map[uint64]*messages.EntityRequest), // holds all sent requests
+		forcedDispatchOngoing: atomic.NewBool(false),
+		rng:                   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -234,19 +241,31 @@ func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.Identi
 // Force will force the requester engine to dispatch all currently
 // valid batch requests.
 func (e *Engine) Force() {
-	count := uint(0)
-	for {
-		dispatched, err := e.dispatchRequest()
-		if err != nil {
-			e.log.Error().Err(err).Msg("could not dispatch requests")
-			return
-		}
-		if !dispatched {
-			e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
-			return
-		}
-		count++
+	// exit early in case a forced dispatch is currently ongoing
+	if e.forcedDispatchOngoing.Load() {
+		return
 	}
+
+	// using Launch to ensure the caller won't be blocked
+	e.unit.Launch(func() {
+		// using atomic bool to ensure there is at most one caller would trigger dispatching requests
+		if e.forcedDispatchOngoing.CompareAndSwap(false, true) {
+			count := uint(0)
+			for {
+				dispatched, err := e.dispatchRequest()
+				if err != nil {
+					e.log.Error().Err(err).Msg("could not dispatch requests")
+					break
+				}
+				if !dispatched {
+					e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
+					break
+				}
+				count++
+			}
+			e.forcedDispatchOngoing.Store(false)
+		}
+	})
 }
 
 func (e *Engine) poll() {
@@ -259,6 +278,10 @@ PollLoop:
 			break PollLoop
 
 		case <-ticker.C:
+			if e.forcedDispatchOngoing.Load() {
+				return
+			}
+
 			dispatched, err := e.dispatchRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not dispatch requests")
@@ -273,6 +296,11 @@ PollLoop:
 	ticker.Stop()
 }
 
+// dispatchRequest dispatches a subset of requests (selection based on internal heuristic).
+// While `dispatchRequest` sends a request (covering some but not necessarily all items),
+// if and only if there is something to request. In other words it cannot happen that
+// `dispatchRequest` sends no request, but there is something to be requested.
+// The boolean return value indicates whether a request was dispatched at all.
 func (e *Engine) dispatchRequest() (bool, error) {
 
 	e.unit.Lock()
@@ -286,11 +314,19 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
+	// randomize order of items, so that they can be requested in different order each time
+	rndItems := make([]flow.Identifier, 0, len(e.items))
+	for k := range e.items {
+		rndItems = append(rndItems, e.items[k].EntityID)
+	}
+	e.rng.Shuffle(len(rndItems), func(i, j int) { rndItems[i], rndItems[j] = rndItems[j], rndItems[i] })
+
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
-	for entityID, item := range e.items {
+	for _, entityID := range rndItems {
+		item := e.items[entityID]
 
 		// if the item should not be requested yet, ignore
 		cutoff := item.LastRequested.Add(item.RetryAfter)
@@ -320,8 +356,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 		// if no provider has been chosen yet, choose from restricted set
 		// NOTE: a single item can not permanently block requests going
-		// out when no providers are available for it, because the map
-		// iteration is random and will skip the item most of the times
+		// out when no providers are available for it, because the iteration
+		// order is random and will skip the item most of the times
 		// when other items are available
 		if providerID == flow.ZeroID {
 			providers = providers.Filter(item.ExtraSelector)
@@ -349,8 +385,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
-		e.log.Debug().Hex("entity", logging.ID(entityID)).Msg("selected entity")
-
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
 			break
@@ -364,7 +398,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	// create a batch request, send it and store it for reference
 	req := &messages.EntityRequest{
-		Nonce:     rand.Uint64(),
+		Nonce:     e.rng.Uint64(),
 		EntityIDs: entityIDs,
 	}
 
@@ -381,7 +415,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
-		return true, fmt.Errorf("could not send request: %w", err)
+		return true, fmt.Errorf("could not send request for entities %v: %w", logging.IDs(entityIDs), err)
 	}
 	e.requests[req.Nonce] = req
 
@@ -422,9 +456,6 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	switch msg := message.(type) {
 	case *messages.EntityResponse:
 		return e.onEntityResponse(originID, msg)
@@ -460,6 +491,9 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			Uint64("nonce", res.Nonce).
 			Msg("onEntityResponse entries received")
 	}
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items
@@ -505,6 +539,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 				lg.Error().
 					Hex("stated_entity_id", logging.ID(entityID)).
 					Hex("provided_entity", logging.ID(actualEntityID)).
+					Bool(logging.KeySuspicious, true).
 					Msg("provided entity does not match stated ID")
 				continue
 			}

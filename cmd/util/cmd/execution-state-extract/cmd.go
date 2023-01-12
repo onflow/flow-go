@@ -3,14 +3,12 @@ package extract
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -26,6 +24,7 @@ var (
 	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
+	flagNWorker           int
 )
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -70,6 +69,8 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
 }
 
 func run(*cobra.Command, []string) {
@@ -86,6 +87,8 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("malformed block hash")
 		}
 
+		log.Info().Msgf("extracting state by block ID: %v", blockID)
+
 		db := common.InitStorage(flagDatadir)
 		defer db.Close()
 
@@ -94,7 +97,7 @@ func run(*cobra.Command, []string) {
 
 		stateCommitment, err = getStateCommitment(commits, blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot get state commitment for block")
+			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
 	}
 
@@ -108,29 +111,29 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
+
+		log.Info().Msgf("extracting state by state commitment: %x", stateCommitment)
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
-		// read state commitment from root checkpoint
-
-		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid root checkpoint")
-		}
-		defer f.Close()
-
-		rootHash, err := wal.ReadLastTrieRootHashFromCheckpoint(f)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to read last root hash in root checkpoint: %s", err.Error())
-		}
-
-		stateCommitment, err = flow.ToStateCommitment(rootHash[:])
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert state commitment from last root hash in root checkpoint")
-		}
+		log.Fatal().Msg("no --block-hash or --state-commitment was specified")
 	}
 
-	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
+	log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
+		flagExecutionStateDir,
+		path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
+		6,
+	)
+
+	log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
+		hex.EncodeToString(stateCommitment[:]),
+		flagExecutionStateDir,
+		flagOutputDir)
+
+	// err := ensureCheckpointFileExist(flagExecutionStateDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+	// }
 
 	chain, err := getChain(flagChain)
 	if err != nil {
@@ -145,9 +148,34 @@ func run(*cobra.Command, []string) {
 		chain,
 		!flagNoMigration,
 		!flagNoReport,
+		flagNWorker,
 	)
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
 }
+
+// func ensureCheckpointFileExist(dir string) error {
+// 	checkpoints, err := wal.Checkpoints(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not find checkpoint files: %v", err)
+// 	}
+//
+// 	if len(checkpoints) != 0 {
+// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+// 		return nil
+// 	}
+//
+// 	has, err := wal.HasRootCheckpoint(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
+// 	}
+//
+// 	if has {
+// 		log.Info().Msg("found root checkpoint file")
+// 		return nil
+// 	}
+//
+// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
+// }

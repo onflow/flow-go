@@ -5,25 +5,50 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/slices"
 )
 
-const keyUUID = "uuid"
+type UUIDGenerator interface {
+	GenerateUUID() (uint64, error)
+}
 
-type UUIDGenerator struct {
-	tracer *Tracer
+type ParseRestrictedUUIDGenerator struct {
+	txnState *state.TransactionState
+	impl     UUIDGenerator
+}
+
+func NewParseRestrictedUUIDGenerator(
+	txnState *state.TransactionState,
+	impl UUIDGenerator,
+) UUIDGenerator {
+	return ParseRestrictedUUIDGenerator{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (generator ParseRestrictedUUIDGenerator) GenerateUUID() (uint64, error) {
+	return parseRestrict1Ret(
+		generator.txnState,
+		trace.FVMEnvGenerateUUID,
+		generator.impl.GenerateUUID)
+}
+
+type uUIDGenerator struct {
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	txnState *state.TransactionState
 }
 
 func NewUUIDGenerator(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	txnState *state.TransactionState,
-) *UUIDGenerator {
-	return &UUIDGenerator{
+) *uUIDGenerator {
+	return &uUIDGenerator{
 		tracer:   tracer,
 		meter:    meter,
 		txnState: txnState,
@@ -31,10 +56,10 @@ func NewUUIDGenerator(
 }
 
 // GetUUID reads uint64 byte value for uuid from the state
-func (generator *UUIDGenerator) GetUUID() (uint64, error) {
+func (generator *uUIDGenerator) getUUID() (uint64, error) {
 	stateBytes, err := generator.txnState.Get(
 		"",
-		keyUUID,
+		state.UUIDKey,
 		generator.txnState.EnforceLimits())
 	if err != nil {
 		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
@@ -45,12 +70,12 @@ func (generator *UUIDGenerator) GetUUID() (uint64, error) {
 }
 
 // SetUUID sets a new uint64 byte value
-func (generator *UUIDGenerator) SetUUID(uuid uint64) error {
+func (generator *uUIDGenerator) setUUID(uuid uint64) error {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
 	err := generator.txnState.Set(
 		"",
-		keyUUID,
+		state.UUIDKey,
 		bytes,
 		generator.txnState.EnforceLimits())
 	if err != nil {
@@ -60,8 +85,8 @@ func (generator *UUIDGenerator) SetUUID(uuid uint64) error {
 }
 
 // GenerateUUID generates a new uuid and persist the data changes into state
-func (generator *UUIDGenerator) GenerateUUID() (uint64, error) {
-	defer generator.tracer.StartExtensiveTracingSpanFromRoot(
+func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
+	defer generator.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGenerateUUID).End()
 
 	err := generator.meter.MeterComputation(
@@ -71,12 +96,12 @@ func (generator *UUIDGenerator) GenerateUUID() (uint64, error) {
 		return 0, fmt.Errorf("generate uuid failed: %w", err)
 	}
 
-	uuid, err := generator.GetUUID()
+	uuid, err := generator.getUUID()
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
 
-	err = generator.SetUUID(uuid + 1)
+	err = generator.setUUID(uuid + 1)
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}

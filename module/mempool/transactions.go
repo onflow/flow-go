@@ -34,8 +34,4 @@ type Transactions interface {
 
 	// Clear removes all transactions from the mempool.
 	Clear()
-
-	// Hash will return a fingerprint hash representing the contents of the
-	// entire memory pool.
-	Hash() flow.Identifier
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -35,7 +36,7 @@ import (
 // nodes.
 type MutableIdentityTableSuite struct {
 	suite.Suite
-	ConduitWrapper
+	testutils.ConduitWrapper
 	testNodes        testNodeList
 	removedTestNodes testNodeList // test nodes which might have been removed from the mesh
 	state            *mockprotocol.State
@@ -50,7 +51,7 @@ type testNode struct {
 	id     *flow.Identity
 	mw     network.Middleware
 	net    network.Network
-	engine *MeshEngine
+	engine *testutils.MeshEngine
 }
 
 // testNodeList encapsulates a list of test node and
@@ -99,10 +100,10 @@ func (t *testNodeList) lastAdded() (testNode, error) {
 	return testNode{}, fmt.Errorf("node list empty")
 }
 
-func (t *testNodeList) engines() []*MeshEngine {
+func (t *testNodeList) engines() []*testutils.MeshEngine {
 	t.RLock()
 	defer t.RUnlock()
-	engs := make([]*MeshEngine, len(t.nodes))
+	engs := make([]*testutils.MeshEngine, len(t.nodes))
 	for i, node := range t.nodes {
 		engs[i] = node.engine
 	}
@@ -155,7 +156,7 @@ func (suite *MutableIdentityTableSuite) TearDownTest() {
 		cancel()
 	}
 	networks := append(suite.testNodes.networks(), suite.removedTestNodes.networks()...)
-	stopNetworks(suite.T(), networks, 3*time.Second)
+	testutils.StopComponents(suite.T(), networks, 3*time.Second)
 }
 
 // setupStateMock setup state related mocks (all networks share the same state mock)
@@ -180,7 +181,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// create the ids, middlewares and networks
-	ids, nodes, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
+	ids, nodes, mws, nets, _ := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		suite.logger,
@@ -189,10 +190,10 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	)
 	suite.cancels = append(suite.cancels, cancel)
 
-	StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)
 
 	// create the engines for the new nodes
-	engines := GenerateEngines(suite.T(), nets)
+	engines := testutils.GenerateEngines(suite.T(), nets)
 
 	// create the test engines
 	for i := 0; i < count; i++ {
@@ -267,7 +268,7 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
-	removedEngines := []*MeshEngine{removedEngine}
+	removedEngines := []*testutils.MeshEngine{removedEngine}
 
 	// assert that all three network primitives still work
 	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
@@ -306,7 +307,7 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
-	removedEngines := []*MeshEngine{removedEngine}
+	removedEngines := []*testutils.MeshEngine{removedEngine}
 
 	// assert that all three network primitives still work
 	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
@@ -354,9 +355,9 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(mw network.Middleware
 // disallowed engines using each of the three network primitives
 func (suite *MutableIdentityTableSuite) assertNetworkPrimitives(
 	allowedIDs flow.IdentityList,
-	allowedEngs []*MeshEngine,
+	allowedEngs []*testutils.MeshEngine,
 	disallowedIDs flow.IdentityList,
-	disallowedEngs []*MeshEngine) {
+	disallowedEngs []*testutils.MeshEngine) {
 	suite.Run("Publish", func() {
 		suite.exchangeMessages(allowedIDs, allowedEngs, disallowedIDs, disallowedEngs, suite.Publish, false)
 	})
@@ -373,10 +374,10 @@ func (suite *MutableIdentityTableSuite) assertNetworkPrimitives(
 // engines can't using the ConduitSendWrapperFunc network primitive
 func (suite *MutableIdentityTableSuite) exchangeMessages(
 	allowedIDs flow.IdentityList,
-	allowedEngs []*MeshEngine,
+	allowedEngs []*testutils.MeshEngine,
 	disallowedIDs flow.IdentityList,
-	disallowedEngs []*MeshEngine,
-	send ConduitSendWrapperFunc,
+	disallowedEngs []*testutils.MeshEngine,
+	send testutils.ConduitSendWrapperFunc,
 	expectSendErrorForDisallowedIDs bool) {
 
 	// send a message from each of the allowed engine to the other allowed engines
@@ -421,9 +422,9 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	// fires a goroutine for each of the allowed engine to listen for incoming messages
 	for i := range allowedEngs {
 		wg.Add(expectedMsgCnt)
-		go func(e *MeshEngine) {
+		go func(e *testutils.MeshEngine) {
 			for x := 0; x < expectedMsgCnt; x++ {
-				<-e.received
+				<-e.Received
 				wg.Done()
 			}
 		}(allowedEngs[i])
@@ -433,25 +434,25 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 5*time.Second)
 	// assert that all allowed engines received no other messages
 	for i := range allowedEngs {
-		assert.Empty(suite.T(), allowedEngs[i].received)
+		assert.Empty(suite.T(), allowedEngs[i].Received)
 	}
 
 	// assert that the disallowed engines didn't receive any message
 	for i, eng := range disallowedEngs {
-		unittest.RequireNeverClosedWithin(suite.T(), eng.received, time.Millisecond,
+		unittest.RequireNeverClosedWithin(suite.T(), eng.Received, time.Millisecond,
 			fmt.Sprintf("%s engine should not have recevied message", disallowedIDs[i]))
 	}
 }
 
 func (suite *MutableIdentityTableSuite) sendMessage(fromID flow.Identifier,
-	fromEngine *MeshEngine,
+	fromEngine *testutils.MeshEngine,
 	toIDs flow.IdentityList,
-	send ConduitSendWrapperFunc) error {
+	send testutils.ConduitSendWrapperFunc) error {
 
 	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
 	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello from node %s using %s", fromID.String(), primitive),
 	}
 
-	return send(event, fromEngine.con, toIDs.NodeIDs()...)
+	return send(event, fromEngine.Con, toIDs.NodeIDs()...)
 }

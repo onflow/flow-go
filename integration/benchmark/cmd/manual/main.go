@@ -29,6 +29,10 @@ type LoadCase struct {
 	duration time.Duration
 }
 
+const (
+	defaultMaxMsgSize = 1024 * 1024 * 16 // 16 MB
+)
+
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
@@ -40,7 +44,6 @@ func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
-	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	_ = flag.Bool("track-txs", false, "deprecated")
 	accountMultiplierFlag := flag.Int("account-multiplier", 100, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
@@ -60,7 +63,7 @@ func main() {
 	}
 	log = log.Level(lvl)
 
-	server := metrics.NewServer(log, *metricport, *profilerEnabled)
+	server := metrics.NewServer(log, *metricport)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
@@ -87,7 +90,14 @@ func main() {
 	accessNodeAddrs := strings.Split(*accessNodes, ",")
 	clients := make([]access.Client, 0, len(accessNodeAddrs))
 	for _, addr := range accessNodeAddrs {
-		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		client, err := client.NewClient(
+			addr,
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
 		}
@@ -103,9 +113,17 @@ func main() {
 		}
 	}
 
+	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
+	defer workerStatsTracker.Stop()
+
+	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger.Start()
+	defer statsLogger.Stop()
+
 	lg, err := benchmark.New(
 		ctx,
 		log,
+		workerStatsTracker,
 		loaderMetrics,
 		clients,
 		benchmark.NetworkParams{

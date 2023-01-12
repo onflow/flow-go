@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -163,7 +163,7 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.BlockPrograms,
+					derivedBlockData *derived.DerivedBlockData,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -260,7 +260,7 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.BlockPrograms,
+					derivedBlockData *derived.DerivedBlockData,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -397,7 +397,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.BlockPrograms,
+				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -508,7 +508,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.BlockPrograms,
+				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := []byte(
@@ -632,7 +632,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.BlockPrograms,
+				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -756,7 +756,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				programs *programs.BlockPrograms,
+				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				message, cadenceMessage := createMessage("random_message")

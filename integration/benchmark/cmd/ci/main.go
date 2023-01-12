@@ -2,20 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"flag"
-	"fmt"
-	"math"
+	"net"
 	"os"
-	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,30 +18,14 @@ import (
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/benchmark"
-	"github.com/onflow/flow-go/model/flow"
+	pb "github.com/onflow/flow-go/integration/benchmark/proto"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type LoadCase struct {
-	tps      uint
-	duration time.Duration
-}
-
-// This struct is used for uploading data to BigQuery.
-type dataSlice struct {
-	GoVersion           string    `bigquery:"goVersion"`
-	OsVersion           string    `bigquery:"osVersion"`
-	GitSha              string    `bigquery:"gitSha"`
-	StartTime           time.Time `bigquery:"startTime"`
-	EndTime             time.Time `bigquery:"endTime"`
-	InputTps            float64   `bigquery:"inputTps"`
-	OutputTps           float64   `bigquery:"outputTps"`
-	StartExecutionCount int       `bigquery:"startExecutionCount"`
-	EndExecutionCount   int       `bigquery:"endExecutionCount"`
-	RunStartTime        time.Time `bigquery:"runStartTime"`
+type BenchmarkInfo struct {
+	BenchmarkType string
 }
 
 // Hardcoded CI values
@@ -60,67 +38,78 @@ const (
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
 
-	// Auto TPS scaling constants
-	additiveIncrease       = 50
-	multiplicativeDecrease = 0.8
-	adjustInterval         = 20 * time.Second
+	defaultAdjustInterval           = 10 * time.Second
+	defaultMetricCollectionInterval = 20 * time.Second
+
+	// gRPC constants
+	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
+	defaultGRPCAddress = "127.0.0.1:4777"
 )
 
 func main() {
-	// holdover flags from loader/main.go
 	logLvl := flag.String("log-level", "info", "set log level")
-	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
-	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
-	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
-	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
 
 	// CI relevant flags
-	initialTPSFlag := flag.Int("initial-tps", 10, "starting transactions per second")
-	maxTPSFlag := flag.Int("max-tps", *initialTPSFlag, "maximum transactions per second allowed")
+	grpcAddressFlag := flag.String("grpc-address", defaultGRPCAddress, "listen address for gRPC server")
+	initialTPSFlag := flag.Int("tps-initial", 10, "starting transactions per second")
+	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
+	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
+	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
+	adjustDelayFlag := flag.Duration("tps-adjust-delay", 120*time.Second, "delay before adjusting TPS")
+	statIntervalFlag := flag.Duration("stat-interval", defaultMetricCollectionInterval, "")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
+	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
+	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
+	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
-	bigQueryTableFlag := flag.String("bigquery-table", "tpsslices", "table name for the bigquery uploader")
-	localDev := flag.Bool("local-dev", false, "whether this script itself is being tested. Turns off submitting data to big query and instead outputs a local results file instead")
-	sliceSize := flag.Duration("slice-size", 2*time.Minute, "the amount of time that each slice covers")
+	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
 	flag.Parse()
-
-	// Version and Commit Info
-	gitSha := build.Commit()
-	goVersion := runtime.Version()
-	osVersion := runtime.GOOS + runtime.GOARCH
-
-	runStartTime := time.Now()
-	if gitSha == "undefined" {
-		gitSha = runStartTime.String()
-	}
-
-	chainID := flowsdk.Emulator
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
 	if err != nil {
-		log.Fatal().Err(err).Msg("invalid log level")
+		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
 	}
 	log = log.Level(lvl)
 
-	server := metrics.NewServer(log, metricport, *profilerEnabled)
-	<-server.Ready()
-	loaderMetrics := metrics.NewLoaderCollector()
+	if *gitRepoPathFlag == "" {
+		flag.PrintDefaults()
+		log.Fatal().Msg("git repo path is required")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if *localDev {
-		sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-		defer sp.Stop()
+	server := metrics.NewServer(log, metricport)
+	<-server.Ready()
+	loaderMetrics := metrics.NewLoaderCollector()
+
+	grpcServerOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(defaultMaxMsgSize),
+		grpc.MaxSendMsgSize(defaultMaxMsgSize),
+	}
+	grpcServer := grpc.NewServer(grpcServerOptions...)
+	defer grpcServer.Stop()
+
+	pb.RegisterBenchmarkServer(grpcServer, &benchmarkServer{})
+
+	grpcListener, err := net.Listen("tcp", *grpcAddressFlag)
+	if err != nil {
+		log.Fatal().Err(err).Str("address", *grpcAddressFlag).Msg("failed to listen")
 	}
 
-	loadCase := LoadCase{tps: uint(*initialTPSFlag), duration: *durationFlag}
+	go func() {
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatal().Err(err).Msg("failed to serve")
+		}
+	}()
 
-	addressGen := flowsdk.NewAddressGenerator(chainID)
+	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Stop()
+
+	addressGen := flowsdk.NewAddressGenerator(flowsdk.Emulator)
 	serviceAccountAddress := addressGen.NextAddress()
 	fungibleTokenAddress := addressGen.NextAddress()
 	flowTokenAddress := addressGen.NextAddress()
@@ -130,23 +119,43 @@ func main() {
 		Stringer("flowTokenAddress", flowTokenAddress).
 		Msg("addresses")
 
-	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		accessNodeAddress,
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+			grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize Flow client")
 	}
 
+	// create context for a single benchmark run
+	bCtx, bCancel := context.WithCancel(ctx)
+
 	// prepare load generator
 	log.Info().
 		Str("load_type", loadType).
-		Uint("tps", loadCase.tps).
+		Int("initialTPS", *initialTPSFlag).
+		Int("minTPS", *minTPSFlag).
 		Int("maxTPS", *maxTPSFlag).
-		Dur("duration", loadCase.duration).
-		Msg("Running load case...")
+		Dur("duration", *durationFlag).
+		Msg("Running load case")
 
 	maxInflight := *maxTPSFlag * accountMultiplier
+
+	workerStatsTracker := benchmark.NewWorkerStatsTracker(bCtx)
+	defer workerStatsTracker.Stop()
+
+	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger.Start()
+	defer statsLogger.Stop()
+
 	lg, err := benchmark.New(
-		ctx,
+		bCtx,
 		log,
+		workerStatsTracker,
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
@@ -160,12 +169,8 @@ func main() {
 			LoadType:         benchmark.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
-		benchmark.ConstExecParams{
-			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-			AuthAccountNum:  *authAccNumInConstExecTx,
-			ArgSizeInByte:   *argSizeInByteInConstExecTx,
-			PayerKeyCount:   *payerKeyCountInConstExecTx,
-		},
+		// We do support only one load type for now.
+		benchmark.ConstExecParams{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
@@ -177,283 +182,109 @@ func main() {
 	}
 
 	// run load
-	err = lg.SetTPS(loadCase.tps)
+	err = lg.SetTPS(uint(*initialTPSFlag))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
 
-	// prepare data slices
-	var dataSlices []dataSlice
+	adjuster := NewTPSAdjuster(
+		bCtx,
+		log,
+		lg,
+		workerStatsTracker,
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		dataSlices = recordTransactionData(
-			lg,
-			*sliceSize,
-			runStartTime,
-			gitSha,
-			goVersion,
-			osVersion)
-	}()
+		AdjusterParams{
+			Delay:       *adjustDelayFlag,
+			Interval:    *adjustIntervalFlag,
+			InitialTPS:  uint(*initialTPSFlag),
+			MinTPS:      uint(*minTPSFlag),
+			MaxTPS:      uint(*maxTPSFlag),
+			MaxInflight: uint(maxInflight / 2),
+		},
+	)
+	defer adjuster.Stop()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := adjustTPS(
-			lg,
-			log,
-			adjustInterval,
-			loadCase.tps,
-			uint(*maxTPSFlag),
-			uint(maxInflight/2),
-		)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			log.Fatal().Err(err).Msgf("unable to adjust tps")
-		}
-	}()
+	recorder := NewTPSRecorder(bCtx, workerStatsTracker, *statIntervalFlag)
+	defer recorder.Stop()
 
+	log.Info().Msg("Waiting for load to finish")
 	select {
-	case <-time.After(loadCase.duration):
-	case <-ctx.Done():
-		// TODO(rbtz): the loader currently doesn't ever cancel the context.
-		log.Warn().Err(ctx.Err()).Msg("loader context canceled")
+	case <-time.After(*durationFlag):
+	case <-bCtx.Done():
+		log.Warn().Err(bCtx.Err()).Msg("loader context canceled")
 	}
+
+	log.Info().Msg("Cancelling benchmark context")
+	bCancel()
+	recorder.Stop()
+	adjuster.Stop()
 
 	log.Info().Msg("Stopping load generator")
 	lg.Stop()
-	log.Info().Msg("Waiting for workers to finish")
-	wg.Wait()
 
-	if len(dataSlices) == 0 {
-		log.Fatal().Msg("no data slices recorded")
-	}
+	mustValidateData(log, recorder)
 
-	if *localDev {
-		outputLocalData(dataSlices, log)
+	// only upload valid data
+	if *bigQueryUpload {
+		repoInfo := MustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
+		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag)
 	} else {
-		log.Info().Msg("Uploading data to BigQuery")
-		err = sendDataToBigQuery(ctx, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryTableFlag, dataSlices)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("unable to send data to bigquery")
+		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
+		// log results locally when not uploading to BigQuery
+		for i, tpsRecord := range recorder.BenchmarkResults.RawTPS {
+			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
 }
 
-func recordTransactionData(
-	lg *benchmark.ContLoadGenerator,
-	sliceDuration time.Duration,
-	runStartTime time.Time,
-	gitSha, goVersion, osVersion string,
-) []dataSlice {
-	var dataSlices []dataSlice
-
-	// get initial values for first slice
-	startTime := time.Now()
-	startExecutedTransactions := lg.GetTxExecuted()
-
-	t := time.NewTicker(sliceDuration)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-t.C:
-			endTime := time.Now()
-			endExecutedTransaction := lg.GetTxExecuted()
-
-			// calculate this slice
-			inputTps := lg.AvgTpsBetween(startTime, endTime)
-			outputTps := float64(endExecutedTransaction-startExecutedTransactions) / sliceDuration.Seconds()
-			dataSlices = append(dataSlices,
-				dataSlice{
-					GitSha:              gitSha,
-					GoVersion:           goVersion,
-					OsVersion:           osVersion,
-					StartTime:           startTime,
-					EndTime:             endTime,
-					InputTps:            inputTps,
-					OutputTps:           outputTps,
-					StartExecutionCount: startExecutedTransactions,
-					EndExecutionCount:   endExecutedTransaction,
-					RunStartTime:        runStartTime,
-				})
-
-			// set start values for next slice
-			startExecutedTransactions = endExecutedTransaction
-			startTime = endTime
-		case <-lg.Done():
-			return dataSlices
-		}
-	}
-}
-
-func sendDataToBigQuery(
+func mustUploadData(
 	ctx context.Context,
-	projectName, datasetName, tableName string,
-	slices []dataSlice,
-) error {
-	bqClient, err := bigquery.NewClient(ctx, projectName)
-	if err != nil {
-		return fmt.Errorf("unable to create bigquery client: %w", err)
-	}
-	defer bqClient.Close()
-
-	dataset := bqClient.Dataset(datasetName)
-	table := dataset.Table(tableName)
-
-	if err := table.Inserter().Put(ctx, slices); err != nil {
-		return fmt.Errorf("failed to insert data: %w", err)
-	}
-	return nil
-}
-
-func outputLocalData(slices []dataSlice, log zerolog.Logger) {
-	jsonText, err := json.MarshalIndent(slices, "", "    ")
-	if err != nil {
-		log.Fatal().Msg("Error converting slice data to json")
-	}
-
-	// output human-readable json blob
-	timestamp := time.Now()
-	fileName := fmt.Sprintf("tps-results-%v.json", timestamp.Format("2006-02-01 15:04"))
-	err = os.WriteFile(fileName, jsonText, 0666)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
-}
-
-// adjustTPS tries to find the maximum TPS that the network can handle using a simple AIMD algorithm.
-// The algorithm starts with minTPS as a target.  Each time it is able to reach the target TPS, it
-// increases the target by `additiveIncrease`. Each time it fails to reach the target TPS, it decreases
-// the target by `multiplicativeDecrease` factor.
-//
-// To avoid oscillation and speedup conversion we skip the adjustment stage if TPS grew
-// compared to the last round.
-//
-// Target TPS is always bounded by [minTPS, maxTPS].
-func adjustTPS(
-	lg *benchmark.ContLoadGenerator,
 	log zerolog.Logger,
-	interval time.Duration,
-	minTPS uint,
-	maxTPS uint,
-	maxInflight uint,
-) error {
-	targetTPS := minTPS
-	lastTs := time.Now()
-	lastTPS := float64(minTPS)
-	lastTxs := uint(lg.GetTxExecuted())
-	for {
-		select {
-		// NOTE: not using a ticker here since adjusting worker count in SetTPS
-		// can take a while and lead to uneven feedback intervals.
-		case nowTs := <-time.After(interval):
-			currentSentTxs := lg.GetTxSent()
-			currentTxs := uint(lg.GetTxExecuted())
+	recorder *tpsRecorder,
+	repoInfo *RepoInfo,
+	bigQueryProject string,
+	bigQueryDataset string,
+	bigQueryRawTable string,
+) {
+	log.Info().Msg("Initializing BigQuery")
+	db, err := NewDB(ctx, log, bigQueryProject)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create bigquery client")
+	}
+	defer db.Close()
 
-			inflight := currentSentTxs - int(currentTxs)
-			inflightPerWorker := inflight / int(targetTPS)
+	err = db.createTable(ctx, bigQueryDataset, bigQueryRawTable, RawRecord{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create raw TPS table")
+	}
 
-			skip, currentTPS, unboundedTPS := computeTPS(
-				lastTxs,
-				currentTxs,
-				lastTs,
-				nowTs,
-				lastTPS,
-				targetTPS,
-				inflight,
-				maxInflight,
-			)
-
-			if skip {
-				log.Info().
-					Float64("lastTPS", lastTPS).
-					Float64("currentTPS", currentTPS).
-					Int("inflight", inflight).
-					Int("inflightPerWorker", inflightPerWorker).
-					Msg("skipped adjusting TPS")
-
-				lastTxs = currentTxs
-				lastTPS = currentTPS
-				lastTs = nowTs
-
-				continue
-			}
-
-			boundedTPS := boundTPS(unboundedTPS, minTPS, maxTPS)
-			log.Info().
-				Uint("lastTargetTPS", targetTPS).
-				Float64("lastTPS", lastTPS).
-				Float64("currentTPS", currentTPS).
-				Uint("unboundedTPS", unboundedTPS).
-				Uint("targetTPS", boundedTPS).
-				Int("inflight", inflight).
-				Int("inflightPerWorker", inflightPerWorker).
-				Msg("adjusting TPS")
-
-			err := lg.SetTPS(boundedTPS)
-			if err != nil {
-				return fmt.Errorf("unable to set tps: %w", err)
-			}
-
-			targetTPS = boundedTPS
-			//
-			// SetTPS is a blocking call, so we need to re-fetch the TxExecuted and time.
-			//
-			lastTxs = uint(lg.GetTxExecuted())
-			lastTPS = currentTPS
-			lastTs = time.Now()
-		case <-lg.Done():
-			return nil
-		}
+	log.Info().Msg("Uploading data to BigQuery")
+	err = db.saveRawResults(
+		ctx,
+		bigQueryDataset,
+		bigQueryRawTable,
+		recorder.BenchmarkResults,
+		*repoInfo,
+		BenchmarkInfo{BenchmarkType: loadType},
+		MustGetDefaultEnvironment(),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to send data to bigquery")
 	}
 }
 
-func computeTPS(
-	lastTxs uint,
-	currentTxs uint,
-	lastTs time.Time,
-	nowTs time.Time,
-	lastTPS float64,
-	targetTPS uint,
-	inflight int,
-	maxInflight uint,
-) (bool, float64, uint) {
-	timeDiff := nowTs.Sub(lastTs).Seconds()
-	if timeDiff == 0 {
-		return true, 0, 0
+func mustValidateData(log zerolog.Logger, recorder *tpsRecorder) {
+	log.Info().Msg("Validating data")
+	var totalTPS float64
+	for _, record := range recorder.BenchmarkResults.RawTPS {
+		totalTPS += record.OutputTPS
 	}
-
-	currentTPS := float64(currentTxs-lastTxs) / timeDiff
-	unboundedTPS := uint(math.Ceil(currentTPS))
-
-	// To avoid setting target TPS below current TPS,
-	// we decrease the former one by the multiplicativeDecrease factor.
-	//
-	// This shortcut is only applicable when current inflight is less than maxInflight.
-	if ((float64(unboundedTPS) >= float64(targetTPS)*multiplicativeDecrease) && (inflight < int(maxInflight))) ||
-		(unboundedTPS >= targetTPS) {
-
-		unboundedTPS = targetTPS + additiveIncrease
-	} else {
-		// Do not reduce the target if TPS incresed since the last round.
-		if (currentTPS > float64(lastTPS)) && (inflight < int(maxInflight)) {
-			return true, currentTPS, 0
-		}
-
-		unboundedTPS = uint(float64(targetTPS) * multiplicativeDecrease)
-	}
-	return false, currentTPS, unboundedTPS
-}
-
-func boundTPS(tps, min, max uint) uint {
-	switch {
-	case tps < min:
-		return min
-	case tps > max:
-		return max
-	default:
-		return tps
+	resultLen := len(recorder.BenchmarkResults.RawTPS)
+	if resultLen == 0 || totalTPS == 0 {
+		recorder.SetStatus(StatusFailure)
+		log.Fatal().
+			Int("resultsLen", resultLen).
+			Float64("totalTPS", totalTPS).
+			Msg("no TPS data generated")
 	}
 }

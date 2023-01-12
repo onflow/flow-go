@@ -38,13 +38,14 @@ const (
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
-	ContractServiceAccountFunction_setupNewAccount           = "setupNewAccount"
-	ContractServiceAccountFunction_defaultTokenBalance       = "defaultTokenBalance"
-	ContractServiceAccountFunction_deductTransactionFee      = "deductTransactionFee"
-	ContractStorageFeesFunction_calculateAccountCapacity     = "calculateAccountCapacity"
-	ContractStorageFeesFunction_calculateAccountsCapacity    = "calculateAccountsCapacity"
-	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
-	ContractDeploymentAuditsFunction_useVoucherForDeploy     = "useVoucherForDeploy"
+	ContractServiceAccountFunction_setupNewAccount                            = "setupNewAccount"
+	ContractServiceAccountFunction_defaultTokenBalance                        = "defaultTokenBalance"
+	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
+	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
+	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
+	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
+	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
+	ContractDeploymentAuditsFunction_useVoucherForDeploy                      = "useVoucherForDeploy"
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -178,14 +179,14 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
-	// Stagingnet test network
+	// Sandboxnet test network
 	// All system contracts are deployed to the service account
-	stagingnet := map[string]flow.Address{
-		ContractNameEpoch:     flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameClusterQC: flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameDKG:       flow.Stagingnet.Chain().ServiceAddress(),
+	sandboxnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Sandboxnet.Chain().ServiceAddress(),
 	}
-	contractAddressesByChainID[flow.Stagingnet] = stagingnet
+	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account

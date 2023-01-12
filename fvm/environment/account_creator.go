@@ -8,13 +8,12 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 const (
-	keyAddressState = "account_address_state"
-
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
@@ -61,7 +60,7 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 ) {
 	return parseRestrict1Arg1Ret(
 		creator.txnState,
-		"CreateAccount",
+		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
 		payer)
 }
@@ -96,7 +95,7 @@ type accountCreator struct {
 
 	isServiceAccountEnabled bool
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	meter   Meter
 	metrics MetricsReporter
 
@@ -130,7 +129,7 @@ func NewAccountCreator(
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
 	systemContracts *SystemContracts,
@@ -150,7 +149,7 @@ func NewAccountCreator(
 func (creator *accountCreator) bytes() ([]byte, error) {
 	stateBytes, err := creator.txnState.Get(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		creator.txnState.EnforceLimits())
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -197,7 +196,7 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	// update the ledger state
 	err = creator.txnState.Set(
 		"",
-		keyAddressState,
+		state.AddressStateKey,
 		addressGenerator.Bytes(),
 		creator.txnState.EnforceLimits())
 	if err != nil {
@@ -264,7 +263,7 @@ func (creator *accountCreator) CreateAccount(
 	runtime.Address,
 	error,
 ) {
-	defer creator.tracer.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
+	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
 	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
 	if err != nil {

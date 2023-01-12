@@ -30,10 +30,13 @@ func extractExecutionState(
 	chain flow.Chain,
 	migrate bool,
 	report bool,
+	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
+	log.Info().Msg("init WAL")
+
 	diskWal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
+		log,
 		nil,
 		metrics.NewNoopCollector(),
 		dir,
@@ -44,6 +47,8 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
+
+	log.Info().Msg("init ledger")
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -60,10 +65,14 @@ func extractExecutionState(
 		checkpointsToKeep  = 1
 	)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	log.Info().Msg("init compactor")
+
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
+
+	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
 
 	<-compactor.Ready()
 
@@ -77,8 +86,11 @@ func extractExecutionState(
 	newState := ledger.State(targetHash)
 
 	if migrate {
-		migrations = []ledger.Migration{}
-
+		// add migration here
+		migrations = []ledger.Migration{
+			// the following migration calculate the storage usage and update the storage for each account
+			// mig.MigrateAccountUsage,
+		}
 	}
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.

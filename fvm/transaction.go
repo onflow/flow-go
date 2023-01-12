@@ -1,10 +1,9 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -17,16 +16,8 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		Transaction:            tx,
 		InitialSnapshotTxIndex: txIndex,
 		TxIndex:                txIndex,
+		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
-}
-
-type TransactionProcessor interface {
-	Process(
-		Context,
-		*TransactionProcedure,
-		*state.TransactionState,
-		*programs.TransactionPrograms,
-	) error
 }
 
 type TransactionProcedure struct {
@@ -35,41 +26,21 @@ type TransactionProcedure struct {
 	InitialSnapshotTxIndex uint32
 	TxIndex                uint32
 
-	Logs            []string
-	Events          []flow.Event
-	ServiceEvents   []flow.Event
-	ComputationUsed uint64
-	MemoryEstimate  uint64
-	Err             errors.CodedError
-	TraceSpan       otelTrace.Span
+	Logs                   []string
+	Events                 []flow.Event
+	ServiceEvents          []flow.Event
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
-	proc.TraceSpan = traceSpan
-}
-
-func (proc *TransactionProcedure) Run(
+func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
 	txnState *state.TransactionState,
-	programs *programs.TransactionPrograms,
-) error {
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(ctx, proc, txnState, programs)
-		txErr, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			// log the full error path
-			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
-			return failure
-		}
-
-		if txErr != nil {
-			proc.Err = txErr
-			// TODO we should not break here we should continue for fee deductions
-			break
-		}
-	}
-
-	return nil
+	derivedTxnData *derived.DerivedTransactionData,
+) ProcedureExecutor {
+	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
@@ -112,10 +83,10 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
+func (proc *TransactionProcedure) InitialSnapshotTime() derived.LogicalTime {
+	return derived.LogicalTime(proc.InitialSnapshotTxIndex)
 }
 
-func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {
+	return derived.LogicalTime(proc.TxIndex)
 }

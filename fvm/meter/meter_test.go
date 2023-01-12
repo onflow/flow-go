@@ -48,11 +48,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 		err := m.MeterComputation(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
 		err = m.MeterComputation(0, 2)
 		require.NoError(t, err)
-		require.Equal(t, uint(1+2), m.TotalComputationUsed())
+		require.Equal(t, uint64(1+2), m.TotalComputationUsed())
 
 		err = m.MeterComputation(0, 8)
 		require.Error(t, err)
@@ -85,7 +85,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 		err := m.MeterComputation(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(13), m.TotalComputationUsed())
+		require.Equal(t, uint64(13), m.TotalComputationUsed())
 		require.Equal(t, uint(1), m.ComputationIntensities()[0])
 
 		err = m.MeterMemory(0, 2)
@@ -107,12 +107,12 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 		err := m.MeterComputation(0, internalPrecisionMinusOne)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		require.Equal(t, internalPrecisionMinusOne, m.ComputationIntensities()[0])
 
 		err = m.MeterComputation(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1), m.TotalComputationUsed())
 		require.Equal(t, uint(1<<meter.MeterExecutionInternalPrecisionBytes), m.ComputationIntensities()[0])
 	})
 
@@ -130,29 +130,29 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterComputation(compKind, 2)
 		require.NoError(t, err)
 
-		child2 := m.NewChild()
+		child2 := meter.NewMeter(m.MeterParameters)
 		err = child2.MeterComputation(compKind, 3)
 		require.NoError(t, err)
 
-		child3 := m.NewChild()
+		child3 := meter.NewMeter(m.MeterParameters)
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
 		m.MergeMeter(child1)
-		require.Equal(t, uint(1+2), m.TotalComputationUsed())
+		require.Equal(t, uint64(1+2), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
 		m.MergeMeter(child2)
-		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
+		require.Equal(t, uint64(1+2+3), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
 		// merge hits limit, but is accepted.
 		m.MergeMeter(child3)
-		require.Equal(t, uint(1+2+3+4), m.TotalComputationUsed())
+		require.Equal(t, uint64(1+2+3+4), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2+3+4), m.ComputationIntensities()[compKind])
 
 		// error after merge (hitting limit)
@@ -174,13 +174,13 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
-		child := m.NewChild()
+		child := meter.NewMeter(m.MeterParameters)
 		err = child.MeterComputation(compKind, 1)
 		require.NoError(t, err)
 
 		// hitting limit and ignoring it
 		m.MergeMeter(child)
-		require.Equal(t, uint(1+1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1+1), m.TotalComputationUsed())
 		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
 	})
 
@@ -196,7 +196,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterComputation(0, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterComputation(0, 1)
 		require.NoError(t, err)
 
@@ -218,7 +218,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err := m.MeterMemory(0, 1)
 		require.NoError(t, err)
 
-		child1 := m.NewChild()
+		child1 := meter.NewMeter(m.MeterParameters)
 		err = child1.MeterMemory(0, 1)
 		require.NoError(t, err)
 
@@ -248,41 +248,41 @@ func TestWeightedComputationMetering(t *testing.T) {
 		reset()
 		err := m.MeterComputation(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(0, 1<<meter.MeterExecutionInternalPrecisionBytes)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(0, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, uint64(0), m.TotalComputationUsed())
 
 		reset()
 		err = m.MeterComputation(1, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, uint64(0), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(1, 1<<meter.MeterExecutionInternalPrecisionBytes)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(1, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(1<<16-1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1<<16-1), m.TotalComputationUsed())
 
 		reset()
 		err = m.MeterComputation(2, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalComputationUsed())
+		require.Equal(t, uint64(1), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(2, 1<<meter.MeterExecutionInternalPrecisionBytes)
 		require.NoError(t, err)
-		require.Equal(t, uint(1<<16), m.TotalComputationUsed())
+		require.Equal(t, uint64(1<<16), m.TotalComputationUsed())
 		reset()
 		err = m.MeterComputation(2, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(math.MaxUint32), m.TotalComputationUsed())
+		require.Equal(t, uint64(math.MaxUint32), m.TotalComputationUsed())
 
 		reset()
 		err = m.MeterComputation(3, 1)

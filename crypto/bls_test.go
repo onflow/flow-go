@@ -5,6 +5,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -16,13 +17,41 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// BLS tests
-func TestBLSBLS12381(t *testing.T) {
-	halg := NewExpandMsgXOFKMAC128("test tag")
+// TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
+func TestBLSMainMethods(t *testing.T) {
+	hasher := NewExpandMsgXOFKMAC128("test tag")
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
-	testGenSignVerify(t, BLSBLS12381, halg)
+	testGenSignVerify(t, BLSBLS12381, hasher)
+
+	// specific signature test for BLS:
+	// Test a signature with a point encoded with a coordinate x not reduced mod p
+	// The same signature point with the x coordinate reduced passes verification.
+	// This test checks that:
+	//  - signature decoding handles input x-coordinates larger than p (doesn't result in an exception)
+	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
+	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
+		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
+		require.NoError(t, err)
+		validSig, err := hex.DecodeString("80b0cac2a0f4f8881913edf2b29065675dfed6f6f4e17e9b5d860a845d4e7d476b277d06a493b81482e63d8131f9f2fa")
+		require.NoError(t, err)
+		invalidSig, err := hex.DecodeString("9AB1DCACDA74DF22642F95A8F5DC123EC276227BE866915AC4B6DD2553FF736B89D37D0555E7B8143CE53D8131F99DA5")
+		require.NoError(t, err)
+		pkBytes, err := hex.DecodeString("a7ac85ac8ffd9d2611f73721a93ec92115f29d769dfa425fec2e2c26ab3e4e8089a961ab430639104262723e829b75e9190a05d8fc8d22a7ac78a18473cc3df146b5c4c9c8e46d5f208039384fe2fc018321f14c01641c3afff7558a2eb06463")
+		require.NoError(t, err)
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err)
+		// sanity check of valid signature (P_x < p)
+		valid, err := pk.Verify(validSig, msg, hasher)
+		require.NoError(t, err)
+		require.True(t, valid)
+		// invalid signature (P'_x = P_x + p )
+		valid, err = pk.Verify(invalidSig, msg, hasher)
+		require.NoError(t, err)
+		assert.False(t, valid)
+	})
+
 }
 
 // Signing bench
@@ -125,17 +154,16 @@ func TestBLSEncodeDecode(t *testing.T) {
 	//  zero private key
 	skBytes := make([]byte, PrKeyLenBLSBLS12381)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.Error(t, err, "the key decoding should fail - key value is zero")
+	require.Error(t, err, "decoding identity private key should fail")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, sk)
 
 	//  identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = 0xC0
+	pkBytes[0] = infinityPointHeader
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
-	require.Error(t, err, "the key decoding should fail - key value is identity")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, pk)
+	require.NoError(t, err, "decoding identity public key should succeed")
+	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
 
 	// invalid point
 	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
@@ -144,6 +172,31 @@ func TestBLSEncodeDecode(t *testing.T) {
 	require.Error(t, err, "the key decoding should fail - key value is invalid")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, pk)
+
+	// Test a public key serialization with a point encoded with a coordinate x with
+	// x[0] or x[1] not reduced mod p.
+	// The same public key point with x[0] and x[1] reduced passes decoding.
+	// This test checks that:
+	//  - public key decoding handles input x-coordinates with x[0] and x[1] larger than p (doesn't result in an exception)
+	//  - public key decoding only accepts reduced x[0] and x[1] to insure key serialization uniqueness.
+	// Although uniqueness of public key respresentation isn't a security property, some implementations
+	// may implicitely rely on the property.
+
+	// valid pk with x[0] < p and x[1] < p
+	validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, validPk)
+	assert.NoError(t, err)
+	// invalidpk1 with x[0]+p and same x[1]
+	invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
+	assert.Error(t, err)
+	// invalidpk1 with same x[0] and x[1]+p
+	invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
+	require.NoError(t, err)
+	_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
+	assert.Error(t, err)
 }
 
 // TestBLSEquals tests equal for BLS keys
@@ -360,7 +413,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 // Aggregate n public keys and their respective private keys and compare
 // the public key of the aggregated private key is equal to the aggregated
 // public key
-func TestAggregatePubKeys(t *testing.T) {
+func TestBLSAggregatePubKeys(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -405,15 +458,16 @@ func TestAggregatePubKeys(t *testing.T) {
 		assert.Nil(t, aggPk)
 	})
 
-	// aggregate with the neutral key
-	t.Run("neutral list", func(t *testing.T) {
-		// aggregate the neutral key with a non neutral key
-		keys := []PublicKey{pks[0], NeutralBLSPublicKey()}
-		aggPkWithNeutral, err := AggregateBLSPublicKeys(keys)
+	// aggregate a list that includes the identity key,
+	// to check that identity key is indeed the identity element with regards to aggregation.
+	t.Run("aggregate a list that includes the identity key", func(t *testing.T) {
+		// aggregate the identity key with a non identity key
+		keys := []PublicKey{pks[0], IdentityBLSPublicKey()}
+		aggPkWithIdentity, err := AggregateBLSPublicKeys(keys)
 		assert.NoError(t, err)
-		assert.True(t, aggPkWithNeutral.Equals(pks[0]),
+		assert.True(t, aggPkWithIdentity.Equals(pks[0]),
 			"incorrect public key %s, should be %s",
-			aggPkWithNeutral, pks[0])
+			aggPkWithIdentity, pks[0])
 	})
 
 	t.Run("invalid inputs", func(t *testing.T) {
@@ -429,6 +483,26 @@ func TestAggregatePubKeys(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, IsNotBLSKeyError(err))
 		assert.Nil(t, aggPK)
+	})
+
+	// check that the public key corresponding to the zero private key is indeed identity
+	// The package doesn't allow to generate a zero private key. One way to obtain a zero
+	// private key is via aggrgeting opposite private keys
+	t.Run("public key of zero private key", func(t *testing.T) {
+		// sk1 is group order of bls12-381 minus one
+		groupOrderMinus1 := []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
+			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
+			0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00}
+		sk1, err := DecodePrivateKey(BLSBLS12381, groupOrderMinus1)
+		require.NoError(t, err)
+		// sk2 is 1
+		one := make([]byte, PrKeyLenBLSBLS12381)
+		one[PrKeyLenBLSBLS12381-1] = 1
+		sk2, err := DecodePrivateKey(BLSBLS12381, one)
+		require.NoError(t, err)
+		aggSK, err := AggregateBLSPrivateKeys([]PrivateKey{sk1, sk2})
+		require.NoError(t, err)
+		assert.True(t, aggSK.PublicKey().Equals(IdentityBLSPublicKey()))
 	})
 }
 
@@ -485,19 +559,19 @@ func TestBLSRemovePubKeys(t *testing.T) {
 
 	// specific test to remove all keys
 	t.Run("remove all keys", func(t *testing.T) {
-		neutralPk, err := RemoveBLSPublicKeys(aggPk, pks)
+		identityPk, err := RemoveBLSPublicKeys(aggPk, pks)
 		require.NoError(t, err)
-		// neutral public key is expected
+		// identity public key is expected
 		randomPk := randomSK(t, seed).PublicKey()
-		randomPkPlusNeutralPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, neutralPk})
+		randomPkPlusIdentityPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, identityPk})
 		require.NoError(t, err)
 
 		BLSRandomPk, ok := randomPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSRandomPk.Equals(randomPkPlusNeutralPk),
+		assert.True(t, BLSRandomPk.Equals(randomPkPlusIdentityPk),
 			"incorrect key %s, should be infinity point, keys are %s",
-			neutralPk, pks)
+			identityPk, pks)
 	})
 
 	// specific test with an empty slice of keys to remove
@@ -980,5 +1054,59 @@ func BenchmarkAggregate(b *testing.B) {
 			require.NoError(b, err)
 		}
 		b.StopTimer()
+	})
+}
+
+func TestBLSIdentity(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
+	var identitySig []byte
+	msg := []byte("random_message")
+	hasher := NewExpandMsgXOFKMAC128("")
+
+	t.Run("identity signature comparison", func(t *testing.T) {
+		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
+		// construct identity signature by summing (aggregating) a random signature and its inverse.
+
+		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
+
+		// sum up a random signature and its inverse to get identity
+		seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+		sk := randomSK(t, seed)
+		sig, err := sk.Sign(msg, hasher)
+		require.NoError(t, err)
+		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
+		copy(oppositeSig, sig)
+		oppositeSig[0] ^= 0x20 // flip the last 3rd bit to flip the point sign
+		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
+		require.NoError(t, err)
+		assert.True(t, IsBLSSignatureIdentity(aggSig))
+	})
+
+	t.Run("verification with identity key", func(t *testing.T) {
+		// all verification methods should return (false, nil) when verified against
+		// an identity public key.
+		idPk := IdentityBLSPublicKey()
+		valid, err := idPk.Verify(identitySig, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		valid, err = VerifyBLSSignatureOneMessage([]PublicKey{idPk}, identitySig, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		valid, err = VerifyBLSSignatureManyMessages([]PublicKey{idPk}, identitySig, [][]byte{msg}, []hash.Hasher{hasher})
+		assert.NoError(t, err)
+		assert.False(t, valid)
+
+		validSlice, err := BatchVerifyBLSSignaturesOneMessage([]PublicKey{idPk}, []Signature{identitySig}, msg, hasher)
+		assert.NoError(t, err)
+		assert.False(t, validSlice[0])
+
+		valid, err = BLSVerifyPOP(idPk, identitySig)
+		assert.NoError(t, err)
+		assert.False(t, valid)
 	})
 }

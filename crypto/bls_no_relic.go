@@ -9,13 +9,18 @@ import (
 
 // The functions below are the non-Relic versions of the public APIs
 // requiring the Relic library.
-// All BLS functionalties in the package require the Relic dependency,
+// All BLS functionalities in the package require the Relic dependency,
 // and therefore the "relic" build tag.
 // Building without the "relic" tag is successful, but and calling one of the
 // BLS functions results in a runtime panic. This allows projects depending on the
 // crypto library to build successfully with or without the "relic" tag.
 
 const relic_panic = "function is not supported when building without \"relic\" Go build tag"
+
+const (
+	SignatureLenBLSBLS12381     = 48
+	KeyGenSeedMinLenBLSBLS12381 = 48
+)
 
 // bls.go functions
 func NewExpandMsgXOFKMAC128(tag string) hash.Hasher {
@@ -47,7 +52,23 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	panic(relic_panic)
 }
 
-func NeutralBLSPublicKey() PublicKey {
+func IdentityBLSPublicKey() PublicKey {
+	panic(relic_panic)
+}
+
+func IsBLSAggregateEmptyListError(err error) bool {
+	panic(relic_panic)
+}
+
+func IsInvalidSignatureError(err error) bool {
+	panic(relic_panic)
+}
+
+func IsNotBLSKeyError(err error) bool {
+	panic(relic_panic)
+}
+
+func IsBLSSignatureIdentity(s Signature) bool {
 	panic(relic_panic)
 }
 
@@ -67,6 +88,18 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 
 func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	message []byte, kmac hash.Hasher) ([]bool, error) {
+	panic(relic_panic)
+}
+
+func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signature) (bool, error) {
 	panic(relic_panic)
 }
 

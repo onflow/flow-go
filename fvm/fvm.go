@@ -3,13 +3,13 @@ package fvm
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -22,13 +22,30 @@ const (
 	ScriptProcedureType      = ProcedureType("script")
 )
 
+type ProcedureExecutor interface {
+	Preprocess() error
+	Execute() error
+	Cleanup()
+}
+
+func Run(executor ProcedureExecutor) error {
+	defer executor.Cleanup()
+
+	err := executor.Preprocess()
+	if err != nil {
+		return err
+	}
+
+	return executor.Execute()
+}
+
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(
+	NewExecutor(
 		ctx Context,
 		txnState *state.TransactionState,
-		programs *programs.TransactionPrograms,
-	) error
+		derivedTxnData *derived.DerivedTransactionData,
+	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
@@ -43,11 +60,11 @@ type Procedure interface {
 	//
 	// For scripts, since they can only be executed after the block has been
 	// executed, the initial snapshot time is EndOfBlockExecutionTime.
-	InitialSnapshotTime() programs.LogicalTime
+	InitialSnapshotTime() derived.LogicalTime
 
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
-	ExecutionTime() programs.LogicalTime
+	ExecutionTime() derived.LogicalTime
 }
 
 func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
@@ -68,21 +85,21 @@ func (vm *VirtualMachine) Run(
 	proc Procedure,
 	v state.View,
 ) error {
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockProgramsWithTransactionOffset(
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = derived.NewEmptyDerivedBlockDataWithTransactionOffset(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var txnPrograms *programs.TransactionPrograms
+	var derivedTxnData *derived.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		txnPrograms, err = blockPrograms.NewSnapshotReadTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	case TransactionProcedureType, BootstrapProcedureType:
-		txnPrograms, err = blockPrograms.NewTransactionPrograms(
+		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
 			proc.InitialSnapshotTime(),
 			proc.ExecutionTime())
 	default:
@@ -90,58 +107,31 @@ func (vm *VirtualMachine) Run(
 	}
 
 	if err != nil {
-		return fmt.Errorf("error creating transaction programs: %w", err)
+		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
-
-	// Note: it is safe to skip committing the parsed programs for non-normal
-	// transactions (i.e., bootstrap and script) since this is only an
-	// optimization.
-	if proc.Type() == TransactionProcedureType {
-		defer func() {
-			commitErr := txnPrograms.Commit()
-			if commitErr != nil {
-				// NOTE: txnPrograms commit error does not impact correctness,
-				// but may slow down execution since some programs may need to
-				// be re-parsed.
-				ctx.Logger.Warn().Err(commitErr).Msg(
-					"failed to commit transaction programs")
-			}
-		}()
-	}
-
-	meterParams := meter.DefaultParameters().
-		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-		WithMemoryLimit(proc.MemoryLimit(ctx))
-
-	meterParams, err = getEnvironmentMeterParameters(
-		ctx,
-		v,
-		txnPrograms,
-		meterParams,
-	)
-	if err != nil {
-		return fmt.Errorf("error gettng environment meter parameters: %w", err)
-	}
-
-	interactionLimit := ctx.MaxStateInteractionSize
-	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
-		interactionLimit = math.MaxUint64
-	}
-
-	eventSizeLimit := ctx.EventCollectionByteSizeLimit
-	meterParams = meterParams.WithEventEmitByteLimit(eventSizeLimit)
 
 	txnState := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
-			WithMeterParameters(meterParams).
+			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(interactionLimit),
-	)
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
-	return proc.Run(ctx, txnState, txnPrograms)
+	err = Run(proc.NewExecutor(ctx, txnState, derivedTxnData))
+	if err != nil {
+		return err
+	}
+
+	// Note: it is safe to skip committing derived data for non-normal
+	// transactions (i.e., bootstrap and script) since these do not invalidate
+	// derived data entries.
+	if proc.Type() == TransactionProcedureType {
+		// NOTE: It is not safe to ignore derivedTxnData' commit error for
+		// transactions that trigger derived data invalidation.
+		return derivedTxnData.Commit()
+	}
+
+	return nil
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -158,27 +148,33 @@ func (vm *VirtualMachine) GetAccount(
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
-	)
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyBlockPrograms()
+	derivedBlockData := ctx.DerivedBlockData
+	if derivedBlockData == nil {
+		derivedBlockData = derived.NewEmptyDerivedBlockData()
 	}
 
-	txnPrograms, err := blockPrograms.NewSnapshotReadTransactionPrograms(
-		programs.EndOfBlockExecutionTime,
-		programs.EndOfBlockExecutionTime)
+	derviedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		derived.EndOfBlockExecutionTime,
+		derived.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error creating transaction programs for GetAccount: %w",
+			"error creating derived transaction data for GetAccount: %w",
 			err)
 	}
 
-	env := NewScriptEnv(context.Background(), ctx, txnState, txnPrograms)
+	env := environment.NewScriptEnvironment(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		txnState,
+		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
-		if errors.IsALedgerFailure(err) {
+		if errors.IsLedgerFailure(err) {
 			return nil, fmt.Errorf(
 				"cannot get account, this error usually happens if the "+
 					"reference block for this query is not set to a recent "+

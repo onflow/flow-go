@@ -12,21 +12,17 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
@@ -41,18 +37,6 @@ const (
 	ReusableCadenceRuntimePoolSize = 1000
 )
 
-var uploadEnabled = true
-
-func SetUploaderEnabled(enabled bool) {
-	uploadEnabled = enabled
-
-	log.Info().Msgf("changed uploadEnabled to %v", enabled)
-}
-
-func GetUploaderEnabled() bool {
-	return uploadEnabled
-}
-
 type ComputationManager interface {
 	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
@@ -66,7 +50,7 @@ type ComputationManager interface {
 type ComputationConfig struct {
 	CadenceTracing           bool
 	ExtensiveTracing         bool
-	ProgramsCacheSize        uint
+	DerivedDataCacheSize     uint
 	ScriptLogThreshold       time.Duration
 	ScriptExecutionTimeLimit time.Duration
 
@@ -88,10 +72,9 @@ type Manager struct {
 	vm                       computer.VirtualMachine
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
-	programsCache            *programs.ChainPrograms
+	derivedChainData         *derived.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
-	uploaders                []uploader.Uploader
 	rngLock                  *sync.Mutex
 	rng                      *rand.Rand
 }
@@ -104,7 +87,6 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	uploaders []uploader.Uploader,
 	executionDataProvider *provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
@@ -138,6 +120,7 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		me,
 		executionDataProvider,
 	)
 
@@ -145,9 +128,9 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	programsCache, err := programs.NewChainPrograms(params.ProgramsCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(params.DerivedDataCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create programs cache: %w", err)
+		return nil, fmt.Errorf("cannot create derived data cache: %w", err)
 	}
 
 	e := Manager{
@@ -159,10 +142,9 @@ func New(
 		vm:                       vm,
 		vmCtx:                    vmCtx,
 		blockComputer:            blockComputer,
-		programsCache:            programsCache,
+		derivedChainData:         derivedChainData,
 		scriptLogThreshold:       params.ScriptLogThreshold,
 		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
-		uploaders:                uploaders,
 		rngLock:                  &sync.Mutex{},
 		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -207,8 +189,8 @@ func (e *Manager) ExecuteScript(
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
 	err := func() (err error) {
 
@@ -285,42 +267,17 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	blockPrograms := e.programsCache.GetOrCreateBlockPrograms(
+	derivedBlockData := e.derivedChainData.GetOrCreateDerivedBlockData(
 		block.ID(),
 		block.ParentID())
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, derivedBlockData)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
 			Msg("failed to compute block result")
 
 		return nil, fmt.Errorf("failed to execute block: %w", err)
-	}
-
-	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
-
-	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
-
-	if uploadEnabled {
-		var group errgroup.Group
-
-		for _, uploader := range e.uploaders {
-			uploader := uploader
-
-			group.Go(func() error {
-				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
-				defer span.End()
-
-				return uploader.Upload(result)
-			})
-		}
-
-		err = group.Wait()
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload block result: %w", err)
-		}
 	}
 
 	e.log.Debug().
@@ -334,8 +291,8 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		fvm.WithBlockPrograms(
-			e.programsCache.NewBlockProgramsForScript(blockHeader.ID())))
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
 	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {

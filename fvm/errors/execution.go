@@ -3,6 +3,7 @@ package errors
 import (
 	"strings"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -44,6 +45,44 @@ func NewTransactionFeeDeductionFailedError(
 		err,
 		"failed to deduct %d transaction fees from %s",
 		txFees,
+		payer)
+}
+
+// IsTransactionFeeDeductionFailedError returns true if error has this code.
+func IsTransactionFeeDeductionFailedError(err error) bool {
+	return HasErrorCode(err, ErrCodeTransactionFeeDeductionFailedError)
+}
+
+// NewInsufficientPayerBalanceError constructs a new CodedError which
+// indicates that the payer has insufficient balance to attempt transaction execution.
+func NewInsufficientPayerBalanceError(
+	payer flow.Address,
+	requiredBalance cadence.UFix64,
+) CodedError {
+	return NewCodedError(
+		ErrCodeInsufficientPayerBalance,
+		"payer %s has insufficient balance to attempt transaction execution (required balance: %s)",
+		payer,
+		requiredBalance,
+	)
+}
+
+// IsInsufficientPayerBalanceError returns true if error has this code.
+func IsInsufficientPayerBalanceError(err error) bool {
+	return HasErrorCode(err, ErrCodeInsufficientPayerBalance)
+}
+
+// indicates that a there was an error checking the payers balance.
+// This is an implementation error most likely between the smart contract and FVM interaction
+// and should not happen in regular execution.
+func NewPayerBalanceCheckFailure(
+	payer flow.Address,
+	err error,
+) CodedError {
+	return WrapCodedError(
+		FailureCodePayerBalanceCheckFailure,
+		err,
+		"failed to check if the payer %s has sufficient balance",
 		payer)
 }
 
@@ -214,6 +253,21 @@ func NewCouldNotGetExecutionParameterFromStateError(
 		ErrCodeCouldNotDecodeExecutionParameterFromState,
 		"could not get execution parameter from the state "+
 			"(address: %s path: %s)",
+		address,
+		path)
+}
+
+// NewInvalidFVMStateAccessError constructs a new CodedError which indicates
+// that the cadence program attempted to directly access fvm's internal state.
+func NewInvalidFVMStateAccessError(
+	address flow.Address,
+	path string,
+	opType string,
+) CodedError {
+	return NewCodedError(
+		ErrCodeInvalidFVMStateAccessError,
+		"could not directly %s fvm internal state (address: %s: path: %s)",
+		opType,
 		address,
 		path)
 }

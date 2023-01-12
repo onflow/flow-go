@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -51,6 +52,8 @@ type Suite struct {
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
+	seals        *storage.Seals
+	downloader   *downloadermock.Downloader
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -102,7 +105,8 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
+		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0,
+		0, false, false, nil, nil)
 	require.NoError(suite.T(), err)
 	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
@@ -158,7 +162,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)

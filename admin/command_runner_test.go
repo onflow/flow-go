@@ -32,6 +32,7 @@ import (
 
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +55,7 @@ func TestCommandRunner(t *testing.T) {
 }
 
 func (suite *CommandRunnerSuite) SetupTest() {
-	suite.httpAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
+	suite.httpAddress = unittest.IPPort(testingdock.RandomPort(suite.T()))
 	suite.bootstrapper = NewCommandRunnerBootstrapper()
 }
 
@@ -78,7 +79,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
-	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock))
+	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock), WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
@@ -164,7 +165,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 		return "ok", nil
 	})
 
-	validatorErr := errors.New("unexpected value")
+	validatorErr := NewInvalidAdminReqErrorf("unexpected value")
 	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
 		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
@@ -285,6 +286,22 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
+}
+
+func (suite *CommandRunnerSuite) TestHTTPPProf() {
+	suite.SetupCommandRunner()
+
+	url := fmt.Sprintf("http://%s/debug/pprof/goroutine", suite.httpAddress)
+	resp, err := http.Get(url)
+	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	suite.Equal(resp.Status, "200 OK")
+	suite.Equal(resp.Header.Get("Content-Type"), "application/octet-stream")
 }
 
 func (suite *CommandRunnerSuite) TestListCommands() {

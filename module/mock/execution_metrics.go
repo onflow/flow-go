@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	module "github.com/onflow/flow-go/module"
+
 	time "time"
 )
 
@@ -29,14 +31,24 @@ func (_m *ExecutionMetrics) ExecutionBlockDataUploadStarted() {
 	_m.Called()
 }
 
-// ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, txCounts, colCounts
-func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
-	_m.Called(dur, compUsed, txCounts, colCounts)
+// ExecutionBlockExecuted provides a mock function with given fields: dur, stats
+func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+	_m.Called(dur, stats)
 }
 
-// ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, txCounts
-func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
-	_m.Called(dur, compUsed, txCounts)
+// ExecutionBlockExecutionEffortVectorComponent provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 string, _a1 uint) {
+	_m.Called(_a0, _a1)
+}
+
+// ExecutionChunkDataPackGenerated provides a mock function with given fields: proofSize, numberOfTransactions
+func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(proofSize int, numberOfTransactions int) {
+	_m.Called(proofSize, numberOfTransactions)
+}
+
+// ExecutionCollectionExecuted provides a mock function with given fields: dur, stats
+func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+	_m.Called(dur, stats)
 }
 
 // ExecutionCollectionRequestRetried provides a mock function with given fields:
@@ -69,11 +81,6 @@ func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed 
 	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
 }
 
-// ExecutionStateReadsPerBlock provides a mock function with given fields: reads
-func (_m *ExecutionMetrics) ExecutionStateReadsPerBlock(reads uint64) {
-	_m.Called(reads)
-}
-
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	_m.Called(bytes)
@@ -84,9 +91,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64, eventCounts int, failed bool) {
-	_m.Called(dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, actualMemoryUsed uint64, eventCounts int, eventSize int, failed bool) {
+	_m.Called(dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

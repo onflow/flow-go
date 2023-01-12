@@ -6,10 +6,62 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 )
+
+type BlockInfo interface {
+	// GetCurrentBlockHeight returns the current block height.
+	GetCurrentBlockHeight() (uint64, error)
+
+	// GetBlockAtHeight returns the block at the given height.
+	GetBlockAtHeight(
+		height uint64,
+	) (
+		runtime.Block,
+		bool,
+		error,
+	)
+}
+
+type ParseRestrictedBlockInfo struct {
+	txnState *state.TransactionState
+	impl     BlockInfo
+}
+
+func NewParseRestrictedBlockInfo(
+	txnState *state.TransactionState,
+	impl BlockInfo,
+) BlockInfo {
+	return ParseRestrictedBlockInfo{
+		txnState: txnState,
+		impl:     impl,
+	}
+}
+
+func (info ParseRestrictedBlockInfo) GetCurrentBlockHeight() (uint64, error) {
+	return parseRestrict1Ret(
+		info.txnState,
+		trace.FVMEnvGetCurrentBlockHeight,
+		info.impl.GetCurrentBlockHeight)
+}
+
+func (info ParseRestrictedBlockInfo) GetBlockAtHeight(
+	height uint64,
+) (
+	runtime.Block,
+	bool,
+	error,
+) {
+	return parseRestrict1Arg2Ret(
+		info.txnState,
+		trace.FVMEnvGetBlockAtHeight,
+		info.impl.GetBlockAtHeight,
+		height)
+}
 
 type BlockInfoParams struct {
 	Blocks      Blocks
@@ -23,8 +75,8 @@ func DefaultBlockInfoParams() BlockInfoParams {
 	}
 }
 
-type BlockInfo struct {
-	tracer *Tracer
+type blockInfo struct {
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	blockHeader *flow.Header
@@ -32,12 +84,12 @@ type BlockInfo struct {
 }
 
 func NewBlockInfo(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	blockHeader *flow.Header,
 	blocks Blocks,
-) *BlockInfo {
-	return &BlockInfo{
+) BlockInfo {
+	return &blockInfo{
 		tracer:      tracer,
 		meter:       meter,
 		blockHeader: blockHeader,
@@ -46,8 +98,8 @@ func NewBlockInfo(
 }
 
 // GetCurrentBlockHeight returns the current block height.
-func (info *BlockInfo) GetCurrentBlockHeight() (uint64, error) {
-	defer info.tracer.StartExtensiveTracingSpanFromRoot(
+func (info *blockInfo) GetCurrentBlockHeight() (uint64, error) {
+	defer info.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := info.meter.MeterComputation(
@@ -64,14 +116,14 @@ func (info *BlockInfo) GetCurrentBlockHeight() (uint64, error) {
 }
 
 // GetBlockAtHeight returns the block at the given height.
-func (info *BlockInfo) GetBlockAtHeight(
+func (info *blockInfo) GetBlockAtHeight(
 	height uint64,
 ) (
 	runtime.Block,
 	bool,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := info.meter.MeterComputation(
 		ComputationKindGetBlockAtHeight,

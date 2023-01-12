@@ -402,7 +402,7 @@ func TestRemove(t *testing.T) {
 			})
 		})
 
-		t.Run("should error when removing non-existant value", func(t *testing.T) {
+		t.Run("should error when removing non-existing value", func(t *testing.T) {
 			nonexistantKey := append(key, 0x01)
 			_ = db.Update(func(txn *badger.Txn) error {
 				err := remove(nonexistantKey)(txn)
@@ -415,7 +415,7 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveByPrefix(t *testing.T) {
-	t.Run("should no-op when removing non-existant value", func(t *testing.T) {
+	t.Run("should no-op when removing non-existing value", func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}

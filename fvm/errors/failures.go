@@ -1,5 +1,9 @@
 package errors
 
+import (
+	"github.com/onflow/flow-go/module/trace"
+)
+
 func NewUnknownFailure(err error) CodedError {
 	return WrapCodedError(
 		FailureCodeUnknownFailure,
@@ -29,9 +33,9 @@ func NewLedgerFailure(err error) CodedError {
 		"ledger returns unsuccessful")
 }
 
-// IsALedgerFailure returns true if the error or any of the wrapped errors is
+// IsLedgerFailure returns true if the error or any of the wrapped errors is
 // a ledger failure
-func IsALedgerFailure(err error) bool {
+func IsLedgerFailure(err error) bool {
 	return HasErrorCode(err, FailureCodeLedgerFailure)
 }
 
@@ -56,9 +60,11 @@ func NewBlockFinderFailure(err error) CodedError {
 // NewParseRestrictedModeInvalidAccessFailure constructs a CodedError which
 // captures a fatal caused by Cadence accessing an unexpected environment
 // operation while it is parsing programs.
-func NewParseRestrictedModeInvalidAccessFailure(op string) CodedError {
+func NewParseRestrictedModeInvalidAccessFailure(
+	spanName trace.SpanName,
+) CodedError {
 	return NewCodedError(
 		FailureCodeParseRestrictedModeInvalidAccessFailure,
 		"cannot access %s while cadence is in parse restricted mode",
-		op)
+		spanName)
 }

@@ -24,6 +24,7 @@ const (
 	// Deprecated: No longer used.
 	FailureCodeHasherFailure                           ErrorCode = 2005
 	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
+	FailureCodePayerBalanceCheckFailure                ErrorCode = 2007
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )
@@ -77,6 +78,10 @@ const (
 	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
 	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
+	ErrCodeEventEncodingError                        ErrorCode = 1115
+	ErrCodeInvalidFVMStateAccessError                ErrorCode = 1116
+	// 1117 was never deployed and is free to use
+	ErrCodeInsufficientPayerBalance ErrorCode = 1118
 
 	// accounts errors 1200 - 1250
 	// Deprecated: No longer used.

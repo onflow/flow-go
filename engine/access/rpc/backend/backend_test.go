@@ -19,15 +19,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/util"
-
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -119,6 +118,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -142,13 +143,14 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	)
 
 	// query the handler for the latest finalized block
-	header, err := backend.GetLatestBlockHeader(context.Background(), false)
+	header, status, err := backend.GetLatestBlockHeader(context.Background(), false)
 	suite.checkResponse(header, err)
 
 	// make sure we got the latest block
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 
@@ -486,6 +488,9 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil).Once()
 
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.snapshot.On("Head").Return(block, nil).Once()
+
 	backend := New(
 		suite.state,
 		nil,
@@ -508,13 +513,14 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetLatestBlockHeader(context.Background(), true)
+	header, status, err := backend.GetLatestBlockHeader(context.Background(), true)
 	suite.checkResponse(header, err)
 
 	// make sure we got the latest sealed block
 	suite.Require().Equal(block.ID(), header.ID())
 	suite.Require().Equal(block.Height, header.Height)
 	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(status, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
 }
@@ -622,12 +628,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionByIndexRequest{
+	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
 		Index:   index,
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
@@ -652,8 +658,8 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		DefaultSnapshotHistoryLimit,
 	)
 	suite.execClient.
-		On("GetTransactionResultByIndex", ctx, &exeEventReq).
-		Return(&exeEventResp, nil).
+		On("GetTransactionResultByIndex", ctx, exeEventReq).
+		Return(exeEventResp, nil).
 		Once()
 
 	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
@@ -685,11 +691,11 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
+	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultsResponse{
+	exeEventResp := &execproto.GetTransactionResultsResponse{
 		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
 	}
 
@@ -714,8 +720,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		DefaultSnapshotHistoryLimit,
 	)
 	suite.execClient.
-		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
-		Return(&exeEventResp, nil).
+		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
+		Return(exeEventResp, nil).
 		Once()
 
 	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
@@ -769,12 +775,12 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
-	exeEventReq := execproto.GetTransactionResultRequest{
+	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
@@ -801,8 +807,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// Successfully return empty event list
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Once()
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -817,8 +823,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// Successfully return empty event list from here on
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, nil)
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
 	result, err = backend.GetTransactionResult(ctx, txID)
@@ -1037,19 +1043,19 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	receipts, _ := suite.setupReceipts(&block)
 
-	exeEventReq := execproto.GetTransactionResultRequest{
+	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultResponse{
+	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
 	// simulate that the execution node has not yet executed the transaction
 	suite.execClient.
-		On("GetTransactionResult", ctx, &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		On("GetTransactionResult", ctx, exeEventReq).
+		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Once()
 
 	// create a mock connection factory
@@ -1151,13 +1157,19 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	suite.snapshot.
 		On("Head").
-		Return(header, nil).
+		Return(header, nil).Once()
+
+	headerClone := *header
+	headerClone.Height = 0
+
+	suite.snapshot.
+		On("Head").
+		Return(&headerClone, nil).
 		Once()
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&expected, nil).
-		Once()
+		Return(&expected, nil)
 
 	backend := New(
 		suite.state,
@@ -1181,11 +1193,12 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	)
 
 	// query the handler for the latest finalized header
-	actual, err := backend.GetLatestBlock(context.Background(), false)
+	actual, status, err := backend.GetLatestBlock(context.Background(), false)
 	suite.checkResponse(actual, err)
 
 	// make sure we got the latest header
 	suite.Require().Equal(expected, *actual)
+	suite.Assert().Equal(status, flow.BlockStatusFinalized)
 
 	suite.assertAllExpectations()
 }
@@ -1257,7 +1270,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	// create the execution node response
-	exeResp := execproto.GetEventsForBlockIDsResponse{
+	exeResp := &execproto.GetEventsForBlockIDsResponse{
 		Results: exeResults,
 	}
 
@@ -1281,7 +1294,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	// expect two calls to the executor api client (one for each of the following 2 test cases)
 	suite.execClient.
 		On("GetEventsForBlockIDs", ctx, exeReq).
-		Return(&exeResp, nil).
+		Return(exeResp, nil).
 		Once()
 
 	suite.Run("with an execution node chosen using block ID form the list of Fixed ENs", func() {
@@ -2192,24 +2205,24 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
 	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
 	}
-	execRes := execproto.ExecuteScriptAtBlockIDResponse{
+	execRes := &execproto.ExecuteScriptAtBlockIDResponse{
 		Value: []byte{4, 5, 6},
 	}
 
 	suite.Run("happy path script execution success", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).Return(&execRes, nil).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
 		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
 
 	suite.Run("script execution failure returns status OK", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
 		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())
@@ -2218,7 +2231,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	})
 
 	suite.Run("execution node internal failure returns status code Internal", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
 		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
 		suite.execClient.AssertExpectations(suite.T())

@@ -1,4 +1,4 @@
-package environment
+package environment_test
 
 import (
 	"fmt"
@@ -13,16 +13,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/errors"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
-	akh := &accountKeyUpdater{accounts: FakeAccounts{}}
+	akh := environment.NewAccountKeyUpdater(
+		tracing.NewTracerSpan(),
+		nil,
+		FakeAccounts{},
+		nil,
+		nil)
 
 	address := cadence.BytesToAddress([]byte{1, 2, 3, 4})
 
@@ -32,22 +38,14 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	invalidEncodedKey := make([]byte, 64)
 	invalidUTF8 := []byte{0xc3, 0x28}
 	copy(invalidUTF8, invalidEncodedKey)
-	publicKey := FakePublicKey{data: invalidEncodedKey}
-
-	accountPublicKey := flow.AccountPublicKey{
-		Index:     1,
-		PublicKey: publicKey,
-		SignAlgo:  crypto.ECDSASecp256k1,
-		HashAlgo:  hash.SHA3_256,
-		SeqNumber: 0,
-		Weight:    1000,
-		Revoked:   false,
-	}
+	accountPublicKey := FakePublicKey{data: invalidEncodedKey}.toAccountPublicKey()
 
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
 
-	err = akh.addEncodedAccountKey(runtime.Address(address), encodedPublicKey)
+	err = akh.InternalAddEncodedAccountKey(
+		runtime.Address(address),
+		encodedPublicKey)
 	require.Error(t, err)
 
 	require.True(t, errors.IsValueError(err))
@@ -75,7 +73,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 		SignAlgo:  invalidSignAlgo,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		sema.HashAlgorithmSHA2_384,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -105,7 +107,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 
 	invalidHashAlgo := sema.HashAlgorithm(112)
 
-	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
+	_, err := environment.NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -133,7 +135,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		runtime.HashAlgorithmSHA2_256,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -156,6 +162,20 @@ type FakePublicKey struct {
 	data []byte
 }
 
+var _ crypto.PublicKey = &FakePublicKey{}
+
+func (f FakePublicKey) toAccountPublicKey() flow.AccountPublicKey {
+	return flow.AccountPublicKey{
+		Index:     1,
+		PublicKey: f,
+		SignAlgo:  crypto.ECDSASecp256k1,
+		HashAlgo:  hash.SHA3_256,
+		SeqNumber: 0,
+		Weight:    1000,
+		Revoked:   false,
+	}
+}
+
 func (f FakePublicKey) Encode() []byte {
 	return f.data
 }
@@ -169,15 +189,25 @@ func (f FakePublicKey) Verify(_ crypto.Signature, _ []byte, _ hash.Hasher) (bool
 func (f FakePublicKey) EncodeCompressed() []byte         { return nil }
 func (f FakePublicKey) Equals(key crypto.PublicKey) bool { return false }
 
-type FakeAccounts struct{}
-
-func (f FakeAccounts) Exists(address flow.Address) (bool, error)                     { return true, nil }
-func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error)               { return &flow.Account{}, nil }
-func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error)              { return 0, nil }
-func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
-func (f FakeAccounts) GetPublicKey(_ flow.Address, _ uint64) (flow.AccountPublicKey, error) {
-	return flow.AccountPublicKey{}, nil
+type FakeAccounts struct {
+	keyCount uint64
 }
+
+var _ environment.Accounts = &FakeAccounts{}
+
+func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
+func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
+func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error) {
+	return f.keyCount, nil
+}
+func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
+func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+	if keyIndex >= f.keyCount {
+		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
+	}
+	return FakePublicKey{}.toAccountPublicKey(), nil
+}
+
 func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
 }

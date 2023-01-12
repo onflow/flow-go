@@ -6,6 +6,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -16,6 +19,8 @@ const (
 )
 
 type NetworkCollector struct {
+	*LibP2PResourceManagerMetrics
+	*GossipSubMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -40,6 +45,8 @@ type NetworkCollector struct {
 	prefix string
 }
 
+var _ module.NetworkMetrics = (*NetworkCollector)(nil)
+
 type NetworkCollectorOpt func(*NetworkCollector)
 
 func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
@@ -50,12 +57,15 @@ func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	}
 }
 
-func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
 	nc := &NetworkCollector{}
 
 	for _, opt := range opts {
 		opt(nc)
 	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
+	nc.GossipSubMetrics = NewGossipSubMetrics(nc.prefix)
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -64,7 +74,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.inboundMessageSize = promauto.NewHistogramVec(
@@ -74,7 +84,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.duplicateMessagesDropped = promauto.NewCounterVec(
@@ -83,7 +93,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.dnsLookupDuration = promauto.NewHistogram(
@@ -211,7 +221,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemAuth,
 			Name:      nc.prefix + "unauthorized_messages_count",
 			Help:      "number of messages that failed authorization validation",
-		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
 	)
 
 	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
@@ -220,27 +230,25 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemRateLimiting,
 			Name:      nc.prefix + "rate_limited_unicast_messages_count",
 			Help:      "number of messages sent via unicast that have been rate limited",
-		}, []string{LabelNodeRole, LabelMessage, LabelChannel},
+		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
 	return nc
 }
 
-// NetworkMessageSent tracks the message size of the last message sent out on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
-	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// OutboundMessageSent collects metrics related to a message sent by the node.
+func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic, protocol, messageType string) {
+	nc.outboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkMessageReceived tracks the message size of the last message received on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
-	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// InboundMessageReceived collects metrics related to a message received by the node.
+func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic, protocol, messageType string) {
+	nc.inboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
-func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
-	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
+// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, messageType string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic, protocol, messageType).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
@@ -255,15 +263,18 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
+// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageStarted(topic string) {
+// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingStarted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageFinished(topic string) {
+// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingCompleted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
 }
 
@@ -275,7 +286,8 @@ func (nc *NetworkCollector) RoutingTablePeerRemoved() {
 	nc.routingTableSize.Dec()
 }
 
-// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+// the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
@@ -323,6 +335,6 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 }
 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic string) {
-	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic).Inc()
+func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }

@@ -46,8 +46,8 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]*flow.PendingBlock
-	childrenDB map[flow.Identifier][]*flow.PendingBlock
+	pendingDB  map[flow.Identifier]flow.Slashable[flow.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[flow.Block]
 
 	// mocked dependencies
 	me             *module.Local
@@ -92,8 +92,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]*flow.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*flow.PendingBlock)
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[flow.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[flow.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.Header
@@ -206,7 +206,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.PendingBlock {
+		func(blockID flow.Identifier) flow.Slashable[flow.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -215,7 +215,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.PendingBlock {
+		func(blockID flow.Identifier) []flow.Slashable[flow.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -373,15 +373,14 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(parent)
 	block1 := unittest.BlockWithParentFixture(parent.Header)
 	block2 := unittest.BlockWithParentFixture(parent.Header)
 	block3 := unittest.BlockWithParentFixture(parent.Header)
 
 	// create the pending blocks
-	pending1 := unittest.PendingFromBlock(block1)
-	pending2 := unittest.PendingFromBlock(block2)
-	pending3 := unittest.PendingFromBlock(block3)
+	pending1 := unittest.AsSlashable(block1)
+	pending2 := unittest.AsSlashable(block2)
+	pending3 := unittest.AsSlashable(block3)
 
 	// store the parent on disk
 	parentID := parent.ID()
@@ -398,7 +397,7 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal, false)
+	err := cs.core.processBlockAndDescendants(parent, false)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -443,7 +442,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	var proposals []*messages.BlockProposal
 	parent := missing
 	for i := 0; i < 3; i++ {
-		descendant := unittest.BlockWithParentFixture(parent.Header)
+		descendant := unittest.BlockWithParentFixture(&parent.Block.Header)
 		proposal := unittest.ProposalFromBlock(descendant)
 		proposals = append(proposals, proposal)
 		parent = proposal
@@ -459,7 +458,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.Block.Header.ID(), ancestorID, "should always request root block")
 			},
 		)
 
@@ -475,10 +474,10 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
 	order := []flow.Identifier{
-		missing.Header.ID(),
-		proposals[0].Header.ID(),
-		proposals[1].Header.ID(),
-		proposals[2].Header.ID(),
+		missing.Block.Header.ID(),
+		proposals[0].Block.Header.ID(),
+		proposals[1].Block.Header.ID(),
+		proposals[2].Block.Header.ID(),
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {

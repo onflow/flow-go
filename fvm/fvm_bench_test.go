@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -34,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
@@ -42,9 +41,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -61,7 +60,6 @@ type TestBenchBlockExecutor interface {
 	ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult
 	Chain(tb testing.TB) flow.Chain
 	ServiceAccount(tb testing.TB) *TestBenchAccount
-	ResetProgramCache(tb testing.TB)
 }
 
 type TestBenchAccount struct {
@@ -136,7 +134,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.BlockPrograms
+	derivedChainData      *derived.DerivedChainData
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
@@ -147,11 +145,15 @@ type BasicBlockExecutor struct {
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
 	vm := fvm.NewVirtualMachine()
 
+	// a big interaction limit since that is not what's being tested.
+	interactionLimit := fvm.DefaultMaxInteractionSize * uint64(1000)
+
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
+		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
@@ -198,10 +200,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	require.NoError(tb, err)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -211,15 +210,31 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		trackerStorage,
 	)
 
+	me := new(moduleMock.Local)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommitter,
+		me,
+		prov)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
+	require.NoError(tb, err)
+
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyBlockPrograms(),
+		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
@@ -232,10 +247,6 @@ func (b *BasicBlockExecutor) Chain(_ testing.TB) flow.Chain {
 	return b.chain
 }
 
-func (b *BasicBlockExecutor) ResetProgramCache(tb testing.TB) {
-	b.programCache = programs.NewEmptyBlockPrograms()
-}
-
 func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 	return b.serviceAccount
 }
@@ -244,10 +255,14 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
+	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
+		executableBlock.ID(),
+		executableBlock.ParentID())
+
+	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
+	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
 	require.NoError(tb, err)
 	b.activeStateCommitment = endState
 
@@ -385,7 +400,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			addrs = append(addrs, account.Address)
 		}
 		// fund all accounts so not to run into storage problems
-		fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), addrs...)
+		fundAccounts(b, blockExecutor, cadence.UFix64(10_000_000_000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {

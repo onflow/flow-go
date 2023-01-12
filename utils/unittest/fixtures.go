@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"net"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -33,6 +35,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -41,7 +45,12 @@ import (
 
 const (
 	DefaultSeedFixtureLength = 64
+	DefaultAddress           = "localhost:0"
 )
+
+func IPPort(port string) string {
+	return net.JoinHostPort("localhost", port)
+}
 
 func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()
@@ -197,28 +206,20 @@ func ProposalFixture() *messages.BlockProposal {
 }
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	proposal := &messages.BlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-	return proposal
+	return messages.NewBlockProposal(block)
 }
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-	return proposal
+	return messages.NewClusterBlockProposal(block)
 }
 
-func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
-	pending := flow.PendingBlock{
-		OriginID: block.Header.ProposerID,
-		Header:   block.Header,
-		Payload:  block.Payload,
+// AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
+func AsSlashable[T any](msg *T) flow.Slashable[T] {
+	slashable := flow.Slashable[T]{
+		OriginID: IdentifierFixture(),
+		Message:  msg,
 	}
-	return &pending
+	return slashable
 }
 
 func StateDeltaFixture() *messages.ExecutionStateDelta {
@@ -1363,6 +1364,17 @@ func ChunkDataResponseMsgFixture(chunkID flow.Identifier, opts ...func(*messages
 	return cdp
 }
 
+// WithApproximateSize sets the ChunkDataResponse to be approximately bytes in size.
+func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
+	return func(request *messages.ChunkDataResponse) {
+		// 1 tx fixture is approximately 350 bytes
+		txCount := bytes / 350
+		collection := CollectionFixture(int(txCount) + 1)
+		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
+		request.ChunkDataPack = *pack
+	}
+}
+
 // ChunkDataResponseMessageListFixture creates a list of chunk data response messages each with a single-transaction collection, and random chunk ID.
 func ChunkDataResponseMessageListFixture(chunkIDs flow.IdentifierList) []*messages.ChunkDataResponse {
 	lst := make([]*messages.ChunkDataResponse, 0, len(chunkIDs))
@@ -2102,7 +2114,7 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 	if err != nil {
 		panic(err)
 	}
-	_, err = instance.SetRequiredApprovalsForSealingConstruction(val)
+	err = instance.SetRequiredApprovalsForSealingConstruction(val)
 	if err != nil {
 		panic(err)
 	}
@@ -2122,4 +2134,28 @@ func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
 	}
 
 	return peerID, nil
+}
+
+func EngineMessageFixture() *engine.Message {
+	return &engine.Message{
+		OriginID: IdentifierFixture(),
+		Payload:  RandomBytes(10),
+	}
+}
+
+func EngineMessageFixtures(count int) []*engine.Message {
+	messages := make([]*engine.Message, 0, count)
+	for i := 0; i < count; i++ {
+		messages = append(messages, EngineMessageFixture())
+	}
+	return messages
+}
+
+// GetFlowProtocolEventID returns the event ID for the event provided.
+func GetFlowProtocolEventID(t *testing.T, channel channels.Channel, event interface{}) flow.Identifier {
+	payload, err := NetworkCodec().Encode(event)
+	require.NoError(t, err)
+	eventIDHash, err := network.EventId(channel, payload)
+	require.NoError(t, err)
+	return flow.HashToID(eventIDHash)
 }

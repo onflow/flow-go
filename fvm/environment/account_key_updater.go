@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -156,7 +157,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
 ) error {
 	return parseRestrict2Arg(
 		updater.txnState,
-		"AddEncodedAccountKey",
+		trace.FVMEnvAddEncodedAccountKey,
 		updater.impl.AddEncodedAccountKey,
 		address,
 		publicKey)
@@ -171,7 +172,7 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
 ) {
 	return parseRestrict2Arg1Ret(
 		updater.txnState,
-		"RevokeEncodedAccountKey",
+		trace.FVMEnvRevokeEncodedAccountKey,
 		updater.impl.RevokeEncodedAccountKey,
 		address,
 		index)
@@ -188,7 +189,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
 ) {
 	return parseRestrict4Arg1Ret(
 		updater.txnState,
-		"AddAccountKey",
+		trace.FVMEnvAddAccountKey,
 		updater.impl.AddAccountKey,
 		address,
 		publicKey,
@@ -205,7 +206,7 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
 ) {
 	return parseRestrict2Arg1Ret(
 		updater.txnState,
-		"RevokeAccountKey",
+		trace.FVMEnvRevokeAccountKey,
 		updater.impl.RevokeAccountKey,
 		address,
 		keyIndex)
@@ -253,7 +254,7 @@ func (NoAccountKeyUpdater) RevokeAccountKey(
 }
 
 type accountKeyUpdater struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
@@ -262,7 +263,7 @@ type accountKeyUpdater struct {
 }
 
 func NewAccountKeyUpdater(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 	txnState *state.TransactionState,
@@ -421,12 +422,13 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	}, nil
 }
 
-// AddEncodedAccountKey adds an encoded public key to an existing account.
+// InternalAddEncodedAccountKey adds an encoded public key to an existing
+// account.
 //
 // This function returns following error
 // * NewAccountNotFoundError - if the specified account does not exist
 // * ValueError - if the provided encodedPublicKey is not valid public key
-func (updater *accountKeyUpdater) addEncodedAccountKey(
+func (updater *accountKeyUpdater) InternalAddEncodedAccountKey(
 	address runtime.Address,
 	encodedPublicKey []byte,
 ) error {
@@ -518,7 +520,8 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	address runtime.Address,
 	publicKey []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
+	defer updater.tracer.StartChildSpan(
+		trace.FVMEnvAddEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindAddEncodedAccountKey,
@@ -536,7 +539,7 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	//
 	// don't enforce limit during adding a key
 	updater.txnState.RunWithAllLimitsDisabled(func() {
-		err = updater.addEncodedAccountKey(address, publicKey)
+		err = updater.InternalAddEncodedAccountKey(address, publicKey)
 	})
 
 	if err != nil {
@@ -552,7 +555,7 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	[]byte,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeEncodedAccountKey,
@@ -583,7 +586,7 @@ func (updater *accountKeyUpdater) AddAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvAddAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindAddAccountKey,
@@ -611,7 +614,7 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeAccountKey,

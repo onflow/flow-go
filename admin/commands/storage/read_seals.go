@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/admin"
@@ -122,17 +121,19 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 	return commands.ConvertToInterfaceList(result)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return ErrValidatorReqDataFormat
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	data := &readSealsRequest{}
 
-	if seal, ok := input["seal"]; ok {
-		errInvalidResultValue := fmt.Errorf("invalid value for \"seal\": expected a seal ID represented as a 64 character long hex string, but got: %v", seal)
-		seal, ok := seal.(string)
+	if sealIn, ok := input["seal"]; ok {
+		errInvalidResultValue := admin.NewInvalidAdminReqParameterError("seal", "expected a seal ID represented as a 64 character long hex string, but got", sealIn)
+		seal, ok := sealIn.(string)
 		if !ok {
 			return errInvalidResultValue
 		}
@@ -145,13 +146,13 @@ func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
 	} else if block, ok := input["block"]; ok {
 		br, err := parseBlocksRequest(block)
 		if err != nil {
-			return err
+			return admin.NewInvalidAdminReqErrorf("invalid 'block' field: %w", err)
 		}
 		data.requestType = readSealsRequestByBlock
 		data.value = br
 		if n, ok := input["n"]; ok {
 			if n, err := parseN(n); err != nil {
-				return err
+				return admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
 			} else {
 				data.numBlocksToQuery = n
 			}
@@ -159,7 +160,7 @@ func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
 			data.numBlocksToQuery = 1
 		}
 	} else {
-		return errors.New("either \"block\" or \"seal\" field is required")
+		return admin.NewInvalidAdminReqErrorf("either \"block\" or \"seal\" field is required")
 	}
 
 	req.ValidatorData = data

@@ -9,39 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm after emulator is updated ...
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// is merged and integrated.
 const (
-	// [2_000, 3_000) reserved for the FVM
-	_ common.ComputationKind = iota + 2_000
-	ComputationKindHash
-	ComputationKindVerifySignature
-	ComputationKindAddAccountKey
-	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
-	ComputationKindCreateAccount
-	ComputationKindEmitEvent
-	ComputationKindGenerateUUID
-	ComputationKindGetAccountAvailableBalance
-	ComputationKindGetAccountBalance
-	ComputationKindGetAccountContractCode
-	ComputationKindGetAccountContractNames
-	ComputationKindGetAccountKey
-	ComputationKindGetBlockAtHeight
-	ComputationKindGetCode
-	ComputationKindGetCurrentBlockHeight
-	ComputationKindGetProgram
-	ComputationKindGetStorageCapacity
-	ComputationKindGetStorageUsed
-	ComputationKindGetValue
-	ComputationKindRemoveAccountContractCode
-	ComputationKindResolveLocation
-	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	ComputationKindSetProgram
-	ComputationKindSetValue
-	ComputationKindUpdateAccountContractCode
-	ComputationKindValidatePublicKey
-	ComputationKindValueExists
+	ComputationKindCreateAccount = 2006
+	ComputationKindGetValue      = 2020
+	ComputationKindSetValue      = 2026
 )
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
@@ -75,7 +48,6 @@ var (
 
 		// Values
 
-		common.MemoryKindBoolValue:      8,
 		common.MemoryKindAddressValue:   32,
 		common.MemoryKindStringValue:    138,
 		common.MemoryKindCharacterValue: 24,
@@ -88,18 +60,20 @@ var (
 		common.MemoryKindSimpleCompositeValue:     73,
 		common.MemoryKindSimpleCompositeValueBase: 89,
 		common.MemoryKindOptionalValue:            41,
-		common.MemoryKindNilValue:                 1,
-		common.MemoryKindVoidValue:                1,
 		common.MemoryKindTypeValue:                17,
 		common.MemoryKindPathValue:                24,
-		common.MemoryKindCapabilityValue:          1,
-		common.MemoryKindLinkValue:                1,
+		common.MemoryKindStorageCapabilityValue:   1,
+		common.MemoryKindPathLinkValue:            1,
+		common.MemoryKindAccountLinkValue:         1,
+		common.MemoryKindAccountReferenceValue:    1,
+		common.MemoryKindPublishedValue:           1,
 		common.MemoryKindStorageReferenceValue:    41,
 		common.MemoryKindEphemeralReferenceValue:  41,
 		common.MemoryKindInterpretedFunctionValue: 128,
 		common.MemoryKindHostFunctionValue:        41,
 		common.MemoryKindBoundFunctionValue:       25,
 		common.MemoryKindBigInt:                   50,
+		common.MemoryKindVoidExpression:           1,
 
 		// Atree
 
@@ -128,32 +102,33 @@ var (
 
 		// Cadence Values
 
-		common.MemoryKindCadenceVoidValue:         1,
-		common.MemoryKindCadenceOptionalValue:     17,
-		common.MemoryKindCadenceBoolValue:         8,
-		common.MemoryKindCadenceStringValue:       16,
-		common.MemoryKindCadenceCharacterValue:    16,
-		common.MemoryKindCadenceAddressValue:      8,
-		common.MemoryKindCadenceIntValue:          50,
-		common.MemoryKindCadenceNumberValue:       1,
-		common.MemoryKindCadenceArrayValueBase:    41,
-		common.MemoryKindCadenceArrayValueLength:  16,
-		common.MemoryKindCadenceDictionaryValue:   41,
-		common.MemoryKindCadenceKeyValuePair:      33,
-		common.MemoryKindCadenceStructValueBase:   33,
-		common.MemoryKindCadenceStructValueSize:   16,
-		common.MemoryKindCadenceResourceValueBase: 33,
-		common.MemoryKindCadenceResourceValueSize: 16,
-		common.MemoryKindCadenceEventValueBase:    33,
-		common.MemoryKindCadenceEventValueSize:    16,
-		common.MemoryKindCadenceContractValueBase: 33,
-		common.MemoryKindCadenceContractValueSize: 16,
-		common.MemoryKindCadenceEnumValueBase:     33,
-		common.MemoryKindCadenceEnumValueSize:     16,
-		common.MemoryKindCadenceLinkValue:         1,
-		common.MemoryKindCadencePathValue:         33,
-		common.MemoryKindCadenceTypeValue:         17,
-		common.MemoryKindCadenceCapabilityValue:   1,
+		common.MemoryKindCadenceVoidValue:              1,
+		common.MemoryKindCadenceOptionalValue:          17,
+		common.MemoryKindCadenceBoolValue:              8,
+		common.MemoryKindCadenceStringValue:            16,
+		common.MemoryKindCadenceCharacterValue:         16,
+		common.MemoryKindCadenceAddressValue:           8,
+		common.MemoryKindCadenceIntValue:               50,
+		common.MemoryKindCadenceNumberValue:            1,
+		common.MemoryKindCadenceArrayValueBase:         41,
+		common.MemoryKindCadenceArrayValueLength:       16,
+		common.MemoryKindCadenceDictionaryValue:        41,
+		common.MemoryKindCadenceKeyValuePair:           33,
+		common.MemoryKindCadenceStructValueBase:        33,
+		common.MemoryKindCadenceStructValueSize:        16,
+		common.MemoryKindCadenceResourceValueBase:      33,
+		common.MemoryKindCadenceResourceValueSize:      16,
+		common.MemoryKindCadenceEventValueBase:         33,
+		common.MemoryKindCadenceEventValueSize:         16,
+		common.MemoryKindCadenceContractValueBase:      33,
+		common.MemoryKindCadenceContractValueSize:      16,
+		common.MemoryKindCadenceEnumValueBase:          33,
+		common.MemoryKindCadenceEnumValueSize:          16,
+		common.MemoryKindCadencePathLinkValue:          1,
+		common.MemoryKindCadencePathValue:              33,
+		common.MemoryKindCadenceTypeValue:              17,
+		common.MemoryKindCadenceStorageCapabilityValue: 1,
+		common.MemoryKindCadenceFunctionValue:          1,
 
 		// Cadence Types
 
@@ -411,16 +386,6 @@ func NewMeter(params MeterParameters) *Meter {
 	return m
 }
 
-// NewChild construct a new Meter instance with the same limits as parent
-func (m *Meter) NewChild() *Meter {
-	return &Meter{
-		MeterParameters:        m.MeterParameters,
-		computationIntensities: make(MeteredComputationIntensities),
-		memoryIntensities:      make(MeteredMemoryIntensities),
-		storageUpdateSizeMap:   make(MeteredStorageInteractionMap),
-	}
-}
-
 // MergeMeter merges the input meter into the current meter and checks for the limits
 func (m *Meter) MergeMeter(child *Meter) {
 	if child == nil {
@@ -470,8 +435,8 @@ func (m *Meter) ComputationIntensities() MeteredComputationIntensities {
 }
 
 // TotalComputationUsed returns the total computation used
-func (m *Meter) TotalComputationUsed() uint {
-	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
+func (m *Meter) TotalComputationUsed() uint64 {
+	return m.computationUsed >> MeterExecutionInternalPrecisionBytes
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit

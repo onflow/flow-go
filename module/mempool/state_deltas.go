@@ -35,8 +35,4 @@ type Deltas interface {
 	// All will retrieve all block deltas that are currently in the memory pool
 	// as a slice.
 	All() []*messages.ExecutionStateDelta
-
-	// Hash will return a fingerprint has representing the contents of the
-	// entire memory pool.
-	Hash() flow.Identifier
 }

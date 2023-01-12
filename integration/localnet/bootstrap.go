@@ -36,6 +36,8 @@ const (
 	PrometheusTargetsFile    = "./targets.nodes.json"
 	DefaultAccessGatewayName = "access_1"
 	DefaultObserverName      = "observer"
+	DefaultLogLevel          = "DEBUG"
+	DefaultGOMAXPROCS        = 8
 	DefaultMaxObservers      = 1000
 	DefaultCollectionCount   = 3
 	DefaultConsensusCount    = 3
@@ -80,6 +82,7 @@ var (
 	extesiveTracing        bool
 	consensusDelay         time.Duration
 	collectionDelay        time.Duration
+	logLevel               string
 )
 
 func init() {
@@ -100,6 +103,7 @@ func init() {
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
+	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -419,6 +423,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Volumes = append(
@@ -448,12 +453,15 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
+		"--execution-data-sync-enabled=true",
+		"--execution-data-dir=/data/execution-data",
 	)
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
 		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
 	}
 
 	return service
@@ -497,12 +505,13 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
+			fmt.Sprintf("--loglevel=%s", logLevel),
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
+			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
@@ -514,10 +523,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
 			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
 			fmt.Sprintf("OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=%s,num=%s", role, num),
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
+			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
 		},
 		Labels: map[string]string{
 			"com.dapperlabs.role": role,

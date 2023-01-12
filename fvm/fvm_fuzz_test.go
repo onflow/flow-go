@@ -12,10 +12,10 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,7 +33,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) {
+		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -52,7 +52,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 			require.NotPanics(t, func() {
 				err = vm.Run(ctx, tx, view)
@@ -102,6 +102,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -114,6 +115,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -133,6 +135,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
@@ -144,6 +147,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -160,6 +164,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			require.Error(t, results.tx.Err)
 			require.Len(t, results.tx.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
@@ -171,6 +176,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -186,6 +192,7 @@ var fuzzTransactionTypes = []transactionType{
 			// if there is an error, it should be computation exceeded
 			if results.tx.Err != nil {
 				require.Len(t, results.tx.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
@@ -198,12 +205,7 @@ var fuzzTransactionTypes = []transactionType{
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			// event indices have to be an increasing uint sequence (0, 1, 2 ...)
-			expectedEventIndex := uint32(0)
-			for _, event := range results.tx.Events {
-				require.Equal(t, expectedEventIndex, event.EventIndex)
-				expectedEventIndex++
-			}
+			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
 		},
 	},
 }
@@ -249,7 +251,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.BlockPrograms) error {
+	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -259,7 +261,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view)
 
@@ -288,7 +290,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
+		tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		err = vm.Run(ctx, tx, view)
 		if err != nil {

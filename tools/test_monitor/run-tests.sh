@@ -22,22 +22,37 @@ then
         docker rm -f $containers > /dev/null
     fi
 
+  echo "preparing $TEST_CATEGORY tests">&2
+  make crypto_setup_gopath
+  make docker-build-flow docker-build-flow-corrupt
   echo "running $TEST_CATEGORY tests">&2
-
-  make -C integration -s ${BASH_REMATCH[1]}-tests
+  make -C integration -s ${BASH_REMATCH[1]}-tests > test-output
 else
     case $TEST_CATEGORY in
         unit)
-          echo "running unittest-main">&2
-          make -s unittest-main
+          echo "preparing unit tests">&2
+          make install-tools
+          make verify-mocks
+          echo "running unit tests">&2
+          make -s unittest-main > test-output
         ;;
         unit-crypto)
+          echo "preparing crypto unit tests">&2
+          make -C crypto setup
           echo "running crypto unit tests">&2
-          make -C crypto -s test
+          make -C crypto -s unittest > test-output
+        ;;
+        unit-insecure)
+          echo "preparing insecure unit tests">&2
+          make install-tools
+          echo "running insecure unit tests">&2
+          make -C insecure -s test > test-output
         ;;
         unit-integration)
+          echo "preparing integration unit tests">&2
+          make install-tools
           echo "running integration unit tests">&2
-          make -C integration -s test
+          make -C integration -s test > test-output
         ;;
         *)
           echo "unrecognized test category (run-tests):" $TEST_CATEGORY>&2

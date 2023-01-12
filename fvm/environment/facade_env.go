@@ -6,8 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -16,29 +17,29 @@ var _ Environment = &facadeEnvironment{}
 type facadeEnvironment struct {
 	*Runtime
 
-	*Tracer
+	tracing.TracerSpan
 	Meter
 
 	*ProgramLogger
 	EventEmitter
 
-	*UnsafeRandomGenerator
-	*CryptoLibrary
+	UnsafeRandomGenerator
+	CryptoLibrary
 
-	*BlockInfo
+	BlockInfo
 	AccountInfo
 	TransactionInfo
 
-	*ValueStore
+	ValueStore
 
 	*SystemContracts
 
-	*UUIDGenerator
+	UUIDGenerator
 
 	AccountCreator
 	AccountFreezer
 
-	*AccountKeyReader
+	AccountKeyReader
 	AccountKeyUpdater
 
 	*ContractReader
@@ -50,12 +51,12 @@ type facadeEnvironment struct {
 }
 
 func newFacadeEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 	meter Meter,
 ) *facadeEnvironment {
-	tracer := NewTracer(params.TracerParams)
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
 	runtime := NewRuntime(params.RuntimeParams)
@@ -68,8 +69,8 @@ func newFacadeEnvironment(
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
-		Tracer: tracer,
-		Meter:  meter,
+		TracerSpan: tracer,
+		Meter:      meter,
 
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
@@ -129,7 +130,7 @@ func newFacadeEnvironment(
 			meter,
 			txnState,
 			accounts,
-			programs),
+			derivedTxnData),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -140,16 +141,18 @@ func newFacadeEnvironment(
 	return env
 }
 
-func newScriptFacadeEnvironment(
+func NewScriptEnvironment(
 	ctx context.Context,
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracer,
 		params,
 		txnState,
-		programs,
+		derivedTxnData,
 		NewCancellableMeter(ctx, txnState))
 
 	env.addParseRestrictedChecks()
@@ -157,25 +160,27 @@ func newScriptFacadeEnvironment(
 	return env
 }
 
-func newTransactionFacadeEnvironment(
+func NewTransactionEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
-	programs TransactionPrograms,
+	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracer,
 		params,
 		txnState,
-		programs,
+		derivedTxnData,
 		NewMeter(txnState),
 	)
 
 	env.TransactionInfo = NewTransactionInfo(
 		params.TransactionInfoParams,
-		env.Tracer,
+		tracer,
 		params.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = NewEventEmitter(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.Chain,
 		params.TransactionInfoParams,
@@ -186,7 +191,7 @@ func newTransactionFacadeEnvironment(
 		params.Chain,
 		env.accounts,
 		params.ServiceAccountEnabled,
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
@@ -195,7 +200,7 @@ func newTransactionFacadeEnvironment(
 		env.accounts,
 		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
 		env.TransactionInfo,
@@ -206,7 +211,7 @@ func newTransactionFacadeEnvironment(
 		env.Runtime)
 
 	env.AccountKeyUpdater = NewAccountKeyUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
 		txnState,
@@ -218,9 +223,12 @@ func newTransactionFacadeEnvironment(
 }
 
 func (env *facadeEnvironment) addParseRestrictedChecks() {
-	// NOTE: Cadence can access Programs, ContractReader and Meter while it is
-	// parsing programs; all other access are unexpected and are potentially
-	// program cache invalidation bugs.
+	// NOTE: Cadence can access Programs, ContractReader, Meter and
+	// ProgramLogger while it is parsing programs; all other access are
+	// unexpected and are potentially program cache invalidation bugs.
+	//
+	// Also note that Tracer and SystemContracts are unguarded since these are
+	// not accessible by Cadence.
 
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
@@ -231,27 +239,48 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.AccountInfo = NewParseRestrictedAccountInfo(
 		env.txnState,
 		env.AccountInfo)
+	env.AccountKeyReader = NewParseRestrictedAccountKeyReader(
+		env.txnState,
+		env.AccountKeyReader)
 	env.AccountKeyUpdater = NewParseRestrictedAccountKeyUpdater(
 		env.txnState,
 		env.AccountKeyUpdater)
+	env.BlockInfo = NewParseRestrictedBlockInfo(
+		env.txnState,
+		env.BlockInfo)
 	env.ContractUpdater = NewParseRestrictedContractUpdater(
 		env.txnState,
 		env.ContractUpdater)
+	env.CryptoLibrary = NewParseRestrictedCryptoLibrary(
+		env.txnState,
+		env.CryptoLibrary)
+	env.EventEmitter = NewParseRestrictedEventEmitter(
+		env.txnState,
+		env.EventEmitter)
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	// TODO(patrick): check other API
+	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+		env.txnState,
+		env.UnsafeRandomGenerator)
+	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
+		env.txnState,
+		env.UUIDGenerator)
+	env.ValueStore = NewParseRestrictedValueStore(
+		env.txnState,
+		env.ValueStore)
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	programs.ModifiedSetsInvalidator,
+	derived.TransactionInvalidator,
 	error,
 ) {
-	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSetsInvalidator{
-		ContractUpdateKeys: keys,
-		FrozenAccounts:     env.FrozenAccounts(),
-	}, err
+	contractKeys, err := env.ContractUpdater.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDerivedDataInvalidator(contractKeys, env), nil
 }
 
 func (env *facadeEnvironment) Reset() {
@@ -267,4 +296,12 @@ func (facadeEnvironment) ResourceOwnerChanged(
 	common.Address,
 	common.Address,
 ) {
+}
+
+func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.SharedState) {
+	// NO-OP
+}
+
+func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	return nil
 }
