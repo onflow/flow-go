@@ -121,11 +121,9 @@ func (store *valueStore) GetValue(
 	[]byte,
 	error,
 ) {
-	key := string(keyBytes)
+	defer store.tracer.StartChildSpan(trace.FVMEnvGetValue).End()
 
-	var valueByteSize int
-	span := store.tracer.StartChildSpan(trace.FVMEnvGetValue)
-	defer span.End()
+	key := string(keyBytes)
 
 	address := flow.BytesToAddress(owner)
 	if state.IsFVMStateKey(string(owner), key) {
@@ -136,11 +134,8 @@ func (store *valueStore) GetValue(
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
-	valueByteSize = len(v)
 
-	err = store.meter.MeterComputation(
-		ComputationKindGetValue,
-		uint(valueByteSize))
+	err = store.meter.MeterComputation(ComputationKindGetValue, uint(len(v)))
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -153,10 +148,9 @@ func (store *valueStore) SetValue(
 	keyBytes []byte,
 	value []byte,
 ) error {
-	key := string(keyBytes)
+	defer store.tracer.StartChildSpan(trace.FVMEnvSetValue).End()
 
-	span := store.tracer.StartChildSpan(trace.FVMEnvSetValue)
-	defer span.End()
+	key := string(keyBytes)
 
 	address := flow.BytesToAddress(owner)
 	if state.IsFVMStateKey(string(owner), key) {

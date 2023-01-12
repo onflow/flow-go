@@ -36,6 +36,7 @@ const (
 	PrometheusTargetsFile    = "./targets.nodes.json"
 	DefaultAccessGatewayName = "access_1"
 	DefaultObserverName      = "observer"
+	DefaultLogLevel          = "DEBUG"
 	DefaultGOMAXPROCS        = 8
 	DefaultMaxObservers      = 1000
 	DefaultCollectionCount   = 3
@@ -81,6 +82,7 @@ var (
 	extesiveTracing        bool
 	consensusDelay         time.Duration
 	collectionDelay        time.Duration
+	logLevel               string
 )
 
 func init() {
@@ -101,6 +103,7 @@ func init() {
 	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
+	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -502,7 +505,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
+			fmt.Sprintf("--loglevel=%s", logLevel),
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			fmt.Sprintf("--profile-uploader-enabled=%t", profileUploader),
 			fmt.Sprintf("--tracer-enabled=%t", tracing),

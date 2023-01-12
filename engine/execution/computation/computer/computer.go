@@ -176,10 +176,8 @@ func (e *blockComputer) ExecuteBlock(
 	derivedBlockData *derived.DerivedBlockData,
 ) (*execution.ComputationResult, error) {
 
-	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
-	if isSampled {
-		span.SetAttributes(attribute.Int("collection_counts", len(block.CompleteCollections)))
-	}
+	span, _ := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
+	span.SetAttributes(attribute.Int("collection_counts", len(block.CompleteCollections)))
 	defer span.End()
 
 	results, err := e.executeBlock(ctx, span, block, stateView, derivedBlockData)
@@ -428,19 +426,15 @@ func (e *blockComputer) executeTransaction(
 	)
 	defer txSpan.End()
 
-	var traceID string
-	txInternalSpan, _, isSampled := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
-	if isSampled {
-		txInternalSpan.SetAttributes(attribute.String("tx_id", txID.String()))
-		traceID = txInternalSpan.SpanContext().TraceID().String()
-	}
+	txInternalSpan, _ := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
+	txInternalSpan.SetAttributes(attribute.String("tx_id", txID.String()))
 	defer txInternalSpan.End()
 
 	logger := e.log.With().
 		Str("tx_id", txID.String()).
 		Uint32("tx_index", txn.txIndex).
 		Str("block_id", txn.blockIdStr).
-		Str("trace_id", traceID).
+		Str("trace_id", txInternalSpan.SpanContext().TraceID().String()).
 		Uint64("height", txn.ctx.BlockHeader.Height).
 		Bool("system_chunk", txn.isSystemTransaction).
 		Bool("system_transaction", txn.isSystemTransaction).
@@ -448,9 +442,10 @@ func (e *blockComputer) executeTransaction(
 	logger.Info().Msg("executing transaction in fvm")
 
 	proc := fvm.Transaction(txn.TransactionBody, txn.txIndex)
-	if isSampled {
-		proc.SetTraceSpan(txInternalSpan)
-	}
+
+	txn.ctx = fvm.NewContextFromParent(
+		txn.ctx,
+		fvm.WithSpan(txInternalSpan))
 
 	txView := collectionView.NewChild()
 	err := e.vm.Run(txn.ctx, proc, txView)

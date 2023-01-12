@@ -81,18 +81,15 @@ func newTransactionExecutor(
 	txnState *state.TransactionState,
 	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
-	span := proc.StartSpanFromProcTraceSpan(
-		ctx.Tracer,
-		trace.FVMExecuteTransaction)
+	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	ctx.Span = span
 	ctx.TxIndex = proc.TxIndex
 	ctx.TxId = proc.Transaction.ID()
 	ctx.TxBody = proc.Transaction
 
 	env := environment.NewTransactionEnvironment(
-		ctx.TracerSpan,
+		span,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
@@ -214,7 +211,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -227,7 +224,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState)
 		if err != nil {

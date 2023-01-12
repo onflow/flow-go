@@ -1,15 +1,11 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 // TODO(patrick): pass in initial snapshot time when we start supporting
@@ -37,24 +33,6 @@ type TransactionProcedure struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64
 	Err                    errors.CodedError
-	TraceSpan              otelTrace.Span
-}
-
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
-	proc.TraceSpan = traceSpan
-}
-
-func (proc *TransactionProcedure) IsSampled() bool {
-	return proc.TraceSpan != nil
-}
-
-func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
-	tracer module.Tracer,
-	spanName trace.SpanName) otelTrace.Span {
-	if tracer != nil && proc.IsSampled() {
-		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
-	}
-	return trace.NoopSpan
 }
 
 func (proc *TransactionProcedure) NewExecutor(

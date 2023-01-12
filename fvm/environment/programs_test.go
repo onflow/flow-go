@@ -212,6 +212,10 @@ func Test_Programs(t *testing.T) {
 		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
 
+		// assert dependencies are correct
+		require.Len(t, entry.Value.Dependencies, 1)
+		require.NotNil(t, entry.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
+
 		// type assertion for further inspections
 		require.IsType(t, entry.State.View(), &delta.View{})
 
@@ -252,7 +256,7 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("deploying another contract cleans programs storage", func(t *testing.T) {
+	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
 
 		// deploy contract B
 		procContractB := fvm.Transaction(
@@ -261,11 +265,15 @@ func Test_Programs(t *testing.T) {
 		err := vm.Run(context, procContractB, mainView)
 		require.NoError(t, err)
 
-		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		// b and c are invalid
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		// a is still valid
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 
-		require.Nil(t, entryA)
 		require.Nil(t, entryB)
+		require.Nil(t, entryC)
+		require.NotNil(t, entryA)
 	})
 
 	var viewExecB *delta.View
@@ -297,6 +305,11 @@ func Test_Programs(t *testing.T) {
 
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
+
+		// assert dependencies are correct
+		require.Len(t, entryB.Value.Dependencies, 2)
+		require.NotNil(t, entryB.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
+		require.NotNil(t, entryB.Value.Dependencies[common.MustBytesToAddress(addressB.Bytes())])
 
 		// program B should contain all the registers used by program A, as it depends on it
 		require.IsType(t, entryB.State.View(), &delta.View{})
@@ -378,7 +391,7 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("deploying contract C cleans programs", func(t *testing.T) {
+	t.Run("deploying contract C invalidates C", func(t *testing.T) {
 		require.NotNil(t, contractBView)
 
 		// deploy contract C
@@ -392,8 +405,8 @@ func Test_Programs(t *testing.T) {
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
-		require.Nil(t, entryA)
-		require.Nil(t, entryB)
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryB)
 		require.Nil(t, entryC)
 
 	})
@@ -425,6 +438,16 @@ func Test_Programs(t *testing.T) {
 		require.IsType(t, entryB.State.View(), &delta.View{})
 		deltaB := entryB.State.View().(*delta.View)
 		compareViews(t, contractBView, deltaB)
+
+		// program C assertions
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		require.NotNil(t, entryC)
+
+		// assert dependencies are correct
+		require.Len(t, entryC.Value.Dependencies, 3)
+		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
+		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressB.Bytes())])
+		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressC.Bytes())])
 	})
 }
 

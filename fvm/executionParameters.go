@@ -131,6 +131,7 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		computer.ctx.TracerSpan,
 		computer.ctx.EnvironmentParams,
 		txnState,
 		computer.derivedTxnData)
