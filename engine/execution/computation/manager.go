@@ -59,7 +59,7 @@ type ComputationConfig struct {
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
-	NewCustomVirtualMachine func() computer.VirtualMachine
+	NewCustomVirtualMachine func() fvm.VM
 }
 
 // Manager manages computation and execution
@@ -69,7 +69,7 @@ type Manager struct {
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
-	vm                       computer.VirtualMachine
+	vm                       fvm.VM
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
 	derivedChainData         *derived.DerivedChainData
@@ -92,7 +92,7 @@ func New(
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	var vm computer.VirtualMachine
+	var vm fvm.VM
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
@@ -152,7 +152,7 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) VM() computer.VirtualMachine {
+func (e *Manager) VM() fvm.VM {
 	return e.vm
 }
 
