@@ -2120,7 +2120,61 @@ func TestScriptHitsParseRestrictions(t *testing.T) {
 	newVMTest().run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
-			address := cadence.NewAddress(chain.ServiceAddress())
+			contractAccount := createAccount(t, vm, chain, ctx, view, derivedBlockData)
+			testAccount := createAccount(t, vm, chain, ctx, view, derivedBlockData)
+
+			contract := []byte(`
+				pub contract TestContract {
+					pub resource TestResource {
+				}
+				pub fun createTestResource(): @TestResource {
+					return <- create TestResource()
+					}
+				}
+			`)
+
+			// deploy the contract
+			deployingContractScriptTemplate := `
+				transaction {
+					prepare(signer: AuthAccount) {
+						let code = "%s".decodeHex()
+						signer.contracts.add(
+							name: "TestContract",
+							code: code
+						)
+				}
+			}
+			`
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString(contract)))).
+				SetPayer(chain.ServiceAddress()).
+				AddAuthorizer(contractAccount)
+			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+			err := vm.Run(ctx, tx, view)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			txBody = flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(
+					`
+					import TestContract from %s
+					
+					transaction {
+					  prepare(acct: AuthAccount) {
+						acct.save(<-TestContract.createTestResource() ,to: /storage/test,)
+					  }
+					  execute {}
+					}
+					`, testAccount.HexWithPrefix()))).
+				SetPayer(chain.ServiceAddress()).
+				AddAuthorizer(testAccount)
+			tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+			err = vm.Run(ctx, tx, view)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			address := cadence.NewAddress(testAccount)
 
 			script := fvm.Script([]byte(`
 			pub fun main(address: Address): [String] {
@@ -2138,7 +2192,9 @@ func TestScriptHitsParseRestrictions(t *testing.T) {
 
 			scriptCtx := fvm.NewContextFromParent(ctx)
 
-			err := vm.Run(scriptCtx, script, view)
+			ctx.DerivedBlockData = nil
+			err = vm.Run(scriptCtx, script, view)
+
 			require.NoError(t, err)
 		})
 }
