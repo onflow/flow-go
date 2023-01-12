@@ -209,8 +209,9 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	processor := s.prepareMockedProcessor(proposal)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
-		// eventually it has to be process by processor
-		s.notifier.On("OnVoteProcessed", vote).Once()
+		// once when caching vote, and once when processing cached vote
+		s.notifier.On("OnVoteProcessed", vote).Twice()
+		// eventually it has to be processed by processor
 		processor.On("Process", vote).Return(nil).Once()
 		require.NoError(s.T(), s.collector.AddVote(vote))
 	}
