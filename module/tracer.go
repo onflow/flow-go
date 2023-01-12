@@ -2,9 +2,7 @@ package module
 
 import (
 	"context"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -74,16 +72,6 @@ type Tracer interface {
 		operationName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
 	) otelTrace.Span
-
-	// RecordSpanFromParent records an span at finish time
-	// start time will be computed by reducing time.Now() - duration
-	RecordSpanFromParent(
-		parentSpan otelTrace.Span,
-		operationName trace.SpanName,
-		duration time.Duration,
-		attrs []attribute.KeyValue,
-		opts ...otelTrace.SpanStartOption,
-	)
 
 	// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 	// executes the function f, and finishes the span once the function returns.

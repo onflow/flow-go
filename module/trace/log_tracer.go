@@ -126,19 +126,6 @@ func (t *LogTracer) StartSpanFromParent(
 	return newLogSpanWithParent(t, operationName, parentSpan.spanID)
 }
 
-func (t *LogTracer) RecordSpanFromParent(
-	span trace.Span,
-	operationName SpanName,
-	duration time.Duration,
-	attrs []attribute.KeyValue,
-	opts ...trace.SpanStartOption,
-) {
-	parentSpan := span.(*logSpan)
-	sp := newLogSpanWithParent(t, operationName, parentSpan.spanID)
-	sp.start = time.Now().Add(-duration)
-	span.End()
-}
-
 // WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 // executes the function f, and finishes the span once the function returns.
 func (t *LogTracer) WithSpanFromContext(

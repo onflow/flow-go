@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -40,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -97,10 +95,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -150,10 +145,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -244,10 +236,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -291,10 +280,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -478,10 +464,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -569,10 +552,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -672,10 +652,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -888,10 +865,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	require.NoError(t, err)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -976,10 +950,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Times(1) // system chunk tx
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
