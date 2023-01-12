@@ -2114,3 +2114,31 @@ func TestInteractionLimit(t *testing.T) {
 		)
 	}
 }
+
+// this should not happen
+func TestScriptHitsParseRestrictions(t *testing.T) {
+	newVMTest().run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+
+			address := cadence.NewAddress(chain.ServiceAddress())
+
+			script := fvm.Script([]byte(`
+			pub fun main(address: Address): [String] {
+				let account = getAuthAccount(address)
+				let paths: [String] = []
+				account.forEachStored(fun (path: StoragePath, type: Type): Bool {
+				  paths.append(path.toString())
+				  return true
+				})
+				return paths
+			}`,
+			)).WithArguments(
+				jsoncdc.MustEncode(address),
+			)
+
+			scriptCtx := fvm.NewContextFromParent(ctx)
+
+			err := vm.Run(scriptCtx, script, view)
+			require.NoError(t, err)
+		})
+}
