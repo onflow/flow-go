@@ -1,11 +1,13 @@
 package metrics
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
+	"testing"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestNodeInfoCollector_NodeInfo tests if node info collector reports desired metrics
