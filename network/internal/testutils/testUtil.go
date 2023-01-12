@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -160,6 +161,7 @@ func GenerateMiddlewares(t *testing.T,
 		peerUpdateInterval:  connection.DefaultPeerUpdateInterval,
 		unicastRateLimiters: ratelimit.NoopRateLimiters(),
 		networkMetrics:      metrics.NewNoopCollector(),
+		peerManagerFilters:  []p2p.PeerFilter{},
 	}
 
 	for _, opt := range opts {
@@ -185,7 +187,8 @@ func GenerateMiddlewares(t *testing.T,
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
-			middleware.WithUnicastRateLimiters(o.unicastRateLimiters))
+			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
+			middleware.WithPeerManagerFilters(o.peerManagerFilters))
 	}
 	return mws, idProviders
 }
@@ -249,6 +252,7 @@ type optsConfig struct {
 	unicastRateLimiters *ratelimit.RateLimiters
 	peerUpdateInterval  time.Duration
 	networkMetrics      module.NetworkMetrics
+	peerManagerFilters  []p2p.PeerFilter
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -267,6 +271,12 @@ func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.peerUpdateInterval = interval
+	}
+}
+
+func WithPeerManagerFilters(filters ...p2p.PeerFilter) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.peerManagerFilters = filters
 	}
 }
 
@@ -463,4 +473,14 @@ func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater 
 	return connection.NewConnGater(unittest.Logger(),
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
+}
+
+func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
+	return func(p peer.ID) error {
+		if rateLimiter.IsRateLimited(p) {
+			return fmt.Errorf("peer is rate limited")
+		}
+
+		return nil
+	}
 }

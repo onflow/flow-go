@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,6 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
-	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -248,7 +248,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		libP2PNodes,
 		unittest.NetworkCodec(),
 		m.slashingViolationsConsumer,
-		testutils.WithUnicastRateLimiters(rateLimiters))
+		testutils.WithUnicastRateLimiters(rateLimiters),
+		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
 
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -289,6 +290,17 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
+	// add our sender node as a direct peer to our receiving node, this allows us to ensure
+	// that connections to peers that are rate limited are completely prune. IsConnected will
+	// return true only if the node is a direct peer of the other, after rate limiting this direct
+	// peer should be removed by the peer manager.
+	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
+	require.NoError(m.T(), err)
+
+	isConnected, err := libP2PNodes[0].IsConnected(expectedPID)
+	require.NoError(m.T(), err)
+	require.True(m.T(), isConnected)
+
 	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
@@ -310,13 +322,20 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// wait for all rate limits before shutting down middleware
 	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop rate limit test ch on time")
 
+	// sleep for 1 seconds to allow connection pruner to prune connections
+	time.Sleep(1 * time.Second)
+	// ensure connection to rate limited peer is pruned
+	isConnected, err = libP2PNodes[0].IsConnected(expectedPID)
+	require.NoError(m.T(), err)
+	require.False(m.T(), isConnected)
+
 	// shutdown our middleware so that each message can be processed
 	cancel()
 	unittest.RequireCloseBefore(m.T(), libP2PNodes[0].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
-	require.True(m.T(), rateLimits.Load() >= 1)
+	require.True(m.T(), rateLimits.Load() > 0)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
@@ -326,11 +345,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	//burst per interval
 	burst := 1000
 
-	// create test time
-	testtime := unittest.NewTestTime()
+	// we only expect messages from the first middleware on the test suite
+	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
+	require.NoError(m.T(), err)
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 60)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
@@ -354,13 +374,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
 	// create middleware
-	opts := testutils.WithUnicastRateLimiters(rateLimiters)
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
 		m.logger,
 		ids,
 		libP2PNodes,
 		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer, opts)
+		m.slashingViolationsConsumer,
+		testutils.WithUnicastRateLimiters(rateLimiters),
+		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -407,22 +428,33 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 3 messages. Each message is about
-	// 400 bytes, the 3rd message will put our limiter over the 1000 byte limit at 1200 bytes. Thus
-	// the 3rd message should be rate limited.
-	start := testtime.Now()
-	end := start.Add(time.Second)
-	for testtime.Now().Before(end) {
+	// add our sender node as a direct peer to our receiving node, this allows us to ensure
+	// that connections to peers that are rate limited are completely prune. IsConnected will
+	// return true only if the node is a direct peer of the other, after rate limiting this direct
+	// peer should be removed by the peer manager.
+	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
+	require.NoError(m.T(), err)
 
+	isConnected, err := libP2PNodes[0].IsConnected(expectedPID)
+	require.NoError(m.T(), err)
+	require.True(m.T(), isConnected)
+
+	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
+	// as it is more than our allowed bandwidth of 1000 bytes.
+	for i := 0; i < 3; i++ {
 		err := m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
-
-		// send 3 messages
-		testtime.Advance(334 * time.Millisecond)
 	}
 
 	// wait for all rate limits before shutting down middleware
 	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
+
+	// sleep for 1 seconds to allow connection pruner to prune connections
+	time.Sleep(1 * time.Second)
+	// ensure connection to rate limited peer is pruned
+	isConnected, err = libP2PNodes[0].IsConnected(expectedPID)
+	require.NoError(m.T(), err)
+	require.False(m.T(), isConnected)
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
