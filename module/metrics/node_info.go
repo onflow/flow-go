@@ -17,7 +17,7 @@ const (
 	commitLabel  = "commit"
 )
 
-func NewNodeInfoCollector(register prometheus.Registerer) *NodeInfoCollector {
+func NewNodeInfoCollector() *NodeInfoCollector {
 	collector := &NodeInfoCollector{
 		nodeInfo: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "node_info",
@@ -25,7 +25,6 @@ func NewNodeInfoCollector(register prometheus.Registerer) *NodeInfoCollector {
 			Help:      "report general information about node, such information can include version, sporkID, commit hash, etc",
 		}, []string{"key", "value"}),
 	}
-	register.MustRegister(collector.nodeInfo)
 
 	return collector
 }
