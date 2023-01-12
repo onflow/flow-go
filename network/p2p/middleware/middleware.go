@@ -210,7 +210,7 @@ func NewMiddleware(
 			Str("topic", topic.String()).
 			Str("reason", reason.String()).
 			Bool(logging.KeySuspicious, true).
-			Msg("disconnecting from rate-limited peer")
+			Msg("pruning connection to rate-limited peer")
 
 		mw.libP2PNode.RequestPeerUpdate()
 	})
@@ -566,10 +566,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		m.wg.Add(1)
-
 		go func() {
+			defer m.wg.Done()
 			m.processUnicastStreamMessage(remotePeer, &msg)
-			m.wg.Done()
 		}()
 	}
 

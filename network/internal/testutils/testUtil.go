@@ -475,6 +475,7 @@ func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater 
 		connection.WithOnInterceptSecuredFilters(filters))
 }
 
+// IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.
 func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if rateLimiter.IsRateLimited(p) {
