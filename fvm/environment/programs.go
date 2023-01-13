@@ -73,6 +73,13 @@ func (programs *Programs) set(
 	// environment.
 	address, ok := location.(common.AddressLocation)
 	if !ok {
+		// If the program is nil cadence is signaling that the program was not loaded,
+		// but the loading process is complete.
+		// Do not set the program in the cache in this case.
+		// This is a temporary solution.
+		if program == nil {
+			return nil
+		}
 		programs.nonAddressPrograms[location] = program
 		return nil
 	}
@@ -80,6 +87,15 @@ func (programs *Programs) set(
 	state, err := programs.txnState.CommitParseRestricted(address)
 	if err != nil {
 		return err
+	}
+
+	// if the program is nil cadence is signaling that the program was not loaded,
+	// but the loading process is complete.
+	// Do not set the program in the cache in this case,
+	// but `CommitParseRestricted` still has to be called.
+	// This is a temporary solution.
+	if program == nil {
+		return nil
 	}
 
 	programs.derivedTxnData.SetProgram(address, program, state)
