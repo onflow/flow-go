@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,7 +19,8 @@ func TestNodeInfoCollector_NodeInfo(t *testing.T) {
 	version := "0.29"
 	commit := "63cec231136914941e2358de2054a6ef71ea3c99"
 	sporkID := unittest.IdentifierFixture().String()
-	collector.NodeInfo(version, commit, sporkID)
+	protocolVersion := uint(10076)
+	collector.NodeInfo(version, commit, sporkID, protocolVersion)
 	metricsFamilies, err := reg.Gather()
 	require.NoError(t, err)
 
@@ -33,8 +35,8 @@ func TestNodeInfoCollector_NodeInfo(t *testing.T) {
 		assert.Failf(t, "metric not found", "except to find value %s", value)
 	}
 
-	for _, value := range []string{version, commit, sporkID} {
+	protocolVersionAsString := strconv.FormatUint(uint64(protocolVersion), 10)
+	for _, value := range []string{version, commit, sporkID, protocolVersionAsString} {
 		assertReported(value)
 	}
-	//t.Logf(proto.MarshalTextString(metricsFamilies[0]))
 }
