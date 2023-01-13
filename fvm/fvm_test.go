@@ -2114,3 +2114,120 @@ func TestInteractionLimit(t *testing.T) {
 		)
 	}
 }
+
+func TestScriptIterationShouldNotHitsParseRestrictions(t *testing.T) {
+	newVMTest().withContextOptions(
+		fvm.WithRestrictedDeployment(false),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
+			contractAccountPrivateKey := privateKeys[0]
+			testAccountPrivateKey := privateKeys[1]
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
+			require.NoError(t, err)
+			contractAccount := accounts[0]
+			testAccount := accounts[1]
+
+			contract := []byte(`
+				pub contract TestContract {
+					pub resource TestResource {
+				}
+				pub fun createTestResource(): @TestResource {
+					return <- create TestResource()
+					}
+				}
+			`)
+
+			brokenContract := []byte(`
+				pub contract TestContract {
+			`)
+
+			// deploy the contract
+			deployingContractScriptTemplate := `
+				transaction {
+					prepare(signer: AuthAccount) {
+						let code = "%s".decodeHex()
+						signer.contracts.add(
+							name: "TestContract",
+							code: code
+						)
+				}
+			}
+			`
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString(contract)))).
+				SetPayer(chain.ServiceAddress()).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(contractAccount)
+			_ = testutil.SignPayload(txBody, contractAccount, contractAccountPrivateKey)
+			_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+			err = vm.Run(ctx, tx, view)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			txBody = flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(
+					`
+					import TestContract from %s
+					
+					transaction {
+					  prepare(acct: AuthAccount) {
+						acct.save(<-TestContract.createTestResource() ,to: /storage/test,)
+					  }
+					  execute {}
+					}
+					`, contractAccount.HexWithPrefix()))).
+				SetPayer(chain.ServiceAddress()).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(testAccount)
+
+			_ = testutil.SignPayload(txBody, testAccount, testAccountPrivateKey)
+			_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+			tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+			err = vm.Run(ctx, tx, view)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			txnState := state.NewTransactionState(
+				view,
+				state.DefaultParameters())
+			acc := environment.NewAccounts(txnState)
+
+			// ==== this breaks the deployed contract ====
+			contractUpdater := environment.NewContractUpdaterForTesting(acc, nil)
+			err = contractUpdater.SetContract(runtime.Address(contractAccount), "TestContract", brokenContract, nil)
+			require.NoError(t, err)
+			_, err = contractUpdater.Commit()
+			require.NoError(t, err)
+
+			// ==== finally the test ====
+			address := cadence.NewAddress(testAccount)
+			script := fvm.Script([]byte(`
+			pub fun main(address: Address): [String] {
+				let account = getAuthAccount(address)
+				let paths: [String] = []
+				account.forEachStored(fun (path: StoragePath, type: Type): Bool {
+				  paths.append(path.toString())
+				  return true
+				})
+				return paths
+			}`,
+			)).WithArguments(
+				jsoncdc.MustEncode(address),
+			)
+			scriptCtx := fvm.NewContextFromParent(ctx)
+			scriptCtx.DerivedBlockData = nil
+			err = vm.Run(scriptCtx, script, view)
+
+			require.NoError(t, err)
+		})(t)
+}
