@@ -360,7 +360,7 @@ func (s *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {
 		return nil, 0, fmt.Errorf("could not query highest version beacon: %w", err)
 	}
 
-	return versionBeacon, vbHeight, err
+	return versionBeacon, vbHeight, nil
 }
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
