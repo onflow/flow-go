@@ -359,6 +359,7 @@ func validateVersionBeacon(snap protocol.Snapshot) error {
 	}
 	highest := segment.Highest()
 
+	// version beacon must be included in a past block to be effective
 	if versionTableHeight > highest.Header.Height {
 		return fmt.Errorf("version table height higher than highest height")
 	}
