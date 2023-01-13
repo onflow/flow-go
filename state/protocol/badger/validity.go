@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -196,6 +197,57 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	}
 
 	return nil
+}
+
+func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
+	if len(vb.RequiredVersions) == 0 {
+		return fmt.Errorf("required versions empty")
+	}
+
+	// first entry in a table must be a current version, so the height must be below the current block
+	if vb.RequiredVersions[0].Height > header.Height {
+		return fmt.Errorf("lowest required version height %d below current block's height %d", vb.RequiredVersions[0].Height, header.Height)
+	}
+
+	// handle case when only one version is present
+	if len(vb.RequiredVersions) == 1 {
+		_, err := validateRequirement(vb.RequiredVersions[0])
+		return err
+	}
+
+	for i := 0; i < len(vb.RequiredVersions)-1; i++ {
+		current := vb.RequiredVersions[i]
+		next := vb.RequiredVersions[i+1]
+
+		// next version must higher than last one
+		if current.Height >= next.Height {
+			return fmt.Errorf("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
+		}
+
+		currentVersion, err := validateRequirement(current)
+		if err != nil {
+			return err
+		}
+
+		nextVersion, err := validateRequirement(next)
+		if err != nil {
+			return err
+		}
+
+		if nextVersion.LessThan(*currentVersion) {
+			return fmt.Errorf("higher requirement (index=%d) semver(%s) lover than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
+		}
+	}
+
+	return nil
+}
+
+func validateRequirement(vr flow.VersionControlRequirement) (*semver.Version, error) {
+	version, err := semver.NewVersion(vr.Version)
+	if err != nil {
+		return nil, fmt.Errorf("invalid semver(%s) for required height %d: %w", vr.Version, vr.Height, err)
+	}
+	return version, nil
 }
 
 // IsValidRootSnapshot checks internal consistency of root state snapshot

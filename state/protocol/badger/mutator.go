@@ -890,8 +890,11 @@ SealLoop:
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
 			case *flow.VersionBeacon:
-				// just skip
-				continue
+				err = isValidVersionBeacon(ev, block.Header)
+				if err != nil {
+					return nil, state.NewInvalidExtensionErrorf("invalid version beacon: %w", err)
+				}
+
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
 			}

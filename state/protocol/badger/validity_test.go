@@ -156,3 +156,80 @@ func TestValidateVersionBeacon(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestIsValidVersionBeacon(t *testing.T) {
+
+	// all we need is height really
+	header := &flow.Header{
+		Height: 21,
+	}
+
+	t.Run("empty requirements table is invalid", func(t *testing.T) {
+		vb := &flow.VersionBeacon{
+			RequiredVersions: nil,
+		}
+
+		err := isValidVersionBeacon(vb, header)
+		require.Error(t, err)
+	})
+
+	t.Run("single version required requirement", func(t *testing.T) {
+		t.Run("height below header is fine", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.NoError(t, err)
+		})
+
+		t.Run("height at or above header is invalid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height + 1, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+
+		t.Run("must be valid semver", func(t *testing.T) {
+
+			// versions starting with v are not valid semver
+			// https://semver.org/#is-v123-a-semantic-version
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "v0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("multiple version requirement", func(t *testing.T) {
+		t.Run("first height below header is fine", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.NoError(t, err)
+		})
+
+		t.Run("first height at or above header is invalid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height + 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+	})
+
+}
