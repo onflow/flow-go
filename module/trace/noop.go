@@ -2,9 +2,7 @@ package trace
 
 import (
 	"context"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -42,8 +40,11 @@ func (t *NoopTracer) StartBlockSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartCollectionSpan(
@@ -51,8 +52,11 @@ func (t *NoopTracer) StartCollectionSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartTransactionSpan(
@@ -60,15 +64,21 @@ func (t *NoopTracer) StartTransactionSpan(
 	entityID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
-	return NoopSpan, ctx, false
+) (
+	trace.Span,
+	context.Context,
+) {
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	return NoopSpan, ctx
 }
 
@@ -78,15 +88,6 @@ func (t *NoopTracer) StartSpanFromParent(
 	opts ...trace.SpanStartOption,
 ) trace.Span {
 	return NoopSpan
-}
-
-func (t *NoopTracer) RecordSpanFromParent(
-	span trace.Span,
-	operationName SpanName,
-	duration time.Duration,
-	attrs []attribute.KeyValue,
-	opts ...trace.SpanStartOption,
-) {
 }
 
 func (t *NoopTracer) WithSpanFromContext(

@@ -52,7 +52,10 @@ func NewTracer(
 	serviceName string,
 	chainID string,
 	sensitivity uint,
-) (*Tracer, error) {
+) (
+	*Tracer,
+	error,
+) {
 	ctx := context.TODO()
 	res, err := resource.New(
 		ctx,
@@ -130,13 +133,16 @@ func (t *Tracer) startEntitySpan(
 	entityType string,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	if !entityID.IsSampled(t.sensitivity) {
-		return NoopSpan, ctx, false
+		return NoopSpan, ctx
 	}
 
 	ctx, rootSpan := t.entityRootSpan(ctx, entityID, entityType)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
 
 // entityRootSpan returns the root span for the given entity from the cache
@@ -147,7 +153,10 @@ func (t *Tracer) entityRootSpan(
 	entityID flow.Identifier,
 	entityType string,
 	opts ...trace.SpanStartOption,
-) (context.Context, trace.Span) {
+) (
+	context.Context,
+	trace.Span,
+) {
 	if c, ok := t.spanCache.Get(entityID); ok {
 		span := c.(trace.Span)
 		return trace.ContextWithSpan(ctx, span), span
@@ -176,7 +185,10 @@ func (t *Tracer) StartBlockSpan(
 	blockID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	return t.startEntitySpan(ctx, blockID, EntityTypeBlock, spanName, opts...)
 }
 
@@ -185,18 +197,25 @@ func (t *Tracer) StartCollectionSpan(
 	collectionID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	return t.startEntitySpan(ctx, collectionID, EntityTypeCollection, spanName, opts...)
 }
 
-// StartTransactionSpan starts a span that will be aggregated under the given transaction.
+// StartTransactionSpan starts a span that will be aggregated under the given
+// transaction.
 // All spans for the same transaction will be aggregated under a root span
 func (t *Tracer) StartTransactionSpan(
 	ctx context.Context,
 	transactionID flow.Identifier,
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context, bool) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	return t.startEntitySpan(ctx, transactionID, EntityTypeTransaction, spanName, opts...)
 }
 
@@ -204,7 +223,10 @@ func (t *Tracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
-) (trace.Span, context.Context) {
+) (
+	trace.Span,
+	context.Context,
+) {
 	ctx, span := t.tracer.Start(ctx, string(operationName), opts...)
 	return span, ctx
 }

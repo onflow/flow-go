@@ -91,6 +91,18 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	panic(relic_panic)
 }
 
+func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signature) (bool, error) {
+	panic(relic_panic)
+}
+
 // bls_threshold.go functions
 func NewBLSThresholdSignatureParticipant(
 	groupPublicKey PublicKey,

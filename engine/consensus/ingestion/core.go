@@ -61,12 +61,10 @@ func NewCore(
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("originID", originID.String()),
-		)
-	}
+	span, _ := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
+	span.SetAttributes(
+		attribute.String("originID", originID.String()),
+	)
 	defer span.End()
 
 	guaranteeID := guarantee.ID()

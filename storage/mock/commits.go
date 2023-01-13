@@ -14,6 +14,20 @@ type Commits struct {
 	mock.Mock
 }
 
+// BatchRemoveByBlockID provides a mock function with given fields: blockID, batch
+func (_m *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, batch)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BatchStore provides a mock function with given fields: blockID, commit, batch
 func (_m *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
 	ret := _m.Called(blockID, commit, batch)
