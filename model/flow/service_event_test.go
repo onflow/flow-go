@@ -99,7 +99,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable)
 		})
 	})
 
@@ -130,7 +130,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotVersionTable := new(flow.VersionBeacon)
 			err = msgpack.Unmarshal(b, gotVersionTable)
 			require.NoError(t, err)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -202,7 +202,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotVersionTable := new(flow.VersionBeacon)
 			err = cbor.Unmarshal(b, gotVersionTable)
 			require.NoError(t, err)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+			assert.DeepEqual(t, versionBeacon, gotVersionTable)
 		})
 	})
 }

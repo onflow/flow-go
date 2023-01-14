@@ -20,6 +20,7 @@ type TestServiceEventVersionControl struct {
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
 
+	// At height 21, run version 0.3.7
 	height := uint64(21)
 	major := uint8(0)
 	minor := uint8(3)
@@ -32,18 +33,16 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	env := templates.Environment{
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
-	//
 	versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
 
 	//Contract should be deployed at bootstrap, so we expect this script to succeed, but ignore the return value
-	_, err := s.AccessClient().ExecuteScriptBytes(context.Background(), versionBufferScript, nil)
+	_, err := s.AccessClient().ExecuteScriptBytes(ctx, versionBufferScript, nil)
 	s.Require().NoError(err)
 
 	versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
 
 	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
 	s.Require().NoError(err)
-	//
 	seq := s.AccessClient().GetSeqNumber()
 
 	tx := sdk.NewTransaction().
@@ -80,20 +79,15 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	sealed := s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
 	s.Require().Len(sealed.ExecutionResult.ServiceEvents, 1)
-
 	s.Require().IsType(&flow.VersionBeacon{}, sealed.ExecutionResult.ServiceEvents[0].Event)
 
 	versionTable := sealed.ExecutionResult.ServiceEvents[0].Event.(*flow.VersionBeacon)
-
 	s.Require().Equal(uint64(5), versionTable.Sequence)
-
 	s.Require().Len(versionTable.RequiredVersions, 1)
-
 	s.Require().Equal(height, versionTable.RequiredVersions[0].Height)
 
 	semver, err := semver.NewVersion(versionTable.RequiredVersions[0].Version)
 	s.Require().NoError(err)
-
 	s.Require().Equal(major, uint8(semver.Major))
 	s.Require().Equal(minor, uint8(semver.Minor))
 	s.Require().Equal(patch, uint8(semver.Patch))
