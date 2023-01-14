@@ -22,12 +22,10 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	cancel      context.CancelFunc
-	net         *testnet.FlowNetwork
-	nodeConfigs []testnet.NodeConfig
-	nodeIDs     []flow.Identifier
-	ghostID     flow.Identifier
-	exe1ID      flow.Identifier
+	cancel  context.CancelFunc
+	net     *testnet.FlowNetwork
+	ghostID flow.Identifier
+	exe1ID  flow.Identifier
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
