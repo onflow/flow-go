@@ -566,18 +566,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 		for _, event := range result.ServiceEvents {
-			// skip updating epoch-related metrics if EECC is triggered
-			if epochFallbackTriggered {
-				continue
-			}
-
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// skip updating epoch-related metrics if EECC is triggered
+				if epochFallbackTriggered {
+					continue
+				}
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// skip updating epoch-related metrics if EECC is triggered
+				if epochFallbackTriggered {
+					continue
+				}
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
