@@ -753,6 +753,8 @@ type mockSnapshot struct {
 	mu     sync.Mutex
 }
 
+var _ protocol.Snapshot = &mockSnapshot{}
+
 func (m *mockSnapshot) set(header *flow.Header, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -777,11 +779,12 @@ func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, nil
 }
-func (m *mockSnapshot) Commit() (flow.StateCommitment, error)         { return flow.DummyStateCommitment, nil }
-func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error) { return nil, nil }
-func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)       { return nil, nil }
-func (m *mockSnapshot) ValidDescendants() ([]flow.Identifier, error)  { return nil, nil }
-func (m *mockSnapshot) RandomSource() ([]byte, error)                 { return nil, nil }
-func (m *mockSnapshot) Phase() (flow.EpochPhase, error)               { return flow.EpochPhaseUndefined, nil }
-func (m *mockSnapshot) Epochs() protocol.EpochQuery                   { return nil }
-func (m *mockSnapshot) Params() protocol.GlobalParams                 { return nil }
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)               { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)       { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)             { return nil, nil }
+func (m *mockSnapshot) ValidDescendants() ([]flow.Identifier, error)        { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                       { return nil, nil }
+func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                     { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                         { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                       { return nil }
+func (m *mockSnapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) { return nil, 0, nil }
