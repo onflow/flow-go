@@ -21,7 +21,7 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		height2 := uint64(37)
 		height3 := uint64(55)
 
-		// inserting 3 results at different height each has a ServiceEventCommit
+		// indexing 3 version beacons at different heights
 		err := db.Update(IndexVersionBeaconByHeight(vb1, height1))
 		require.NoError(t, err)
 
@@ -31,7 +31,7 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		err = db.Update(IndexVersionBeaconByHeight(vb3, height3))
 		require.NoError(t, err)
 
-		// insert result 2 again to make sure we tolerate duplicates
+		// index version beacon 2 again to make sure we tolerate duplicates
 		// it is possible for two or more events of the same type to be from the same height
 		err = db.Update(IndexVersionBeaconByHeight(vb2, height2))
 		require.NoError(t, err)

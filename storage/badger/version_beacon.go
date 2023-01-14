@@ -25,7 +25,7 @@ func NewVersionBeacons(collector module.CacheMetrics, db *badger.DB) *VersionBea
 }
 
 // Highest finds the highest flow.VersionBeacon but no higher than maxHeight.
-// Returns storage.ErrNotFound if version beacon exists at or below the given height.
+// Returns storage.ErrNotFound if no version beacon exists at or below the given height.
 func (r *VersionBeacons) Highest(maxHeight uint64) (*flow.VersionBeacon, uint64, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
