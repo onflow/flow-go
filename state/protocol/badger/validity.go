@@ -199,6 +199,10 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	return nil
 }
 
+// isValidVersionBeacon validates internal structure of flow.VersionBeacon and in a context of given block,
+// which is assumed to be a block flow.VersionBeacon has been put into effect.
+// InvalidServiceEventError with appropriate message is returned if any validation fails.
+// Please refer to documentation of flow.VersionBeacon for a description of what's expected of a valid VersionBeacon.
 func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 	if len(vb.RequiredVersions) == 0 {
 		return fmt.Errorf("required versions empty")
@@ -206,7 +210,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 
 	// first entry in a table must be a current version, so the height must be below the current block
 	if vb.RequiredVersions[0].Height > header.Height {
-		return fmt.Errorf("lowest required version height %d below current block's height %d", vb.RequiredVersions[0].Height, header.Height)
+		return protocol.NewInvalidServiceEventError("lowest required version height %d above current block's height %d", vb.RequiredVersions[0].Height, header.Height)
 	}
 
 	// handle case when only one version is present
@@ -221,7 +225,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 
 		// next version must higher than last one
 		if current.Height >= next.Height {
-			return fmt.Errorf("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
+			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
 		}
 
 		currentVersion, err := validateRequirement(current)
@@ -235,7 +239,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 		}
 
 		if nextVersion.LessThan(*currentVersion) {
-			return fmt.Errorf("higher requirement (index=%d) semver(%s) lover than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
+			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) semver(%s) lover than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
 		}
 	}
 
@@ -245,7 +249,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 func validateRequirement(vr flow.VersionControlRequirement) (*semver.Version, error) {
 	version, err := semver.NewVersion(vr.Version)
 	if err != nil {
-		return nil, fmt.Errorf("invalid semver(%s) for required height %d: %w", vr.Version, vr.Height, err)
+		return nil, protocol.NewInvalidServiceEventError("invalid semver(%s) for required height %d: %w", vr.Version, vr.Height, err)
 	}
 	return version, nil
 }
