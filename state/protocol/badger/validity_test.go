@@ -141,15 +141,12 @@ func TestValidateVersionBeacon(t *testing.T) {
 		snap := new(mock.Snapshot)
 		block := unittest.BlockFixture()
 		block.Header.Height = 12
-		ss := &flow.SealingSegment{
-			Blocks: []*flow.Block{&block},
-		}
 
 		vb := &flow.VersionBeacon{}
 
 		vbHeight := uint64(37)
 
-		snap.On("SealingSegment").Return(ss, nil)
+		snap.On("Head").Return(block.Header, nil)
 		snap.On("VersionBeacon").Return(vb, vbHeight, nil)
 
 		err := validateVersionBeacon(snap)
