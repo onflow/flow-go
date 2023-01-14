@@ -671,6 +671,17 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		fnb.Component("mempools metrics", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			return mempools, nil
 		})
+
+		// metrics enabled, report node info metrics as post init event
+		fnb.PostInit(func(nodeConfig *NodeConfig) error {
+			nodeInfoMetrics := metrics.NewNodeInfoCollector()
+			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
+			if err != nil {
+				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Semver(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			return nil
+		})
 	}
 	return nil
 }
