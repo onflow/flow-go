@@ -31,6 +31,6 @@ func (n *NodeBlockListDistributor) OnNodeBlockListUpdate(blockList flow.Identifi
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 	for _, consumer := range n.nodeBlockListConsumers {
-		consumer(blockList)
+		consumer.OnNodeBlockListUpdate(blockList)
 	}
 }
