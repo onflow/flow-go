@@ -230,6 +230,70 @@ func TestIsValidVersionBeacon(t *testing.T) {
 			err := isValidVersionBeacon(vb, header)
 			require.Error(t, err)
 		})
+
+		t.Run("ordered by height ascending is valid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+					{Height: header.Height + 3000, Version: "0.21.37"},
+					{Height: header.Height + 4000, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.NoError(t, err)
+		})
+
+		t.Run("decreasing height is invalid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+					{Height: header.Height + 1800, Version: "0.21.37"},
+					{Height: header.Height + 4000, Version: "0.21.37"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+		t.Run("version higher or equal to the previous one is valid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+					{Height: header.Height + 3000, Version: "0.21.38"},
+					{Height: header.Height + 4000, Version: "1.0.0"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.NoError(t, err)
+		})
+
+		t.Run("any version lower than previous one is invalid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "1.2.3"},
+					{Height: header.Height + 3000, Version: "1.2.4"},
+					{Height: header.Height + 4000, Version: "1.2.3"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+		t.Run("all version must be valid semver string to be valid", func(t *testing.T) {
+			vb := &flow.VersionBeacon{
+				RequiredVersions: []flow.VersionControlRequirement{
+					{Height: header.Height - 1, Version: "0.21.37"},
+					{Height: header.Height + 2000, Version: "0.21.37"},
+					{Height: header.Height + 3000, Version: "0.21.38"},
+					{Height: header.Height + 4000, Version: "v0.21.39"},
+				},
+			}
+			err := isValidVersionBeacon(vb, header)
+			require.Error(t, err)
+		})
+
 	})
 
 }
