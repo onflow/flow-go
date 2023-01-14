@@ -181,14 +181,14 @@ func TestIsValidVersionBeacon(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("height at or above header is invalid", func(t *testing.T) {
+		t.Run("height at or above header is also fine", func(t *testing.T) {
 			vb := &flow.VersionBeacon{
 				RequiredVersions: []flow.VersionControlRequirement{
 					{Height: header.Height + 1, Version: "0.21.37"},
 				},
 			}
 			err := isValidVersionBeacon(vb, header)
-			require.Error(t, err)
+			require.NoError(t, err)
 		})
 
 		t.Run("must be valid semver", func(t *testing.T) {

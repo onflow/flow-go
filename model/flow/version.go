@@ -15,8 +15,9 @@ type VersionControlRequirement struct {
 // It contains RequiredVersions field which is an ordered list of VersionControlRequirement.
 // RequiredVersions is an ordered table of VersionControlRequirement. It informs about upcoming required versions by
 // height. Table is ordered by height, ascending. While heights are strictly increasing, versions are equal or greater,
-// compared by semver semantics. First entry, if present, must indicate a current version - that is its height must be
-// at or below a block is has been emitted in.
+// compared by semver semantics. First entry, if present in multi-requirement table, must indicate a current version -
+// that is its height must be at or below a block is has been emitted in. If whole table contains only one requirement,
+// no height limitations are present.
 // Sequence is event sequence number, which can be used to verify that no event has been skipped by the follower
 type VersionBeacon struct {
 	RequiredVersions []VersionControlRequirement

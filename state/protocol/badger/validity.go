@@ -209,15 +209,15 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 		return fmt.Errorf("required versions empty")
 	}
 
-	// first entry in a table must be a current version, so the height must be below the current block
-	if vb.RequiredVersions[0].Height > header.Height {
-		return protocol.NewInvalidServiceEventError("lowest required version height %d above current block's height %d", vb.RequiredVersions[0].Height, header.Height)
-	}
-
 	// handle case when only one version is present
 	if len(vb.RequiredVersions) == 1 {
 		_, err := validateRequirement(vb.RequiredVersions[0])
 		return err
+	}
+
+	// first entry in a table must be a current version, so the height must be below the current block
+	if vb.RequiredVersions[0].Height > header.Height {
+		return protocol.NewInvalidServiceEventError("lowest required version height %d above current block's height %d", vb.RequiredVersions[0].Height, header.Height)
 	}
 
 	for i := 0; i < len(vb.RequiredVersions)-1; i++ {
