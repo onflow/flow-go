@@ -20,7 +20,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
-	versionBeacon := unittest.VersionBeaconFixture(3)
+	versionBeacon := unittest.VersionBeaconFixture(3, 21)
 
 	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
@@ -252,8 +252,8 @@ func TestEquality(t *testing.T) {
 	setupBevent := unittest.EpochSetupFixture()
 	commitA := unittest.EpochCommitFixture().ServiceEvent()
 	commitBevent := unittest.EpochCommitFixture()
-	versionTableA := unittest.VersionBeaconFixture(2).ServiceEvent()
-	versionTableBevent := unittest.VersionBeaconFixture(2)
+	versionTableA := unittest.VersionBeaconFixture(2, 21).ServiceEvent()
+	versionTableBevent := unittest.VersionBeaconFixture(2, 22)
 
 	// modify B versions
 	setupBevent.Counter += 1

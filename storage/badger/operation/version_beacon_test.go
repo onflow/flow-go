@@ -14,9 +14,9 @@ import (
 func TestResults_IndexByServiceEvents(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		vb1 := unittest.VersionBeaconFixture(2)
-		vb2 := unittest.VersionBeaconFixture(2)
-		vb3 := unittest.VersionBeaconFixture(2)
+		vb1 := unittest.VersionBeaconFixture(2, 5)
+		vb2 := unittest.VersionBeaconFixture(2, 5)
+		vb3 := unittest.VersionBeaconFixture(2, 5)
 		height1 := uint64(21)
 		height2 := uint64(37)
 		height3 := uint64(55)

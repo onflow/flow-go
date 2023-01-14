@@ -22,6 +22,9 @@ func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
+	header, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
@@ -104,7 +107,7 @@ func TestFromSnapshot(t *testing.T) {
 		// ensure last version beacon is included
 		t.Run("version beacon", func(t *testing.T) {
 
-			expectedVB := unittest.VersionBeaconFixture(2)
+			expectedVB := unittest.VersionBeaconFixture(2, header.Height)
 			unittest.AddVersionBeacon(t, expectedVB, state)
 
 			expected := state.Final()

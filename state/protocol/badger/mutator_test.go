@@ -142,9 +142,9 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Extend(context.Background(), b1)
 		require.NoError(t, err)
 
-		vb1 := unittest.VersionBeaconFixture(2)
-		vb2 := unittest.VersionBeaconFixture(3)
-		vb3 := unittest.VersionBeaconFixture(4)
+		vb1 := unittest.VersionBeaconFixture(2, rootHeader.Height)
+		vb2 := unittest.VersionBeaconFixture(3, rootHeader.Height)
+		vb3 := unittest.VersionBeaconFixture(4, rootHeader.Height)
 
 		b1Receipt := unittest.ReceiptForBlockFixture(b1)
 		b1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb1.ServiceEvent()}

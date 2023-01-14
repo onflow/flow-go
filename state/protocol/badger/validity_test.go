@@ -293,7 +293,6 @@ func TestIsValidVersionBeacon(t *testing.T) {
 			err := isValidVersionBeacon(vb, header)
 			require.Error(t, err)
 		})
-
 	})
 
 }

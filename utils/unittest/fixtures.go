@@ -776,7 +776,7 @@ func ServiceEventsFixture(n int) flow.ServiceEventList {
 		case 1:
 			sel[n-1] = EpochSetupFixture().ServiceEvent()
 		case 2:
-			sel[n-1] = VersionBeaconFixture(3).ServiceEvent()
+			sel[n-1] = VersionBeaconFixture(3, 21).ServiceEvent()
 		}
 	}
 
@@ -1878,7 +1878,7 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	return commit
 }
 
-func VersionBeaconFixture(size uint, opts ...func(beacon *flow.VersionBeacon)) *flow.VersionBeacon {
+func VersionBeaconFixture(size uint, lowestHeight uint64, opts ...func(beacon *flow.VersionBeacon)) *flow.VersionBeacon {
 
 	if size == 0 {
 		return &flow.VersionBeacon{
@@ -1887,7 +1887,7 @@ func VersionBeaconFixture(size uint, opts ...func(beacon *flow.VersionBeacon)) *
 	}
 
 	versionTable := &flow.VersionBeacon{
-		RequiredVersions: []flow.VersionControlRequirement{{Height: 23, Version: "0.21.37"}},
+		RequiredVersions: []flow.VersionControlRequirement{{Height: lowestHeight, Version: "0.21.37"}},
 		Sequence:         uint64(5),
 	}
 
@@ -1935,7 +1935,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithDKGFromParticipants(participants),
 	)
 
-	versionBeacon := VersionBeaconFixture(2)
+	versionBeacon := VersionBeaconFixture(2, root.Header.Height)
 
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent(), versionBeacon.ServiceEvent()}
