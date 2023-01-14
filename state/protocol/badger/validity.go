@@ -405,11 +405,10 @@ func validateVersionBeacon(snap protocol.Snapshot) error {
 		}
 	}
 
-	segment, err := snap.SealingSegment()
+	head, err := snap.Head()
 	if err != nil {
-		return fmt.Errorf("could not get sealing segment: %w", err)
+		return fmt.Errorf("could not get snapshot head: %w", err)
 	}
-	highest := segment.Highest()
 
 	// version beacon must be included in a past block to be effective
 	if versionTableHeight > highest.Header.Height {
