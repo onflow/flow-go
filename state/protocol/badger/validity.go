@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
