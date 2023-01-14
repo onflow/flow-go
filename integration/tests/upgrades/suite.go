@@ -110,85 +110,81 @@ func (s *Suite) MetricsPort() string {
 	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
 }
 
-func (s *Suite) SetupTest2() {
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	s.log.Info().Msg("================> SetupTest")
-
-	blockRateFlag := "--block-rate-delay=1ms"
-
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
-
-	// generate the four consensus identities
-	s.nodeIDs = unittest.IdentifierListFixture(4)
-	for _, nodeID := range s.nodeIDs {
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-			testnet.WithAdditionalFlag(blockRateFlag),
-			testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
-			testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		)
-		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
-	}
-
-	// need one execution nodes
-	s.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.DebugLevel))
-	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
-
-	vn1Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.DebugLevel))
-	vn2Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
-	vn3Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
-
-	s.nodeConfigs = append(s.nodeConfigs, vn1Config, vn2Config, vn3Config)
-
-	// need two collection node
-	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
-	)
-	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
-	)
-	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
-
-	// add the ghost (verification) node config
-	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess,
-		testnet.WithID(s.ghostID),
-		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
-
-	// generate the network config
-	netConfig := testnet.NewNetworkConfig(
-		"upgrade_tests",
-		s.nodeConfigs,
-		// set long staking phase to avoid QC/DKG transactions during test run
-		testnet.WithViewsInStakingAuction(10_000),
-		testnet.WithViewsInEpoch(100_000),
-	)
-
-	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
-
-	// start the network
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-	s.net.Start(ctx)
-
-	// start tracking blocks
-	s.Track(s.T(), ctx, s.Ghost())
-
-}
+//func (s *Suite) SetupTest2() {
+//	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+//	s.log.Info().Msg("================> SetupTest")
+//
+//	blockRateFlag := "--block-rate-delay=1ms"
+//
+//	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
+//
+//	// generate the four consensus identities
+//	s.nodeIDs = unittest.IdentifierListFixture(4)
+//	for _, nodeID := range s.nodeIDs {
+//		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
+//			testnet.WithLogLevel(zerolog.FatalLevel),
+//			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+//			testnet.WithAdditionalFlag(blockRateFlag),
+//			testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+//			testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+//		)
+//		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
+//	}
+//
+//	// need one execution nodes
+//	s.exe1ID = unittest.IdentifierFixture()
+//	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
+//		testnet.WithLogLevel(zerolog.DebugLevel))
+//	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+//
+//	vn1Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.DebugLevel))
+//	vn2Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
+//	vn3Config := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
+//
+//	s.nodeConfigs = append(s.nodeConfigs, vn1Config, vn2Config, vn3Config)
+//
+//	// need two collection node
+//	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
+//		testnet.WithLogLevel(zerolog.FatalLevel),
+//		testnet.WithAdditionalFlag(blockRateFlag),
+//	)
+//	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
+//		testnet.WithLogLevel(zerolog.FatalLevel),
+//		testnet.WithAdditionalFlag(blockRateFlag),
+//	)
+//	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
+//
+//	// add the ghost (verification) node config
+//	s.ghostID = unittest.IdentifierFixture()
+//	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess,
+//		testnet.WithID(s.ghostID),
+//		testnet.AsGhost(),
+//		testnet.WithLogLevel(zerolog.InfoLevel))
+//	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
+//
+//	// generate the network config
+//	netConfig := testnet.NewNetworkConfig(
+//		"upgrade_tests",
+//		s.nodeConfigs,
+//		// set long staking phase to avoid QC/DKG transactions during test run
+//		testnet.WithViewsInStakingAuction(10_000),
+//		testnet.WithViewsInEpoch(100_000),
+//	)
+//
+//	// initialize the network
+//	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
+//
+//	// start the network
+//	ctx, cancel := context.WithCancel(context.Background())
+//	s.cancel = cancel
+//	s.net.Start(ctx)
+//
+//	// start tracking blocks
+//	s.Track(s.T(), ctx, s.Ghost())
+//
+//}
 
 func (s *Suite) SetupTest() {
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	s.log.Info().Msg("================> SetupTest")
-
-	//s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
@@ -239,12 +235,8 @@ func (s *Suite) SetupTest() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
 	// start the network
-
-	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	s.net.Start(ctx)
-
 	s.net.Start(ctx)
 
 	// start tracking blocks
