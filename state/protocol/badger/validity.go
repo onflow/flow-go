@@ -209,22 +209,33 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 		return fmt.Errorf("required versions empty")
 	}
 
+	minimumThresholdHeight := header.Height + flow.VersionThreshold
+
 	// handle case when only one version is present
 	if len(vb.RequiredVersions) == 1 {
+		if vb.RequiredVersions[0].Height < minimumThresholdHeight {
+			return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 0, vb.RequiredVersions[0].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
+		}
 		_, err := validateRequirement(vb.RequiredVersions[0])
 		return err
 	}
 
-	// first entry in a table must be a current version, so the height must be below the current block
-	if vb.RequiredVersions[0].Height > header.Height {
-		return protocol.NewInvalidServiceEventError("lowest required version height %d above current block's height %d", vb.RequiredVersions[0].Height, header.Height)
+	// if first requirement below current height, second one must obey threshold
+	if vb.RequiredVersions[0].Height <= header.Height {
+		if vb.RequiredVersions[1].Height < minimumThresholdHeight {
+			return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 1, vb.RequiredVersions[1].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
+		}
+
+		// if first requirement is not below current height, it must obey threshold
+	} else if vb.RequiredVersions[0].Height < minimumThresholdHeight {
+		return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 0, vb.RequiredVersions[0].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
 	}
 
 	for i := 0; i < len(vb.RequiredVersions)-1; i++ {
 		current := vb.RequiredVersions[i]
 		next := vb.RequiredVersions[i+1]
 
-		// next version must higher than last one
+		// next version must higher than previous one
 		if current.Height >= next.Height {
 			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
 		}
@@ -240,7 +251,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 		}
 
 		if nextVersion.LessThan(*currentVersion) {
-			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) semver(%s) lover than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
+			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) semver(%s) lower than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
 		}
 	}
 
