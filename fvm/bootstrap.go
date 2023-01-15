@@ -354,6 +354,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
+	b.deployVersionBeacon(service)
+
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
 
@@ -785,6 +787,18 @@ func (b *bootstrapExecutor) deployStakingProxyContract(service flow.Address) {
 		),
 	)
 	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployVersionBeacon(service flow.Address) {
+	contract := contracts.NodeVersionBeacon()
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(service, contract, "NodeVersionBeacon"),
+			0,
+		),
+	)
+	panicOnMetaInvokeErrf("failed to deploy NodeVersionBeacon contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,

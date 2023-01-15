@@ -79,11 +79,13 @@ func checkSystemContracts(t *testing.T, chainID flow.ChainID) {
 	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameEpoch])
 	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameClusterQC])
 	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameDKG])
+	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameVersion])
 
 	// entries must match internal mapping
 	assert.Equal(t, addresses[ContractNameEpoch], contracts.Epoch.Address)
 	assert.Equal(t, addresses[ContractNameClusterQC], contracts.ClusterQC.Address)
 	assert.Equal(t, addresses[ContractNameDKG], contracts.DKG.Address)
+	assert.Equal(t, addresses[ContractNameVersion], contracts.VersionBeacon.Address)
 }
 
 func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
@@ -94,8 +96,10 @@ func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
 	require.True(t, ok, "missing chain %w", chainID.String())
 
 	epochContractAddr := addresses[ContractNameEpoch]
+	versionContractAddr := addresses[ContractNameVersion]
 	// entries may not be empty
 	assert.NotEqual(t, flow.EmptyAddress, epochContractAddr)
+	assert.NotEqual(t, flow.EmptyAddress, versionContractAddr)
 
 	// entries must match internal mapping
 	assert.Equal(t, epochContractAddr, events.EpochSetup.Address)
