@@ -115,7 +115,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
+	OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate)
 
 	// OnTcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a TC. The arguments specify the tc (first argument), which triggered
@@ -123,7 +123,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
+	OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
@@ -132,6 +132,36 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnStartingTimeout(model.TimerInfo)
+
+	// OnVoteProcessed notifications are produced by the Vote Aggregation logic, each time
+	// we successfully ingest a valid vote.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteProcessed(vote *model.Vote)
+
+	// OnTimeoutProcessed notifications are produced by the Timeout Aggregation logic,
+	// each time we successfully ingest a valid timeout.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTimeoutProcessed(timeout *model.TimeoutObject)
+
+	// OnCurrentViewDetails notifications are produced by the EventHandler during the course of a view with auxiliary information.
+	// These notifications are generally not produced for all views (for example skipped views).
+	// These notifications are guaranteed to be produced for all views we enter after fully processing a message.
+	// Example 1:
+	//   - We are in view 8. We process a QC with view 10, causing us to enter view 11.
+	//   - Then this notification will be produced for view 11.
+	// Example 2:
+	//   - We are in view 8. We process a proposal with view 10, which contains a TC for view 9 and TC.NewestQC for view 8.
+	//   - The QC would allow us to enter view 9 and the TC would allow us to enter view 10,
+	//     so after fully processing the message we are in view 10.
+	//   - Then this notification will be produced for view 10, but not view 9
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
@@ -145,7 +175,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidVoteDetected(*model.Vote)
+	OnInvalidVoteDetected(err model.InvalidVoteError)
 
 	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
 	// whenever vote for invalid proposal was detected.
@@ -166,7 +196,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidTimeoutDetected(*model.TimeoutObject)
+	OnInvalidTimeoutDetected(err model.InvalidTimeoutError)
 }
 
 // QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.

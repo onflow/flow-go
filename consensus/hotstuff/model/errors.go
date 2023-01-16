@@ -186,27 +186,36 @@ func (e InvalidBlockError) Unwrap() error {
 
 // InvalidVoteError indicates that the vote with identifier `VoteID` is invalid
 type InvalidVoteError struct {
-	VoteID flow.Identifier
-	View   uint64
-	Err    error
+	Vote *Vote
+	Err  error
 }
 
 func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
 	return InvalidVoteError{
-		VoteID: vote.ID(),
-		View:   vote.View,
-		Err:    fmt.Errorf(msg, args...),
+		Vote: vote,
+		Err:  fmt.Errorf(msg, args...),
 	}
 }
 
 func (e InvalidVoteError) Error() string {
-	return fmt.Sprintf("invalid vote %x for view %d: %s", e.VoteID, e.View, e.Err.Error())
+	return fmt.Sprintf("invalid vote at view %d for block %x: %s", e.Vote.View, e.Vote.BlockID, e.Err.Error())
 }
 
 // IsInvalidVoteError returns whether an error is InvalidVoteError
 func IsInvalidVoteError(err error) bool {
 	var e InvalidVoteError
 	return errors.As(err, &e)
+}
+
+// AsInvalidVoteError determines whether the given error is a InvalidVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidVoteError(err error) (*InvalidVoteError, bool) {
+	var e InvalidVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
 }
 
 func (e InvalidVoteError) Unwrap() error {
@@ -421,6 +430,17 @@ func (e InvalidTimeoutError) Error() string {
 func IsInvalidTimeoutError(err error) bool {
 	var e InvalidTimeoutError
 	return errors.As(err, &e)
+}
+
+// AsInvalidTimeoutError determines whether the given error is a InvalidTimeoutError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidTimeoutError(err error) (*InvalidTimeoutError, bool) {
+	var e InvalidTimeoutError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
 }
 
 func (e InvalidTimeoutError) Unwrap() error {

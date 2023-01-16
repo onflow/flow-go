@@ -546,12 +546,13 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
+			// create consensus logger
+			logger := createLogger(node.Logger, node.RootChainID)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
-				node.Logger,
+				logger,
 				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
 			)
 
 			notifier.AddConsumer(finalizationDistributor)
@@ -581,7 +582,7 @@ func main() {
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
-				node.Logger,
+				logger,
 				mainMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -594,9 +595,15 @@ func main() {
 			}
 
 			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
+				logger,
+				timeoutCollectorDistributor,
+				committee,
+				validator,
+				msig.ConsensusTimeoutTag,
+			)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
-				node.Logger,
+				logger,
 				mainMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -669,7 +676,7 @@ func main() {
 
 			// initialize hotstuff consensus algorithm
 			hot, err = consensus.NewParticipant(
-				node.Logger,
+				createLogger(node.Logger, node.RootChainID),
 				mainMetrics,
 				build,
 				finalizedBlock,
@@ -689,7 +696,8 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			complianceCore, err := compliance.NewCore(node.Logger,
+			logger := createLogger(node.Logger, node.RootChainID)
+			complianceCore, err := compliance.NewCore(logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				mainMetrics,
@@ -713,7 +721,7 @@ func main() {
 
 			// initialize the compliance engine
 			comp, err = compliance.NewEngine(
-				node.Logger,
+				logger,
 				node.Me,
 				complianceCore,
 			)
@@ -727,7 +735,7 @@ func main() {
 		}).
 		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			messageHub, err := message_hub.NewMessageHub(
-				node.Logger,
+				createLogger(node.Logger, node.RootChainID),
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,

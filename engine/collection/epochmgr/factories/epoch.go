@@ -141,6 +141,7 @@ func (factory *EpochComponentsFactory) Create(
 	validator := hotstuffModules.Validator
 
 	hotstuff, err = factory.hotstuff.Create(
+		cluster,
 		state,
 		metrics,
 		builder,

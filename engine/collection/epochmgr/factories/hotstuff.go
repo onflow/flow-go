@@ -30,7 +30,7 @@ import (
 type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 
 type HotStuffFactory struct {
-	log            zerolog.Logger
+	baseLogger     zerolog.Logger
 	me             module.Local
 	db             *badger.DB
 	protoState     protocol.State
@@ -52,7 +52,7 @@ func NewHotStuffFactory(
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:            log,
+		baseLogger:     log,
 		me:             me,
 		db:             db,
 		protoState:     protoState,
@@ -72,15 +72,15 @@ func (f *HotStuffFactory) CreateModules(
 	payloads storage.ClusterPayloads,
 	updater module.Finalizer,
 ) (*consensus.HotstuffModules, module.HotstuffMetrics, error) {
-
 	// setup metrics/logging with the new chain ID
+	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 	notifier.AddConsumer(finalizationDistributor)
-	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
+	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
+	notifier.AddConsumer(notifications.NewTelemetryConsumer(log))
 
 	var (
 		err       error
@@ -119,7 +119,7 @@ func (f *HotStuffFactory) CreateModules(
 	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	voteAggregator, err := consensus.NewVoteAggregator(
-		f.log,
+		log,
 		metrics,
 		f.engineMetrics,
 		f.mempoolMetrics,
@@ -135,10 +135,10 @@ func (f *HotStuffFactory) CreateModules(
 	}
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(log, timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
 
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
-		f.log,
+		log,
 		metrics,
 		f.engineMetrics,
 		f.mempoolMetrics,
@@ -167,6 +167,7 @@ func (f *HotStuffFactory) CreateModules(
 }
 
 func (f *HotStuffFactory) Create(
+	cluster protocol.Cluster,
 	clusterState cluster.State,
 	metrics module.HotstuffMetrics,
 	builder module.Builder,
@@ -182,8 +183,9 @@ func (f *HotStuffFactory) Create(
 		return nil, err
 	}
 
+	log := f.createLogger(cluster)
 	participant, err := consensus.NewParticipant(
-		f.log,
+		log,
 		metrics,
 		builder,
 		finalizedBlock,
@@ -192,4 +194,9 @@ func (f *HotStuffFactory) Create(
 		f.opts...,
 	)
 	return participant, err
+}
+
+// createLogger creates a logger by wrapping base logger by decorating it will cluster ID
+func (f *HotStuffFactory) createLogger(cluster protocol.Cluster) zerolog.Logger {
+	return f.baseLogger.With().Str("chain", cluster.ChainID().String()).Logger()
 }

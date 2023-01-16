@@ -60,7 +60,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 	}
 
 	return &StakingVoteProcessor{
-		log:               log,
+		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:             block,
 		stakingSigAggtor:  stakingSigAggtor,
 		onQCCreated:       f.onQCCreated,
@@ -139,6 +139,8 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.ID(), err)
 	}
 
+	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)
+
 	// checking of conditions for building QC are satisfied
 	if totalWeight < p.minRequiredWeight {
 		return nil
@@ -153,6 +155,11 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if err != nil {
 		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
+
+	p.log.Info().
+		Uint64("view", qc.View).
+		Hex("signers", qc.SignerIndices).
+		Msg("new QC has been created")
 	p.onQCCreated(qc)
 
 	return nil
