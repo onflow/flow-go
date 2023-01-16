@@ -16,7 +16,6 @@ import (
 // one that can easily be serialized to disk or to network.
 // TODO error docs
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
-
 	var (
 		snap EncodableSnapshot
 		err  error
@@ -89,7 +88,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-
 	var (
 		params EncodableParams
 		err    error
@@ -103,7 +101,15 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
+	params.SporkRootBlockHeight, err = from.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork root block height: %w", err)
+	}
 	params.ProtocolVersion, err = from.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
+	params.EpochCommitSafetyThreshold, err = from.EpochCommitSafetyThreshold()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
@@ -117,7 +123,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
-
 	var (
 		epoch EncodableEpoch
 		err   error
@@ -248,7 +253,6 @@ func SnapshotFromBootstrapStateWithParams(
 	protocolVersion uint,
 	epochCommitSafetyThreshold uint64,
 ) (*Snapshot, error) {
-
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
 		return nil, fmt.Errorf("invalid setup event type (%T)", result.ServiceEvents[0].Event)
@@ -290,6 +294,7 @@ func SnapshotFromBootstrapStateWithParams(
 	params := EncodableParams{
 		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
 		SporkID:                    root.ID(),                  // use root block ID as the unique spork identifier
+		SporkRootBlockHeight:       root.Header.Height,         // use root block height as the spork root block height
 		ProtocolVersion:            protocolVersion,            // major software version for this spork
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
@@ -304,6 +309,7 @@ func SnapshotFromBootstrapStateWithParams(
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			FirstSeal:        seal,
+			ExtraBlocks:      make([]*flow.Block, 0),
 		},
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,

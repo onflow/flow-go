@@ -165,6 +165,27 @@ func (_m *Params) SporkID() (flow.Identifier, error) {
 	return r0, r1
 }
 
+// SporkRootBlockHeight provides a mock function with given fields:
+func (_m *Params) SporkRootBlockHeight() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewParams interface {
 	mock.TestingT
 	Cleanup(func())

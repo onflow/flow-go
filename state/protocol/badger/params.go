@@ -4,12 +4,15 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Params struct {
 	state *State
 }
+
+var _ protocol.Params = (*Params)(nil)
 
 func (p Params) ChainID() (flow.ChainID, error) {
 
@@ -31,6 +34,16 @@ func (p Params) SporkID() (flow.Identifier, error) {
 	}
 
 	return sporkID, nil
+}
+
+func (p Params) SporkRootBlockHeight() (uint64, error) {
+	var sporkRootBlockHeight uint64
+	err := p.state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+	if err != nil {
+		return 0, fmt.Errorf("could not get spork root block height: %w", err)
+	}
+
+	return sporkRootBlockHeight, nil
 }
 
 func (p Params) ProtocolVersion() (uint, error) {
