@@ -102,10 +102,13 @@ type SealingSegment struct {
 	FirstSeal *Seal
 }
 
+// Highest is the highest block in the sealing segment and the reference block from snapshot that was
+// used to produce this sealing segment.
 func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
+// Sealed returns the most recently sealed block based on head of sealing segment(highest block).
 func (segment *SealingSegment) Sealed() *Block {
 	return segment.Blocks[0]
 }

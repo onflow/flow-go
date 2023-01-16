@@ -259,11 +259,11 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	//       This is relevant if `head` does not contain any seals.
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
-	//       limitHeight := max(header.Height - m.cfg.transactionExpiry, SporkRootBlockHeight)
+	//       limitHeight := max(header.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	//
 	// Condition (i) and (ii) are necessary for the sealing segment for _any node_. In contrast, (iii) is
 	// necessary to bootstrap nodes that _validate_ block payloads (e.g. consensus nodes), to verify that
-	// collection guarantees are not duplicated (collections expire after `m.cfg.transactionExpiry` blocks).
+	// collection guarantees are not duplicated (collections expire after `flow.DefaultTransactionExpiry` blocks).
 	// However, per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
 	head, err := s.state.blocks.ByID(s.blockID)
