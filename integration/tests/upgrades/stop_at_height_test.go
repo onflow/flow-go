@@ -31,7 +31,6 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 	commandsList := AdminCommandListCommands{}
 	err := s.SendExecutionAdminCommand(context.Background(), "list-commands", struct{}{}, &commandsList)
 	require.NoError(s.T(), err)
-
 	require.Contains(s.T(), commandsList, "stop-at-height")
 
 	// wait for some blocks being finalized
@@ -40,7 +39,7 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 
 	// stop in 5 blocks
-	stopHeight := currentFinalized + 5
+	stopHeight := currentFinalized + 10
 
 	stopAtHeightRequest := StopAtHeightRequest{
 		Height: stopHeight,

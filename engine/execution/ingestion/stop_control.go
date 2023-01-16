@@ -104,7 +104,7 @@ func (s *StopControl) SetStopHeight(height uint64, crash bool) (uint64, bool, er
 
 	// +1 because we track last executing height, so +1 is the lowest possible block to stop
 	if height <= s.highestExecutingHeight+1 {
-		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.highestExecutingHeight)
+		return oldHeight, oldCrash, fmt.Errorf("cannot update stop height, given height %d at or below last executed %d", height, s.highestExecutingHeight+1)
 	}
 
 	s.log.Info().
