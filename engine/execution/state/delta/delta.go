@@ -36,8 +36,18 @@ func (d Delta) Set(owner, key string, value flow.RegisterValue) {
 	d.Data[k] = value
 }
 
+// UpdatedRegisterIDs returns all register ids that were updated by this delta.
+// The returned ids are unsorted.
+func (d Delta) UpdatedRegisterIDs() []flow.RegisterID {
+	ids := make([]flow.RegisterID, 0, len(d.Data))
+	for key := range d.Data {
+		ids = append(ids, key)
+	}
+	return ids
+}
+
 // UpdatedRegisters returns all registers that were updated by this delta.
-// ids are returned sorted, in ascending order
+// The returned entries are sorted by ids in ascending order.
 func (d Delta) UpdatedRegisters() flow.RegisterEntries {
 	entries := make(flow.RegisterEntries, 0, len(d.Data))
 	for key, value := range d.Data {
