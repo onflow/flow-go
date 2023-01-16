@@ -20,8 +20,8 @@ type TestServiceEventVersionControl struct {
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
 
-	// At height 21, run version 0.3.7
-	height := uint64(21)
+	// At height 2137+VersionThreshold, run version 0.3.7
+	height := uint64(2137) + flow.VersionThreshold
 	major := uint8(0)
 	minor := uint8(3)
 	patch := uint8(7)
