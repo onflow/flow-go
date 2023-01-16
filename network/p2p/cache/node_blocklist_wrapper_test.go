@@ -251,6 +251,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 
 			// step 3: after removing the node from the blocklist,
 			// an Identity with `Ejected` equal to the original value should be returned
+			s.mockNotifier.On("OnNodeBlockListUpdate", flow.IdentifierList{}).Once()
 			err = s.wrapper.Update(flow.IdentifierList{})
 			require.NoError(s.T(), err)
 
@@ -287,6 +288,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist2.Lookup(), s.wrapper.GetBlocklist().Lookup())
 
+	s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 	err = s.wrapper.ClearBlocklist()
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), s.wrapper.GetBlocklist())
@@ -317,6 +319,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	})
 
 	s.Run("Clear blocklist on empty database", func() {
+		s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 		err := s.wrapper.ClearBlocklist() // No-op as data base does not contain any block list
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), s.wrapper.GetBlocklist())
@@ -366,6 +369,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 
 		// clear blocklist ->
 		// newly created wrapper should now read empty blocklist from data base during initialization
+		s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 		err = s.wrapper.ClearBlocklist()
 		require.NoError(s.T(), err)
 

@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -66,7 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware = (*Middleware)(nil)
+	_ network.Middleware        = (*Middleware)(nil)
+	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -129,14 +129,6 @@ func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOptio
 func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.unicastRateLimiters = rateLimiters
-	}
-}
-
-// WithNodeBlockListDistributor adds a consumer func mw.onNodeBlockListUpdate to the node block list distributor provided.
-// This will allow the middleware to disconnect from block listed peers without waiting for the peer manager peer update interval.
-func WithNodeBlockListDistributor(distributor *cache.NodeBlockListDistributor) MiddlewareOption {
-	return func(mw *Middleware) {
-		distributor.AddConsumer(mw.onNodeBlockListUpdate)
 	}
 }
 
@@ -353,8 +345,8 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	return peerIDs
 }
 
-// onNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
-func (m *Middleware) onNodeBlockListUpdate(blockList flow.IdentifierList) {
+// OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
+func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
 	for _, pid := range m.peerIDs(blockList) {
 		err := m.libP2PNode.RemovePeer(pid)
 		if err != nil {

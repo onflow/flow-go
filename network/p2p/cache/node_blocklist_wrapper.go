@@ -76,10 +76,7 @@ func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
 	w.blocklist = b
-
-	if blocklist.Len() > 0 {
-		w.notifier.OnNodeBlockListUpdate(blocklist)
-	}
+	w.notifier.OnNodeBlockListUpdate(blocklist)
 
 	return nil
 }

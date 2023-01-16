@@ -1033,9 +1033,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
+	validators ...network.MessageValidator,
+) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		builder.Logger,
 		libp2pNode, nodeID,
 		builder.Metrics.Bitswap,
@@ -1044,11 +1045,10 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
-		middleware.WithNodeBlockListDistributor(builder.NodeBlockListDistributor),
+		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }
 

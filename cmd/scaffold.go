@@ -405,11 +405,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
 
-	mwOpts = append(mwOpts, middleware.WithNodeBlockListDistributor(fnb.NodeBlockListDistributor))
-
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-
-	fnb.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		fnb.Logger,
 		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
@@ -420,6 +417,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
 		mwOpts...)
+	fnb.NodeBlockListDistributor.AddConsumer(mw)
+	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
