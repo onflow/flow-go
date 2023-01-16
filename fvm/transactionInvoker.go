@@ -81,17 +81,15 @@ func newTransactionExecutor(
 	txnState *state.TransactionState,
 	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
-	span := proc.StartSpanFromProcTraceSpan(
-		ctx.Tracer,
-		trace.FVMExecuteTransaction)
+	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	ctx.RootSpan = span
 	ctx.TxIndex = proc.TxIndex
 	ctx.TxId = proc.Transaction.ID()
 	ctx.TxBody = proc.Transaction
 
 	env := environment.NewTransactionEnvironment(
+		span,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
@@ -213,7 +211,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -226,7 +224,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState)
 		if err != nil {
@@ -454,18 +452,14 @@ func (executor *transactionExecutor) commit(
 	}
 
 	// if tx failed this will only contain fee deduction logs
-	executor.proc.Logs = append(executor.proc.Logs, executor.env.Logs()...)
-	executor.proc.ComputationUsed += executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate += executor.env.MemoryEstimate()
-	if executor.proc.IsSampled() {
-		executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
-	}
+	executor.proc.Logs = executor.env.Logs()
+	executor.proc.ComputationUsed = executor.env.ComputationUsed()
+	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
+	executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
 
 	// if tx failed this will only contain fee deduction events
-	executor.proc.Events = append(executor.proc.Events, executor.env.Events()...)
-	executor.proc.ServiceEvents = append(
-		executor.proc.ServiceEvents,
-		executor.env.ServiceEvents()...)
+	executor.proc.Events = executor.env.Events()
+	executor.proc.ServiceEvents = executor.env.ServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

@@ -18,6 +18,7 @@ PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
+LOGLEVEL=DEBUG
 
 # The Git commit hash
 COMMIT=$(shell git rev-parse HEAD)
@@ -46,6 +47,7 @@ else
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
 		bootstrap.go \
+		-loglevel=$(LOGLEVEL) \
 		-collection=$(COLLECTION) \
 		-consensus=$(CONSENSUS) \
 		-execution=$(EXECUTION) \
@@ -74,7 +76,7 @@ bootstrap-light:
 # CI tests have a larger number of nodes
 .PHONY: bootstrap-ci
 bootstrap-ci:
-	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 bootstrap
+	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 LOGLEVEL=INFO bootstrap
 
 # Creates a version of localnet configured with short epochs
 .PHONY: bootstrap-short-epochs

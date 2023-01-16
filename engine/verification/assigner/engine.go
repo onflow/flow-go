@@ -163,7 +163,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 
-	span, ctx, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
+	span, ctx := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
 	defer span.End()
 
 	e.processFinalizedBlock(ctx, block)

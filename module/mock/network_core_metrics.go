@@ -13,14 +13,14 @@ type NetworkCoreMetrics struct {
 	mock.Mock
 }
 
-// DuplicateInboundMessagesDropped provides a mock function with given fields: topic, messageType
-func (_m *NetworkCoreMetrics) DuplicateInboundMessagesDropped(topic string, messageType string) {
-	_m.Called(topic, messageType)
+// DuplicateInboundMessagesDropped provides a mock function with given fields: topic, protocol, messageType
+func (_m *NetworkCoreMetrics) DuplicateInboundMessagesDropped(topic string, protocol string, messageType string) {
+	_m.Called(topic, protocol, messageType)
 }
 
-// InboundMessageReceived provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkCoreMetrics) InboundMessageReceived(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
+// InboundMessageReceived provides a mock function with given fields: sizeBytes, topic, protocol, messageType
+func (_m *NetworkCoreMetrics) InboundMessageReceived(sizeBytes int, topic string, protocol string, messageType string) {
+	_m.Called(sizeBytes, topic, protocol, messageType)
 }
 
 // MessageAdded provides a mock function with given fields: priority
@@ -43,9 +43,9 @@ func (_m *NetworkCoreMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
-// OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
-func (_m *NetworkCoreMetrics) OutboundMessageSent(sizeBytes int, topic string, messageType string) {
-	_m.Called(sizeBytes, topic, messageType)
+// OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, protocol, messageType
+func (_m *NetworkCoreMetrics) OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string) {
+	_m.Called(sizeBytes, topic, protocol, messageType)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority

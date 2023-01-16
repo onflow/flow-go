@@ -119,7 +119,14 @@ func main() {
 		Stringer("flowTokenAddress", flowTokenAddress).
 		Msg("addresses")
 
-	flowClient, err := client.NewClient(accessNodeAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		accessNodeAddress,
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+			grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize Flow client")
 	}

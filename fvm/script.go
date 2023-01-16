@@ -139,6 +139,7 @@ func newScriptExecutor(
 		derivedTxnData: derivedTxnData,
 		env: environment.NewScriptEnvironment(
 			proc.RequestContext,
+			ctx.TracerSpan,
 			ctx.EnvironmentParams,
 			txnState,
 			derivedTxnData),
@@ -158,7 +159,7 @@ func (executor *scriptExecutor) Execute() error {
 	err := executor.execute()
 	txError, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
-		if errors.IsALedgerFailure(failure) {
+		if errors.IsLedgerFailure(failure) {
 			return fmt.Errorf(
 				"cannot execute the script, this error usually happens if "+
 					"the reference block for this script is not set to a "+

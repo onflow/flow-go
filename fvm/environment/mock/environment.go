@@ -34,6 +34,8 @@ import (
 
 	trace "github.com/onflow/flow-go/module/trace"
 
+	tracing "github.com/onflow/flow-go/fvm/tracing"
+
 	zerolog "github.com/rs/zerolog"
 )
 
@@ -1123,17 +1125,22 @@ func (_m *Environment) SigningAccounts() []common.Address {
 	return r0
 }
 
-// StartSpanFromRoot provides a mock function with given fields: name
-func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
-	ret := _m.Called(name)
+// StartChildSpan provides a mock function with given fields: name, options
+func (_m *Environment) StartChildSpan(name trace.SpanName, options ...oteltrace.SpanStartOption) tracing.TracerSpan {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
-	var r0 oteltrace.Span
-	if rf, ok := ret.Get(0).(func(trace.SpanName) oteltrace.Span); ok {
-		r0 = rf(name)
+	var r0 tracing.TracerSpan
+	if rf, ok := ret.Get(0).(func(trace.SpanName, ...oteltrace.SpanStartOption) tracing.TracerSpan); ok {
+		r0 = rf(name, options...)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(oteltrace.Span)
-		}
+		r0 = ret.Get(0).(tracing.TracerSpan)
 	}
 
 	return r0

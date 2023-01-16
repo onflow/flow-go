@@ -6,11 +6,13 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -268,7 +270,8 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		actualAccount := resp.GetAccount()
 		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
-		suite.Require().Equal(*expectedAccount, *actualAccount)
+		suite.Require().Empty(
+			cmp.Diff(expectedAccount, actualAccount, protocmp.Transform()))
 		mockEngine.AssertExpectations(suite.T())
 	})
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -19,7 +20,10 @@ type Environment interface {
 	runtime.Interface
 
 	// Tracer
-	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
+	StartChildSpan(
+		name trace.SpanName,
+		options ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan
 
 	Meter
 
@@ -90,7 +94,6 @@ type EnvironmentParams struct {
 
 	RuntimeParams
 
-	TracerParams
 	ProgramLoggerParams
 
 	EventEmitterParams
@@ -107,7 +110,6 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		ServiceAccountEnabled: true,
 
 		RuntimeParams:         DefaultRuntimeParams(),
-		TracerParams:          DefaultTracerParams(),
 		ProgramLoggerParams:   DefaultProgramLoggerParams(),
 		EventEmitterParams:    DefaultEventEmitterParams(),
 		BlockInfoParams:       DefaultBlockInfoParams(),

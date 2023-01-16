@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -25,14 +26,14 @@ type ContractFunctionSpec struct {
 type SystemContracts struct {
 	chain flow.Chain
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	logger  *ProgramLogger
 	runtime *Runtime
 }
 
 func NewSystemContracts(
 	chain flow.Chain,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	logger *ProgramLogger,
 	runtime *Runtime,
 ) *SystemContracts {
@@ -56,7 +57,7 @@ func (sys *SystemContracts) Invoke(
 		Name:    spec.LocationName,
 	}
 
-	span := sys.tracer.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
 	span.SetAttributes(
 		attribute.String(
 			"transaction.ContractFunctionCall",
