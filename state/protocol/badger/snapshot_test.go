@@ -537,8 +537,9 @@ func TestSealingSegment(t *testing.T) {
 		})
 	})
 	// Test the case where the reference block of the snapshot contains seals for blocks that are lower than the lowest sealing segment's block.
-	// ROOT <- B1 <- B2 <- B3(S1) <- B4 <- ... <- B5(S2, S3)
-	// Expected sealing segment: [B3, B4, B5], Extra blocks: [B1, B2]
+	// This test case specifically checks if sealing segment includes both highest and lowest block sealed by head.
+	// ROOT <- B1 <- B2 <- B3(Seal_B1) <- B4 <- ... <- LastBlock(Seal_B2, Seal_B3, Seal_B4)
+	// Expected sealing segment: [B4, ..., B5], Extra blocks: [B2, B3]
 	t.Run("highest block seals outside segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
@@ -564,29 +565,29 @@ func TestSealingSegment(t *testing.T) {
 
 			// build chain, so it's long enough to not target blocks as inside of flow.DefaultTransactionExpiry window.
 			parent := block4
-			for i := 0; i < flow.DefaultTransactionExpiry; i++ {
+			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
 				next := unittest.BlockWithParentFixture(parent.Header)
 				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
 				buildBlock(t, state, next)
 				parent = next
 			}
 
-			block5 := unittest.BlockWithParentFixture(parent.Header)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2, seal3)))
-			buildBlock(t, state, block5)
+			receipt4, seal4 := unittest.ReceiptAndSealForBlock(block4)
+			lastBlock := unittest.BlockWithParentFixture(parent.Header)
+			lastBlock.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2, seal3, seal4), unittest.WithReceipts(receipt4)))
+			buildBlock(t, state, lastBlock)
 
-			snapshot := state.AtBlockID(block5.ID())
+			snapshot := state.AtBlockID(lastBlock.ID())
 
 			// build a valid child to ensure we have a QC
-			buildBlock(t, state, unittest.BlockWithParentFixture(block5.Header))
+			buildBlock(t, state, unittest.BlockWithParentFixture(lastBlock.Header))
 
 			segment, err := snapshot.SealingSegment()
 			require.NoError(t, err)
-			// sealing segment should contain B1 and B5
-			// B5 is reference of snapshot, B1 is latest sealed
-			//unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block3, block4, block5}, segment.Blocks)
-			//unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2}, segment.ExtraBlocks[1:])
-			assert.Len(t, segment.ExecutionResults, 1)
+			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
+			assert.Equal(t, block4.Header, segment.Sealed().Header)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3}, segment.ExtraBlocks)
+			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 		})
