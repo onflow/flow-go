@@ -134,4 +134,13 @@ func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
 		require.NoError(t, err)
 	})
+	t.Run("more-history-than-needed", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		// advance height to be not spork root snapshot
+		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
+		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		require.NoError(t, err)
+	})
 }
