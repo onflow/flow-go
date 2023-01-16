@@ -115,7 +115,7 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 }
 
-func TestDelta_RegisterUpdatesAreSorted(t *testing.T) {
+func TestDelta_UpdatedRegistersAreSorted(t *testing.T) {
 
 	d := delta.NewDelta()
 
@@ -142,8 +142,7 @@ func TestDelta_RegisterUpdatesAreSorted(t *testing.T) {
 	d.Set(data[0].Key.Owner, data[0].Key.Key, data[0].Value)
 	d.Set(data[4].Key.Owner, data[4].Key.Key, data[4].Value)
 
-	retKeys, retValues := d.RegisterUpdates()
+	ret := d.UpdatedRegisters()
 
-	assert.Equal(t, data.IDs(), retKeys)
-	assert.Equal(t, data.Values(), retValues)
+	assert.Equal(t, data, ret)
 }

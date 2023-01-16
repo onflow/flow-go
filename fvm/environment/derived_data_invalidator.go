@@ -38,11 +38,12 @@ func NewDerivedDataInvalidator(
 }
 
 func meterParamOverridesUpdated(env *facadeEnvironment) bool {
-	updatedRegisterIds, _ := env.txnState.RegisterUpdates()
+	// TODO(patrick): expose lighter weight api to list updated ids only
+	updatedRegisters := env.txnState.UpdatedRegisters()
 
 	serviceAccount := string(env.chain.ServiceAddress().Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
-	for _, registerId := range updatedRegisterIds {
+	for _, registerId := range updatedRegisters.IDs() {
 		// The meter param override values are stored in the service account.
 		if registerId.Owner != serviceAccount {
 			continue

@@ -127,12 +127,10 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, v)
 
-	ids, values := view.Delta().RegisterUpdates()
-	updated, err := ledger.NewUpdate(
-		emptyState,
-		executionState.RegisterIDSToKeys(ids),
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values := executionState.RegisterEntriesToKeysValues(
+		view.Delta().UpdatedRegisters())
+
+	updated, err := ledger.NewUpdate(emptyState, keys, values)
 	require.NoError(t, err)
 
 	allRegisters := view.Interactions().AllRegisters()

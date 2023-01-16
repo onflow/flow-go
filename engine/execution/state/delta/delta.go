@@ -36,21 +36,35 @@ func (d Delta) Set(owner, key string, value flow.RegisterValue) {
 	d.Data[k] = value
 }
 
+// UpdatedRegisters returns all registers that were updated by this delta.
+// ids are returned sorted, in ascending order
+func (d Delta) UpdatedRegisters() flow.RegisterEntries {
+	entries := make(flow.RegisterEntries, 0, len(d.Data))
+	for key, value := range d.Data {
+		entries = append(entries, flow.RegisterEntry{Key: key, Value: value})
+	}
+
+	slices.SortFunc(entries, func(a, b flow.RegisterEntry) bool {
+		return (a.Key.Owner < b.Key.Owner) ||
+			(a.Key.Owner == b.Key.Owner && a.Key.Key < b.Key.Key)
+	})
+
+	return entries
+}
+
+// TODO(patrick): remove once emulator is updated.
+//
 // RegisterUpdates returns all registers that were updated by this delta.
 // ids are returned sorted, in ascending order
 func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	ids := make([]flow.RegisterID, 0, len(d.Data))
-	for k := range d.Data {
-		ids = append(ids, k)
-	}
+	entries := d.UpdatedRegisters()
 
-	slices.SortFunc(ids, func(a, b flow.RegisterID) bool {
-		return (a.Owner < b.Owner) || (a.Owner == b.Owner && a.Key < b.Key)
-	})
+	ids := make([]flow.RegisterID, 0, len(entries))
+	values := make([]flow.RegisterValue, 0, len(entries))
 
-	values := make([]flow.RegisterValue, len(d.Data))
-	for i, v := range ids {
-		values[i] = d.Data[v]
+	for _, entry := range entries {
+		ids = append(ids, entry.Key)
+		values = append(values, entry.Value)
 	}
 
 	return ids, values
