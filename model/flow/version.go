@@ -29,7 +29,9 @@ const VersionThreshold = 1000
 // no VersionBeacon should be emitted at all.
 // There are two cases for RequiredVersions:
 // Single-entry - can only happen when no previous version beacon exists:
-//   Its height must be greater than current block by at least VersionThreshold distance.
+//
+//	Its height must be greater than current block by at least VersionThreshold distance.
+//
 // Multi-entry:
 //   - no previous versions were ever set - first entry must be at least VersionThreshold blocks from the current block's height
 //   - there were previous version set - first entry's height must be below the current block's height and it's version must be
@@ -37,9 +39,6 @@ const VersionThreshold = 1000
 //
 // In other words, current active version, if ever set,  must be the first entry in the table. Then, any upcoming change must be at least
 // VersionThreshold blocks in the future regardless.
-
-// testy maksio kurwa
-
 // Sequence is event sequence number, which can be used to verify that no event has been skipped by the follower
 type VersionBeacon struct {
 	RequiredVersions []VersionControlRequirement

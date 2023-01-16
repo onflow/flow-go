@@ -206,7 +206,7 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 // Please refer to documentation of flow.VersionBeacon for a description of what's expected of a valid VersionBeacon.
 func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
 	if len(vb.RequiredVersions) == 0 {
-		return fmt.Errorf("required versions empty")
+		return protocol.NewInvalidServiceEventError("required versions empty")
 	}
 
 	minimumThresholdHeight := header.Height + flow.VersionThreshold
