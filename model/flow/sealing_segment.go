@@ -67,7 +67,7 @@ type SealingSegment struct {
 	// Blocks contain the chain segment blocks in ascending height order.
 	Blocks []*Block
 
-	// ExtraBlocks contain the chain extra blocks in ascending height order. These blocks
+	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order. These blocks
 	// are connecting to `Blocks[0]` (the lowest block of sealing segment). Formally, let `l`
 	// be the length of `ExtraBlocks`, then ExtraBlocks[l-1] is the _parent_ of `Blocks[0]`.
 	// These extra blocks are included in order to ensure that a newly bootstrapped node

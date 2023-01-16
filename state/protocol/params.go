@@ -53,7 +53,7 @@ type GlobalParams interface {
 	// No errors are expected during normal operation.
 	SporkID() (flow.Identifier, error)
 
-	// SporkRootBlockHeight returns the height of spork's root block.
+	// SporkRootBlockHeight returns the height of the spork's root block.
 	// This value is determined at the beginning of a spork during bootstrapping.
 	// If node uses a sealing segment for bootstrapping then this value will be carried over
 	// as part of snapshot.
