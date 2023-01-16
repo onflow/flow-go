@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
@@ -14,6 +16,7 @@ import (
 // their view is newer than any QC or TC previously known to the TimeoutCollector.
 // This module is safe to use in concurrent environment.
 type TimeoutCollector struct {
+	log               zerolog.Logger
 	notifier          hotstuff.Consumer
 	timeoutsCache     *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
 	collectorNotifier hotstuff.TimeoutCollectorConsumer
@@ -25,12 +28,17 @@ type TimeoutCollector struct {
 var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 
 // NewTimeoutCollector creates new instance of TimeoutCollector
-func NewTimeoutCollector(view uint64,
+func NewTimeoutCollector(log zerolog.Logger,
+	view uint64,
 	notifier hotstuff.Consumer,
 	collectorNotifier hotstuff.TimeoutCollectorConsumer,
 	processor hotstuff.TimeoutProcessor,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
+		log: log.With().
+			Str("component", "hotstuff.timeout_collector").
+			Uint64("view", view).
+			Logger(),
 		notifier:          notifier,
 		timeoutsCache:     NewTimeoutObjectsCache(view),
 		processor:         processor,
@@ -76,12 +84,14 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
-		if model.IsInvalidTimeoutError(err) {
-			c.notifier.OnInvalidTimeoutDetected(timeout)
+		if invalidTimeoutErr, ok := model.AsInvalidTimeoutError(err); ok {
+			c.notifier.OnInvalidTimeoutDetected(*invalidTimeoutErr)
 			return nil
 		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
+
+	c.notifier.OnTimeoutProcessed(timeout)
 
 	// In the following, we emit notifications about new QCs, if their view is newer than any QC previously
 	// known to the TimeoutCollector. Note that our implementation only provides weak ordering:

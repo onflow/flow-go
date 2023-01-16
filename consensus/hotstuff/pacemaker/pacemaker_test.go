@@ -99,7 +99,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	qc := QC(s.livenessData.CurrentView)
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4)).Return().Once()
-	s.notifier.On("OnQcTriggeredViewChange", qc, uint64(4)).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", s.livenessData.CurrentView, uint64(4), qc).Return().Once()
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, qc.View+1).Once()
 	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
@@ -112,7 +112,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	qc = QC(s.livenessData.CurrentView + 10)
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1)).Return().Once()
-	s.notifier.On("OnQcTriggeredViewChange", qc, qc.View+1).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", s.livenessData.CurrentView, qc.View+1, qc).Return().Once()
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, qc.View+1).Once()
 	nve, err = s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
@@ -135,7 +135,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
-	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", s.livenessData.CurrentView, tc.View+1, tc).Return().Once()
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
@@ -154,7 +154,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
-	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", s.livenessData.CurrentView, tc.View+1, tc).Return().Once()
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err = s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
@@ -211,8 +211,8 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 		helper.WithTCNewestQC(s.livenessData.NewestQC))
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Times(2)
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Times(2)
-	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
-	s.notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NotNil(s.T(), nve)
@@ -242,7 +242,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
 func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
-	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
 		helper.WithTCNewestQC(s.livenessData.NewestQC))
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()
@@ -269,7 +269,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
 func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
-	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
 		helper.WithTCNewestQC(s.livenessData.NewestQC))
 	s.notifier.On("OnViewChange", s.livenessData.CurrentView, tc.View+1).Once()

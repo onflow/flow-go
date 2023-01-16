@@ -348,8 +348,7 @@ func newInvalidTCError(tc *flow.TimeoutCertificate, err error) error {
 
 func newInvalidVoteError(vote *model.Vote, err error) error {
 	return model.InvalidVoteError{
-		VoteID: vote.ID(),
-		View:   vote.View,
-		Err:    err,
+		Vote: vote,
+		Err:  err,
 	}
 }

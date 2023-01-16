@@ -17,26 +17,26 @@
   {
     "Role": "consensus",
     "Address": "10.138.0.8:3569",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Role": "consensus",
     "Address": "10.138.0.9:3569",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Role": "execution",
     "Address": "10.138.0.3:3569",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Role": "verification",
     "Address": "10.138.0.4:3569",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Role": "access",
     "Address": "10.138.0.5:3569",
-    "Weight": 1000
+    "Weight": 100
   }
 ]

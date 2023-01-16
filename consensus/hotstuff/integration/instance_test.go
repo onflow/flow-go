@@ -399,7 +399,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.verifier)
 
-	weight := uint64(1000)
+	weight := uint64(flow.DefaultInitialWeight)
 
 	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
@@ -484,11 +484,22 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				nil,
 			).Maybe()
 
-			p, err := timeoutcollector.NewTimeoutProcessor(in.committee, in.validator, aggregator, collectorDistributor)
+			p, err := timeoutcollector.NewTimeoutProcessor(
+				unittest.Logger(),
+				in.committee,
+				in.validator,
+				aggregator,
+				collectorDistributor,
+			)
 			require.NoError(t, err)
 			return p
 		}, nil).Maybe()
-	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, collectorDistributor, timeoutProcessorFactory)
+	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(
+		unittest.Logger(),
+		notifier,
+		collectorDistributor,
+		timeoutProcessorFactory,
+	)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator

@@ -258,7 +258,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	p.log.Info().
 		Uint64("view", qc.View).
 		Hex("signers", qc.SignerIndices).
-		Msg("new qc has been created")
+		Msg("new QC has been created")
 
 	p.onQCCreated(qc)
 

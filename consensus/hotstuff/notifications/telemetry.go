@@ -25,20 +25,27 @@ import (
 //     -- a local timeout has been initiated
 //   - Each path through the state machine is identified by a unique id.
 //
+// Additionally, the TelemetryConsumer reports events related to vote and timeout aggregation
+// but those events are not bound to a path, so they are reported differently.
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
 // For now, we export the data to a logger.
 //
 // Telemetry does NOT capture slashing notifications
 type TelemetryConsumer struct {
 	NoopConsumer
-	pathHandler *PathHandler
+	pathHandler  *PathHandler
+	noPathLogger zerolog.Logger
 }
 
 var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
 
-func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryConsumer {
+// NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
+// Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
+func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
+	pathHandler := NewPathHandler(log)
 	return &TelemetryConsumer{
-		pathHandler: NewPathHandler(log, chain),
+		pathHandler:  pathHandler,
+		noPathLogger: pathHandler.log,
 	}
 }
 
@@ -137,17 +144,19 @@ func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("OnFinalizedBlock")
 }
 
-func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (t *TelemetryConsumer) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("qc_view", qc.View).
+		Uint64("old_view", oldView).
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcTriggeredViewChange")
 }
 
-func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (t *TelemetryConsumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("tc_view", tc.View).
+		Uint64("old_view", oldView).
 		Uint64("next_view", newView).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
@@ -198,6 +207,39 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 	step.Msg("OnOwnTimeout")
 }
 
+func (t *TelemetryConsumer) OnVoteProcessed(vote *model.Vote) {
+	t.noPathLogger.Info().
+		Uint64("voted_block_view", vote.View).
+		Hex("voted_block_id", logging.ID(vote.BlockID)).
+		Hex("signer_id", logging.ID(vote.SignerID)).
+		Msg("OnVoteProcessed")
+}
+
+func (t *TelemetryConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	step := t.noPathLogger.Info().
+		Uint64("view", timeout.View).
+		Uint64("timeout_tick", timeout.TimeoutTick).
+		Uint64("newest_qc_view", timeout.NewestQC.View).
+		Hex("newest_qc_block_id", logging.ID(timeout.NewestQC.BlockID)).
+		Hex("signer_id", logging.ID(timeout.SignerID))
+	lastViewTC := timeout.LastViewTC
+	if lastViewTC != nil {
+		step.
+			Uint64("last_view_tc_view", lastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", lastViewTC.NewestQC.View).
+			Hex("last_view_tc_newest_qc_block_id", logging.ID(lastViewTC.NewestQC.BlockID))
+	}
+	step.Msg("OnTimeoutProcessed")
+}
+
+func (t *TelemetryConsumer) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
+	t.pathHandler.NextStep().
+		Uint64("view", currentView).
+		Uint64("finalized_view", finalizedView).
+		Hex("current_leader", currentLeader[:]).
+		Msg("OnCurrentViewDetails")
+}
+
 // PathHandler maintains a notion of the current path through the state machine.
 // It allows to close a path and open new path. Each path is identified by a unique
 // (randomly generated) uuid. Along each path, we can capture information about relevant
@@ -205,8 +247,7 @@ func (t *TelemetryConsumer) OnOwnTimeout(timeout *model.TimeoutObject) {
 // In case there is no currently open path, the PathHandler still returns a Step,
 // but such steps are logged as telemetry errors.
 type PathHandler struct {
-	chain flow.ChainID
-	log   zerolog.Logger
+	log zerolog.Logger
 
 	// currentPath holds a Zerolog Context with the information about the current path.
 	// We represent the case where the current path has been closed by nil value.
@@ -215,10 +256,10 @@ type PathHandler struct {
 
 // NewPathHandler instantiate a new PathHandler.
 // The PathHandler has no currently open path
-func NewPathHandler(log zerolog.Logger, chain flow.ChainID) *PathHandler {
+// Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
+func NewPathHandler(log zerolog.Logger) *PathHandler {
 	return &PathHandler{
-		chain:       chain,
-		log:         log.With().Str("hotstuff", "telemetry").Str("chain", chain.String()).Logger(),
+		log:         log.With().Str("component", "hotstuff.telemetry").Logger(),
 		currentPath: nil,
 	}
 }

@@ -117,19 +117,21 @@ func (lc *LogConsumer) OnViewChange(oldView, newView uint64) {
 		Msg("entered new view")
 }
 
-func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (lc *LogConsumer) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
+		Uint64("old_view", oldView).
 		Uint64("new_view", newView).
 		Msg("QC triggered view change")
 }
 
-func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (lc *LogConsumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	lc.log.Debug().
 		Uint64("tc_view", tc.View).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Uint64("new_view", newView).
+		Uint64("old_view", oldView).
 		Msg("TC triggered view change")
 }
 
@@ -138,6 +140,27 @@ func (lc *LogConsumer) OnStartingTimeout(info model.TimerInfo) {
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("timeout started")
+}
+
+func (lc *LogConsumer) OnVoteProcessed(vote *model.Vote) {
+	lc.log.Debug().
+		Hex("block_id", vote.BlockID[:]).
+		Uint64("block_view", vote.View).
+		Hex("recipient_id", vote.SignerID[:]).
+		Msg("processed valid HotStuff vote")
+}
+
+func (lc *LogConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	log := timeout.LogContext(lc.log).Logger()
+	log.Debug().Msg("processed valid timeout object")
+}
+
+func (lc *LogConsumer) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
+	lc.log.Info().
+		Uint64("view", currentView).
+		Uint64("finalized_view", finalizedView).
+		Hex("current_leader", currentLeader[:]).
+		Msg("current view details")
 }
 
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
@@ -149,12 +172,12 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 		Msg("double vote detected")
 }
 
-func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
+func (lc *LogConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	lc.log.Warn().
-		Uint64("vote_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("invalid vote detected")
+		Uint64("vote_view", err.Vote.View).
+		Hex("voted_block_id", err.Vote.BlockID[:]).
+		Hex("voter_id", err.Vote.SignerID[:]).
+		Msgf("invalid vote detected: %s", err.Error())
 }
 
 func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
@@ -175,9 +198,9 @@ func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt
 		Msg("double timeout detected")
 }
 
-func (lc *LogConsumer) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
-	log := timeout.LogContext(lc.log).Logger()
-	log.Warn().Msg("invalid timeout detected")
+func (lc *LogConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+	log := err.Timeout.LogContext(lc.log).Logger()
+	log.Warn().Msgf("invalid timeout detected: %s", err.Error())
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
