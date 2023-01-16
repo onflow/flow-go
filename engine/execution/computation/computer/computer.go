@@ -63,7 +63,7 @@ func newTransactions(
 	for idx, txnBody := range txnBodies {
 		txnId := txnBody.ID()
 		txnIdStr := txnId.String()
-		txIndex := uint32(startTxnIndex + idx)
+		txnIndex := uint32(startTxnIndex + idx)
 		txns = append(
 			txns,
 			transaction{
@@ -72,14 +72,14 @@ func newTransactions(
 				txnId:               txnId,
 				txnIdStr:            txnIdStr,
 				collectionIndex:     collectionIndex,
-				txIndex:             txIndex,
+				txnIndex:            txnIndex,
 				isSystemTransaction: isSystemCollection,
 				ctx: fvm.NewContextFromParent(
 					collectionCtx,
 					fvm.WithLogger(
 						logger.With().
 							Str("tx_id", txnIdStr).
-							Uint32("tx_index", txIndex).
+							Uint32("tx_index", txnIndex).
 							Logger())),
 				TransactionBody: txnBody,
 			})
@@ -96,7 +96,7 @@ type transaction struct {
 	txnIdStr string
 
 	collectionIndex int
-	txIndex         uint32
+	txnIndex        uint32
 
 	isSystemTransaction bool
 
@@ -301,12 +301,12 @@ func (e *blockComputer) executeBlock(
 		len(collections))
 	defer collector.Stop()
 
-	var txIndex uint32
+	var txnIndex uint32
 	for _, collection := range collections {
 		colView := stateView.NewChild()
-		txIndex, err = e.executeCollection(
+		txnIndex, err = e.executeCollection(
 			blockSpan,
-			txIndex,
+			txnIndex,
 			colView,
 			collection,
 			collector)
@@ -317,9 +317,9 @@ func (e *blockComputer) executeBlock(
 			}
 
 			return nil, fmt.Errorf(
-				"failed to execute %scollection at txIndex %v: %w",
+				"failed to execute %scollection at txnIndex %v: %w",
 				collectionPrefix,
-				txIndex,
+				txnIndex,
 				err)
 		}
 		err = e.mergeView(
@@ -419,7 +419,7 @@ func (e *blockComputer) executeCollection(
 	for _, txn := range txns {
 		err := e.executeTransaction(colSpan, txn, collectionView, collector)
 		if err != nil {
-			return txn.txIndex, err
+			return txn.txnIndex, err
 		}
 	}
 
@@ -448,7 +448,7 @@ func (e *blockComputer) executeTransaction(
 	txSpan := e.tracer.StartSpanFromParent(parentSpan, trace.EXEComputeTransaction)
 	txSpan.SetAttributes(
 		attribute.String("tx_id", txn.txnIdStr),
-		attribute.Int64("tx_index", int64(txn.txIndex)),
+		attribute.Int64("tx_index", int64(txn.txnIndex)),
 		attribute.Int("col_index", txn.collectionIndex),
 	)
 	defer txSpan.End()
@@ -462,7 +462,7 @@ func (e *blockComputer) executeTransaction(
 
 	logger := e.log.With().
 		Str("tx_id", txn.txnIdStr).
-		Uint32("tx_index", txn.txIndex).
+		Uint32("tx_index", txn.txnIndex).
 		Str("block_id", txn.blockIdStr).
 		Str("trace_id", txInternalSpan.SpanContext().TraceID().String()).
 		Uint64("height", txn.ctx.BlockHeader.Height).
@@ -471,7 +471,7 @@ func (e *blockComputer) executeTransaction(
 		Logger()
 	logger.Info().Msg("executing transaction in fvm")
 
-	proc := fvm.Transaction(txn.TransactionBody, txn.txIndex)
+	proc := fvm.NewTransaction(txn.txnId, txn.txnIndex, txn.TransactionBody)
 
 	txn.ctx = fvm.NewContextFromParent(
 		txn.ctx,
