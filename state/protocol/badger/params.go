@@ -4,12 +4,15 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Params struct {
 	state *State
 }
+
+var _ protocol.Params = (*Params)(nil)
 
 func (p Params) ChainID() (flow.ChainID, error) {
 

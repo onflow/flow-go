@@ -16,7 +16,6 @@ import (
 // one that can easily be serialized to disk or to network.
 // TODO error docs
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
-
 	var (
 		snap EncodableSnapshot
 		err  error
@@ -89,7 +88,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-
 	var (
 		params EncodableParams
 		err    error
@@ -111,6 +109,10 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
+	params.EpochCommitSafetyThreshold, err = from.EpochCommitSafetyThreshold()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
 
 	return &Params{params}, nil
 }
@@ -121,7 +123,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
-
 	var (
 		epoch EncodableEpoch
 		err   error
@@ -252,7 +253,6 @@ func SnapshotFromBootstrapStateWithParams(
 	protocolVersion uint,
 	epochCommitSafetyThreshold uint64,
 ) (*Snapshot, error) {
-
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
 		return nil, fmt.Errorf("invalid setup event type (%T)", result.ServiceEvents[0].Event)

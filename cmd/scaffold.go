@@ -130,6 +130,8 @@ type FlowNodeBuilder struct {
 	componentBuilder         component.ComponentManagerBuilder
 }
 
+var _ NodeBuilder = (*FlowNodeBuilder)(nil)
+
 func (fnb *FlowNodeBuilder) BaseFlags() {
 	defaultConfig := DefaultBaseConfig()
 

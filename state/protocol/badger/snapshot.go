@@ -253,17 +253,35 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 // receipt in the block's payload to make sure we have a corresponding execution result, any execution
 // results missing from blocks are stored in the SealingSegment.ExecutionResults field.
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
-	head, err := s.Head()
+	// Lets denote the highest block in the sealing segment `head` (initialized below). Formally,
+	// the sealing segment needs to contains enough history to satisfy _all_ of the following conditions:
+	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
+	//       This is relevant if `head` does not contain any seals.
+	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	// (iii) The sealing segment should contain the history back to (including):
+	//       limitHeight := max(header.Height - m.cfg.transactionExpiry, SporkRootBlockHeight)
+	//
+	// Condition (i) and (ii) are necessary for the sealing segment for _any node_. In contrast, (iii) is
+	// necessary to bootstrap nodes that _validate_ block payloads (e.g. consensus nodes), to verify that
+	// collection guarantees are not duplicated (collections expire after `m.cfg.transactionExpiry` blocks).
+	// However, per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
+	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
+	head, err := s.state.blocks.ByID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
+		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Height < s.state.rootHeight {
+	if head.Header.Height < s.state.rootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
+	// STEP (i): highest sealed block as of `head` must be included.
 	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
+	}
+	blockSealedAtHead, err := s.state.headers.ByBlockID(seal.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
@@ -283,38 +301,38 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 		return nil
 	}
-
-	lowestBlockID := seal.BlockID
-	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(lowestBlockID))
+	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
 	}
 
-	// strictly speaking sealing segment length should be bounded by next formula:
-	// limitHeight = max(s.block.Height - maxSealingSegmentLength, SporkRootBlockHeight)
-
-	highestBlock, err := s.state.headers.ByBlockID(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get highest block in sealing segment: %w", err)
-	}
-
-	// start by assuming that we won't go lower than spork root block height
-	limitHeight := s.state.sporkRootBlockHeight
-	sealingSegmentMaxLength := s.state.maxSealingSegmentLength
-	if highestBlock.Height > sealingSegmentMaxLength {
-		lowestSealingSegmentHeight := highestBlock.Height - sealingSegmentMaxLength
-		if limitHeight < lowestSealingSegmentHeight {
-			limitHeight = lowestSealingSegmentHeight
+	// STEP (ii): extend history down to the lowest block, whose seal is included in `head`
+	lowestSealedByHead := blockSealedAtHead
+	for _, sealInHead := range head.Payload.Seals {
+		h, e := s.state.headers.ByBlockID(sealInHead.BlockID)
+		if e != nil {
+			return nil, fmt.Errorf("could not get block (id=%x) for seal: %w", seal.BlockID, e) // storage.ErrNotFound or exception
+		}
+		if h.Height < lowestSealedByHead.Height {
+			lowestSealedByHead = h
 		}
 	}
 
-	// the highest sealed block is the first block above any extra blocks
-	lowestSealingSegmentBlock, err := s.state.headers.ByBlockID(lowestBlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not query lowest sealing segment block: %w", err)
+	// STEP (iii): extended history to allow checking for duplicated collections, i.e.
+	// limitHeight = max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	limitHeight := s.state.sporkRootBlockHeight
+	if head.Header.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
+		limitHeight = head.Header.Height - flow.DefaultTransactionExpiry
 	}
 
-	if limitHeight < lowestSealingSegmentBlock.Height {
+	// As we have to satisfy (ii) _and_ (iii), we have to take the longest history, i.e. the lowest height.
+	if lowestSealedByHead.Height < limitHeight {
+		limitHeight = lowestSealedByHead.Height
+		if limitHeight < s.state.sporkRootBlockHeight { // sanity check; should never happen
+			return nil, fmt.Errorf("unexpected internal error: calculated history-cutoff at height %d, which is lower than the spork's root height %d", limitHeight, s.state.sporkRootBlockHeight)
+		}
+	}
+	if limitHeight < blockSealedAtHead.Height {
 		// we need to include extra blocks in sealing segment
 		extraBlocksScraper := func(header *flow.Header) error {
 			blockID := header.ID()
@@ -331,7 +349,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 			return nil
 		}
 
-		err = fork.TraverseBackward(s.state.headers, lowestSealingSegmentBlock.ParentID, extraBlocksScraper, fork.IncludingHeight(limitHeight))
+		err = fork.TraverseBackward(s.state.headers, blockSealedAtHead.ParentID, extraBlocksScraper, fork.IncludingHeight(limitHeight))
 		if err != nil {
 			return nil, fmt.Errorf("could not traverse extra blocks for sealing segment: %w", err)
 		}

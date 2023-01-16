@@ -69,7 +69,6 @@ func NewFollowerState(
 		consumer:   consumer,
 		blockTimer: blockTimer,
 	}
-	state.maxSealingSegmentLength = flow.DefaultTransactionExpiry
 	return followerState, nil
 }
 
