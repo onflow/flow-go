@@ -151,7 +151,6 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
-
 	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
 	// protocol state.
 	n.logger.Warn().
