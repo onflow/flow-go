@@ -267,7 +267,6 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 	if limit > header.Height { // overflow check
 		limit = 0
 	}
-
 	if limit < m.sporkRootBlockHeight {
 		limit = m.sporkRootBlockHeight
 	}

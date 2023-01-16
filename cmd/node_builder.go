@@ -131,8 +131,8 @@ type NodeBuilder interface {
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
 
-	// ValidateRootSnapshot sets any custom validation rules for the root snapshot,
-	// this check is executed after other checks but before applying any data from root snapshot.
+	// ValidateRootSnapshot sets any custom validation rules for the root snapshot.
+	// This check is executed after other checks but before applying any data from root snapshot.
 	ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder
 }
 
