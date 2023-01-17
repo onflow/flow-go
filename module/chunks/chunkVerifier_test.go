@@ -238,10 +238,16 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
 
-	ids := make([]flow.RegisterID, 0)
-	values := make([]flow.RegisterValue, 0)
-	ids = append(ids, id1, id2)
-	values = append(values, value1, value2)
+	entries := flow.RegisterEntries{
+		{
+			Key:   id1,
+			Value: value1,
+		},
+		{
+			Key:   id2,
+			Value: value2,
+		},
+	}
 
 	var verifiableChunkData verification.VerifiableChunkData
 
@@ -257,12 +263,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		<-compactor.Done()
 	}()
 
-	keys := executionState.RegisterIDSToKeys(ids)
-	update, err := ledger.NewUpdate(
-		f.InitialState(),
-		keys,
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values := executionState.RegisterEntriesToKeysValues(entries)
+	update, err := ledger.NewUpdate(f.InitialState(), keys, values)
 
 	require.NoError(t, err)
 
@@ -275,15 +277,15 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	proof, err := f.Prove(query)
 	require.NoError(t, err)
 
-	ids = []flow.RegisterID{id2}
-	values = [][]byte{UpdatedValue2}
+	entries = flow.RegisterEntries{
+		{
+			Key:   id2,
+			Value: UpdatedValue2,
+		},
+	}
 
-	keys = executionState.RegisterIDSToKeys(ids)
-	update, err = ledger.NewUpdate(
-		startState,
-		keys,
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values = executionState.RegisterEntriesToKeysValues(entries)
+	update, err = ledger.NewUpdate(startState, keys, values)
 	require.NoError(t, err)
 
 	endState, _, err := f.Set(update)

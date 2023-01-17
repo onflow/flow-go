@@ -41,17 +41,37 @@ func GenerateExecutionResultAndChunkDataPacks(
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
+			chunk = flow.NewChunk(
+				blockID,
+				i,
+				startState,
+				len(completeCollection.Transactions),
+				result.EventsHashes[i],
+				endState)
+			chdps[i] = flow.NewChunkDataPack(
+				chunk.ID(),
+				startState,
+				result.Proofs[i],
+				&collection)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(completeCollection.Transactions))
 
 		} else {
 			// system chunk
 			// note that system chunk does not have a collection.
 			// also, number of transactions is one for system chunk.
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
+			chunk = flow.NewChunk(
+				blockID,
+				i,
+				startState,
+				1,
+				result.EventsHashes[i],
+				endState)
 			// system chunk has a nil collection.
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
+			chdps[i] = flow.NewChunkDataPack(
+				chunk.ID(),
+				startState,
+				result.Proofs[i],
+				nil)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), 1)
 		}
 
@@ -97,37 +117,4 @@ func GenerateExecutionResultForBlock(
 	}
 
 	return er, nil
-}
-
-// GenerateChunk creates a chunk from the provided computation data.
-func GenerateChunk(colIndex int,
-	startState, endState flow.StateCommitment,
-	blockID, eventsCollection flow.Identifier, txNumber uint64) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			EventCollection: eventsCollection,
-			BlockID:         blockID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			NumberOfTransactions: txNumber,
-		},
-		Index:    uint64(colIndex),
-		EndState: endState,
-	}
-}
-
-func GenerateChunkDataPack(
-	chunkID flow.Identifier,
-	startState flow.StateCommitment,
-	collection *flow.Collection,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:    chunkID,
-		StartState: startState,
-		Proof:      proof,
-		Collection: collection,
-	}
 }

@@ -195,7 +195,7 @@ func (v *RemoteView) AllRegisters() []flow.RegisterID {
 	panic("Not implemented yet")
 }
 
-func (v *RemoteView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+func (v *RemoteView) UpdatedRegisters() flow.RegisterEntries {
 	panic("Not implemented yet")
 }
 
