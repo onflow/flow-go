@@ -23,14 +23,14 @@ import (
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm             computer.VirtualMachine
+	vm             fvm.VM
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
 	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm computer.VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
+func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
@@ -261,13 +261,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// applying chunk delta (register updates at chunk level) to the partial trie
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
-	regs, values := chunkView.Delta().RegisterUpdates()
+	keys, values := executionState.RegisterEntriesToKeysValues(
+		chunkView.Delta().UpdatedRegisters())
 
 	update, err := ledger.NewUpdate(
 		ledger.State(chunkDataPack.StartState),
-		executionState.RegisterIDSToKeys(regs),
-		executionState.RegisterValuesToValues(values),
-	)
+		keys,
+		values)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}

@@ -360,7 +360,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
 		},
@@ -406,7 +406,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
@@ -452,7 +452,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
 		},
@@ -759,7 +759,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 			ScriptExecutionTimeLimit: timeout,
 		},
 	)
-	vm := manager.vm.(*fvm.VirtualMachine)
+	vm := manager.vm
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()

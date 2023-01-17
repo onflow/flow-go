@@ -45,7 +45,7 @@ type testAccounts struct {
 	seq      uint64
 }
 
-func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num int) *testAccounts {
+func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAccounts {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
@@ -71,7 +71,7 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 
 func mustFundAccounts(
 	b *testing.B,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	ledger state.View,
 	execCtx fvm.Context,
 	accs *testAccounts,

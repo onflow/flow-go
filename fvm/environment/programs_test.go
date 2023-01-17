@@ -315,12 +315,12 @@ func Test_Programs(t *testing.T) {
 		require.IsType(t, entryB.State.View(), &delta.View{})
 		deltaB := entryB.State.View().(*delta.View)
 
-		idsA, valuesA := deltaA.Delta().RegisterUpdates()
-		for i, id := range idsA {
-			v, has := deltaB.Delta().Get(id.Owner, id.Key)
+		entriesA := deltaA.Delta().UpdatedRegisters()
+		for _, entry := range entriesA {
+			v, has := deltaB.Delta().Get(entry.Key.Owner, entry.Key.Key)
 			require.True(t, has)
 
-			require.Equal(t, valuesA[i], v)
+			require.Equal(t, entry.Value, v)
 		}
 
 		for id, registerA := range deltaA.Interactions().Reads {
