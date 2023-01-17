@@ -86,14 +86,17 @@ func (v *SimpleView) AllRegisters() []flow.RegisterID {
 	return res
 }
 
-func (v *SimpleView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	ids := make([]flow.RegisterID, 0, len(v.Ledger.RegisterUpdated))
-	values := make([]flow.RegisterValue, 0, len(v.Ledger.RegisterUpdated))
+func (v *SimpleView) UpdatedRegisters() flow.RegisterEntries {
+	entries := make(flow.RegisterEntries, 0, len(v.Ledger.RegisterUpdated))
 	for key := range v.Ledger.RegisterUpdated {
-		ids = append(ids, key)
-		values = append(values, v.Ledger.Registers[key])
+		entries = append(
+			entries,
+			flow.RegisterEntry{
+				Key:   key,
+				Value: v.Ledger.Registers[key],
+			})
 	}
-	return ids, values
+	return entries
 }
 
 func (v *SimpleView) Touch(owner, key string) error {

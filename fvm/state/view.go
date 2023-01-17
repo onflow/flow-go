@@ -8,7 +8,7 @@ type View interface {
 	NewChild() View
 	MergeView(child View) error
 	DropDelta() // drops all the delta changes
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	UpdatedRegisters() flow.RegisterEntries
 	AllRegisters() []flow.RegisterID
 	Ledger
 }

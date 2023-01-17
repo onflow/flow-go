@@ -170,6 +170,21 @@ func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
 	return vals
 }
 
+func RegisterEntriesToKeysValues(
+	entries flow.RegisterEntries,
+) (
+	[]ledger.Key,
+	[]ledger.Value,
+) {
+	keys := make([]ledger.Key, len(entries))
+	values := make([]ledger.Value, len(entries))
+	for i, entry := range entries {
+		keys[i] = RegisterIDToKey(entry.Key)
+		values[i] = entry.Value
+	}
+	return keys, values
+}
+
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
@@ -213,17 +228,13 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 }
 
 type RegisterUpdatesHolder interface {
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	UpdatedRegisters() flow.RegisterEntries
 }
 
 func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	ids, values := ruh.RegisterUpdates()
+	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
 
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
