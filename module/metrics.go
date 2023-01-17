@@ -5,6 +5,8 @@ import (
 
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,8 +38,8 @@ type NetworkSecurityMetrics interface {
 	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
-	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.

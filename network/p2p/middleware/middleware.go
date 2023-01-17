@@ -65,7 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware = (*Middleware)(nil)
+	_ network.Middleware      = (*Middleware)(nil)
+	_ p2p.RateLimiterConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -201,20 +202,6 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
-
-	mw.unicastRateLimiters.RegisterOnRateLimitedPeerFuncs(func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		mw.log.Warn().
-			Str("peer_id", peerID.String()).
-			Str("role", role).
-			Str("message_type", msgType).
-			Str("topic", topic.String()).
-			Str("reason", reason.String()).
-			Bool(logging.KeySuspicious, true).
-			Msg("pruning connection to rate-limited peer")
-
-		mw.libP2PNode.RequestPeerUpdate()
-	})
-
 	return mw
 }
 
@@ -840,4 +827,18 @@ func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
 	default:
 		return m.unicastMessageTimeout
 	}
+}
+
+// OnRateLimitedPeer removes rate limited peer from underlying libp2pnode.
+func (m *Middleware) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
+	m.log.Warn().
+		Str("peer_id", peerID.String()).
+		Str("role", role).
+		Str("message_type", msgType).
+		Str("topic", topic).
+		Str("reason", reason).
+		Bool(logging.KeySuspicious, true).
+		Msg("pruning connection to rate-limited peer")
+
+	m.libP2PNode.RequestPeerUpdate()
 }

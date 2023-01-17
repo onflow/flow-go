@@ -29,9 +29,8 @@ func NewNoopRateLimiter() *NoopRateLimiter {
 // NoopRateLimiters returns noop rate limiters.
 func NoopRateLimiters() *RateLimiters {
 	return &RateLimiters{
-		MessageRateLimiter:     &NoopRateLimiter{},
-		BandWidthRateLimiter:   &NoopRateLimiter{},
-		onRateLimitedPeerFuncs: make([]OnRateLimitedPeerFunc, 0),
-		disabled:               true,
+		MessageRateLimiter:   &NoopRateLimiter{},
+		BandWidthRateLimiter: &NoopRateLimiter{},
+		disabled:             true,
 	}
 }

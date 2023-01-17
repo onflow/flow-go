@@ -38,19 +38,19 @@ func WithDisabledRateLimiting(disabled bool) RateLimitersOption {
 
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
-	MessageRateLimiter     p2p.RateLimiter
-	BandWidthRateLimiter   p2p.RateLimiter
-	onRateLimitedPeerFuncs []OnRateLimitedPeerFunc // the callback called each time a peer is rate limited
-	disabled               bool                    // flag allows rate limiter to collect metrics without rate limiting if set to false
+	MessageRateLimiter   p2p.RateLimiter
+	BandWidthRateLimiter p2p.RateLimiter
+	notifier             p2p.RateLimiterConsumer
+	disabled             bool // flag allows rate limiter to collect metrics without rate limiting if set to false
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, opts ...RateLimitersOption) *RateLimiters {
+func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, notifier p2p.RateLimiterConsumer, opts ...RateLimitersOption) *RateLimiters {
 	r := &RateLimiters{
-		MessageRateLimiter:     messageLimiter,
-		BandWidthRateLimiter:   bandwidthLimiter,
-		onRateLimitedPeerFuncs: make([]OnRateLimitedPeerFunc, 0),
-		disabled:               true,
+		MessageRateLimiter:   messageLimiter,
+		BandWidthRateLimiter: bandwidthLimiter,
+		notifier:             notifier,
+		disabled:             true,
 	}
 
 	for _, opt := range opts {
@@ -68,7 +68,7 @@ func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
 	}
 
 	if !r.MessageRateLimiter.Allow(peerID, 0) { // 0 is not used for message rate limiter. It is only used for bandwidth rate limiter.
-		r.onRateLimitedPeer(peerID, "", "", "", ReasonMessageCount)
+		r.notifier.OnRateLimitedPeer(peerID, "", "", "", ReasonMessageCount.String())
 
 		// avoid rate limiting during dry run
 		return r.disabled
@@ -85,26 +85,13 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, originRole string, msgSi
 	}
 
 	if !r.BandWidthRateLimiter.Allow(peerID, msgSize) {
-		r.onRateLimitedPeer(peerID, originRole, msgType, msgTopic, ReasonBandwidth)
+		r.notifier.OnRateLimitedPeer(peerID, originRole, msgType, msgTopic.String(), ReasonBandwidth.String())
 
 		// avoid rate limiting during dry runs if disabled set to false
 		return r.disabled
 	}
 
 	return true
-}
-
-// RegisterOnRateLimitedPeerFuncs adds the given OnRateLimitedPeerFunc f to the list of rate limited peer callbacks.
-func (r *RateLimiters) RegisterOnRateLimitedPeerFuncs(f ...OnRateLimitedPeerFunc) *RateLimiters {
-	r.onRateLimitedPeerFuncs = append(r.onRateLimitedPeerFuncs, f...)
-	return r
-}
-
-// onRateLimitedPeer invokes the r.onRateLimitedPeer callback if it is not nil
-func (r *RateLimiters) onRateLimitedPeer(peerID peer.ID, role string, msgType string, topic channels.Topic, reason RateLimitReason) {
-	for _, f := range r.onRateLimitedPeerFuncs {
-		f(peerID, role, msgType, topic, reason)
-	}
 }
 
 // Start starts the cleanup loop for all limiters

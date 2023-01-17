@@ -49,6 +49,15 @@ import (
 
 var sporkID = unittest.IdentifierFixture()
 
+// RateLimitConsumer p2p.RateLimiterConsumer fixture that invokes a callback when rate limit event is consumed.
+type RateLimitConsumer struct {
+	callback func(pid peer.ID, role, msgType, topic, reason string) // callback func that will be invoked on rate limit
+}
+
+func (r *RateLimitConsumer) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+	r.callback(pid, role, msgType, topic, reason)
+}
+
 type PeerTag struct {
 	Peer peer.ID
 	Tag  string
@@ -484,4 +493,9 @@ func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 
 		return nil
 	}
+}
+
+// NewRateLimiterConsumer returns a p2p.RateLimiterConsumer fixture that will invoke the callback provided.
+func NewRateLimiterConsumer(callback func(pid peer.ID, role, msgType, topic, reason string)) p2p.RateLimiterConsumer {
+	return &RateLimitConsumer{callback}
 }

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
@@ -334,7 +335,7 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
 }
 
-// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
+// OnRateLimitedPeer tracks the number of rate limited messages seen on the network.
+func (nc *NetworkCollector) OnRateLimitedPeer(_ peer.ID, role, msgType, topic, reason string) {
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }

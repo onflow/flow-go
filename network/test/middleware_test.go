@@ -225,18 +225,21 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
 	require.NoError(m.T(), err)
 
-	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
-	// after 5 rate limits we will close ch.
-	ch := make(chan struct{})
+	// the onRateLimit call back we will use to keep track of how many times a rate limit happens.
 	rateLimits := atomic.NewUint64(0)
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount)
+
+	onRateLimit := func(peerID peer.ID, role, msgType, topic, reason string) {
+		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount.String())
 		require.Equal(m.T(), expectedPID, peerID)
 		// update hook calls
 		rateLimits.Inc()
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, ratelimit.WithDisabledRateLimiting(false)).RegisterOnRateLimitedPeerFuncs(onRateLimit)
+	// setup rate limit distributor that will be used to track the number of rate limits via the onRateLimit callback.
+	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
+	distributor := ratelimit.NewUnicastRateLimiterDistributor()
+	distributor.AddConsumer(consumer)
+	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, distributor, ratelimit.WithDisabledRateLimiting(false))
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
@@ -256,7 +259,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-
+	distributor.AddConsumer(newMw.(*middleware.Middleware))
 	idList := flow.IdentityList(append(m.ids, newId))
 
 	providers[0].SetIdentities(idList)
@@ -264,6 +267,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	overlay := m.createOverlay(providers[0])
 
 	calls := atomic.NewUint64(0)
+	ch := make(chan struct{})
 	overlay.On("Receive", mockery.AnythingOfType("*network.IncomingMessageScope")).Return(nil).Run(func(args mockery.Arguments) {
 		calls.Inc()
 		if calls.Load() >= 5 {
@@ -352,12 +356,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// setup bandwidth rate limiter
 	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 60)
 
-	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
+	// the onRateLimit call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
 	rateLimits := atomic.NewUint64(0)
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth)
+	onRateLimit := func(peerID peer.ID, role, msgType, topic, reason string) {
+		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth.String())
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -368,7 +372,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, ratelimit.WithDisabledRateLimiting(false)).RegisterOnRateLimitedPeerFuncs(onRateLimit)
+	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
+	distributor := ratelimit.NewUnicastRateLimiterDistributor()
+	distributor.AddConsumer(consumer)
+	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, distributor, ratelimit.WithDisabledRateLimiting(false))
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
@@ -387,7 +394,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-
+	distributor.AddConsumer(newMw.(*middleware.Middleware))
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 

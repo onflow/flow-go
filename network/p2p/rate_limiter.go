@@ -36,3 +36,11 @@ func WithGetTimeNowFunc(now GetTimeNow) RateLimiterOpt {
 		limiter.SetTimeNowFunc(now)
 	}
 }
+
+// RateLimiterConsumer consumes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+type RateLimiterConsumer interface {
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
+}

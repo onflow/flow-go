@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -249,6 +250,9 @@ type NodeConfig struct {
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
+
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor *ratelimit.UnicastRateLimiterDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
