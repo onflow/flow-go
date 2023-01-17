@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 
@@ -41,6 +42,7 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 // TimeoutProcessor will create a timeout certificate which can be used to advance round.
 // Concurrency safe.
 type TimeoutProcessor struct {
+	log              zerolog.Logger
 	view             uint64
 	validator        hotstuff.Validator
 	committee        hotstuff.Replicas
@@ -58,7 +60,8 @@ var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 //   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //
 // All other errors should be treated as exceptions.
-func NewTimeoutProcessor(committee hotstuff.Replicas,
+func NewTimeoutProcessor(log zerolog.Logger,
+	committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
 	notifier hotstuff.TimeoutCollectorConsumer,
@@ -73,6 +76,10 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 		return nil, fmt.Errorf("could not retrieve timeout weight threshold for view %d: %w", view, err)
 	}
 	return &TimeoutProcessor{
+		log: log.With().
+			Str("component", "hotstuff.timeout_processor").
+			Uint64("view", view).
+			Logger(),
 		view:      view,
 		committee: committee,
 		validator: validator,
@@ -139,6 +146,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		// It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
 		return fmt.Errorf("adding signature to aggregator failed: %w", err)
 	}
+	p.log.Debug().Msgf("processed timeout, total weight=(%d), required=(%d)", totalWeight, p.tcTracker.minRequiredWeight)
 
 	if p.partialTCTracker.Track(totalWeight) {
 		p.notifier.OnPartialTcCreated(p.view, p.newestQCTracker.NewestQC(), timeout.LastViewTC)

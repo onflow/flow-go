@@ -25,13 +25,13 @@ func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	}
 }
 
-func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (c *MetricsConsumer) OnQcTriggeredViewChange(_ uint64, newView uint64, qc *flow.QuorumCertificate) {
 	c.metrics.SetCurView(newView)
 	c.metrics.SetQCView(qc.View)
 	c.metrics.CountSkipped()
 }
 
-func (c *MetricsConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+func (c *MetricsConsumer) OnTcTriggeredViewChange(_ uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	c.metrics.SetCurView(newView)
 	c.metrics.SetTCView(tc.View)
 	c.metrics.CountTimeout()

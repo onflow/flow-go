@@ -369,10 +369,13 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
+	finalizedView := e.forks.FinalizedView()
 	log := e.log.With().
 		Uint64("cur_view", curView).
-		Uint64("finalized_view", e.forks.FinalizedView()).
+		Uint64("finalized_view", finalizedView).
 		Hex("leader_id", currentLeader[:]).Logger()
+
+	e.notifier.OnCurrentViewDetails(curView, finalizedView, currentLeader)
 
 	// check that I am the primary for this view and that I haven't already proposed; otherwise there is nothing to do
 	if e.committee.Self() != currentLeader {

@@ -220,7 +220,7 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	}
 
 	highest := segment.Highest() // reference block of the snapshot
-	lowest := segment.Lowest()   // last sealed block
+	lowest := segment.Sealed()   // last sealed block
 	highestID := highest.ID()
 	lowestID := lowest.ID()
 
@@ -347,6 +347,57 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	err = hotstuffValidator.ValidateQC(cluster.RootQC())
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
+	}
+	return nil
+}
+
+// SanityCheckConsensusNodeRootSnapshotValidity performs a sanity check to make sure root snapshot has enough history
+// to participate in consensus, we require one of next conditions to pass:
+//  1. IsSporkRootSnapshot() == true - this is a snapshot build from a first block of spork.
+//  2. snapshot.SealingSegment().Len() >= transaction_expiry_limit - such snapshot
+//     has enough history to validate collection guarantees and can safely participate in consensus.
+func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) error {
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(snapshot)
+	if err != nil {
+		return fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err)
+	}
+	// condition 1 satisfied
+	if isSporkRootSnapshot {
+		return nil
+	}
+
+	// check condition 2
+	head, err := snapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not query root snapshot head: %w", err)
+	}
+
+	sporkRootBlockHeight, err := snapshot.Params().SporkRootBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not query spork root block height: %w", err)
+	}
+
+	sealingSegment, err := snapshot.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("could not query sealing segment: %w", err)
+	}
+
+	sealingSegmentLength := uint64(len(sealingSegment.AllBlocks()))
+	transactionExpiry := uint64(flow.DefaultTransactionExpiry)
+	blocksInSpork := head.Height - sporkRootBlockHeight
+	// check if head.Height - sporkRootBlockHeight < flow.DefaultTransactionExpiry
+	// this is the case where we bootstrap early into the spork and there is simply not enough blocks
+	if blocksInSpork < transactionExpiry {
+		// the distance to spork root is less than transaction expiry, we need all blocks back to the spork root.
+		if sealingSegmentLength != blocksInSpork {
+			return fmt.Errorf("invalid root snapshot length, expecting exactly (%d), got (%d)", blocksInSpork, sealingSegmentLength)
+		}
+	} else {
+		// the distance to spork root is more than transaction expiry, we need at least `transactionExpiry` many blocks
+		if sealingSegmentLength < transactionExpiry {
+			return fmt.Errorf("invalid root snapshot length, expecting at least (%d), got (%d)",
+				transactionExpiry, sealingSegmentLength)
+		}
 	}
 	return nil
 }

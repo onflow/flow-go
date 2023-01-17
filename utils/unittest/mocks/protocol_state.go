@@ -50,6 +50,10 @@ func (p *Params) SporkID() (flow.Identifier, error) {
 	return flow.ZeroID, fmt.Errorf("not implemented")
 }
 
+func (p *Params) SporkRootBlockHeight() (uint64, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
 func (p *Params) ProtocolVersion() (uint, error) {
 	return 0, fmt.Errorf("not implemented")
 }

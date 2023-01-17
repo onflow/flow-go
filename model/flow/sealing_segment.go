@@ -2,6 +2,8 @@ package flow
 
 import (
 	"fmt"
+
+	"golang.org/x/exp/slices"
 )
 
 // SealingSegment is the chain segment such that the last block (greatest height)
@@ -65,6 +67,17 @@ type SealingSegment struct {
 	// Blocks contain the chain segment blocks in ascending height order.
 	Blocks []*Block
 
+	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order. These blocks
+	// are connecting to `Blocks[0]` (the lowest block of sealing segment). Formally, let `l`
+	// be the length of `ExtraBlocks`, then ExtraBlocks[l-1] is the _parent_ of `Blocks[0]`.
+	// These extra blocks are included in order to ensure that a newly bootstrapped node
+	// knows about all entities which might be referenced by blocks which extend from
+	// the sealing segment.
+	// ExtraBlocks are stored separately from Blocks, because not all node roles need
+	// the same amount of history. Blocks represents the minimal possible required history;
+	// ExtraBlocks represents additional role-required history.
+	ExtraBlocks []*Block
+
 	// ExecutionResults contain any results which are referenced by receipts
 	// or seals in the sealing segment, but not included in any segment block
 	// payloads.
@@ -89,12 +102,20 @@ type SealingSegment struct {
 	FirstSeal *Seal
 }
 
+// Highest is the highest block in the sealing segment and the reference block from snapshot that was
+// used to produce this sealing segment.
 func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
-func (segment *SealingSegment) Lowest() *Block {
+// Sealed returns the most recently sealed block based on head of sealing segment(highest block).
+func (segment *SealingSegment) Sealed() *Block {
 	return segment.Blocks[0]
+}
+
+// AllBlocks returns all blocks within the sealing segment, including extra blocks, in ascending height order.
+func (segment *SealingSegment) AllBlocks() []*Block {
+	return append(segment.ExtraBlocks, segment.Blocks...)
 }
 
 // FinalizedSeal returns the seal that seals the lowest block.
@@ -112,9 +133,9 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 	}
 
 	// sanity check
-	if seal.BlockID != segment.Lowest().ID() {
+	if seal.BlockID != segment.Sealed().ID() {
 		return nil, fmt.Errorf("finalized seal should seal the lowest block %v, but actually is to seal %v",
-			segment.Lowest().ID(), seal.BlockID)
+			segment.Sealed().ID(), seal.BlockID)
 	}
 	return seal, nil
 }
@@ -168,6 +189,15 @@ func (segment *SealingSegment) Validate() error {
 			return fmt.Errorf("invalid segment: %w", err)
 		}
 	}
+	// extra blocks should be added in reverse order, starting from the highest one since they are sorted
+	// in ascending order.
+	for i := len(segment.ExtraBlocks) - 1; i >= 0; i-- {
+		block := segment.ExtraBlocks[i]
+		err := builder.AddExtraBlock(block)
+		if err != nil {
+			return fmt.Errorf("invalid segment: %w", err)
+		}
+	}
 	_, err := builder.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("invalid segment: %w", err)
@@ -204,11 +234,19 @@ type SealingSegmentBuilder struct {
 	results     []*ExecutionResult
 	latestSeals map[Identifier]Identifier
 	firstSeal   *Seal
+	// extraBlocks included in sealing segment, must connect to the lowest block of segment
+	// stored in descending order for simpler population logic
+	extraBlocks []*Block
 }
 
 // AddBlock appends a block to the sealing segment under construction.
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+	// sanity check: all blocks have to be added before adding extra blocks
+	if len(builder.extraBlocks) > 0 {
+		return fmt.Errorf("cannot add sealing segment block after extra block is added")
+	}
+
 	// sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
 		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
@@ -274,6 +312,27 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	return nil
 }
 
+// AddExtraBlock appends an extra block to sealing segment under construction.
+// Extra blocks needs to be added in descending order and the first block must connect to the lowest block
+// of sealing segment, this way they form a continuous chain.
+// No errors are expected during normal operation.
+func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
+	if len(builder.extraBlocks) == 0 {
+		if len(builder.blocks) == 0 {
+			return fmt.Errorf("cannot add extra blocks before adding lowest sealing segment block")
+		}
+		// first extra block has to match the lowest block of sealing segment
+		if (block.Header.Height + 1) != builder.lowest().Header.Height {
+			return fmt.Errorf("invalid extra block height (%d), doesn't connect to sealing segment: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		}
+	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
+		return fmt.Errorf("invalid extra block height (%d), doesn't connect to last extra block: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+	}
+
+	builder.extraBlocks = append(builder.extraBlocks, block)
+	return nil
+}
+
 // AddExecutionResult adds result to executionResults
 func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult) {
 	builder.results = append(builder.results, result)
@@ -290,8 +349,15 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
 
+	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
+	// Apply a sort to reverse the slice and use correct ordering.
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) bool {
+		return lhs.Header.Height < rhs.Header.Height
+	})
+
 	return &SealingSegment{
 		Blocks:           builder.blocks,
+		ExtraBlocks:      builder.extraBlocks,
 		ExecutionResults: builder.results,
 		LatestSeals:      builder.latestSeals,
 		FirstSeal:        builder.firstSeal,
@@ -318,6 +384,9 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.blocks) == 0 {
 		return fmt.Errorf("root segment must have at least 1 block")
+	}
+	if len(builder.extraBlocks) > 0 {
+		return fmt.Errorf("root segment cannot have extra blocks")
 	}
 	if builder.lowest().Header.View != 0 {
 		return fmt.Errorf("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
@@ -352,6 +421,12 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
 	if len(builder.blocks) == 0 {
 		return fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but got an empty sealing segment: %w", ErrSegmentBlocksWrongLen)
+	}
+
+	if len(builder.extraBlocks) > 0 {
+		if builder.extraBlocks[0].Header.Height+1 != builder.lowest().Header.Height {
+			return fmt.Errorf("extra blocks don't connect to lowest block in segment")
+		}
 	}
 
 	// if root sealing segment, use different validation
@@ -394,6 +469,7 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		includedResults:     make(map[Identifier]struct{}),
 		latestSeals:         make(map[Identifier]Identifier),
 		blocks:              make([]*Block, 0),
+		extraBlocks:         make([]*Block, 0),
 		results:             make(ExecutionResultList, 0),
 	}
 }

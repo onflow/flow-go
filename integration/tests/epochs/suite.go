@@ -681,7 +681,7 @@ func (s *Suite) getLatestSealedHeader(ctx context.Context) *flow.Header {
 	require.NoError(s.T(), err)
 	segment, err := snapshot.SealingSegment()
 	require.NoError(s.T(), err)
-	sealed := segment.Lowest()
+	sealed := segment.Sealed()
 	return sealed.Header
 }
 
@@ -818,8 +818,8 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	s.TimedLogf("retrieved header after entering EpochSetup phase: root_height=%d, root_view=%d, segment_heights=[%d-%d], segment_views=[%d-%d]",
 		header.Height, header.View,
-		segment.Lowest().Header.Height, segment.Highest().Header.Height,
-		segment.Lowest().Header.View, segment.Highest().Header.Height)
+		segment.Sealed().Header.Height, segment.Highest().Header.Height,
+		segment.Sealed().Header.View, segment.Highest().Header.Height)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.ctx)

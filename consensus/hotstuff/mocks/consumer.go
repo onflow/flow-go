@@ -23,6 +23,11 @@ func (_m *Consumer) OnBlockIncorporated(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
+// OnCurrentViewDetails provides a mock function with given fields: currentView, finalizedView, currentLeader
+func (_m *Consumer) OnCurrentViewDetails(currentView uint64, finalizedView uint64, currentLeader flow.Identifier) {
+	_m.Called(currentView, finalizedView, currentLeader)
+}
+
 // OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model.Block) {
 	_m.Called(_a0, _a1)
@@ -48,14 +53,14 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
-// OnInvalidTimeoutDetected provides a mock function with given fields: _a0
-func (_m *Consumer) OnInvalidTimeoutDetected(_a0 *model.TimeoutObject) {
-	_m.Called(_a0)
+// OnInvalidTimeoutDetected provides a mock function with given fields: err
+func (_m *Consumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+	_m.Called(err)
 }
 
-// OnInvalidVoteDetected provides a mock function with given fields: _a0
-func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
-	_m.Called(_a0)
+// OnInvalidVoteDetected provides a mock function with given fields: err
+func (_m *Consumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
+	_m.Called(err)
 }
 
 // OnLocalTimeout provides a mock function with given fields: currentView
@@ -83,9 +88,9 @@ func (_m *Consumer) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialT
 	_m.Called(currentView, partialTc)
 }
 
-// OnQcTriggeredViewChange provides a mock function with given fields: qc, newView
-func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
-	_m.Called(qc, newView)
+// OnQcTriggeredViewChange provides a mock function with given fields: oldView, newView, qc
+func (_m *Consumer) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
+	_m.Called(oldView, newView, qc)
 }
 
 // OnReceiveProposal provides a mock function with given fields: currentView, proposal
@@ -113,9 +118,14 @@ func (_m *Consumer) OnStartingTimeout(_a0 model.TimerInfo) {
 	_m.Called(_a0)
 }
 
-// OnTcTriggeredViewChange provides a mock function with given fields: tc, newView
-func (_m *Consumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
-	_m.Called(tc, newView)
+// OnTcTriggeredViewChange provides a mock function with given fields: oldView, newView, tc
+func (_m *Consumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
+	_m.Called(oldView, newView, tc)
+}
+
+// OnTimeoutProcessed provides a mock function with given fields: timeout
+func (_m *Consumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	_m.Called(timeout)
 }
 
 // OnViewChange provides a mock function with given fields: oldView, newView
@@ -126,6 +136,11 @@ func (_m *Consumer) OnViewChange(oldView uint64, newView uint64) {
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
 func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
 	_m.Called(vote, invalidProposal)
+}
+
+// OnVoteProcessed provides a mock function with given fields: vote
+func (_m *Consumer) OnVoteProcessed(vote *model.Vote) {
+	_m.Called(vote)
 }
 
 type mockConstructorTestingTNewConsumer interface {

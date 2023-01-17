@@ -144,7 +144,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 		return nil, err
 	}
 
-	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	p.notifier.OnQcTriggeredViewChange(oldView, newView, qc)
 	p.notifier.OnViewChange(oldView, newView)
 
 	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
@@ -185,7 +185,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, err
 	}
 
-	p.notifier.OnTcTriggeredViewChange(tc, newView)
+	p.notifier.OnTcTriggeredViewChange(oldView, newView, tc)
 	p.notifier.OnViewChange(oldView, newView)
 
 	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)

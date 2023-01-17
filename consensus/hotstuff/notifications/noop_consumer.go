@@ -43,21 +43,27 @@ func (*NoopPartialConsumer) OnLocalTimeout(uint64) {}
 
 func (*NoopPartialConsumer) OnViewChange(uint64, uint64) {}
 
-func (*NoopPartialConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
+func (*NoopPartialConsumer) OnQcTriggeredViewChange(uint64, uint64, *flow.QuorumCertificate) {}
 
-func (*NoopPartialConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64) {}
+func (*NoopPartialConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.TimeoutCertificate) {}
 
 func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
 
+func (*NoopPartialConsumer) OnVoteProcessed(*model.Vote) {}
+
+func (*NoopPartialConsumer) OnTimeoutProcessed(*model.TimeoutObject) {}
+
+func (*NoopPartialConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
+
 func (*NoopPartialConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
-func (*NoopPartialConsumer) OnInvalidVoteDetected(*model.Vote) {}
+func (*NoopPartialConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
 
 func (*NoopPartialConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
 
 func (*NoopPartialConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {}
 
-func (*NoopPartialConsumer) OnInvalidTimeoutDetected(*model.TimeoutObject) {}
+func (*NoopPartialConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) {}
 
 // no-op implementation of hotstuff.FinalizationConsumer
 

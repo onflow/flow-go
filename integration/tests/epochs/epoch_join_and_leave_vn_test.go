@@ -6,12 +6,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
-	// TODO this test is blocked by https://github.com/dapperlabs/flow-go/issues/6443
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this test is flaky due to an unhandled case in service event processing following epoch transition https://github.com/dapperlabs/flow-go/issues/6443")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
 }
 

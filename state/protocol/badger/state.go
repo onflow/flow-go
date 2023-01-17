@@ -33,6 +33,8 @@ type State struct {
 	}
 	// cache the root height because it cannot change over the lifecycle of a protocol state instance
 	rootHeight uint64
+	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	sporkRootBlockHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -96,7 +98,7 @@ func Bootstrap(
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
 		highest := segment.Highest() // reference block of the snapshot
-		lowest := segment.Lowest()   // last sealed block
+		lowest := segment.Sealed()   // last sealed block
 
 		// 1) bootstrap the sealing segment
 		err = state.bootstrapSealingSegment(segment, highest)(tx)
@@ -121,7 +123,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
+		err = state.bootstrapEpoch(root.Epochs(), segment, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -183,6 +185,19 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
+		for _, block := range segment.ExtraBlocks {
+			blockID := block.ID()
+			height := block.Header.Height
+			err := state.blocks.StoreTx(block)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert root block: %w", err)
+			}
+			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+			}
+		}
+
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
@@ -240,7 +255,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
 		highest := segment.Highest()
-		lowest := segment.Lowest()
+		lowest := segment.Sealed()
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
@@ -315,11 +330,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		previous := root.Epochs().Previous()
-		current := root.Epochs().Current()
-		next := root.Epochs().Next()
+		previous := epochs.Previous()
+		current := epochs.Current()
+		next := epochs.Next()
 
 		// build the status as we go
 		status := new(flow.EpochStatus)
@@ -430,11 +445,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment in within the same phase within the same epoch.
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
-		for _, block := range segment.Blocks {
+		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()
 			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
 			if err != nil {
@@ -459,6 +470,15 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 		err = operation.InsertSporkID(sporkID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
+		}
+
+		sporkRootBlockHeight, err := params.SporkRootBlockHeight()
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
 		version, err := params.ProtocolVersion()
@@ -683,6 +703,12 @@ func (state *State) populateCache() error {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
 	state.rootHeight = rootHeight
+
+	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not read spork root block height: %w", err)
+	}
+	state.sporkRootBlockHeight = sporkRootBlockHeight
 	return nil
 }
 
