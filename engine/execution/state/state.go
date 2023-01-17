@@ -154,22 +154,6 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
-	}
-	return keys
-}
-
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
-	}
-	return vals
-}
-
 func RegisterEntriesToKeysValues(
 	entries flow.RegisterEntries,
 ) (

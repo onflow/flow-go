@@ -134,7 +134,11 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.NoError(t, err)
 
 	allRegisters := view.Interactions().AllRegisters()
-	allKeys := executionState.RegisterIDSToKeys(allRegisters)
+	allKeys := make([]ledger.Key, len(allRegisters))
+	for i, id := range allRegisters {
+		allKeys[i] = executionState.RegisterIDToKey(id)
+	}
+
 	newState := updated.State()
 
 	proofQuery, err := ledger.NewQuery(newState, allKeys)
