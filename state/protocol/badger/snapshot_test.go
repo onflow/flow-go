@@ -1147,8 +1147,3 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 		assert.ElementsMatch(t, expected, actual)
 	})
 }
-
-func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	require.NoError(t, state.Extend(context.Background(), block))
-	require.NoError(t, state.Finalize(context.Background(), block.ID()))
-}
