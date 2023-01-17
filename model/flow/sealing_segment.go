@@ -6,76 +6,34 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// SealingSegment is the chain segment such that the last block (greatest height)
-// is this snapshot's reference block and the first (least height) is the most
-// recently sealed block as of this snapshot (ie. the block referenced by LatestSeal).
+// SealingSegment is a continuous segment of recently finalized blocks that contains enough history
+// for a new node to execute its business logic normally. It is part of the data need to initialize
+// a new node to join the network.
+// DETAILED SPECIFICATION: ./sealing_segment.md
 //
-// In other words, the most recently incorporated seal as of the highest block
-// references the lowest block. The highest block does not need to contain this seal.
+//			├═══════════┤  ├───────────────────────┤
+//			 ExtraBlocks   ^          Blocks       ^
+//	                    B                      Head
 //
-// Example 1 - E seals A:
-//
-//	A <- B <- C <- D <- E(SA)
-//
-// The above sealing segment's last block (E) has a seal for block A, which is
-// the first block of the sealing segment.
-//
-// Example 2 - E contains no seals, but latest seal prior to E seals A:
-//
-//	A <- B <- C <- D(SA) <- E
-//
-// Example 3 - E contains multiple seals
-//
-//	B <- C <- D <- E(SA, SB)
-//
-// MINIMALITY REQUIREMENT:
-// Note that block B is the highest sealed block as of E. Therefore, the
-// sealing segment's lowest block must be B. Essentially, this is a minimality
-// requirement for the history: it shouldn't be longer than necessary. So
-// extending the chain segment above to A <- B <- C <- D <- E(SA, SB) would
-// _not_ yield a valid SealingSegment.
-//
-// ROOT SEALING SEGMENTS:
-// Root sealing segments are sealing segments which contain the root block:
-// * the root block is a self-sealing block with an empty payload
-// * the root block must be the first block (least height) in the segment
-// * no blocks in the segment may contain any seals (by the minimality requirement)
-// * it is possible (but not necessary) for root sealing segments to contain only the root block
-//
-// Example 1 - one self-sealing root block
-//
-//	ROOT
-//
-// The above sealing segment is the form of sealing segments within root snapshots,
-// for example those snapshots used to bootstrap a new network, or spork.
-//
-// Example 2 - one self-sealing root block followed by any number of seal-less blocks
-//
-//	ROOT <- A <- B
-//
-// All non-root sealing segments contain more than one block.
-// Sealing segments are in ascending height order.
-//
-// In addition to storing the blocks within the sealing segment, as defined above,
-// the SealingSegment structure also stores any resources which are referenced
-// by blocks in the segment, but not included in the payloads of blocks within
-// the segment. In particular:
-// * results referenced by receipts within segment payloads
-// * results referenced by seals within segment payloads
-// * seals which represent the latest state commitment as of a segment block
+// Lets denote the highest block in the sealing segment as `head`. Per convention,
+// `head` must be a finalized block.
+// Consider the fork leading up to head. The highest block in the fork leading up to head that is sealed,
+// we denote as B.
 type SealingSegment struct {
-	// Blocks contain the chain segment blocks in ascending height order.
+	// Blocks contain the chain `B <- ... <- Head` in ascending height order.
+	// Formally, Blocks contains exactly (not more!) the history to satisfy condition
+	// (see sealing_segment.md for details):
+	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
+	//       This is relevant if `head` does not contain any seals.
 	Blocks []*Block
 
-	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order. These blocks
-	// are connecting to `Blocks[0]` (the lowest block of sealing segment). Formally, let `l`
-	// be the length of `ExtraBlocks`, then ExtraBlocks[l-1] is the _parent_ of `Blocks[0]`.
-	// These extra blocks are included in order to ensure that a newly bootstrapped node
-	// knows about all entities which might be referenced by blocks which extend from
-	// the sealing segment.
-	// ExtraBlocks are stored separately from Blocks, because not all node roles need
-	// the same amount of history. Blocks represents the minimal possible required history;
-	// ExtraBlocks represents additional role-required history.
+	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order.
+	// Formally, ExtraBlocks contains at least the additional history to satisfy conditions
+	// (see sealing_segment.md for details):
+	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	// (iii) The sealing segment hold the history of all non-expired collection guarantees, i.e.
+	//       limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	// (Potentially longer history is permitted)
 	ExtraBlocks []*Block
 
 	// ExecutionResults contain any results which are referenced by receipts

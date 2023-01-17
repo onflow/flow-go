@@ -80,7 +80,8 @@ func newCache(collector module.CacheMetrics, resourceName string, options ...fun
 }
 
 // Get will try to retrieve the resource from cache first, and then from the
-// injected
+// injected. During normal operations, the following error returns are expected:
+//   - `storage.ErrNotFound` if key is unknown.
 func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 	return func(tx *badger.Txn) (interface{}, error) {
 
