@@ -140,3 +140,12 @@ the segment. In particular:
 * results referenced by receipts within segment payloads
 * results referenced by seals within segment payloads
 * seals which represent the latest state commitment as of a segment block
+
+## Outlook
+
+In its current state, the sealing segment has been evolving driven by different needs. Most likely, there is some room for simplifications
+and other improvements. However, an important aspect of the sealing segment is to allow newly-joining nodes to build an internal representation
+of the protocol state, in particular the identity table. There are large changes coming around when we move to the dynamic identity table.
+Therefore, we accept that the Sealing Segment currently has some technical debt and unnecessary complexity. Once we have implemented the
+dynamic identity table, we will have a much more solidified understanding of the data in the sealing segment. 
+
