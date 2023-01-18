@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	mig "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -90,6 +91,7 @@ func extractExecutionState(
 		migrations = []ledger.Migration{
 			// the following migration calculate the storage usage and update the storage for each account
 			// mig.MigrateAccountUsage,
+			mig.AddMissingKeysAndUpgradeContractsMigration(chain, log),
 		}
 	}
 	// generating reports at the end, so that the checkpoint file can be used
