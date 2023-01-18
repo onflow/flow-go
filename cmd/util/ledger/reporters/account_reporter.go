@@ -115,7 +115,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 }
 
 type balanceProcessor struct {
-	vm            *fvm.VirtualMachine
+	vm            fvm.VM
 	ctx           fvm.Context
 	view          state.View
 	env           environment.Environment

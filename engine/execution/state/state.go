@@ -154,20 +154,19 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+func RegisterEntriesToKeysValues(
+	entries flow.RegisterEntries,
+) (
+	[]ledger.Key,
+	[]ledger.Value,
+) {
+	keys := make([]ledger.Key, len(entries))
+	values := make([]ledger.Value, len(entries))
+	for i, entry := range entries {
+		keys[i] = RegisterIDToKey(entry.Key)
+		values[i] = entry.Value
 	}
-	return keys
-}
-
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
-	}
-	return vals
+	return keys, values
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
@@ -213,17 +212,13 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 }
 
 type RegisterUpdatesHolder interface {
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	UpdatedRegisters() flow.RegisterEntries
 }
 
 func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	ids, values := ruh.RegisterUpdates()
+	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
 
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
@@ -236,13 +231,6 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 
 	return flow.StateCommitment(commit), trieUpdate, nil
 }
-
-//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.End()
-//
-//	return CommitDelta(s.ls, delta, baseState)
-//}
 
 func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
 

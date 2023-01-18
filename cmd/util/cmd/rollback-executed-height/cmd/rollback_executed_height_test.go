@@ -95,8 +95,11 @@ func TestReExecuteBlock(t *testing.T) {
 
 		require.NoError(t, err)
 
+		batch := bstorage.NewBatch(db)
+
 		// remove execution results
 		err = removeForBlockID(
+			batch,
 			headers,
 			commits,
 			txResults,
@@ -109,6 +112,45 @@ func TestReExecuteBlock(t *testing.T) {
 		)
 
 		require.NoError(t, err)
+
+		// remove again, to make sure missing entires are handled properly
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+
+		err2 := batch.Flush()
+
+		require.NoError(t, err)
+		require.NoError(t, err2)
+
+		batch = bstorage.NewBatch(db)
+
+		// remove again after flushing
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+		err2 = batch.Flush()
+
+		require.NoError(t, err)
+		require.NoError(t, err2)
 
 		// re execute result
 		err = es.SaveExecutionResults(
@@ -205,8 +247,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		require.NoError(t, err)
 
+		batch := bstorage.NewBatch(db)
+
 		// remove execution results
 		err = removeForBlockID(
+			batch,
 			headers,
 			commits,
 			txResults,
@@ -218,7 +263,31 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			header.ID(),
 		)
 
+		err2 := batch.Flush()
+
 		require.NoError(t, err)
+		require.NoError(t, err2)
+
+		batch = bstorage.NewBatch(db)
+
+		// remove again to test for duplicates handling
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+
+		err2 = batch.Flush()
+
+		require.NoError(t, err)
+		require.NoError(t, err2)
 
 		executionReceipt2 := unittest.ExecutionReceiptFixture()
 		executionReceipt2.ExecutionResult.BlockID = header.ID()
