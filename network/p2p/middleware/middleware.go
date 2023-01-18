@@ -853,5 +853,5 @@ func (m *Middleware) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, rea
 	if err != nil {
 		m.log.Error().Err(err).Str("peer_id", peerID.String()).Msg("failed to disconnect from blocklisted peer")
 	}
-	lg.Warn().Msg("pruning connection to rate-limited peer")
+	lg.Warn().Msg("pruned connection to rate-limited peer")
 }
