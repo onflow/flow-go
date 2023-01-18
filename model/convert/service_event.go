@@ -145,10 +145,16 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 
 	// parse cadence types to Go types
 	commit := new(flow.EpochCommit)
-	commit.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
+
+	payloadEvent, is := payload.(cadence.Event)
+	if !is {
+		return nil, fmt.Errorf("unexpected type of payload, expected cadence.Event got %T", payload)
+	}
+
+	commit.Counter = uint64(payloadEvent.Fields[0].(cadence.UInt64))
 
 	// parse cluster qc votes
-	cdcClusterQCVotes := payload.(cadence.Event).Fields[1].(cadence.Array).Values
+	cdcClusterQCVotes := payloadEvent.Fields[1].(cadence.Array).Values
 	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
@@ -157,7 +163,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	// parse DKG group key and participants
 	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
 	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
-	cdcDKGKeys := payload.(cadence.Event).Fields[2].(cadence.Array).Values
+	cdcDKGKeys := payloadEvent.Fields[2].(cadence.Array).Values
 	dkgGroupKey, dkgParticipantKeys, err := convertDKGKeys(cdcDKGKeys)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)

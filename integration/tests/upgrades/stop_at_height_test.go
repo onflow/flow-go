@@ -38,7 +38,7 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 
-	// stop in 5 blocks
+	// stop in 10 blocks
 	stopHeight := currentFinalized + 10
 
 	stopAtHeightRequest := StopAtHeightRequest{
