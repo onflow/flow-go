@@ -11,9 +11,9 @@ import (
 // a new node to join the network.
 // DETAILED SPECIFICATION: ./sealing_segment.md
 //
-//			├═══════════┤  ├───────────────────────┤
-//			 ExtraBlocks   ^          Blocks       ^
-//	                    B                      Head
+//   ├═══════════┤  ├───────────────────────┤
+//    ExtraBlocks   ^          Blocks       ^
+//                  B                      Head
 //
 // Lets denote the highest block in the sealing segment as `head`. Per convention,
 // `head` must be a finalized block.
@@ -31,7 +31,7 @@ type SealingSegment struct {
 	// Formally, ExtraBlocks contains at least the additional history to satisfy conditions
 	// (see sealing_segment.md for details):
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
-	// (iii) The sealing segment hold the history of all non-expired collection guarantees, i.e.
+	// (iii) The sealing segment holds the history of all non-expired collection guarantees, i.e.
 	//       limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	// (Potentially longer history is permitted)
 	ExtraBlocks []*Block

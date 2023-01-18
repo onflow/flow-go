@@ -254,7 +254,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
 // receipt in the block's payload to make sure we have a corresponding execution result, any
 // execution results missing from blocks are stored in the `SealingSegment.ExecutionResults` field.
-// See `flow/sealing_segment.md` for detailed technical specification of the Sealing Segment
+// See `model/flow/sealing_segment.md` for detailed technical specification of the Sealing Segment
 //
 // Expected errors during normal operations:
 //   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off

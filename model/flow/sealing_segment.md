@@ -4,7 +4,7 @@ The `SealingSegment` is a section of the finalized chain. It is part of the data
 initialize a new node to join the network. Informally, the `SealingSegment` is continuous section
 of recently finalized blocks that is long enough for the new node to execute its business logic.   
 
-## history length covered by the Sealing Segment 
+## History length covered by the Sealing Segment 
 
 The `SealingSegment` is created from a `protocol.Snapshot` via the method `SealingSegment`.
 Lets denote the block that the `protocol.Snapshot` refers to as `head`. Per convention, 
@@ -12,7 +12,7 @@ Lets denote the block that the `protocol.Snapshot` refers to as `head`. Per conv
 
 ### Part 1: from `head` back to the latest sealed block 
 
-The SealingSegment is the a chain segment such that the last block (greatest height)
+The SealingSegment is the chain segment such that the last block (greatest height)
 is this snapshot's reference block (i.e. `head`) and the first (least height) is the most
 recently sealed block as of this snapshot.
 In other words, the most recently incorporated seal as of the highest block
@@ -68,7 +68,7 @@ ExtraBlocks []*Block
 ```
 
 **In case `head` contains multiple seals, we need _all_ the sealed blocks**, for the following reason:
-* All nodes locally maintain a copy of the protocol state. A system event may change the sate of the protocol state. 
+* All nodes locally maintain a copy of the protocol state. A service event may change the state of the protocol state. 
 * For Byzantine resilience, we don't want protocol-state changes to take effect immediately. Therefore, we process
   system events only after receiving a QC for the block.
   
@@ -84,7 +84,7 @@ ExtraBlocks []*Block
 * As the service events are order-sensitive, we need to process the seals in the correct order, which is by increasing height
   of the sealed block. The seals don't contain the block's height information, hence we need to resolve the block. 
 
-**Extended history to check for duplicated collection guarantees in blocks** is required by nodes _validate_ block
+**Extended history to check for duplicated collection guarantees in blocks** is required by nodes that _validate_ block
 payloads (e.g. consensus nodes). Also Access Nodes require these blocks. Collections expire after `flow.DefaultTransactionExpiry` blocks.
 Hence, we desire a history of `flow.DefaultTransactionExpiry` blocks. However, there is the edge case of a recent spork (or genesis),
 where the history is simply less that `flow.DefaultTransactionExpiry`. 
@@ -95,7 +95,7 @@ The descriptions from the previous section can be formalized as follows
 
 * (i) The highest sealed block as of `head` needs to be included in the sealing segment.
   This is relevant if `head` does not contain any seals.
-* (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+* (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 * (iii) The sealing segment should contain the history back to (including):
   ```
   limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
