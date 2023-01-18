@@ -12,7 +12,7 @@ Lets denote the block that the `protocol.Snapshot` refers to as `head`. Per conv
 
 ### Part 1: from `head` back to the latest sealed block 
 
-The SealingSegment is the chain segment such that the last block (greatest height)
+The SealingSegment is a chain segment such that the last block (greatest height)
 is this snapshot's reference block (i.e. `head`) and the first (least height) is the most
 recently sealed block as of this snapshot.
 In other words, the most recently incorporated seal as of the highest block
