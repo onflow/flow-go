@@ -200,35 +200,18 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	return nil
 }
 
-// isValidVersionBeacon validates internal structure of flow.VersionBeacon and in a context of given block,
-// which is assumed to be a block flow.VersionBeacon has been put into effect.
+// isValidVersionBeacon validates internal structure of flow.VersionBeacon
 // InvalidServiceEventError with appropriate message is returned if any validation fails.
 // Please refer to documentation of flow.VersionBeacon for a description of what's expected of a valid VersionBeacon.
-func isValidVersionBeacon(vb *flow.VersionBeacon, header *flow.Header) error {
+func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 	if len(vb.RequiredVersions) == 0 {
 		return protocol.NewInvalidServiceEventError("required versions empty")
 	}
 
-	minimumThresholdHeight := header.Height + flow.VersionThreshold
-
 	// handle case when only one version is present
 	if len(vb.RequiredVersions) == 1 {
-		if vb.RequiredVersions[0].Height < minimumThresholdHeight {
-			return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 0, vb.RequiredVersions[0].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
-		}
 		_, err := validateRequirement(vb.RequiredVersions[0])
 		return err
-	}
-
-	// if first requirement below current height, second one must obey threshold
-	if vb.RequiredVersions[0].Height <= header.Height {
-		if vb.RequiredVersions[1].Height < minimumThresholdHeight {
-			return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 1, vb.RequiredVersions[1].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
-		}
-
-		// if first requirement is not below current height, it must obey threshold
-	} else if vb.RequiredVersions[0].Height < minimumThresholdHeight {
-		return protocol.NewInvalidServiceEventError("required version (index=%d) height %d below minimum possible height (current block %d + threshold %d = %d)", 0, vb.RequiredVersions[0].Height, header.Height, flow.VersionThreshold, minimumThresholdHeight)
 	}
 
 	for i := 0; i < len(vb.RequiredVersions)-1; i++ {

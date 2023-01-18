@@ -420,7 +420,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-// insert stores the candidate block in the data base. The
+// insert stores the candidate block in the database. The
 // `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
@@ -593,12 +593,14 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			case *flow.VersionBeacon:
 
-				// TODO here we want to notify about this event, but that's for another PR
+				err := isValidVersionBeacon(ev)
 
-				// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
-				// events in a single result. However, should this happen we will keep only the last one, since it's newer
-				// and takes precedence anyway
-				versionBeacon = ev
+				if err == nil {
+					// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
+					// events in a single result. However, should this happen we will keep only the last one, since it's newer
+					// and takes precedence anyway
+					versionBeacon = ev
+				}
 
 				continue
 			default:
@@ -681,6 +683,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			if err != nil {
 				return fmt.Errorf("could not index version beacon or height (%d): %w", header.Height, err)
 			}
+
+			// TODO here we want to notify about this event, but that's for another PR
 		}
 
 		// emit protocol events within the scope of the Badger transaction to
@@ -893,11 +897,7 @@ SealLoop:
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
 			case *flow.VersionBeacon:
-				err = isValidVersionBeacon(ev, block.Header)
-				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("invalid version beacon: %w", err)
-				}
-
+				// nothing here, but prevents default case from triggering
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
 			}
