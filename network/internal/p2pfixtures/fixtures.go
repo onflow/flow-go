@@ -235,11 +235,8 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	_, topic := messageFactory()
 
 	subs := make([]p2p.Subscription, len(to))
-	svc := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 	tv := validator.TopicValidator(
 		unittest.Logger(),
-		unittest.NetworkCodec(),
-		svc,
 		unittest.AllowAllPeerFilter())
 	var err error
 	for _, node := range from {

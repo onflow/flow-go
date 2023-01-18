@@ -2,7 +2,6 @@ package corruptlibp2p
 
 import (
 	"context"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -11,42 +10,17 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // AcceptAllTopicValidator pubsub validator func that does not perform any validation, it will only attempt to decode the message and update the
 // rawMsg.ValidatorData needed for further processing by the middleware receive loop. Malformed messages that fail to unmarshal or decode will result
 // in a pubsub.ValidationReject result returned.
-func AcceptAllTopicValidator(lg zerolog.Logger, c network.Codec) p2p.TopicValidatorFunc {
-	lg = lg.With().
-		Str("component", "corrupt-libp2p-node-topic-validator").
-		Logger()
-
-	return func(ctx context.Context, from peer.ID, rawMsg *pubsub.Message) p2p.ValidationResult {
-		var msg message.Message
-		err := msg.Unmarshal(rawMsg.Data)
-		if err != nil {
-			lg.Err(err).Msg("could not unmarshal raw message data")
-			return p2p.ValidationReject
-		}
-
-		decodedMsgPayload, err := c.Decode(msg.Payload)
-		if err != nil {
-			lg.Err(err).Msg("could not decode message payload")
-			return p2p.ValidationReject
-		}
-
-		rawMsg.ValidatorData = validator.TopicValidatorData{
-			Message:           &msg,
-			DecodedMsgPayload: decodedMsgPayload,
-			From:              from,
-		}
-
+func AcceptAllTopicValidator() p2p.TopicValidatorFunc {
+	return func(_ context.Context, _ peer.ID, _ *pubsub.Message) p2p.ValidationResult {
 		return p2p.ValidationAccept
 	}
 }
@@ -61,7 +35,7 @@ type CorruptP2PNode struct {
 // Subscribe subscribes the node to the given topic with a noop topic validator.
 // All errors returned from this function can be considered benign.
 func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFunc) (p2p.Subscription, error) {
-	topicValidator := AcceptAllTopicValidator(n.logger, n.codec)
+	topicValidator := AcceptAllTopicValidator()
 	return n.Node.Subscribe(topic, topicValidator)
 }
 

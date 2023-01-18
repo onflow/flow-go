@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
@@ -39,7 +40,7 @@ func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer
 
 // PubSubMessageValidator wraps Validate and returns PubSubMessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Channel) PubSubMessageValidator {
-	return func(from peer.ID, msg interface{}) p2p.ValidationResult {
+	return func(from peer.ID, msg *message.Message) p2p.ValidationResult {
 		_, err := av.Validate(from, msg, channel, message.ProtocolPublish)
 		if err != nil {
 			return p2p.ValidationReject
@@ -54,7 +55,7 @@ func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Cha
 // Otherwise, the message is rejected. The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
-func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, channel channels.Channel, protocol message.Protocol) (string, error) {
+func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg *message.Message, channel channels.Channel, protocol message.Protocol) (string, error) {
 	// NOTE: Gossipsub messages from unstaked nodes should be rejected by the libP2P node topic validator
 	// before they reach message validators. If a message from a unstaked peer gets to this point
 	// something terrible went wrong.
@@ -105,16 +106,24 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msg interface{}, cha
 //
 // Expected error returns during normal operations:
 //   - ErrSenderEjected: if identity of sender is ejected from the network
-//   - message.ErrUnknownMsgType if message auth config us not found for the msg
+//   - codec.ErrUnknownMsgCode: if interface for the encoded message code byte is unknown
+//   - message.UnknownMsgTypeErr if message auth config us not found for the msg
 //   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
-func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}, protocol message.Protocol) (string, error) {
+func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg *message.Message, protocol message.Protocol) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}
 
+	// attempt to get the message interface from the message code encoded into the first byte of the message payload
+	// this will be used to get the message auth configuration.
+	iFace, _, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+	if err != nil {
+		return "", err
+	}
+
 	// get message auth config
-	conf, err := message.GetMessageAuthConfig(msg)
+	conf, err := message.GetMessageAuthConfig(iFace)
 	if err != nil {
 		return "", err
 	}
