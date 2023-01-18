@@ -38,8 +38,9 @@ type Environment interface {
 	Logs() []string
 
 	// EventEmitter
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
+	Events() flow.EventsList
+	ServiceEvents() flow.EventsList
+	ConvertedServiceEvents() flow.ServiceEventList
 
 	// SystemContracts
 	AccountsStorageCapacity(

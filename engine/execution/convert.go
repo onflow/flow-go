@@ -1,9 +1,6 @@
 package execution
 
 import (
-	"fmt"
-
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -12,7 +9,8 @@ func GenerateExecutionResultAndChunkDataPacks(
 	metrics module.ExecutionMetrics,
 	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
-	result *ComputationResult) (
+	result *ComputationResult,
+) (
 	endState flow.StateCommitment,
 	chdps []*flow.ChunkDataPack,
 	executionResult *flow.ExecutionResult,
@@ -80,41 +78,12 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataID)
-	if err != nil {
-		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
-	}
+	executionResult = flow.NewExecutionResult(
+		prevResultId,
+		blockID,
+		chunks,
+		result.ConvertedServiceEvents,
+		result.ExecutionDataID)
 
 	return endState, chdps, executionResult, nil
-}
-
-// GenerateExecutionResultForBlock creates new ExecutionResult for a block from
-// the provided chunk results.
-func GenerateExecutionResultForBlock(
-	previousErID flow.Identifier,
-	block *flow.Block,
-	chunks []*flow.Chunk,
-	serviceEvents []flow.Event,
-	executionDataID flow.Identifier,
-) (*flow.ExecutionResult, error) {
-
-	// convert Cadence service event representation to flow-go representation
-	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
-	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(block.Header.ChainID, event)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert service event: %w", err)
-		}
-		convertedServiceEvents = append(convertedServiceEvents, *converted)
-	}
-
-	er := &flow.ExecutionResult{
-		PreviousResultID: previousErID,
-		BlockID:          block.ID(),
-		Chunks:           chunks,
-		ServiceEvents:    convertedServiceEvents,
-		ExecutionDataID:  executionDataID,
-	}
-
-	return er, nil
 }
