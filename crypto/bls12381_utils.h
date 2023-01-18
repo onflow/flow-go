@@ -8,8 +8,7 @@
 #define _REL_MISC_INCLUDE_H
 
 #include "relic.h"
-
-typedef uint8_t byte;
+#include "blst.h"
 
 #define VALID     RLC_OK
 #define INVALID   RLC_ERR

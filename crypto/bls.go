@@ -33,7 +33,10 @@ package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
+// #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
+// #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls_include.h"
+// #include "blst.h"
 import "C"
 
 import (
