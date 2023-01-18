@@ -17,7 +17,7 @@ import (
 )
 
 // readSubscriptionCB the callback called when a new message is received on the read subscription
-type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID)
+type readSubscriptionCB func(msg *message.Message, peerID peer.ID)
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
 // the context of the subscription is cancelled.
@@ -77,6 +77,6 @@ func (r *readSubscription) receiveLoop(ctx context.Context) {
 		}
 
 		// call the callback
-		r.callback(validatorData.Message, validatorData.DecodedMsgPayload, validatorData.From)
+		r.callback(validatorData.Message, validatorData.From)
 	}
 }

@@ -613,8 +613,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 }
 
 // processPubSubMessages processes messages received from the pubsub subscription.
-func (m *Middleware) processPubSubMessages(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, peerID, network.ProtocolTypePubSub)
+func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID) {
+	m.processAuthenticatedMessage(msg, peerID, network.ProtocolTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -641,33 +641,6 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	lg := m.log.With().Str("peer_id", remotePeer.String()).Str("channel", msg.ChannelID).Logger()
 
 	channel := channels.Channel(msg.ChannelID)
-	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-	if codec.IsErrUnknownMsgCode(err) {
-		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{
-			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
-		}
-		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		return
-	}
-	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
-		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{
-			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
-		}
-		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
-		return
-	}
-
-	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector.
-	if err != nil {
-		lg.Error().
-			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to decode message payload")
-		return
-	}
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
@@ -705,14 +678,14 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		}
 	}
 
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
+	m.processAuthenticatedMessage(msg, remotePeer, network.ProtocolTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID, protocol network.ProtocolType) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol network.ProtocolType) {
 	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
@@ -722,6 +695,25 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 			Str("peer_id", peerID.String()).
 			Bool(logging.KeySuspicious, true).
 			Msg("dropped message from unknown peer")
+		return
+	}
+
+	channel := channels.Channel(msg.ChannelID)
+	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+	if codec.IsErrUnknownMsgCode(err) {
+		// slash peer if message contains unknown message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	}
+	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		}
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	}
 
