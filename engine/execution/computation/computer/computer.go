@@ -180,13 +180,15 @@ func (e *blockComputer) ExecuteBlock(
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	derivedBlockData *derived.DerivedBlockData,
-) (*execution.ComputationResult, error) {
-
-	span, _ := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
-	span.SetAttributes(attribute.Int("collection_counts", len(block.CompleteCollections)))
-	defer span.End()
-
-	results, err := e.executeBlock(ctx, span, block, stateView, derivedBlockData)
+) (
+	*execution.ComputationResult,
+	error,
+) {
+	results, err := e.executeBlock(
+		ctx,
+		block,
+		stateView,
+		derivedBlockData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -196,10 +198,11 @@ func (e *blockComputer) ExecuteBlock(
 	return results, nil
 }
 
-func (e *blockComputer) getCollections(
+func (e *blockComputer) getRootSpanAndCollections(
 	block *entity.ExecutableBlock,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
+	otelTrace.Span,
 	[]collectionItem,
 	error,
 ) {
@@ -238,7 +241,7 @@ func (e *blockComputer) getCollections(
 
 	systemTxn, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return trace.NoopSpan, nil, fmt.Errorf(
 			"could not get system chunk transaction: %w",
 			err)
 	}
@@ -269,26 +272,35 @@ func (e *blockComputer) getCollections(
 				systemTransactions),
 		})
 
-	return collections, nil
+	return e.tracer.BlockRootSpan(blockId), collections, nil
 }
 
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
-	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	derivedBlockData *derived.DerivedBlockData,
-) (*execution.ComputationResult, error) {
-
+) (
+	*execution.ComputationResult,
+	error,
+) {
 	// check the start state is set
 	if !block.HasStartState() {
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	collections, err := e.getCollections(block, derivedBlockData)
+	rootSpan, collections, err := e.getRootSpanAndCollections(
+		block,
+		derivedBlockData)
 	if err != nil {
 		return nil, err
 	}
+
+	blockSpan := e.tracer.StartSpanFromParent(rootSpan, trace.EXEComputeBlock)
+	blockSpan.SetAttributes(
+		attribute.String("block_id", block.ID().String()),
+		attribute.Int("collection_counts", len(block.CompleteCollections)))
+	defer blockSpan.End()
 
 	collector := newResultCollector(
 		e.tracer,
@@ -391,21 +403,12 @@ func (e *blockComputer) executeCollection(
 
 	txns := collection.transactions
 
-	colSpanType := trace.EXEComputeSystemCollection
 	collectionId := ""
 	referenceBlockId := ""
 	if !collection.isSystemCollection {
-		colSpanType = trace.EXEComputeCollection
 		collectionId = collection.Guarantee.CollectionID.String()
 		referenceBlockId = collection.Guarantee.ReferenceBlockID.String()
 	}
-
-	colSpan := e.tracer.StartSpanFromParent(blockSpan, colSpanType)
-	defer colSpan.End()
-
-	colSpan.SetAttributes(
-		attribute.Int("collection.txCount", len(txns)),
-		attribute.String("collection.hash", collectionId))
 
 	logger := e.log.With().
 		Str("block_id", collection.blockIdStr).
@@ -417,7 +420,7 @@ func (e *blockComputer) executeCollection(
 	logger.Debug().Msg("executing collection")
 
 	for _, txn := range txns {
-		err := e.executeTransaction(colSpan, txn, collectionView, collector)
+		err := e.executeTransaction(blockSpan, txn, collectionView, collector)
 		if err != nil {
 			return txn.txnIndex, err
 		}
@@ -444,8 +447,10 @@ func (e *blockComputer) executeTransaction(
 	startedAt := time.Now()
 	memAllocBefore := debug.GetHeapAllocsBytes()
 
-	// we capture two spans one for tx-based view and one for the current context (block-based) view
-	txSpan := e.tracer.StartSpanFromParent(parentSpan, trace.EXEComputeTransaction)
+	txSpan := e.tracer.StartSampledSpanFromParent(
+		parentSpan,
+		txn.txnId,
+		trace.EXEComputeTransaction)
 	txSpan.SetAttributes(
 		attribute.String("tx_id", txn.txnIdStr),
 		attribute.Int64("tx_index", int64(txn.txnIndex)),
@@ -453,18 +458,10 @@ func (e *blockComputer) executeTransaction(
 	)
 	defer txSpan.End()
 
-	txInternalSpan, _ := e.tracer.StartTransactionSpan(
-		context.Background(),
-		txn.txnId,
-		trace.EXERunTransaction)
-	txInternalSpan.SetAttributes(attribute.String("tx_id", txn.txnIdStr))
-	defer txInternalSpan.End()
-
 	logger := e.log.With().
 		Str("tx_id", txn.txnIdStr).
 		Uint32("tx_index", txn.txnIndex).
 		Str("block_id", txn.blockIdStr).
-		Str("trace_id", txInternalSpan.SpanContext().TraceID().String()).
 		Uint64("height", txn.ctx.BlockHeader.Height).
 		Bool("system_chunk", txn.isSystemTransaction).
 		Bool("system_transaction", txn.isSystemTransaction).
@@ -473,9 +470,7 @@ func (e *blockComputer) executeTransaction(
 
 	proc := fvm.NewTransaction(txn.txnId, txn.txnIndex, txn.TransactionBody)
 
-	txn.ctx = fvm.NewContextFromParent(
-		txn.ctx,
-		fvm.WithSpan(txInternalSpan))
+	txn.ctx = fvm.NewContextFromParent(txn.ctx, fvm.WithSpan(txSpan))
 
 	txView := collectionView.NewChild()
 	err := e.vm.Run(txn.ctx, proc, txView)

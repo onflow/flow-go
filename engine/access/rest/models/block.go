@@ -9,6 +9,7 @@ func (b *Block) Build(
 	block *flow.Block,
 	execResult *flow.ExecutionResult,
 	link LinkGenerator,
+	blockStatus flow.BlockStatus,
 	expand map[string]bool,
 ) error {
 	self, err := SelfLink(block.ID(), link.BlockLink)
@@ -61,6 +62,7 @@ func (b *Block) Build(
 	}
 
 	b.Links = self
+	b.BlockStatus = blockStatus.String()
 	return nil
 }
 
