@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,6 +44,7 @@ type FollowerState struct {
 	index      storage.Index
 	payloads   storage.Payloads
 	tracer     module.Tracer
+	log        zerolog.Logger
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
 	cfg        Config
@@ -63,6 +65,7 @@ func NewFollowerState(
 	index storage.Index,
 	payloads storage.Payloads,
 	tracer module.Tracer,
+	log zerolog.Logger,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
@@ -71,6 +74,7 @@ func NewFollowerState(
 		index:      index,
 		payloads:   payloads,
 		tracer:     tracer,
+		log:        log,
 		consumer:   consumer,
 		blockTimer: blockTimer,
 		cfg:        DefaultConfig(),
@@ -88,11 +92,12 @@ func NewFullConsensusState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	log zerolog.Logger,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(state, index, payloads, tracer, log, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -594,15 +599,20 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			case *flow.VersionBeacon:
 
 				err := isValidVersionBeacon(ev)
-
-				if err == nil {
-					// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
-					// events in a single result. However, should this happen we will keep only the last one, since it's newer
-					// and takes precedence anyway
-					versionBeacon = ev
+				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						m.log.Warn().Err(err).Msg("invalid VersionBeacon service event")
+						continue
+					} else {
+						return fmt.Errorf("unexpected error during VersionBeacon validation: %w", err)
+					}
 				}
 
-				continue
+				// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
+				// events in a single result. However, should this happen we will keep only the last one, since it's newer
+				// and takes precedence anyway
+				versionBeacon = ev
+
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
