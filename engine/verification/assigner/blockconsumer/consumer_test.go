@@ -1,10 +1,11 @@
 package blockconsumer_test
 
 import (
-	"github.com/rs/zerolog"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"

@@ -5,11 +5,12 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"github.com/rs/zerolog"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"

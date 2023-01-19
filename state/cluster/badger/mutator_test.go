@@ -3,12 +3,13 @@ package badger
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"math"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"

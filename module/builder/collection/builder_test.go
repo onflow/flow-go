@@ -2,11 +2,12 @@ package collection_test
 
 import (
 	"context"
-	"github.com/rs/zerolog"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
