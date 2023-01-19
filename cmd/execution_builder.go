@@ -221,6 +221,7 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		node.Storage.Index,
 		node.Storage.Payloads,
 		node.Tracer,
+		node.Logger,
 		node.ProtocolEvents,
 		blocktimer.DefaultBlockTimer,
 	)

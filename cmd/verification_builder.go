@@ -121,6 +121,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
+				node.Logger,
 				node.ProtocolEvents,
 				blocktimer.DefaultBlockTimer,
 			)
