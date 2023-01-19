@@ -685,6 +685,13 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 
 			// TODO here we want to notify about this event, but that's for another PR
+			// We don't expect multiple VB events in one block. This would indicate a serious
+			// problem in a version smart contract, however it's technically possible
+			// to continue chain simply using the latest version.
+			// VB tracking mechanism should account for this possibility, checking
+			// if multiple events were emitted in one block and if they make proper sequence.
+			// Since it's bordering on a bug we don't store any extra data in an index -
+			// seals can always be retrieved by height.
 		}
 
 		// emit protocol events within the scope of the Badger transaction to
@@ -898,7 +905,7 @@ SealLoop:
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
 			case *flow.VersionBeacon:
 				// Conceptually, service events are processed and incorporated into the state at this point
-				// before finalization (in a fork-aware manner). Since there is no use-case for querying 
+				// before finalization (in a fork-aware manner). Since there is no use-case for querying
 				// VersionTable information for un-finalized forks, we skip validation here for convenience
 				// and instead perform both validation and indexing together when the block is finalized (see Finalize)
 				continue
