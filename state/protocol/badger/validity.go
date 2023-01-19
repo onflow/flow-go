@@ -241,6 +241,9 @@ func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 	return nil
 }
 
+// validateRequirement validates an individual version requirement (one entry in the version table).
+// Returns the parsed semver version for a valid requirement input.
+// Returns protocol.InvalidServiceEventError for an invalid semver string
 func validateRequirement(vr flow.VersionControlRequirement) (*semver.Version, error) {
 	version, err := semver.NewVersion(vr.Version)
 	if err != nil {
