@@ -384,7 +384,8 @@ func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) er
 
 	sealingSegmentLength := uint64(len(sealingSegment.AllBlocks()))
 	transactionExpiry := uint64(flow.DefaultTransactionExpiry)
-	blocksInSpork := head.Height - sporkRootBlockHeight
+	blocksInSpork := head.Height - sporkRootBlockHeight + 1 // range is inclusive on both ends
+
 	// check if head.Height - sporkRootBlockHeight < flow.DefaultTransactionExpiry
 	// this is the case where we bootstrap early into the spork and there is simply not enough blocks
 	if blocksInSpork < transactionExpiry {
