@@ -107,13 +107,13 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 	t.Run("spork-root-snapshot", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
 	t.Run("not-enough-history", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		rootSnapshot.Encodable().Head.Height += 10 // advance height to be not spork root snapshot
-		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.Error(t, err)
 	})
 	t.Run("enough-history-spork-just-started", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry / 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry/2) - 1)
-		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
 	t.Run("enough-history-long-spork", func(t *testing.T) {
@@ -131,7 +131,7 @@ func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry) - 1)
-		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
 	t.Run("more-history-than-needed", func(t *testing.T) {
@@ -140,7 +140,7 @@ func TestBootstrapConsensusRootSnapshot(t *testing.T) {
 		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
-		err := SanityCheckConsensusNodeRootSnapshotValidity(rootSnapshot)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
 	})
 }
