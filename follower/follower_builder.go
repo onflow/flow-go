@@ -158,6 +158,7 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 			node.Storage.Index,
 			node.Storage.Payloads,
 			node.Tracer,
+			node.Logger,
 			node.ProtocolEvents,
 			blocktimer.DefaultBlockTimer,
 		)

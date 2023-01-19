@@ -244,6 +244,7 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
+				node.Logger,
 				node.ProtocolEvents,
 				blockTimer,
 				receiptValidator,

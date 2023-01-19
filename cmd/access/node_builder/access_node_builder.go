@@ -237,6 +237,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			node.Storage.Index,
 			node.Storage.Payloads,
 			node.Tracer,
+			node.Logger,
 			node.ProtocolEvents,
 			blocktimer.DefaultBlockTimer,
 		)

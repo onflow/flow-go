@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"github.com/rs/zerolog"
 	"math/rand"
 	"sync"
 	"testing"
@@ -87,6 +88,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -102,7 +104,7 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer(),
+		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, log, consumer, util.MockBlockTimer(),
 			util.MockReceiptValidator(), util.MockSealValidator(all.Seals))
 		require.NoError(t, err)
 
@@ -131,10 +133,128 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// build a chain:
-		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
+		// G <- B1 <- B2 (resultB1) <- B3 <- B4 (resultB2, resultB3) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
 		// test that when B4 is finalized, can only find seal for G
 		// 					 when B5 is finalized, can find seal for B1
 		//					 when B7 is finalized, can find seals for B2, B3
+
+		// block 1
+		b1 := unittest.BlockWithParentFixture(rootHeader)
+		b1.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b1)
+		require.NoError(t, err)
+
+		// block 2(result B1)
+		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
+		err = state.Extend(context.Background(), b2)
+		require.NoError(t, err)
+
+		// block 3
+		b3 := unittest.BlockWithParentFixture(b2.Header)
+		b3.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b3)
+		require.NoError(t, err)
+
+		// block 4 (resultB2, resultB3)
+		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+		})
+		err = state.Extend(context.Background(), b4)
+		require.NoError(t, err)
+
+		// block 5 (sealB1)
+		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
+		b5 := unittest.BlockWithParentFixture(b4.Header)
+		b5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b1Seal},
+		})
+		err = state.Extend(context.Background(), b5)
+		require.NoError(t, err)
+
+		// block 6 (sealB2, sealB3)
+		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
+		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
+		b6 := unittest.BlockWithParentFixture(b5.Header)
+		b6.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b2Seal, b3Seal},
+		})
+		err = state.Extend(context.Background(), b6)
+		require.NoError(t, err)
+
+		// block 7
+		b7 := unittest.BlockWithParentFixture(b6.Header)
+		b7.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b7)
+		require.NoError(t, err)
+
+		// finalizing b1 - b4
+		// when B4 is finalized, can only find seal for G
+		err = state.Finalize(context.Background(), b1.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b2.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b3.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b4.ID())
+		require.NoError(t, err)
+
+		metrics := metrics.NewNoopCollector()
+		seals := bstorage.NewSeals(metrics, db)
+
+		// can only find seal for G
+		_, err = seals.FinalizedSealForBlock(rootHeader.ID())
+		require.NoError(t, err)
+
+		_, err = seals.FinalizedSealForBlock(b1.ID())
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// when B5 is finalized, can find seal for B1
+		err = state.Finalize(context.Background(), b5.ID())
+		require.NoError(t, err)
+
+		s1, err := seals.FinalizedSealForBlock(b1.ID())
+		require.NoError(t, err)
+		require.Equal(t, b1Seal, s1)
+
+		_, err = seals.FinalizedSealForBlock(b2.ID())
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// when B7 is finalized, can find seals for B2, B3
+		err = state.Finalize(context.Background(), b6.ID())
+		require.NoError(t, err)
+
+		err = state.Finalize(context.Background(), b7.ID())
+		require.NoError(t, err)
+
+		s2, err := seals.FinalizedSealForBlock(b2.ID())
+		require.NoError(t, err)
+		require.Equal(t, b2Seal, s2)
+
+		s3, err := seals.FinalizedSealForBlock(b3.ID())
+		require.NoError(t, err)
+		require.Equal(t, b3Seal, s3)
+	})
+}
+
+func TestVersionBeaconIndex(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		rootHeader, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		// build a chain:
+		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
+		// up until and including finalization of B5 there should be no VBs indexed
+		//    when B6 is finalized, index VB1
+		//    when B7 is finalized, we can index VB2 and VB3, but the last one should be indexed for a height
 
 		// block 1
 		b1 := unittest.BlockWithParentFixture(rootHeader)
@@ -199,8 +319,14 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Extend(context.Background(), b7)
 		require.NoError(t, err)
 
-		// finalizing b1 - b4
-		// when B4 is finalized, can only find seal for G
+		metrics := metrics.NewNoopCollector()
+		versionBeacons := bstorage.NewVersionBeacons(metrics, db)
+
+		// No VB can be found before finalizing anything
+		_, _, err = versionBeacons.Highest(b7.Header.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// finalizing b1 - b5
 		err = state.Finalize(context.Background(), b1.ID())
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), b2.ID())
@@ -209,67 +335,32 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
-
-		metrics := metrics.NewNoopCollector()
-		seals := bstorage.NewSeals(metrics, db)
-
-		// can only find seal for G
-		_, err = seals.FinalizedSealForBlock(rootHeader.ID())
-		require.NoError(t, err)
-
-		_, err = seals.FinalizedSealForBlock(b1.ID())
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-
-		versionBeacons := bstorage.NewVersionBeacons(metrics, db)
-
-		_, _, err = versionBeacons.Highest(b7.Header.Height)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-
-		// when B5 is finalized, can find seal for B1
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		s1, err := seals.FinalizedSealForBlock(b1.ID())
-		require.NoError(t, err)
-		require.Equal(t, b1Seal, s1)
-
-		_, err = seals.FinalizedSealForBlock(b2.ID())
-		require.Error(t, err)
+		// No VB can be found after finalizing B5
+		_, _, err = versionBeacons.Highest(b7.Header.Height)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
-		// when B7 is finalized, can find seals for B2, B3
+		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
 		err = state.Finalize(context.Background(), b6.ID())
 		require.NoError(t, err)
 
-		//executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
 		versionBeacon, beaconHeight, err := versionBeacons.Highest(b7.Header.Height)
-
 		require.NoError(t, err)
-		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
 		require.Equal(t, vb1, versionBeacon)
 		require.Equal(t, b6.Header.Height, beaconHeight)
 
+		// finalizing B7 should index events sealed by B6, so VB2 and VB3
+		// while we don't expect multiple VBs in one block, we index newest, so last one emitted - VB3
 		err = state.Finalize(context.Background(), b7.ID())
 		require.NoError(t, err)
 
-		s2, err := seals.FinalizedSealForBlock(b2.ID())
-		require.NoError(t, err)
-		require.Equal(t, b2Seal, s2)
-
-		s3, err := seals.FinalizedSealForBlock(b3.ID())
-		require.NoError(t, err)
-		require.Equal(t, b3Seal, s3)
-
-		//executionResult, err = results.HighestByServiceEventType(serviceEvent.Type, b7.Header.Height)
 		versionBeacon, beaconHeight, err = versionBeacons.Highest(b7.Header.Height)
-
 		require.NoError(t, err)
 		require.Equal(t, vb3, versionBeacon)
 		require.Equal(t, b7.Header.Height, beaconHeight)
-
 	})
-
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
@@ -629,12 +720,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
-		state, err := protocol.NewFullConsensusState(protoState, all.Index, all.Payloads, tracer, consumer,
+		state, err := protocol.NewFullConsensusState(protoState, all.Index, all.Payloads, tracer, log, consumer,
 			util.MockBlockTimer(), receiptValidator, sealValidator)
 		require.NoError(t, err)
 
@@ -1579,6 +1671,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -1625,7 +1718,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer,
+		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, log, consumer,
 			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
 		require.NoError(t, err)
 
@@ -2027,6 +2120,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -2045,7 +2139,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, blockTimer,
+		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, log, consumer, blockTimer,
 			util.MockReceiptValidator(), util.MockSealValidator(all.Seals))
 		require.NoError(t, err)
 

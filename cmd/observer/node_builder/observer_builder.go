@@ -269,6 +269,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 			node.Storage.Index,
 			node.Storage.Payloads,
 			node.Tracer,
+			node.Logger,
 			node.ProtocolEvents,
 			blocktimer.DefaultBlockTimer,
 		)
