@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -150,6 +151,13 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
+	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
+	// protocol state.
+	n.logger.Warn().
+		Str("peer_id", peerID.String()).
+		Bool(logging.KeySuspicious, true).
+		Msg("disconnected from peer")
+
 	return nil
 }
 

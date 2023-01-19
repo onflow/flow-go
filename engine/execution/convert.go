@@ -1,9 +1,6 @@
 package execution
 
 import (
-	"fmt"
-
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -12,7 +9,8 @@ func GenerateExecutionResultAndChunkDataPacks(
 	metrics module.ExecutionMetrics,
 	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
-	result *ComputationResult) (
+	result *ComputationResult,
+) (
 	endState flow.StateCommitment,
 	chdps []*flow.ChunkDataPack,
 	executionResult *flow.ExecutionResult,
@@ -41,17 +39,37 @@ func GenerateExecutionResultAndChunkDataPacks(
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
+			chunk = flow.NewChunk(
+				blockID,
+				i,
+				startState,
+				len(completeCollection.Transactions),
+				result.EventsHashes[i],
+				endState)
+			chdps[i] = flow.NewChunkDataPack(
+				chunk.ID(),
+				startState,
+				result.Proofs[i],
+				&collection)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), len(completeCollection.Transactions))
 
 		} else {
 			// system chunk
 			// note that system chunk does not have a collection.
 			// also, number of transactions is one for system chunk.
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
+			chunk = flow.NewChunk(
+				blockID,
+				i,
+				startState,
+				1,
+				result.EventsHashes[i],
+				endState)
 			// system chunk has a nil collection.
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
+			chdps[i] = flow.NewChunkDataPack(
+				chunk.ID(),
+				startState,
+				result.Proofs[i],
+				nil)
 			metrics.ExecutionChunkDataPackGenerated(len(result.Proofs[i]), 1)
 		}
 
@@ -60,74 +78,12 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataID)
-	if err != nil {
-		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
-	}
+	executionResult = flow.NewExecutionResult(
+		prevResultId,
+		blockID,
+		chunks,
+		result.ConvertedServiceEvents,
+		result.ExecutionDataID)
 
 	return endState, chdps, executionResult, nil
-}
-
-// GenerateExecutionResultForBlock creates new ExecutionResult for a block from
-// the provided chunk results.
-func GenerateExecutionResultForBlock(
-	previousErID flow.Identifier,
-	block *flow.Block,
-	chunks []*flow.Chunk,
-	serviceEvents []flow.Event,
-	executionDataID flow.Identifier,
-) (*flow.ExecutionResult, error) {
-
-	// convert Cadence service event representation to flow-go representation
-	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
-	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(block.Header.ChainID, event)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert service event: %w", err)
-		}
-		convertedServiceEvents = append(convertedServiceEvents, *converted)
-	}
-
-	er := &flow.ExecutionResult{
-		PreviousResultID: previousErID,
-		BlockID:          block.ID(),
-		Chunks:           chunks,
-		ServiceEvents:    convertedServiceEvents,
-		ExecutionDataID:  executionDataID,
-	}
-
-	return er, nil
-}
-
-// GenerateChunk creates a chunk from the provided computation data.
-func GenerateChunk(colIndex int,
-	startState, endState flow.StateCommitment,
-	blockID, eventsCollection flow.Identifier, txNumber uint64) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			EventCollection: eventsCollection,
-			BlockID:         blockID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			NumberOfTransactions: txNumber,
-		},
-		Index:    uint64(colIndex),
-		EndState: endState,
-	}
-}
-
-func GenerateChunkDataPack(
-	chunkID flow.Identifier,
-	startState flow.StateCommitment,
-	collection *flow.Collection,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:    chunkID,
-		StartState: startState,
-		Proof:      proof,
-		Collection: collection,
-	}
 }

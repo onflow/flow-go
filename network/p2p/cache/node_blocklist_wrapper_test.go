@@ -16,6 +16,7 @@ import (
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,7 +25,8 @@ type NodeBlocklistWrapperTestSuite struct {
 	DB       *badger.DB
 	provider *mocks.IdentityProvider
 
-	wrapper *cache.NodeBlocklistWrapper
+	wrapper      *cache.NodeBlocklistWrapper
+	mockNotifier *mockp2p.NodeBlockListConsumer
 }
 
 func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
@@ -32,7 +34,8 @@ func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error
-	s.wrapper, err = cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+	s.mockNotifier = mockp2p.NewNodeBlockListConsumer(s.T())
+	s.wrapper, err = cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 	require.NoError(s.T(), err)
 }
 
@@ -90,6 +93,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 //     generality.
 func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
 	blocklist := unittest.IdentityListFixture(11)
+	s.mockNotifier.On("OnNodeBlockListUpdate", blocklist.NodeIDs()).Once()
 	err := s.wrapper.Update(blocklist.NodeIDs())
 	require.NoError(s.T(), err)
 
@@ -233,6 +237,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 
 			// step 2: _after_ putting node on blocklist,
 			// an Identity with `Ejected` equal to `true` should be returned
+			s.mockNotifier.On("OnNodeBlockListUpdate", flow.IdentifierList{originalIdentity.NodeID}).Once()
 			err := s.wrapper.Update(flow.IdentifierList{originalIdentity.NodeID})
 			require.NoError(s.T(), err)
 
@@ -246,6 +251,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 
 			// step 3: after removing the node from the blocklist,
 			// an Identity with `Ejected` equal to the original value should be returned
+			s.mockNotifier.On("OnNodeBlockListUpdate", flow.IdentifierList{}).Once()
 			err = s.wrapper.Update(flow.IdentifierList{})
 			require.NoError(s.T(), err)
 
@@ -272,18 +278,22 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	blocklist2 := unittest.IdentifierListFixture(11)
 	blocklist3 := unittest.IdentifierListFixture(5)
 
+	s.mockNotifier.On("OnNodeBlockListUpdate", blocklist1).Once()
 	err := s.wrapper.Update(blocklist1)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist1.Lookup(), s.wrapper.GetBlocklist().Lookup())
 
+	s.mockNotifier.On("OnNodeBlockListUpdate", blocklist2).Once()
 	err = s.wrapper.Update(blocklist2)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist2.Lookup(), s.wrapper.GetBlocklist().Lookup())
 
+	s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 	err = s.wrapper.ClearBlocklist()
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), s.wrapper.GetBlocklist())
 
+	s.mockNotifier.On("OnNodeBlockListUpdate", blocklist3).Once()
 	err = s.wrapper.Update(blocklist3)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocklist3.Lookup(), s.wrapper.GetBlocklist().Lookup())
@@ -309,35 +319,39 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	})
 
 	s.Run("Clear blocklist on empty database", func() {
+		s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 		err := s.wrapper.ClearBlocklist() // No-op as data base does not contain any block list
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), s.wrapper.GetBlocklist())
 
 		// newly created wrapper should read `blocklist` from data base during initialization
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w.GetBlocklist())
 	})
 
 	s.Run("Update blocklist and init new wrapper from database", func() {
+		s.mockNotifier.On("OnNodeBlockListUpdate", blocklist).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
 
 		// newly created wrapper should read `blocklist` from data base during initialization
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist.Lookup(), w.GetBlocklist().Lookup())
 	})
 
 	s.Run("Update and overwrite blocklist and then init new wrapper from database", func() {
+		s.mockNotifier.On("OnNodeBlockListUpdate", blocklist).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
 
+		s.mockNotifier.On("OnNodeBlockListUpdate", blocklist2).Once()
 		err = s.wrapper.Update(blocklist2)
 		require.NoError(s.T(), err)
 
 		// newly created wrapper should read initial state from data base
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist2.Lookup(), w.GetBlocklist().Lookup())
 	})
@@ -345,28 +359,31 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	s.Run("Update & clear & update and then init new wrapper from database", func() {
 		// set blocklist ->
 		// newly created wrapper should now read this list from data base during initialization
+		s.mockNotifier.On("OnNodeBlockListUpdate", blocklist).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
 
-		w0, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w0, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist.Lookup(), w0.GetBlocklist().Lookup())
 
 		// clear blocklist ->
 		// newly created wrapper should now read empty blocklist from data base during initialization
+		s.mockNotifier.On("OnNodeBlockListUpdate", (flow.IdentifierList)(nil)).Once()
 		err = s.wrapper.ClearBlocklist()
 		require.NoError(s.T(), err)
 
-		w1, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w1, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w1.GetBlocklist())
 
 		// set blocklist2 ->
 		// newly created wrapper should now read this list from data base during initialization
+		s.mockNotifier.On("OnNodeBlockListUpdate", blocklist2).Once()
 		err = s.wrapper.Update(blocklist2)
 		require.NoError(s.T(), err)
 
-		w2, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB)
+		w2, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.mockNotifier)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist2.Lookup(), w2.GetBlocklist().Lookup())
 	})

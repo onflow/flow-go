@@ -459,13 +459,13 @@ func TestView_RegisterTouches(t *testing.T) {
 	})
 }
 
-func TestView_AllRegisters(t *testing.T) {
+func TestView_AllRegisterIDs(t *testing.T) {
 	v := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
 	t.Run("Empty", func(t *testing.T) {
-		regs := v.Interactions().AllRegisters()
+		regs := v.Interactions().AllRegisterIDs()
 		assert.Empty(t, regs)
 	})
 
@@ -498,7 +498,7 @@ func TestView_AllRegisters(t *testing.T) {
 		err = v.Touch("f", "")
 		assert.NoError(t, err)
 
-		allRegs := v.Interactions().AllRegisters()
+		allRegs := v.Interactions().AllRegisterIDs()
 		assert.Len(t, allRegs, 6)
 	})
 	t.Run("With Merge", func(t *testing.T) {
@@ -532,7 +532,7 @@ func TestView_AllRegisters(t *testing.T) {
 
 		err = v.MergeView(vv)
 		assert.NoError(t, err)
-		allRegs := v.Interactions().AllRegisters()
+		allRegs := v.Interactions().AllRegisterIDs()
 		assert.Len(t, allRegs, 6)
 	})
 }

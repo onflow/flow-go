@@ -65,7 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware = (*Middleware)(nil)
+	_ network.Middleware        = (*Middleware)(nil)
+	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -342,6 +343,16 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	}
 
 	return peerIDs
+}
+
+// OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
+func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
+	for _, pid := range m.peerIDs(blockList) {
+		err := m.libP2PNode.RemovePeer(pid)
+		if err != nil {
+			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
+		}
+	}
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous

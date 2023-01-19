@@ -8,14 +8,25 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func Transaction(
+	txn *flow.TransactionBody,
+	txnIndex uint32,
+) *TransactionProcedure {
+	return NewTransaction(txn.ID(), txnIndex, txn)
+}
+
 // TODO(patrick): pass in initial snapshot time when we start supporting
 // speculative pre-processing / execution.
-func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
+func NewTransaction(
+	txnId flow.Identifier,
+	txnIndex uint32,
+	txnBody *flow.TransactionBody,
+) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     tx.ID(),
-		Transaction:            tx,
-		InitialSnapshotTxIndex: txIndex,
-		TxIndex:                txIndex,
+		ID:                     txnId,
+		Transaction:            txnBody,
+		InitialSnapshotTxIndex: txnIndex,
+		TxIndex:                txnIndex,
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
@@ -27,8 +38,9 @@ type TransactionProcedure struct {
 	TxIndex                uint32
 
 	Logs                   []string
-	Events                 []flow.Event
-	ServiceEvents          []flow.Event
+	Events                 flow.EventsList
+	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
 	ComputationUsed        uint64
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64

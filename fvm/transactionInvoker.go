@@ -85,7 +85,7 @@ func newTransactionExecutor(
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
 	ctx.TxIndex = proc.TxIndex
-	ctx.TxId = proc.Transaction.ID()
+	ctx.TxId = proc.ID
 	ctx.TxBody = proc.Transaction
 
 	env := environment.NewTransactionEnvironment(
@@ -460,6 +460,7 @@ func (executor *transactionExecutor) commit(
 	// if tx failed this will only contain fee deduction events
 	executor.proc.Events = executor.env.Events()
 	executor.proc.ServiceEvents = executor.env.ServiceEvents()
+	executor.proc.ConvertedServiceEvents = executor.env.ConvertedServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

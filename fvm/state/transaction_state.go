@@ -404,11 +404,12 @@ func (s *TransactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
 }
 
-func (s *TransactionState) RegisterUpdates() (
-	[]flow.RegisterID,
-	[]flow.RegisterValue,
-) {
-	return s.currentState().RegisterUpdates()
+func (s *TransactionState) UpdatedRegisterIDs() []flow.RegisterID {
+	return s.currentState().UpdatedRegisterIDs()
+}
+
+func (s *TransactionState) UpdatedRegisters() flow.RegisterEntries {
+	return s.currentState().UpdatedRegisters()
 }
 
 // EnableAllLimitEnforcements enables all the limits

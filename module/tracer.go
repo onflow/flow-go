@@ -12,12 +12,15 @@ import (
 var (
 	_ Tracer = &trace.Tracer{}
 	_ Tracer = &trace.NoopTracer{}
-	_ Tracer = &trace.LogTracer{}
 )
 
 // Tracer interface for tracers in flow. Uses open tracing span definitions
 type Tracer interface {
 	ReadyDoneAware
+
+	// BlockRootSpan returns the block's empty root span.  The returned span
+	// has already ended, and should only be used for creating children span.
+	BlockRootSpan(blockID flow.Identifier) otelTrace.Span
 
 	// StartBlockSpan starts an span for a block, built as a child of rootSpan.
 	// It also returns the context including this span which can be used for
@@ -45,19 +48,6 @@ type Tracer interface {
 		context.Context,
 	)
 
-	// StartTransactionSpan starts an span for a transaction, built as a child
-	// of rootSpan.  It also returns the context including this span which can
-	// be used for nested calls.
-	StartTransactionSpan(
-		ctx context.Context,
-		transactionID flow.Identifier,
-		spanName trace.SpanName,
-		opts ...otelTrace.SpanStartOption,
-	) (
-		otelTrace.Span,
-		context.Context,
-	)
-
 	StartSpanFromContext(
 		ctx context.Context,
 		operationName trace.SpanName,
@@ -69,6 +59,17 @@ type Tracer interface {
 
 	StartSpanFromParent(
 		parentSpan otelTrace.Span,
+		operationName trace.SpanName,
+		opts ...otelTrace.SpanStartOption,
+	) otelTrace.Span
+
+	ShouldSample(entityID flow.Identifier) bool
+
+	// StartSampledSpanFromParent starts a real span from the parent span
+	// if the entity should be sampled.  Otherwise, it returns a no-op span.
+	StartSampledSpanFromParent(
+		parentSpan otelTrace.Span,
+		entityID flow.Identifier,
 		operationName trace.SpanName,
 		opts ...otelTrace.SpanStartOption,
 	) otelTrace.Span

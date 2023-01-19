@@ -93,8 +93,9 @@ func (v *View) Interactions() *SpockSnapshot {
 	}
 }
 
-// AllRegisters returns all the register IDs either in read or delta
-func (r *Snapshot) AllRegisters() []flow.RegisterID {
+// AllRegisterIDs returns all the register IDs either in read or delta.
+// The returned ids are unsorted.
+func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 	set := make(map[flow.RegisterID]struct{}, len(r.Reads)+len(r.Delta.Data))
 	for reg := range r.Reads {
 		set[reg] = struct{}{}
@@ -118,13 +119,18 @@ func (v *View) DropDelta() {
 	v.delta = NewDelta()
 }
 
-func (v *View) AllRegisters() []flow.RegisterID {
-	return v.Interactions().AllRegisters()
+func (v *View) AllRegisterIDs() []flow.RegisterID {
+	return v.Interactions().AllRegisterIDs()
 }
 
-// RegisterUpdates returns a list of register updates
-func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return v.Delta().RegisterUpdates()
+// UpdatedRegisterIDs returns a list of updated registers' ids.
+func (v *View) UpdatedRegisterIDs() []flow.RegisterID {
+	return v.Delta().UpdatedRegisterIDs()
+}
+
+// UpdatedRegisters returns a list of updated registers.
+func (v *View) UpdatedRegisters() flow.RegisterEntries {
+	return v.Delta().UpdatedRegisters()
 }
 
 // Get gets a register value from this view.

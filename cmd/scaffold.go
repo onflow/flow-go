@@ -406,8 +406,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-
-	fnb.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		fnb.Logger,
 		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
@@ -418,6 +417,8 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
 		mwOpts...)
+	fnb.NodeBlockListDistributor.AddConsumer(mw)
+	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -954,7 +955,8 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		fnb.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}

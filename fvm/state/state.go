@@ -146,9 +146,14 @@ func (s *State) InteractionUsed() uint64 {
 	return s.meter.TotalBytesOfStorageInteractions()
 }
 
-// RegisterUpdates returns the lists of register id / value that were updated.
-func (s *State) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return s.view.RegisterUpdates()
+// UpdatedRegisterIDs returns the lists of register ids that were updated.
+func (s *State) UpdatedRegisterIDs() []flow.RegisterID {
+	return s.view.UpdatedRegisterIDs()
+}
+
+// UpdatedRegisters returns the lists of register entries that were updated.
+func (s *State) UpdatedRegisters() flow.RegisterEntries {
+	return s.view.UpdatedRegisters()
 }
 
 // Get returns a register value given owner and key
