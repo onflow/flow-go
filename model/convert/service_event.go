@@ -148,7 +148,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 
 	payloadEvent, is := payload.(cadence.Event)
 	if !is {
-		return nil, fmt.Errorf("unexpected type of payload, expected cadence.Event got %T", payload)
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
 	commit.Counter = uint64(payloadEvent.Fields[0].(cadence.UInt64))
@@ -190,14 +190,48 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
 
-	for _, cadenceVal := range payload.(cadence.Event).Fields[0].(cadence.Array).Values {
-		height := cadenceVal.(cadence.Struct).Fields[0].(cadence.UInt64).ToGoValue().(uint64)
-		version := cadenceVal.(cadence.Struct).Fields[1].(cadence.String).ToGoValue().(string)
+	payloadEvent, is := payload.(cadence.Event)
+	if !is {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
+	}
+
+	if len(payloadEvent.Fields) < 2 {
+		return nil, fmt.Errorf("insufficient fields in VersionBeacon event (%d < 2)", len(payloadEvent.Fields))
+	}
+
+	payloadArray, is := payloadEvent.Fields[0].(cadence.Array)
+	if !is {
+		return nil, invalidCadenceTypeError("payload.Fields[0]", payloadEvent.Fields[0], cadence.Array{})
+	}
+
+	for i, cadenceVal := range payloadArray.Values {
+		valStruct, is := cadenceVal.(cadence.Struct)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d]", i), cadenceVal, cadence.Struct{})
+		}
+		if len(valStruct.Fields) < 2 {
+			return nil, fmt.Errorf("insufficient fields in payload.Fields[0].Values[%d].Fields (%d < 2)", i, len(valStruct.Fields))
+		}
+		cadenceHeight, is := valStruct.Fields[0].(cadence.UInt64)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[0]", i), valStruct.Fields[0], cadence.UInt64(0))
+		}
+		height := cadenceHeight.ToGoValue().(uint64)
+
+		cadenceVersion, is := valStruct.Fields[1].(cadence.String)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1]", i), valStruct.Fields[1], cadence.String(""))
+		}
+		version := cadenceVersion.ToGoValue().(string)
 
 		versionTable.RequiredVersions = append(versionTable.RequiredVersions, flow.VersionControlRequirement{Height: height, Version: version})
 	}
 
-	seq := payload.(cadence.Event).Fields[1].(cadence.UInt64).ToGoValue().(uint64)
+	payloadUint64 := payloadEvent.Fields[1].(cadence.UInt64)
+	seq, is := payloadUint64.ToGoValue().(uint64)
+	if !is {
+		return nil, invalidCadenceTypeError("payload.Fields[1]", payloadEvent.Fields[1], cadence.UInt64(0))
+	}
 
 	versionTable.Sequence = seq
 

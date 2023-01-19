@@ -201,7 +201,7 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 }
 
 // isValidVersionBeacon validates internal structure of flow.VersionBeacon
-// InvalidServiceEventError with appropriate message is returned if any validation fails.
+// protocol.InvalidServiceEventError with appropriate message is returned if any validation fails.
 // Please refer to documentation of flow.VersionBeacon for a description of what's expected of a valid VersionBeacon.
 func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 	if len(vb.RequiredVersions) == 0 {
@@ -241,6 +241,9 @@ func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 	return nil
 }
 
+// validateRequirement validates an individual version requirement (one entry in the version table).
+// Returns the parsed semver version for a valid requirement input.
+// Returns protocol.InvalidServiceEventError for an invalid semver string
 func validateRequirement(vr flow.VersionControlRequirement) (*semver.Version, error) {
 	version, err := semver.NewVersion(vr.Version)
 	if err != nil {
