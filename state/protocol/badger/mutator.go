@@ -897,7 +897,11 @@ SealLoop:
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.epoch.commits.StoreTx(ev))
 			case *flow.VersionBeacon:
-				// nothing here, but prevents default case from triggering
+				// Conceptually, service events are processed and incorporated into the state at this point
+				// before finalization (in a fork-aware manner). Since there is no use-case for querying 
+				// VersionTable information for un-finalized forks, we skip validation here for convenience
+				// and instead perform both validation and indexing together when the block is finalized (see Finalize)
+				continue
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
 			}
