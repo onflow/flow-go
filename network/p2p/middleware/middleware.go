@@ -364,14 +364,7 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	maxMsgSize, err := unicastMaxMsgSize(msg.Proto().Payload[0])
-	if err != nil {
-		m.log.Error().
-			Err(err).
-			Str("payload_type", msg.PayloadType()).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed get unicast max message size")
-	}
+	maxMsgSize := unicastMaxMsgSize(msg.PayloadType())
 	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
@@ -638,18 +631,16 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
 func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
-	lg := m.log.With().Str("peer_id", remotePeer.String()).Str("channel", msg.ChannelID).Logger()
-
 	channel := channels.Channel(msg.ChannelID)
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize, err := unicastMaxMsgSize(msg.Payload[0])
+	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload[0])
 	if err != nil {
-		lg.Error().
-			Err(err).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to unicast max message size")
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
+			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+		})
+		return
 	}
 	if msg.Size() > maxSize {
 		// message size exceeded
@@ -665,7 +656,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg, channel, message.ProtocolUnicast)
+		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload[0], channel, message.ProtocolUnicast)
 		if err != nil {
 			m.log.
 				Error().
@@ -810,18 +801,24 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message
-func unicastMaxMsgSize(messageCode uint8) (int, error) {
+func unicastMaxMsgSize(messageType string) int {
+	switch messageType {
+	case "messages.ChunkDataResponse":
+		return LargeMsgMaxUnicastMsgSize
+	default:
+		return DefaultMaxUnicastMsgSize
+	}
+}
+
+// unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func unicastMaxMsgSizeByCode(messageCode uint8) (int, error) {
 	_, messageType, err := codec.InterfaceFromMessageCode(messageCode)
 	if err != nil {
 		return 0, err
 	}
 
-	switch messageType {
-	case "ChunkDataResponse":
-		return LargeMsgMaxUnicastMsgSize, nil
-	default:
-		return DefaultMaxUnicastMsgSize, nil
-	}
+	maxSize := unicastMaxMsgSize(messageType)
+	return maxSize, nil
 }
 
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete

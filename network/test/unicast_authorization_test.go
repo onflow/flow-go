@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -377,19 +376,17 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	modifiedMessageCode := codec.CodeDKGMessage
 
-	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
-		Identity: nilID,
+		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "",
+		MsgType:  "DKGMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolUnicast,
-		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
-		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
+		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
 	slashingViolationsConsumer.On(
-		"OnInvalidMsgError",
+		"OnUnAuthorizedSenderError",
 		expectedViolation,
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
@@ -570,7 +567,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	expectedViolation := &slashing.Violation{
 		Identity: nil,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  message.TestMessage,
+		MsgType:  "message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolUnicast,
 		Err:      middleware.ErrUnicastMsgWithoutSub,
