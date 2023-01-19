@@ -3,6 +3,8 @@ package wintermute
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
@@ -179,7 +181,7 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 
 	// bootstraps the system
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), rootSnapshot)
+	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), rootSnapshot)
 
 	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...).NodeIDs()
 }
