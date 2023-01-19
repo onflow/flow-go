@@ -239,6 +239,7 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 	finalized, err := client.GetLatestFinalizedBlockHeader(ctx)
 	if err != nil {
 		log.Err(err).Msg("failed to get finalized header")
+		return
 	}
 
 	sealed, err := snapshot.Head()
