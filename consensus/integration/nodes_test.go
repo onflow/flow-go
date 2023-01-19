@@ -367,11 +367,17 @@ func createNode(
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
+	localID := identity.ID()
+
+	// log with node index an ID
+	log := unittest.Logger().With().
+		Int("index", index).
+		Hex("node_id", localID[:]).
+		Logger()
+
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, log, consumer,
 		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
-
-	localID := identity.ID()
 
 	node := &Node{
 		db:    db,
@@ -379,12 +385,6 @@ func createNode(
 		index: index,
 		id:    identity,
 	}
-
-	// log with node index an ID
-	log := unittest.Logger().With().
-		Int("index", index).
-		Hex("node_id", localID[:]).
-		Logger()
 
 	stopConsumer := stopper.AddNode(node)
 

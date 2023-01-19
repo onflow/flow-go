@@ -2,6 +2,7 @@ package collection_test
 
 import (
 	"context"
+	"github.com/rs/zerolog"
 	"math/rand"
 	"os"
 	"testing"
@@ -75,6 +76,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
+	log := zerolog.Nop()
 	all := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
 	suite.headers = all.Headers
@@ -103,7 +105,7 @@ func (suite *BuilderSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, log, consumer, util.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool

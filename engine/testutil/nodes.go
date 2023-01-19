@@ -120,7 +120,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates state fixture and bootstrap it.
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	stateFixture := CompleteStateFixture(t, metrics, tracer, rootSnapshot)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, log, rootSnapshot)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -146,7 +146,7 @@ func GenericNode(
 		Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	stateFixture := CompleteStateFixture(t, metrics, tracer, root)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, log, root)
 
 	head, err := root.Head()
 	require.NoError(t, err)
@@ -220,6 +220,7 @@ func CompleteStateFixture(
 	t testing.TB,
 	metric *metrics.NoopCollector,
 	tracer module.Tracer,
+	log zerolog.Logger,
 	rootSnapshot protocol.Snapshot,
 ) *testmock.StateFixture {
 
@@ -234,7 +235,7 @@ func CompleteStateFixture(
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, s.VersionBeacons, rootSnapshot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer,
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, log, consumer,
 		util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
@@ -516,7 +517,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer,
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.Log,
 		node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	require.NoError(t, err)
 

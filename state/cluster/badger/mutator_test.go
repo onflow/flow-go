@@ -3,6 +3,7 @@ package badger
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"math"
 	"math/rand"
 	"os"
@@ -62,6 +63,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
+	log := zerolog.Nop()
 	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
@@ -89,7 +91,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses, all.VersionBeacons, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, log, consumer, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 }
 
