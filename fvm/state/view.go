@@ -8,8 +8,19 @@ type View interface {
 	NewChild() View
 	MergeView(child View) error
 	DropDelta() // drops all the delta changes
+
+	// UpdatedRegisters returns all registers that were updated by this view.
+	// The returned entries are sorted by ids.
 	UpdatedRegisters() flow.RegisterEntries
-	AllRegisters() []flow.RegisterID
+
+	// UpdatedRegisterIDs returns all register ids that were updated by this
+	// view.  The returned ids are unsorted.
+	UpdatedRegisterIDs() []flow.RegisterID
+
+	// AllRegisterIDs returns all register ids that were touched by this view.
+	// The returned ids are unsorted.
+	AllRegisterIDs() []flow.RegisterID
+
 	Ledger
 }
 
