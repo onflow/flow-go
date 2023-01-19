@@ -1,6 +1,7 @@
 package jobqueue_test
 
 import (
+	"github.com/rs/zerolog"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -51,9 +52,10 @@ func withReader(
 
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+		s := testutil.CompleteStateFixture(t, collector, tracer, log, rootSnapshot)
 
 		reader := jobqueue.NewFinalizedBlockReader(s.State, s.Storage.Blocks)
 

@@ -1,6 +1,7 @@
 package blockconsumer_test
 
 import (
+	"github.com/rs/zerolog"
 	"sync"
 	"testing"
 	"time"
@@ -123,9 +124,10 @@ func withConsumer(
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+		s := testutil.CompleteStateFixture(t, collector, tracer, log, rootSnapshot)
 
 		engine := &mockBlockProcessor{
 			process: process,
