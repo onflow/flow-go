@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
 )
 
@@ -29,7 +30,7 @@ func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.
 	trie := tries[len(tries)-1]
 	leafNodes := trie.AllLeafNodes()
 
-	err = importLeafNodesConcurrently(leafNodes, store)
+	err = importLeafNodesConcurrently(leafNodes, logger, store)
 	if err != nil {
 		return fmt.Errorf("fail to store the leafNode to store: %w", err)
 	}
@@ -37,7 +38,7 @@ func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.
 	return nil
 }
 
-func importLeafNodesConcurrently(leafNodes []*node.Node, store ledger.Storage) error {
+func importLeafNodesConcurrently(leafNodes []*node.Node, logger *zerolog.Logger, store ledger.Storage) error {
 	jobs := make(chan *node.Node, len(leafNodes))
 	results := make(chan error, len(leafNodes))
 
@@ -77,8 +78,10 @@ func importLeafNodesConcurrently(leafNodes []*node.Node, store ledger.Storage) e
 	}
 	close(jobs)
 
+	logProgress := util.LogProgress("importing leaf nodes to storage", len(leafNodes), logger)
 	// waiting for results
 	for i := 0; i < len(leafNodes); i++ {
+		logProgress(i)
 		err := <-results
 		if err != nil {
 			return err
