@@ -36,7 +36,7 @@ const (
 
 	EventNameEpochSetup   = "EpochSetup"
 	EventNameEpochCommit  = "EpochCommit"
-	EventNameVersionTable = "VersionTable"
+	EventNameVersionTable = "NodeVersionTableUpdated"
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 

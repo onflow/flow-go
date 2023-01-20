@@ -3,6 +3,7 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -185,6 +186,8 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 
 	versionTable := new(flow.VersionBeacon)
 
+	spew.Dump(event.Payload)
+
 	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
@@ -196,6 +199,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	if len(payloadEvent.Fields) < 2 {
+		spew.Dump(payloadEvent)
 		return nil, fmt.Errorf("insufficient fields in VersionBeacon event (%d < 2)", len(payloadEvent.Fields))
 	}
 

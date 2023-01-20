@@ -35,7 +35,6 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
@@ -405,7 +404,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 		require.NoError(t, err)
 
-		payload, err := json.Decode(nil, []byte(fixtures.EpochSetupFixtureJSON))
+		payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
 		require.NoError(t, err)
 
 		serviceEventA, ok := payload.(cadence.Event)
@@ -416,7 +415,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-		payload, err = json.Decode(nil, []byte(fixtures.EpochCommitFixtureJSON))
+		payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
 		require.NoError(t, err)
 
 		serviceEventB, ok := payload.(cadence.Event)
@@ -426,14 +425,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Address: common.Address(serviceEvents.EpochCommit.Address),
 		}
 		serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
-		serviceEventC := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.VersionTable.Address),
-				},
-				QualifiedIdentifier: serviceEvents.VersionTable.QualifiedIdentifier(),
-			},
+
+		payload, err = json.Decode(nil, []byte(unittest.VersionBeaconFixtureJSON))
+		require.NoError(t, err)
+
+		serviceEventC, ok := payload.(cadence.Event)
+		require.True(t, ok)
+
+		serviceEventC.EventType.Location = common.AddressLocation{
+			Address: common.Address(serviceEvents.VersionTable.Address),
 		}
+		serviceEventC.EventType.QualifiedIdentifier = serviceEvents.VersionTable.QualifiedIdentifier()
 
 		// events to emit for each iteration/transaction
 		events := make([][]cadence.Event, totalTransactionCount)

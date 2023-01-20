@@ -1,4 +1,4 @@
-package fixtures
+package unittest
 
 import (
 	"github.com/onflow/flow-go/crypto"
@@ -156,7 +156,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	}
 
 	event := EventFixture(events.VersionTable.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(versionBeaconFixtureJSON)
+	event.Payload = []byte(VersionBeaconFixtureJSON)
 
 	expected := &flow.VersionBeacon{
 		RequiredVersions: []flow.VersionControlRequirement{
@@ -1252,7 +1252,7 @@ var EpochCommitFixtureJSON = `
     }
 }`
 
-var versionBeaconFixtureJSON = `{
+var VersionBeaconFixtureJSON = `{
   "type": "Event",
   "value": {
     "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionTable",
