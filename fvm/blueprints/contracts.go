@@ -35,6 +35,9 @@ var setIsContractDeploymentRestrictedTransactionTemplate string
 //go:embed scripts/deployContractTransactionTemplate.cdc
 var deployContractTransactionTemplate string
 
+//go:embed scripts/deployNodeVersionBeaconTransactionTemplate.cdc
+var deployNodeVersionBeaconTransactionTemplate string
+
 // SetContractDeploymentAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to deploy/update contracts
 func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
 	return setContractAuthorizersTransaction(ContractDeploymentAuthorizedAddressesPath, serviceAccount, authorized)

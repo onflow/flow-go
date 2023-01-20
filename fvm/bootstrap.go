@@ -44,6 +44,9 @@ var (
 			"fee execution effort cost",
 			"0.0"),
 	}
+
+	// DefaultVersionThreshold is the default NodeVersionBeacon threshold value
+	DefaultVersionThreshold = cadence.UInt64(1000)
 )
 
 func mustParseUFix64(name string, valueString string) cadence.UFix64 {
@@ -71,6 +74,8 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+
+	versionThreshold cadence.UInt64
 
 	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
 	// restrictedContractDeployment of nil means that the contract deployment is taken from the fvm Context instead of from the state.
@@ -221,8 +226,9 @@ func Bootstrap(
 				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
 				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 			},
-			transactionFees: BootstrapProcedureFeeParameters{0, 0, 0},
-			epochConfig:     epochs.DefaultEpochConfig(),
+			transactionFees:  BootstrapProcedureFeeParameters{0, 0, 0},
+			epochConfig:      epochs.DefaultEpochConfig(),
+			versionThreshold: DefaultVersionThreshold,
 		},
 	}
 
@@ -354,7 +360,7 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
-	b.deployVersionBeacon(service)
+	b.deployVersionBeacon(service, b.versionThreshold)
 
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
@@ -789,12 +795,12 @@ func (b *bootstrapExecutor) deployStakingProxyContract(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployVersionBeacon(service flow.Address) {
-	contract := contracts.NodeVersionBeacon()
+func (b *bootstrapExecutor) deployVersionBeacon(service flow.Address, versionThreshold cadence.UInt64) {
+	tx := blueprints.DeployNodeVersionBeaconTransaction(service, versionThreshold)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployContractTransaction(service, contract, "NodeVersionBeacon"),
+			tx,
 			0,
 		),
 	)

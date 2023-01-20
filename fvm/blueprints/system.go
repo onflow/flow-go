@@ -2,7 +2,11 @@ package blueprints
 
 import (
 	_ "embed"
+	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -37,4 +41,13 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 		SetGasLimit(SystemChunkTransactionGasLimit)
 
 	return tx, nil
+}
+
+// DeployNodeVersionBeaconTransaction returns the transaction body for the deployment NodeVersionBeacon contract transaction
+func DeployNodeVersionBeaconTransaction(service flow.Address, versionThreshold cadence.UInt64) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(deployNodeVersionBeaconTransactionTemplate)).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.NodeVersionBeacon())))).
+		AddArgument(jsoncdc.MustEncode(versionThreshold)).
+		AddAuthorizer(service)
 }
