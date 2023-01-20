@@ -39,7 +39,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	_, err := s.AccessClient().ExecuteScriptBytes(ctx, versionBufferScript, nil)
 	s.Require().NoError(err)
 
-	versionTableChangeScript := templates.GenerateChangeVersionTableScript(env)
+	versionTableChangeScript := templates.GenerateAddVersionToTableScript(env)
 
 	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
 	s.Require().NoError(err)
