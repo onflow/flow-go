@@ -178,8 +178,8 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
 	github.com/onflow/cadence v0.31.3 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20230120154104-9b6081951b30 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20230120154104-9b6081951b30 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20230120164231-55e01c715228 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20230120164231-55e01c715228 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go-sdk v0.31.3 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221130185733-92eb85ead310 // indirect
