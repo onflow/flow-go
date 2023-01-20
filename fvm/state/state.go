@@ -40,9 +40,8 @@ type State struct {
 	// bookkeeping purpose).
 	committed bool
 
-	view             View
-	meter            *meter.Meter
-	updatedAddresses map[flow.Address]struct{}
+	view  View
+	meter *meter.Meter
 	stateLimits
 }
 
@@ -114,11 +113,10 @@ type StateOption func(st *State) *State
 func NewState(view View, params StateParameters) *State {
 	m := meter.NewMeter(params.MeterParameters)
 	return &State{
-		committed:        false,
-		view:             view,
-		meter:            m,
-		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      params.stateLimits,
+		committed:   false,
+		view:        view,
+		meter:       m,
+		stateLimits: params.stateLimits,
 	}
 }
 
@@ -128,11 +126,10 @@ func (s *State) NewChildWithMeterParams(
 	params meter.MeterParameters,
 ) *State {
 	return &State{
-		committed:        false,
-		view:             s.view.NewChild(),
-		meter:            meter.NewMeter(params),
-		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      s.stateLimits,
+		committed:   false,
+		view:        s.view.NewChild(),
+		meter:       meter.NewMeter(params),
+		stateLimits: s.stateLimits,
 	}
 }
 
@@ -214,10 +211,6 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 		return err
 	}
 
-	if address, isAddress := addressFromOwner(owner); isAddress {
-		s.updatedAddresses[address] = struct{}{}
-	}
-
 	return nil
 }
 
@@ -294,20 +287,27 @@ func (s *State) MergeState(other *State) error {
 
 	s.meter.MergeMeter(other.meter)
 
-	// apply address updates
-	for k, v := range other.updatedAddresses {
-		s.updatedAddresses[k] = v
-	}
-
 	return nil
 }
 
 // UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
+	updatedRegisterIds := s.view.UpdatedRegisterIDs()
 
-	for k := range s.updatedAddresses {
-		addresses = append(addresses, k)
+	dedup := make(map[flow.Address]struct{}, len(updatedRegisterIds))
+	addresses := make([]flow.Address, 0, len(updatedRegisterIds))
+
+	for _, id := range updatedRegisterIds {
+		address, isAddress := addressFromOwner(id.Owner)
+		if !isAddress {
+			continue
+		}
+
+		_, ok := dedup[address]
+		if !ok {
+			addresses = append(addresses, address)
+			dedup[address] = struct{}{}
+		}
 	}
 
 	slices.SortFunc(addresses, func(a, b flow.Address) bool {
