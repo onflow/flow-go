@@ -204,18 +204,22 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
 
-	cdcNodeIDs := make([]cadence.Value, 0, len(allowedNodeIDs))
+	cdcDictEntries := make([]cadence.KeyValuePair, 0, len(allowedNodeIDs))
 	for _, id := range allowedNodeIDs {
 		cdcNodeID, err := cadence.NewString(id.String())
 		if err != nil {
 			panic(err)
 		}
-		cdcNodeIDs = append(cdcNodeIDs, cdcNodeID)
+		kvPair := cadence.KeyValuePair{
+			Key:   cdcNodeID,
+			Value: cadence.NewBool(true),
+		}
+		cdcDictEntries = append(cdcDictEntries, kvPair)
 	}
 
 	return flow.NewTransactionBody().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		AddArgument(jsoncdc.MustEncode(cadence.NewArray(cdcNodeIDs))).
+		AddArgument(jsoncdc.MustEncode(cadence.NewDictionary(cdcDictEntries))).
 		AddAuthorizer(idTableStakingAddr)
 }
 
