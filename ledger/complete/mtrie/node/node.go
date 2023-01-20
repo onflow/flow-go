@@ -270,3 +270,23 @@ func (n *Node) appendSubtreePayloads(result []ledger.Payload) []ledger.Payload {
 	result = n.rChild.appendSubtreePayloads(result)
 	return result
 }
+
+// AllLeafNodes returns all subtree leaf nodes from this subtrie
+func (n *Node) AllLeafNodes() []*Node {
+	return n.appendSubtreeLeafNodes([]*Node{})
+}
+
+// appendSubtreeLeafNodes recursively append the subtree leaf nodes to the
+// provided result slice.
+func (n *Node) appendSubtreeLeafNodes(result []*Node) []*Node {
+	if n == nil {
+		return result
+	}
+
+	if n.IsLeaf() {
+		return append(result, n)
+	}
+	result = n.lChild.appendSubtreeLeafNodes(result)
+	result = n.rChild.appendSubtreeLeafNodes(result)
+	return result
+}

@@ -732,6 +732,11 @@ func (mt *MTrie) AllPayloads() []ledger.Payload {
 	return mt.root.AllPayloads()
 }
 
+// AllLeafNodes returns all leaf nodes
+func (mt *MTrie) AllLeafNodes() []*node.Node {
+	return mt.root.AllLeafNodes()
+}
+
 // IsAValidTrie verifies the content of the trie for potential issues
 func (mt *MTrie) IsAValidTrie() bool {
 	// TODO add checks on the health of node max height ...
