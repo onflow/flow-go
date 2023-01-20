@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -34,6 +35,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
@@ -403,22 +405,27 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 		require.NoError(t, err)
 
-		serviceEventA := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochSetup.Address),
-				},
-				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
-			},
+		payload, err := json.Decode(nil, []byte(fixtures.EpochSetupFixtureJSON))
+		require.NoError(t, err)
+
+		serviceEventA, ok := payload.(cadence.Event)
+		require.True(t, ok)
+
+		serviceEventA.EventType.Location = common.AddressLocation{
+			Address: common.Address(serviceEvents.EpochSetup.Address),
 		}
-		serviceEventB := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochCommit.Address),
-				},
-				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
-			},
+		serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
+
+		payload, err = json.Decode(nil, []byte(fixtures.EpochCommitFixtureJSON))
+		require.NoError(t, err)
+
+		serviceEventB, ok := payload.(cadence.Event)
+		require.True(t, ok)
+
+		serviceEventB.EventType.Location = common.AddressLocation{
+			Address: common.Address(serviceEvents.EpochCommit.Address),
 		}
+		serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 		serviceEventC := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{

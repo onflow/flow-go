@@ -1,4 +1,4 @@
-package unittest
+package fixtures
 
 import (
 	"github.com/onflow/flow-go/crypto"
@@ -18,7 +18,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	}
 
 	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(epochSetupFixtureJSON)
+	event.Payload = []byte(EpochSetupFixtureJSON)
 
 	// randomSource is [0,0,...,1,2,3,4]
 	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
@@ -117,7 +117,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	}
 
 	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(epochCommitFixtureJSON)
+	event.Payload = []byte(EpochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{
 		Counter: 1,
@@ -171,7 +171,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-var epochSetupFixtureJSON = `
+var EpochSetupFixtureJSON = `
 {
   "type": "Event",
   "value": {
@@ -1103,7 +1103,7 @@ var epochSetupFixtureJSON = `
 }
 `
 
-var epochCommitFixtureJSON = `
+var EpochCommitFixtureJSON = `
 {
     "type": "Event",
     "value": {
