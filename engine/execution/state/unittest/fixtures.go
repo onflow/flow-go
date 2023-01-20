@@ -39,11 +39,16 @@ func ComputationResultForBlockFixture(
 		eventHashes[i] = unittest.IdentifierFixture()
 	}
 
-	serviceEventEpochCommit, _ := unittest.EpochCommitFixtureByChainID(flow.Localnet)
-	serviceEventEpochSetup, _ := unittest.EpochSetupFixtureByChainID(flow.Localnet)
-	serviceEventVersionBeacon, _ := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+	serviceEventEpochCommit, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
+	serviceEventEpochSetup, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	serviceEventVersionBeacon, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
 
 	serviceEvents := []flow.Event{serviceEventEpochCommit, serviceEventEpochSetup, serviceEventVersionBeacon}
+	convertedServiceEvents := flow.ServiceEventList{
+		serviceEventEpochCommitProtocol.ServiceEvent(),
+		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventVersionBeaconProtocol.ServiceEvent(),
+	}
 
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
@@ -55,5 +60,6 @@ func ComputationResultForBlockFixture(
 		EventsHashes:           eventHashes,
 		SpockSignatures:        spockHashes,
 		ServiceEvents:          serviceEvents,
+		ConvertedServiceEvents: convertedServiceEvents,
 	}
 }
