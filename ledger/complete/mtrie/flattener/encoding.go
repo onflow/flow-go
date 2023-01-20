@@ -31,7 +31,7 @@ const (
 	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
 )
 
-const payloadEncodingVersion = 1
+const PayloadEncodingVersion = 1
 
 // encodeLeafNode encodes leaf node in the following format:
 // - node type (1 byte)
@@ -49,7 +49,7 @@ const payloadEncodingVersion = 1
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := ledger.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
+	encPayloadSize := ledger.EncodedPayloadLengthWithoutPrefix(n.Payload(), PayloadEncodingVersion)
 
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
@@ -93,7 +93,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
 	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
 	// Returned buf is resliced to include appended payload.
-	buf = ledger.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
+	buf = ledger.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), PayloadEncodingVersion)
 
 	return buf
 }
@@ -385,7 +385,7 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	// Decode and copy payload
-	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
+	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, PayloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}
