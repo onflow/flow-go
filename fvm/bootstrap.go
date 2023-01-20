@@ -903,7 +903,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	}
 
 	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
-	txErr, fatalErr := errors.SplitErrorTypes(err)
 
-	return txErr, fatalErr
+	return tx.Err, err
 }
