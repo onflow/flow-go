@@ -55,11 +55,19 @@ type ManagerConfig struct {
 	LowWatermark  int // naming from libp2p
 }
 
+type ConnManagerOpt func(*ConnManager)
+
+func WithNotifyBundle(n *network.NotifyBundle) ConnManagerOpt {
+	return func(cn *ConnManager) {
+		cn.n = n
+	}
+}
+
 // NewConnManager creates a new connection manager.
 // It errors if creating the basic connection manager of libp2p fails.
 // The error is not benign, and we should crash the node if it happens.
 // It is a malpractice to start the node without connection manager.
-func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig) (*ConnManager, error) {
+func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig, opt ...ConnManagerOpt) (*ConnManager, error) {
 	basic, err := libp2pconnmgr.NewConnManager(cfg.LowWatermark, cfg.HighWatermark)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create basic connection manager of libp2p: %w", err)
@@ -78,6 +86,11 @@ func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics
 		DisconnectedF: cn.Disconnected,
 	}
 	cn.n = n
+
+	for _, apply := range opt {
+		apply(cn)
+	}
+
 	cn.log.Info().
 		Int("low_watermark", cfg.LowWatermark).
 		Int("high_watermark", cfg.HighWatermark).
