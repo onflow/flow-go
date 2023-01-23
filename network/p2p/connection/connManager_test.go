@@ -45,7 +45,7 @@ var isNotProtected = fun{
 	false,
 }
 
-// TestConnectionManagerProtection tests that multiple protect and unprotect calls result in the correct IsProtected
+// TestConnectionManagerProtection tests that multiple protected and unprotected calls result in the correct IsProtected
 // status for a peer ID
 func TestConnectionManagerProtection(t *testing.T) {
 

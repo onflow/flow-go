@@ -74,6 +74,10 @@ func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics
 		DisconnectedF: cn.Disconnected,
 	}
 	cn.n = n
+	cn.log.Info().
+		Int("low_watermark", cfg.LowWatermark).
+		Int("high_watermark", cfg.HighWatermark).
+		Msg("connection manager initialized")
 
 	return cn, nil
 }
