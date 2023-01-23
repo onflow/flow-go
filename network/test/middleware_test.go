@@ -239,7 +239,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
 	distributor := ratelimit.NewUnicastRateLimiterDistributor()
 	distributor.AddConsumer(consumer)
-	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter, &ratelimit.NoopRateLimiter{}, distributor, ratelimit.WithDisabledRateLimiting(false))
+
+	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
+	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
@@ -375,7 +377,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
 	distributor := ratelimit.NewUnicastRateLimiterDistributor()
 	distributor.AddConsumer(consumer)
-	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{}, bandwidthRateLimiter, distributor, ratelimit.WithDisabledRateLimiting(false))
+	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
+	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)

@@ -283,8 +283,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.UnicastRateLimiterDistributor = ratelimit.NewUnicastRateLimiterDistributor()
 	fnb.UnicastRateLimiterDistributor.AddConsumer(fnb.Metrics.Network)
 
-	// setup default noop unicast rate limiters
-	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), fnb.UnicastRateLimiterDistributor, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
+	// setup default rate limiter options
+	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun),
+		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
+	}
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
@@ -293,7 +296,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastMessageRateLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -304,6 +307,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// don't create outbound connections to rate limited peers
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
+
 	}
 
 	// override noop unicast bandwidth rate limiter
@@ -313,7 +317,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -323,6 +327,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
+
+	// setup unicast rate limiters
+	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()

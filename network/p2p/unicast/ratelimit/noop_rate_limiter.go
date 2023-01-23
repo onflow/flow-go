@@ -32,5 +32,6 @@ func NoopRateLimiters() *RateLimiters {
 		MessageRateLimiter:   &NoopRateLimiter{},
 		BandWidthRateLimiter: &NoopRateLimiter{},
 		disabled:             true,
+		notifier:             NewUnicastRateLimiterDistributor(),
 	}
 }

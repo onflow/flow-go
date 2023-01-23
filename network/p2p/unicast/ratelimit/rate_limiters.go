@@ -36,6 +36,24 @@ func WithDisabledRateLimiting(disabled bool) RateLimitersOption {
 	}
 }
 
+func WithMessageRateLimiter(messageLimiter p2p.RateLimiter) RateLimitersOption {
+	return func(r *RateLimiters) {
+		r.MessageRateLimiter = messageLimiter
+	}
+}
+
+func WithBandwidthRateLimiter(bandwidthLimiter p2p.RateLimiter) RateLimitersOption {
+	return func(r *RateLimiters) {
+		r.BandWidthRateLimiter = bandwidthLimiter
+	}
+}
+
+func WithNotifier(notifier p2p.RateLimiterConsumer) RateLimitersOption {
+	return func(r *RateLimiters) {
+		r.notifier = notifier
+	}
+}
+
 // RateLimiters used to manage stream and bandwidth rate limiters
 type RateLimiters struct {
 	MessageRateLimiter   p2p.RateLimiter
@@ -45,13 +63,8 @@ type RateLimiters struct {
 }
 
 // NewRateLimiters returns *RateLimiters
-func NewRateLimiters(messageLimiter, bandwidthLimiter p2p.RateLimiter, notifier p2p.RateLimiterConsumer, opts ...RateLimitersOption) *RateLimiters {
-	r := &RateLimiters{
-		MessageRateLimiter:   messageLimiter,
-		BandWidthRateLimiter: bandwidthLimiter,
-		notifier:             notifier,
-		disabled:             true,
-	}
+func NewRateLimiters(opts ...RateLimitersOption) *RateLimiters {
+	r := NoopRateLimiters()
 
 	for _, opt := range opts {
 		opt(r)
