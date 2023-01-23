@@ -51,7 +51,8 @@ func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(log, noopMetrics)
+	connManager, err := connection.NewConnManager(log, noopMetrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	testCases := [][]fun{
 		// single stream created on a connection

@@ -15,6 +15,24 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+const (
+	// DefaultHighWatermark is the default value for the high watermark (i.e., max number of connections).
+	// We assume a complete topology graph with maximum of 500 nodes.
+	defaultHighWatermark = 500
+
+	// DefaultLowWatermark is the default value for the low watermark (i.e., min number of connections).
+	// We assume a complete topology graph with minimum of 450 nodes.
+	defaultLowWatermark = 450
+)
+
+// DefaultConnManagerConfig returns the default configuration for the connection manager.
+func DefaultConnManagerConfig() *ManagerConfig {
+	return &ManagerConfig{
+		HighWatermark: defaultHighWatermark,
+		LowWatermark:  defaultLowWatermark,
+	}
+}
+
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
 // This implementation updates networking metrics when a peer connection is added or removed
@@ -30,9 +48,6 @@ type ConnManager struct {
 var _ connmgr.ConnManager = (*ConnManager)(nil)
 
 type ManagerConfig struct {
-	logger zerolog.Logger
-	metric module.LibP2PConnectionMetrics
-
 	// HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
 	// When the peer count exceeds the HighWatermark, as many peers will be pruned (and
 	// their connections terminated) until LowWatermark peers remain.
@@ -40,15 +55,15 @@ type ManagerConfig struct {
 	LowWatermark  int // naming from libp2p
 }
 
-func NewConnManager(cfg *ManagerConfig) (*ConnManager, error) {
+func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig) (*ConnManager, error) {
 	basic, err := libp2pconnmgr.NewConnManager(cfg.LowWatermark, cfg.HighWatermark)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create basic connection manager of libp2p: %w", err)
 	}
 
 	cn := &ConnManager{
-		log:          cfg.logger.With().Str("component", "connection_manager").Logger(),
-		metrics:      cfg.metric,
+		log:          logger.With().Str("component", "connection_manager").Logger(),
+		metrics:      metric,
 		protected:    make(map[peer.ID]map[string]struct{}),
 		basicConnMgr: basic,
 	}

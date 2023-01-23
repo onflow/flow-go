@@ -74,8 +74,10 @@ func NodeFixture(
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(logger, noopMetrics)
 	resourceManager := testutils.NewResourceManager(t)
+
+	connManager, err := connection.NewConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,

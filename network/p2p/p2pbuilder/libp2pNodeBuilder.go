@@ -71,8 +71,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	connectionPruning bool,
 	updateInterval time.Duration,
 	rCfg *ResourceManagerConfig) LibP2PFactoryFunc {
+
 	return func() (p2p.LibP2PNode, error) {
-		builder := DefaultNodeBuilder(log,
+		builder, err := DefaultNodeBuilder(log,
 			address,
 			flowKey,
 			sporkId,
@@ -86,6 +87,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			connectionPruning,
 			updateInterval,
 			rCfg)
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create node builder: %w", err)
+		}
+
 		return builder.Build()
 	}
 }
@@ -451,8 +457,12 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerScoringEnabled bool,
 	connectionPruning bool,
 	updateInterval time.Duration,
-	rCfg *ResourceManagerConfig) NodeBuilder {
-	connManager := connection.NewConnManager(log, metrics)
+	rCfg *ResourceManagerConfig) (NodeBuilder, error) {
+
+	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection manager: %w", err)
+	}
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
 	peerFilter := notEjectedPeerFilter(idProvider)
@@ -481,5 +491,5 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 	}
 
-	return builder
+	return builder, nil
 }

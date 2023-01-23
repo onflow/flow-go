@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -91,13 +92,17 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *TagWatchingConnManager {
-	cm := connection.NewConnManager(log, metrics)
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *connection.ManagerConfig) (*TagWatchingConnManager, error) {
+	cm, err := connection.NewConnManager(log, metrics, config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection manager: %w", err)
+	}
+
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
 		obsLock:     sync.RWMutex{},
-	}
+	}, nil
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
@@ -120,12 +125,10 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		}
 	}
 
-	idProvider := id.NewFixedIdentityProvider(identities)
-
 	// generates keys and address for the node
-	for i, id := range identities {
+	for i, identity := range identities {
 		// generate key
-		key, err := generateNetworkingKey(id.NodeID)
+		key, err := generateNetworkingKey(identity.NodeID)
 		require.NoError(t, err)
 
 		var opts []nodeBuilderOption
@@ -133,7 +136,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -361,13 +364,13 @@ func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	key crypto.PrivateKey,
-	idProvider module.IdentityProvider,
 	opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, noopMetrics)
+	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
