@@ -37,6 +37,12 @@ func WithGetTimeNowFunc(now GetTimeNow) RateLimiterOpt {
 	}
 }
 
+// UnicastRateLimiterDistributor consumes then distributes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
+type UnicastRateLimiterDistributor interface {
+	RateLimiterConsumer
+	AddConsumer(consumer RateLimiterConsumer)
+}
+
 // RateLimiterConsumer consumes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
 // Implementations must:
 //   - be concurrency safe
