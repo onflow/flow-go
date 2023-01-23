@@ -578,9 +578,15 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
-// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
-func integrationBootstrapDir() (string, error) {
-	return os.MkdirTemp(TmpRoot, integrationBootstrap)
+// tempDir creates a temporary directory at /tmp/flow-integration-bootstrap
+func tempDir(t *testing.T) string {
+	dir, err := os.MkdirTemp(TmpRoot, integrationBootstrap)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
+	})
+	return dir
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
@@ -609,8 +615,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	})
 
 	// create a temporary directory to store all bootstrapping files
-	bootstrapDir, err := integrationBootstrapDir()
-	require.Nil(t, err)
+	bootstrapDir := tempDir(t)
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
@@ -813,7 +818,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}()
 
 	// Setup directories
-	tmpdir := t.TempDir()
+	tmpdir := tempDir(t)
 
 	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
 	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -921,7 +926,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
-	tmpdir := t.TempDir()
+	tmpdir := tempDir(t)
 
 	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
