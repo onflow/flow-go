@@ -1,9 +1,6 @@
 package delta
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -94,31 +91,4 @@ func (d Delta) RegisterIDs() []flow.RegisterID {
 		ids = append(ids, k)
 	}
 	return ids
-}
-
-func (d Delta) MarshalJSON() ([]byte, error) {
-	m := make(flow.RegisterEntries, len(d.Data))
-	for key, value := range d.Data {
-		m = append(m, flow.RegisterEntry{Key: key, Value: value})
-	}
-	return json.Marshal(m)
-}
-
-func (d *Delta) UnmarshalJSON(data []byte) error {
-
-	var m flow.RegisterEntries
-
-	err := json.Unmarshal(data, &m)
-	if err != nil {
-		return fmt.Errorf("cannot umarshal Delta: %w", err)
-	}
-	dd := make(map[flow.RegisterID]flow.RegisterValue, len(m))
-
-	for _, value := range m {
-		dd[value.Key] = value.Value
-	}
-
-	d.Data = dd
-
-	return nil
 }
