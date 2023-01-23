@@ -618,10 +618,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	bootstrapDir := tempDir(t)
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
-	t.Cleanup(func() {
-		err := os.RemoveAll(bootstrapDir)
-		require.NoError(t, err)
-	})
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
