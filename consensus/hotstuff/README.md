@@ -103,13 +103,13 @@ the `LevelledForest` is an in-memory data structure to store and maintain a leve
    - vote: validity of signature, voter is has positive weight
 * `VoteAggregator` caches votes on a per-block basis and builds QC if enough votes have been accumulated.
 * `TimeoutAggregator` caches timeouts on a per-view basis and builds TC if enough timeouts have been accumulated. Performs validation and verification of timeouts.
-* `Voter` tracks the view of the latest vote and determines whether or not to vote for a block (by calling `forks.IsSafeBlock`)
-* `Committee` maintains the list of all authorized network members and their respective weight on a per-block basis. Furthermore, the committee contains the primary selection algorithm. 
+* `Replicas` maintains the list of all authorized network members and their respective weight on a per-view basis. Maintains a static list which changes only between epochs. Furthermore, the `Replicas` contains the primary selection algorithm.
+* `DynamicCommittee` maintains the list of all authorized network members and their respective weight on a per-block basis. Extends `Replicas`.
 * `BlockProducer` constructs the payload of a block, after the HotStuff core logic has decided which fork to extend 
 
 # Implementation
 
-We have translated the Chained HotStuff protocol into a state machine shown below. The state machine is implemented 
+We have translated the HotStuff protocol into a state machine shown below. The state machine is implemented 
 in `EventHandler`.
 
 ![](/docs/StateMachine.png)
