@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 
@@ -186,7 +184,6 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 
 	versionTable := new(flow.VersionBeacon)
-
 
 	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
