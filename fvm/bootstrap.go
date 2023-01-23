@@ -891,6 +891,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),
 		WithSequenceNumberCheckAndIncrementEnabled(false),
+		WithMemoryAndInteractionLimitsDisabled(),
 	)
 
 	// use new derived transaction data for each meta transaction.
