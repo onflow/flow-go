@@ -119,6 +119,10 @@ func NodeFixture(
 		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
+	if parameters.ConnManager != nil {
+		builder.SetConnectionManager(parameters.ConnManager)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -153,6 +157,7 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
+	ConnManager        connmgr.ConnManager
 	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 }
@@ -205,6 +210,12 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.ConnGater = connGater
+	}
+}
+
+func WithConnectionManager(connManager connmgr.ConnManager) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnManager = connManager
 	}
 }
 
