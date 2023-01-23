@@ -109,7 +109,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 
 // EpochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func /**/ EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {

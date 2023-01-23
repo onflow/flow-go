@@ -45,7 +45,8 @@ var (
 			"0.0"),
 	}
 
-	// DefaultVersionThreshold is the default NodeVersionBeacon threshold value
+	// DefaultVersionThreshold is the default NodeVersionBeacon threshold value - the number
+	// of block heights required between consecutive version table changes.
 	DefaultVersionThreshold = cadence.UInt64(1000)
 )
 

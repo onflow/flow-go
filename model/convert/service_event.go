@@ -187,7 +187,6 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 
 	versionTable := new(flow.VersionBeacon)
 
-	spew.Dump(event.Payload)
 
 	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
@@ -200,7 +199,6 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	if len(payloadEvent.Fields) < 2 {
-		spew.Dump(payloadEvent)
 		return nil, fmt.Errorf("insufficient fields in VersionBeacon event (%d < 2)", len(payloadEvent.Fields))
 	}
 

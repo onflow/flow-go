@@ -601,7 +601,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 				err := isValidVersionBeacon(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
-						m.log.Warn().Err(err).Msg("invalid VersionBeacon service event")
+						m.log.Err(err).Str("block_id", blockID.String()).Msg("invalid VersionBeacon service event")
 						continue
 					} else {
 						return fmt.Errorf("unexpected error during VersionBeacon validation: %w", err)
