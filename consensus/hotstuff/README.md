@@ -5,15 +5,14 @@ We use a BFT consensus algorithm with deterministic finality in Flow for
 * Cluster of Collector Nodes: batching transactions into collections. 
 
 Flow uses a derivative of HotStuff 
-(see paper [HotStuff: BFT Consensus in the Lens of Blockchain (version 6)](https://arxiv.org/abs/1803.05069v6) for the original algorithm).
-Our implementation is a mixture of Chained HotStuff and Event-Driven HotStuff with a few additional, minor modifications:
-* We employ the rules for locking on blocks and block finalization from Event-Driven HotStuff. 
-Specifically, we lock the newest block which has an (direct or indirect) 2-chain built on top. 
-We finalize a block when it has a 3-chain built on top where with the first two chain links being _direct_.  
-* The way we progress though views follows the Chained HotStuff algorithm. 
-A replica only votes or proposes for its current view.  
-* Flow's HotStuff does not implement `ViewChange` messages
-(akin to the approach taken in [Streamlet:  Textbook Streamlined Blockchains](https://eprint.iacr.org/2020/088.pdf))
+(see paper [HotStuff: BFT Consensus in the Lens of Blockchain (version 6)](https://arxiv.org/abs/1803.05069v6) for the original algorithm) called Jolteon(see paper [Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback](https://arxiv.org/abs/2106.10362).
+Our implementation is a mixture of HotStuff and Jolteon, the main modifications:
+* We employ the rules for locking on blocks and block finalization from Jolteon which is built on top of Event-Driven HotStuff. 
+Specifically, upon seeing a valid QC, the replica updates its highest known QC. It votes only for blocks that extend that QC(in case of happy path)
+or for blocks that contain a valid TC(in case of recovery path).
+We finalize a block when it has a 2-chain built on top where with the first chain link being _direct_. This is possible because of active protocol for recovery path.  
+* The way we progress though views follows the Jolteon protocol. We advance views when observing a valid QC or TC. A replica only votes or proposes for its current view.  
+* Flow's protocol as view synchronization component does not use Passive Pacemaker which was described in the paper, instead we use an Active Pacemaker from Jolteon protocol.
 * Flow uses a decentralized random beacon (based on [Dfinity's proposal](https://dfinity.org/pdf-viewer/library/dfinity-consensus.pdf)).
 The random beacon is run by Flow's consensus nodes and integrated into the consensus voting process.  
 
@@ -34,12 +33,14 @@ In Flow, there are multiple HotStuff instances running in parallel. Specifically
 
 In addition to HotStuff's requirements on block validity, the Flow protocol adds additional requirements. 
 For example, it is illegal to repeatedly include the same payload entities (e.g. collections, challenges, etc) in the same fork.
-Generally, payload entities expire. However within the expiry horizon, all ancestors of a block need to be known 
+Generally, payload entities expire. However, within the expiry horizon, all ancestors of a block need to be known 
 to verify that payload entities are not repeated. 
 
-We exclude the entire logic for determining payload validity from the HotStuff core implementation. 
+We exclude the entire logic for determining payload validity from the HotStuff core implementation.
 This functionality is encapsulated in the Chain Compliance Layer (CCL) which precedes HotStuff. 
+The CCL is designed to forward only fully validated blocks to the HotStuff core logic.
 The CCL forwards a block to the HotStuff core logic only if 
+* the block's header is valid(including QC),
 * the block's payload is valid,
 * the block is connected to the most recently finalized block, and
 * all ancestors have previously been processed by HotStuff. 
@@ -47,7 +48,7 @@ The CCL forwards a block to the HotStuff core logic only if
 If ancestors of a block are missing, the CCL caches the respective block and (iteratively) requests missing ancestors.
 
 #### Payload generation
-Payloads are generated outside of the HotStuff core logic. HotStuff only incorporates the payload root hash into the block header. 
+Payloads are generated outside the HotStuff core logic. HotStuff only incorporates the payload root hash into the block header. 
 
 #### Structure of votes 
 In Flow's HotStuff implementation, votes are used for two purposes: 
@@ -56,11 +57,10 @@ Therefore, nodes include a `StakingSignature` (BLS with curve BLS12-381) in thei
 2. Construct a Source of Randomness as described in [Dfinity's Random Beacon](https://dfinity.org/pdf-viewer/library/dfinity-consensus.pdf).
 Therefore, consensus nodes include a `RandomBeaconSignature` (also BLS with curve BLS12-381, used in a threshold signature scheme) in their vote.  
 
-When the primary collects the votes, it verifies the `StakingSignature` and the `RandomBeaconSignature`.
+When the primary collects the votes, it verifies content of `SigData` it can contain only a `StakingSignature` or a pair `StakingSignature` + `RandomBeaconSignature`.
+A `StakingSignature` must be present in all votes. 
 If either signature is invalid, the entire vote is discarded. From all valid votes, the
-`StakingSignatures` and the `RandomBeaconSignatures` are aggregated separately. 
-(note: Only the aggregation of the `RandomBeaconSignature` into a threshold signature is currently implemented. 
-Aggregation of the BLS `StakingSignatures` will be added later.)
+`StakingSignatures` and the `RandomBeaconSignatures` are aggregated separately.
 
 * Following [version 6 of the HotStuff paper](https://arxiv.org/abs/1803.05069v6), 
 replicas forward their votes for block `b` to the leader of the _next_ view, i.e. the primary for view `b.View + 1`. 
@@ -78,26 +78,31 @@ The figure below illustrates the dependencies of the core components and informa
 
 ![](/docs/HotStuffEventLoop.png)
 
-* `HotStuffEngine` and `ChainComplianceLayer` do not contain any core HotStuff logic. 
-They are responsible for relaying HotStuff messages and validating block payloads respectively. 
+* `MessageHub` is responsible for relaying HotStuff messages, incoming messages are relayed to respective modules depending on message type.
+Outgoing messages are relayed to committee using p2p communication. 
+* `compliance.Core` is responsible for processing incoming blocks, caching if needed, validating, extending state and publishing to
+HotStuff for further processing. 
+* `compliance.Engine` performs work scheduling logic for `compliance.Core`, doesn't perform any business logic. 
 * `EventLoop` buffers all incoming events, so `EventHandler` can process one event at a time in a single thread.
 * `EventHandler` orchestrates all HotStuff components and implements [HotStuff's state machine](/docs/StateMachine.png).
-The event handler is designed to be executed single-threaded. 
-* `Communicator` relays outgoing HotStuff messages (votes and block proposals)
-* `Pacemaker` is a basic PaceMaker to ensure liveness by keeping the majority of committee replicas in the same view
+The event handler is designed to be executed single-threaded.
+* `SafetyRules` tracks the latest vote, the latest timeout and determines whether to vote for a block. 
+* `Pacemaker` is an implementation of Active PaceMaker to ensure liveness by keeping the majority of committee replicas in the same view. Tracks current view.
 * `Forks` maintains an in-memory representation of all blocks `b`, whose view is larger or equal to the view of the latest finalized block (known to this specific replica).
-As blocks with missing ancestors are cached outside of HotStuff (by the Chain Compliance Layer), 
+As blocks with missing ancestors are cached outside HotStuff (by the Chain Compliance Layer), 
 all blocks stored in `Forks` are guaranteed to be connected to the genesis block 
-(or the trusted checkpoint from which the replica started). Internally, `Forks` consists of multiple layers:
-   - `LevelledForest`: A blockchain forms a Tree. When removing all blocks with views strictly smaller than the last finalized block, the chain decomposes into multiple disconnected trees. In graph theory, such structure is a forest. To separate general graph-theoretical concepts from the concrete block-chain application, `LevelledForest` refers to blocks as graph `vertices` and to a block's view number as `level`. The `LevelledForest` is an in-memory data structure to store and maintain a levelled forest. It provides functions to add vertices, query vertices by their ID (block's hash), query vertices by level, query the children of a vertex, and prune vertices by level (remove them from memory).
-   - `Finalizer`: the finalizer uses the `LevelledForest` to store blocks. The Finalizer tracks the locked and finalized blocks. Furthermore, it evaluates whether a block is safe to vote for.
-   - `ForkChoice`: implements the fork choice rule. Currently, `NewestForkChoice` always uses the quorum certificate (QC) with the largest view to build a new block (i.e. the fork a super-majority voted for most recently).
-   - `Forks` is the highest level. It bundles the `Finalizer` and `ForkChoice` into one component.
+(or the trusted checkpoint from which the replica started). `Forks` is implemented using `LevelledForest`: A blockchain forms a Tree, when removing all blocks
+with views strictly smaller than the last finalized block, the chain decomposes into multiple disconnected trees, in graph theory, such structure is a forest, to separate general graph-theoretical 
+concepts from the concrete blockchain application, `LevelledForest` refers to blocks as graph `vertices` and to a block's view number as `level`, 
+the `LevelledForest` is an in-memory data structure to store and maintain a levelled forest, it provides functions to add vertices, query vertices by their ID (block's hash), query vertices by level, query the children of a vertex, and prune vertices by level (remove them from memory).
+`Forks` tracks the finalized blocks and triggers finalization events whenever it observes a valid extension to the chain of finalized blocks.
 * `Validator` validates the HotStuff-relevant aspects of
    - QC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, view number is strictly monotonously increasing
-   - block proposal: from designated primary for the block's respective view, contains proposer's vote for its own block, QC in block is valid
-   - vote: validity of signature, voter is has positive weight 
+   - TC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, proof for entering view. 
+   - block proposal: from designated primary for the block's respective view, contains proposer's vote for its own block, QC in block is valid, TC if needed is valid.
+   - vote: validity of signature, voter is has positive weight
 * `VoteAggregator` caches votes on a per-block basis and builds QC if enough votes have been accumulated.
+* `TimeoutAggregator` caches timeouts on a per-view basis and builds TC if enough timeouts have been accumulated. Performs validation and verification of timeouts.
 * `Voter` tracks the view of the latest vote and determines whether or not to vote for a block (by calling `forks.IsSafeBlock`)
 * `Committee` maintains the list of all authorized network members and their respective weight on a per-block basis. Furthermore, the committee contains the primary selection algorithm. 
 * `BlockProducer` constructs the payload of a block, after the HotStuff core logic has decided which fork to extend 
