@@ -25,6 +25,8 @@ type ConnManager struct {
 	protected map[peer.ID]map[string]struct{}
 }
 
+var _ connmgr.ConnManager = (*ConnManager)(nil)
+
 func NewConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *ConnManager {
 	cn := &ConnManager{
 		log:         log.With().Str("component", "conn_manager").Logger(),
