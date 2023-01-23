@@ -487,7 +487,7 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 	return v
 }
 
-// SubmitSetApprovedListTx adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
+// SubmitSetApprovedListTx adds a node to the approved node list, this must be done when a node joins the protocol during the epoch staking phase
 func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
 	cdcApprovedNodeDictEntries := make([]cadence.KeyValuePair, 0, len(identities))
 	for _, id := range identities {
