@@ -200,15 +200,22 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 
 // ReadSinglePayload reads and returns a payload for a single path.
 func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
-	return readSinglePayload(path, mt.root)
+	leafNode, _ := findLeafNode(path, mt.root)
+
+	return leafNode.Payload()
 }
 
-// readSinglePayload reads and returns a payload for a single path in subtree with `head` as root node.
-func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
+// ReadLeafNode returns the leaf node by given path from the trie root
+func (mt *MTrie) ReadLeafNode(path ledger.Path) (*node.Node, bool) {
+	return findLeafNode(path, mt.root)
+}
+
+// findLeafNode finds the leaf node by a single path in subtree with `head` as root  node
+func findLeafNode(path ledger.Path, head *node.Node) (*node.Node, bool) {
 	pathBytes := path[:]
 
 	if head == nil {
-		return ledger.EmptyPayload()
+		return nil, false
 	}
 
 	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
@@ -225,10 +232,10 @@ func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
 	}
 
 	if head != nil && *head.Path() == path {
-		return head.Payload()
+		return head, true
 	}
 
-	return ledger.EmptyPayload()
+	return ledger.EmptyPayload(), false
 }
 
 // UnsafeRead reads payloads for the given paths.

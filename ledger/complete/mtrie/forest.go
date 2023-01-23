@@ -110,7 +110,8 @@ func (f *Forest) ReadSingleValue(r *ledger.TrieReadSingleValue) (ledger.Value, e
 	}
 
 	payload := trie.ReadSinglePayload(r.Path)
-	return payload.Value().DeepCopy(), nil
+	// no need to deep copy, because the payload is from storage, and always be a copy
+	return payload.Value(), nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
