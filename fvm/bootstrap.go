@@ -891,7 +891,10 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),
 		WithSequenceNumberCheckAndIncrementEnabled(false),
+
+		// disable interaction and computation limits for bootstrapping
 		WithMemoryAndInteractionLimitsDisabled(),
+		WithComputationLimit(math.MaxUint64),
 	)
 
 	// use new derived transaction data for each meta transaction.
