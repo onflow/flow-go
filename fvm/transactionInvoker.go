@@ -278,7 +278,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	if executor.errs.CollectedError() {
 		invalidator = nil
-		executor.errorExecution()
+		executor.txnState.RunWithAllLimitsDisabled(executor.errorExecution)
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -405,9 +405,6 @@ func (executor *transactionExecutor) normalExecution() (
 
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
-	executor.txnState.DisableAllLimitEnforcements()
-	defer executor.txnState.EnableAllLimitEnforcements()
-
 	// log transaction as failed
 	executor.env.Logger().Info().
 		Err(executor.errs.ErrorOrNil()).

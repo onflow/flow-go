@@ -412,16 +412,6 @@ func (s *TransactionState) UpdatedRegisters() flow.RegisterEntries {
 	return s.currentState().UpdatedRegisters()
 }
 
-// EnableAllLimitEnforcements enables all the limits
-func (s *TransactionState) EnableAllLimitEnforcements() {
-	s.enforceLimits = true
-}
-
-// DisableAllLimitEnforcements disables all the limits
-func (s *TransactionState) DisableAllLimitEnforcements() {
-	s.enforceLimits = false
-}
-
 // RunWithAllLimitsDisabled runs f with limits disabled
 func (s *TransactionState) RunWithAllLimitsDisabled(f func()) {
 	if f == nil {
