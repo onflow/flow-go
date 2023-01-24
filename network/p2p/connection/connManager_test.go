@@ -1,16 +1,20 @@
 package connection_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -88,4 +92,42 @@ func generatePeerInfo(t *testing.T) peer.ID {
 	pInfo, err := utils.PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
+}
+
+func TestConnectionManager_Watermarking(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	defer cancel()
+
+	thisConnMgr, err := connection.NewConnManager(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		&connection.ManagerConfig{
+			HighWatermark: 4,
+			LowWatermark:  2,
+		})
+	require.NoError(t, err)
+
+	thisNode, _ := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		p2ptest.WithConnectionManager(thisConnMgr))
+
+	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5)
+
+	nodes := append(otherNodes, thisNode)
+
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	// connect this node to all other nodes
+	for _, otherNode := range otherNodes {
+		require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+	}
+
+	time.Sleep(20 * time.Second)
+
+	fmt.Println(len(thisNode.Host().Network().Conns()))
 }
