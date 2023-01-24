@@ -67,19 +67,11 @@ type ManagerConfig struct {
 	GracePeriod time.Duration // naming from libp2p
 }
 
-type ConnManagerOpt func(*ConnManager)
-
-func WithNotifyBundle(n *network.NotifyBundle) ConnManagerOpt {
-	return func(cn *ConnManager) {
-		cn.n = n
-	}
-}
-
 // NewConnManager creates a new connection manager.
 // It errors if creating the basic connection manager of libp2p fails.
 // The error is not benign, and we should crash the node if it happens.
 // It is a malpractice to start the node without connection manager.
-func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig, opt ...ConnManagerOpt) (*ConnManager, error) {
+func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig) (*ConnManager, error) {
 	basic, err := libp2pconnmgr.NewConnManager(
 		cfg.LowWatermark,
 		cfg.HighWatermark,
@@ -97,10 +89,6 @@ func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics
 
 	// aggregates the notifiee callbacks from libp2p and our own notifiee into one.
 	cn.n = internal.NewRelayNotifee(internal.NewLoggerNotifiee(cn.log, metric), cn.basicConnMgr.Notifee())
-
-	for _, apply := range opt {
-		apply(cn)
-	}
 
 	cn.log.Info().
 		Int("low_watermark", cfg.LowWatermark).
