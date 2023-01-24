@@ -13,6 +13,10 @@ type RelayNotifee struct {
 
 var _ network.Notifiee = (*RelayNotifee)(nil)
 
+func NewRelayNotifee(notifiees ...network.Notifiee) *RelayNotifee {
+	return &RelayNotifee{notifiees}
+}
+
 func (r *RelayNotifee) Listen(n network.Network, multiaddr multiaddr.Multiaddr) {
 	for _, notifiee := range r.n {
 		notifiee.Listen(n, multiaddr)
