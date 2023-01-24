@@ -20,10 +20,10 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 	// require approvals for seals to verify that the joining VN is producing valid seals in the second epoch
 	s.RequiredSealApprovals = 1
 	// increase epoch length to account for greater sealing lag due to above
-	s.StakingAuctionLen = 200
+	s.StakingAuctionLen = 100
 	s.DKGPhaseLen = 100
-	s.EpochLen = 650
-	s.EpochCommitSafetyThreshold = 50
+	s.EpochLen = 450
+	s.EpochCommitSafetyThreshold = 20
 	s.DynamicEpochTransitionSuite.SetupTest()
 }
 
