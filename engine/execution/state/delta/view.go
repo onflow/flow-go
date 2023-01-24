@@ -194,24 +194,6 @@ func (v *View) Set(owner, key string, value flow.RegisterValue) error {
 	return nil
 }
 
-// Touch explicitly adds a register to the touched registers set.
-func (v *View) Touch(owner, key string) error {
-
-	k := flow.NewRegisterID(owner, key)
-
-	// capture register touch
-	v.regTouchSet[k] = struct{}{}
-	// increase reads
-	v.readsCount++
-
-	return nil
-}
-
-// Delete removes a register in this view.
-func (v *View) Delete(owner, key string) error {
-	return v.Set(owner, key, nil)
-}
-
 // Delta returns a record of the registers that were mutated in this view.
 func (v *View) Delta() Delta {
 	return v.delta
