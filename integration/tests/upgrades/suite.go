@@ -22,10 +22,12 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	cancel  context.CancelFunc
-	net     *testnet.FlowNetwork
-	ghostID flow.Identifier
-	exe1ID  flow.Identifier
+	cancel   context.CancelFunc
+	net      *testnet.FlowNetwork
+	ghostID  flow.Identifier
+	exe1ID   flow.Identifier
+	extraVNs uint
+	VNsFlag  string
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -137,6 +139,19 @@ func (s *Suite) SetupTest() {
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
 
+	verificationNodes := make([]testnet.NodeConfig, s.extraVNs+1)
+
+	for i := uint(0); i <= s.extraVNs; i++ {
+		var nodeConfig testnet.NodeConfig
+
+		if s.VNsFlag == "" {
+			nodeConfig = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel))
+		} else {
+			nodeConfig = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag(s.VNsFlag))
+		}
+		verificationNodes[i] = nodeConfig
+	}
+
 	s.exe1ID = unittest.IdentifierFixture()
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
@@ -144,10 +159,11 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
 	}
+
+	confs = append(confs, verificationNodes...)
 
 	netConfig := testnet.NewNetworkConfig(
 		"upgrade_tests",

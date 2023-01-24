@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestStopAtHeight(t *testing.T) {
-	suite.Run(t, new(TestStopAtHeightSuite))
+func TestENStopAtHeight(t *testing.T) {
+	suite.Run(t, new(TestENStopAtHeightSuite))
 }
 
-type TestStopAtHeightSuite struct {
+type TestENStopAtHeightSuite struct {
 	Suite
 }
 
@@ -24,7 +24,7 @@ type StopAtHeightRequest struct {
 	Crash  bool   `json:"crash"`
 }
 
-func (s *TestStopAtHeightSuite) TestStopAtHeight() {
+func (s *TestENStopAtHeightSuite) TestENStopAtHeight() {
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
 	// make sure stop at height admin command is available

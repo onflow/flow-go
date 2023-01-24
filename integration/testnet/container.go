@@ -336,6 +336,19 @@ func (c *Container) WaitForContainerStopped(timeout time.Duration) error {
 	return nil
 }
 
+// IsRunning checks if the container is running
+func (c *Container) IsRunning(timeout time.Duration) (error, bool) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	res, err := c.net.cli.ContainerInspect(ctx, c.ID)
+	if err != nil {
+		return fmt.Errorf("could not inspect container: %w", err), false
+	}
+	return nil, res.State.Running
+}
+
 // Connect connects this container to the network.
 func (c *Container) Connect() error {
 
