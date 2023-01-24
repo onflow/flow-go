@@ -193,6 +193,7 @@ func (c *Client) Account() *sdk.Account {
 	return c.account
 }
 
+// WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)

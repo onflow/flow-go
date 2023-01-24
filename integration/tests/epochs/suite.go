@@ -488,6 +488,10 @@ func (s *Suite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, ex
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
 	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("asserted in epoch %d, phase %s, finalized height/view: %d/%d", expectedEpoch, expectedPhase, head.Height, head.View)
 }
 
 // AssertInEpoch requires actual epoch counter is equal to counter provided.
@@ -708,10 +712,10 @@ type DynamicEpochTransitionSuite struct {
 func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// use a longer staking auction length to accommodate staking operations for
 	// joining/leaving nodes
-	s.StakingAuctionLen = 200
+	s.StakingAuctionLen = 50
 	s.DKGPhaseLen = 50
-	s.EpochLen = 500
-	s.EpochCommitSafetyThreshold = 50
+	s.EpochLen = 250
+	s.EpochCommitSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
