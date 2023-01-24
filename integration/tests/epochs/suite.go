@@ -14,6 +14,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/fvm/blueprints"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -489,18 +490,6 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 
 // SubmitSetApprovedListTx adds a node to the approved node list, this must be done when a node joins the protocol during the epoch staking phase
 func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
-	cdcApprovedNodeDictEntries := make([]cadence.KeyValuePair, 0, len(identities))
-	for _, id := range identities {
-		cdcNodeID, err := cadence.NewString(id.String())
-		require.NoError(s.T(), err)
-
-		kvPair := cadence.KeyValuePair{
-			Key:   cdcNodeID,
-			Value: cadence.NewBool(true),
-		}
-		cdcApprovedNodeDictEntries = append(cdcApprovedNodeDictEntries, kvPair)
-	}
-
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -512,7 +501,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.client.SDKServiceAddress()).
 		AddAuthorizer(idTableAddress)
-	err = tx.AddArgument(cadence.NewDictionary(cdcApprovedNodeDictEntries))
+	err = tx.AddArgument(blueprints.SetStakingAllowlistTxArg(identities))
 	require.NoError(s.T(), err)
 
 	err = s.client.SignAndSendTransaction(ctx, tx)

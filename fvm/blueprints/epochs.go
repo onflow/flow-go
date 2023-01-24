@@ -203,7 +203,15 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 	env := templates.Environment{
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
+	allowedNodesArg := SetStakingAllowlistTxArg(allowedNodeIDs)
+	return flow.NewTransactionBody().
+		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		AddArgument(jsoncdc.MustEncode(allowedNodesArg)).
+		AddAuthorizer(idTableStakingAddr)
+}
 
+// SetStakingAllowlistTxArg returns the transaction argument for setting the staking allow-list.
+func SetStakingAllowlistTxArg(allowedNodeIDs []flow.Identifier) cadence.Value {
 	cdcDictEntries := make([]cadence.KeyValuePair, 0, len(allowedNodeIDs))
 	for _, id := range allowedNodeIDs {
 		cdcNodeID, err := cadence.NewString(id.String())
@@ -216,11 +224,7 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 		}
 		cdcDictEntries = append(cdcDictEntries, kvPair)
 	}
-
-	return flow.NewTransactionBody().
-		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		AddArgument(jsoncdc.MustEncode(cadence.NewDictionary(cdcDictEntries))).
-		AddAuthorizer(idTableStakingAddr)
+	return cadence.NewDictionary(cdcDictEntries)
 }
 
 // BytesToCadenceArray converts byte slice to cadence array
