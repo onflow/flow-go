@@ -5,6 +5,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// RelayNotifee is a notifiee that relays notifications to a list of notifiees.
+// A network.Notifiee is a function that is called when a network event occurs, such as a new connection.
 type RelayNotifee struct {
 	n []network.Notifiee
 }
