@@ -28,28 +28,29 @@ func (l *LoggerNotifiee) Listen(n network.Network, multiaddr multiaddr.Multiaddr
 }
 
 func (l *LoggerNotifiee) ListenClose(n network.Network, multiaddr multiaddr.Multiaddr) {
-	l.logger.Debug().Str("multiaddress", multiaddr.String()).Msg("listen started")
+	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen started")
 }
 
 func (l *LoggerNotifiee) Connected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
-	l.logConnectionUpdate(n, conn, "connection established")
+	lg := l.connectionUpdateLogger(n, conn)
+	lg.Info().Msg("connection established")
 }
 
 func (l *LoggerNotifiee) Disconnected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
-	l.logConnectionUpdate(n, conn, "connection removed")
+	lg := l.connectionUpdateLogger(n, conn)
+	lg.Warn().Msg("connection closed")
 }
 
-func (l *LoggerNotifiee) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
-	l.logger.Debug().
+func (l *LoggerNotifiee) connectionUpdateLogger(n network.Network, con network.Conn) zerolog.Logger {
+	return l.logger.With().
 		Str("remote_peer", con.RemotePeer().String()).
 		Str("remote_address", con.RemoteMultiaddr().String()).
 		Str("local_peer", con.LocalPeer().String()).
 		Str("local_address", con.LocalMultiaddr().String()).
 		Str("direction", con.Stat().Direction.String()).
-		Int("total_connections", len(n.Conns())).
-		Msg(logMsg)
+		Int("total_connections", len(n.Conns())).Logger()
 }
 
 func (l *LoggerNotifiee) updateConnectionMetric(n network.Network) {
