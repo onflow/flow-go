@@ -9,24 +9,28 @@ type RelayNotifee struct {
 	n []network.Notifiee
 }
 
-func (r RelayNotifee) Listen(n network.Network, multiaddr multiaddr.Multiaddr) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r RelayNotifee) ListenClose(n network.Network, multiaddr multiaddr.Multiaddr) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r RelayNotifee) Connected(n network.Network, conn network.Conn) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r RelayNotifee) Disconnected(n network.Network, conn network.Conn) {
-	//TODO implement me
-	panic("implement me")
-}
-
 var _ network.Notifiee = (*RelayNotifee)(nil)
+
+func (r *RelayNotifee) Listen(n network.Network, multiaddr multiaddr.Multiaddr) {
+	for _, notifiee := range r.n {
+		notifiee.Listen(n, multiaddr)
+	}
+}
+
+func (r *RelayNotifee) ListenClose(n network.Network, multiaddr multiaddr.Multiaddr) {
+	for _, notifiee := range r.n {
+		notifiee.ListenClose(n, multiaddr)
+	}
+}
+
+func (r *RelayNotifee) Connected(n network.Network, conn network.Conn) {
+	for _, notifiee := range r.n {
+		notifiee.Connected(n, conn)
+	}
+}
+
+func (r *RelayNotifee) Disconnected(n network.Network, conn network.Conn) {
+	for _, notifiee := range r.n {
+		notifiee.Disconnected(n, conn)
+	}
+}
