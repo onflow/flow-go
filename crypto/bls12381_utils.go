@@ -9,7 +9,10 @@ package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
+// #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
+// #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls12381_utils.h"
+// #include "blst.h"
 import "C"
 import (
 	"errors"
