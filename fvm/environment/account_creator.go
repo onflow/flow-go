@@ -149,8 +149,7 @@ func NewAccountCreator(
 func (creator *accountCreator) bytes() ([]byte, error) {
 	stateBytes, err := creator.txnState.Get(
 		"",
-		state.AddressStateKey,
-		creator.txnState.EnforceLimits())
+		state.AddressStateKey)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -197,8 +196,7 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	err = creator.txnState.Set(
 		"",
 		state.AddressStateKey,
-		addressGenerator.Bytes(),
-		creator.txnState.EnforceLimits())
+		addressGenerator.Bytes())
 	if err != nil {
 		return address, fmt.Errorf(
 			"failed to update the state with address generator state: %w",

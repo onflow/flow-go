@@ -178,7 +178,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		err = view2.Delete(registerID1, "")
+		err = view2.Set(registerID1, "", nil)
 		assert.NoError(t, err)
 
 		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)

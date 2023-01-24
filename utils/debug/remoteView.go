@@ -203,13 +203,3 @@ func (v *RemoteView) AllRegisterIDs() []flow.RegisterID {
 func (v *RemoteView) UpdatedRegisters() flow.RegisterEntries {
 	panic("Not implemented yet")
 }
-
-func (v *RemoteView) Touch(owner, key string) error {
-	// no-op for now
-	return nil
-}
-
-func (v *RemoteView) Delete(owner, key string) error {
-	v.Delta[owner+"~"+key] = nil
-	return nil
-}
