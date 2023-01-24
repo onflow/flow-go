@@ -268,7 +268,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		view := utils.NewSimpleView()
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
-		err := txnState.Set(owner, key, flow.RegisterValue("blah"), false)
+		err := txnState.Set(owner, key, flow.RegisterValue("blah"))
 		require.NoError(t, err)
 
 		env := environment.NewTransactionEnvironment(
