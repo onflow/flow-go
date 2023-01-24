@@ -12,7 +12,7 @@ transaction(
     networkingAddress: String,
     networkingKey: String,
     stakingKey: String,
-    machineAcctKey: Crypto.KeyListEntry ?) {
+    machineAcctKey: Crypto.KeyListEntry?) {
 
     prepare(service: AuthAccount) {
         // 1 - create the staking account for the new node.
@@ -22,7 +22,7 @@ transaction(
 
         // 2 - fund the new staking account
         //
-        let stakeDst = stakingAccount.getCapability(/public/flowTokenReceiver).borrow <&{FungibleToken.Receiver}> ()
+        let stakeDst = stakingAccount.getCapability(/public/flowTokenReceiver).borrow<&{FungibleToken.Receiver}>()
             ?? panic("Could not borrow receiver reference to the recipient's Vault")
         // withdraw stake from service account
         let stakeSrc = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -33,7 +33,7 @@ transaction(
         //
         let flowToken = stakingAccount.link<&FlowToken.Vault>(/private/flowTokenVault, target: /storage/flowTokenVault)!
         // Create a new Staking Collection and put it in storage
-        let stakingCollection = <-FlowStakingCollection.createStakingCollection(unlockedVault: flowToken, tokenHolder: nil)
+        let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: flowToken, tokenHolder: nil)
         let stakingCollectionRef = &stakingCollection as &FlowStakingCollection.StakingCollection
         stakingAccount.save(<-stakingCollection, to: FlowStakingCollection.StakingCollectionStoragePath)
 
@@ -54,7 +54,7 @@ transaction(
             amount: stake,
             payer: service,
         ) {
-            machineAccount.keys.add(publicKey: machineAcctKey.publicKey, hashAlgorithm: machineAcctKey.hashAlgorithm, weight: machineAcctKey.weight)
+            machineAccount.keys.add(publicKey: machineAcctKey!.publicKey, hashAlgorithm: machineAcctKey!.hashAlgorithm, weight: machineAcctKey!.weight)
         }
     }
 }
