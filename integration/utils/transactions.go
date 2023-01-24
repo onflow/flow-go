@@ -26,7 +26,8 @@ func LocalnetEnv() templates.Environment {
 	}
 }
 
-// MakeCreateAndSetupNodeTx ...
+// MakeCreateAndSetupNodeTx creates a transaction which creates and configures a new staking account.
+// It creates the account, funds it, and registers the node using the staking collection.
 func MakeCreateAndSetupNodeTx(
 	env templates.Environment,
 	service *sdk.Account,

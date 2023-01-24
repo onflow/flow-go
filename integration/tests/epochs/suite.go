@@ -171,7 +171,7 @@ type StakedNodeOperationInfo struct {
 // 7. Add the node to the approved list
 //
 // NOTE: assumes staking occurs in first epoch (counter 0)
-// NOTE 2: This function performs steps 1-7 in one custom transaction, to reduce
+// NOTE 2: This function performs steps 1-6 in one custom transaction, to reduce
 // the time taken by each test case. Individual transactions for each step can be
 // found in Git history, for example: 9867056a8b7246655047bc457f9000398f6687c0.
 func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
