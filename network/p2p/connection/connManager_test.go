@@ -149,8 +149,8 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	for _, otherNode := range otherNodes {
 		if len(thisNode.Host().Network().ConnsToPeer(otherNode.Host().ID())) == 0 {
 			require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+			break // we only need to connect to one node.
 		}
-		break // we only need to connect to one node.
 	}
 
 	// wait for another grace period to expire and connection manager kick in.
