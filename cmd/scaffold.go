@@ -353,6 +353,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
 			fnb.LibP2PResourceManagerConfig,
+			fnb.UnicastRateLimiterDistributor,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -413,7 +414,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
 		mwOpts...)
-	fnb.UnicastRateLimiterDistributor.AddConsumer(mw)
 	fnb.NodeBlockListDistributor.AddConsumer(mw)
 	fnb.Middleware = mw
 

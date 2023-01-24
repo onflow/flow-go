@@ -244,7 +244,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor))
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
@@ -261,7 +261,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-	distributor.AddConsumer(newMw.(*middleware.Middleware))
 	idList := flow.IdentityList(append(m.ids, newId))
 
 	providers[0].SetIdentities(idList)
@@ -381,7 +380,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor))
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
@@ -397,7 +396,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-	distributor.AddConsumer(newMw.(*middleware.Middleware))
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 

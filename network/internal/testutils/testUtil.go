@@ -117,7 +117,10 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
+	o := &optsConfig{
+		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
+		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -142,6 +145,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
@@ -255,13 +259,20 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts              []func(*flow.Identity)
-	dhtPrefix           string
-	dhtOpts             []dht.Option
-	unicastRateLimiters *ratelimit.RateLimiters
-	peerUpdateInterval  time.Duration
-	networkMetrics      module.NetworkMetrics
-	peerManagerFilters  []p2p.PeerFilter
+	idOpts                        []func(*flow.Identity)
+	dhtPrefix                     string
+	dhtOpts                       []dht.Option
+	unicastRateLimiters           *ratelimit.RateLimiters
+	peerUpdateInterval            time.Duration
+	networkMetrics                module.NetworkMetrics
+	peerManagerFilters            []p2p.PeerFilter
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+}
+
+func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.unicastRateLimiterDistributor = distributor
+	}
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -373,6 +384,12 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
+	}
+}
+
+func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetRateLimiterDistributor(distributor)
 	}
 }
 

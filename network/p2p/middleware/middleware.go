@@ -66,7 +66,6 @@ const (
 
 var (
 	_ network.Middleware        = (*Middleware)(nil)
-	_ p2p.RateLimiterConsumer   = (*Middleware)(nil)
 	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
@@ -320,7 +319,9 @@ func (m *Middleware) start(ctx context.Context) error {
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
 // which this node should be directly connected to as peers. The peer ID list
-// returned will be filtered through any configured m.peerManagerFilters.
+// returned will be filtered through any configured m.peerManagerFilters. If the
+// underlying libp2p node has a peer manager configured this func will be used as the
+// peers provider.
 func (m *Middleware) topologyPeers() peer.IDSlice {
 	peerIDs := make([]peer.ID, 0)
 	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
@@ -838,20 +839,4 @@ func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
 	default:
 		return m.unicastMessageTimeout
 	}
-}
-
-// OnRateLimitedPeer removes rate limited peer from underlying libp2pnode.
-func (m *Middleware) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
-	lg := m.log.With().
-		Str("peer_id", peerID.String()).
-		Str("role", role).
-		Str("message_type", msgType).
-		Str("topic", topic).
-		Str("reason", reason).
-		Bool(logging.KeySuspicious, true).Logger()
-	err := m.libP2PNode.RemovePeer(peerID)
-	if err != nil {
-		m.log.Error().Err(err).Str("peer_id", peerID.String()).Msg("failed to disconnect from blocklisted peer")
-	}
-	lg.Warn().Msg("pruned connection to rate-limited peer")
 }
