@@ -46,10 +46,8 @@ func DefaultConnManagerConfig() *ManagerConfig {
 // This implementation updates networking metrics when a peer connection is added or removed
 type ConnManager struct {
 	basicConnMgr *libp2pconnmgr.BasicConnMgr
-	basicNotifee network.Notifiee
 	n            network.Notifiee // the notifiee callback provided by libp2p
 	log          zerolog.Logger   // logger to log connection, stream and other statistics about libp2p
-	metrics      module.LibP2PConnectionMetrics
 }
 
 var _ connmgr.ConnManager = (*ConnManager)(nil)
@@ -83,7 +81,6 @@ func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics
 
 	cn := &ConnManager{
 		log:          logger.With().Str("component", "connection_manager").Logger(),
-		metrics:      metric,
 		basicConnMgr: basic,
 	}
 
