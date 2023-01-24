@@ -17,7 +17,6 @@ package crypto
 // from the standard as both libraries are being developed.
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
