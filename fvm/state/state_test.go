@@ -29,12 +29,12 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		key := "key1"
 		value := createByteArray(1)
 		// set key1 on parent
-		err := st.Set("address", key, value, true)
+		err := st.Set("address", key, value)
 		require.NoError(t, err)
 
 		// read key1 on child
 		stChild := st.NewChild()
-		v, err := stChild.Get("address", key, true)
+		v, err := stChild.Get("address", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
@@ -45,11 +45,11 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		stChild := st.NewChild()
 
 		// set key2 on child
-		err := stChild.Set("address", key, value, true)
+		err := stChild.Set("address", key, value)
 		require.NoError(t, err)
 
 		// read key2 on parent
-		v, err := st.Get("address", key, true)
+		v, err := st.Get("address", key)
 		require.NoError(t, err)
 		require.Equal(t, len(v), 0)
 	})
@@ -60,11 +60,11 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		stChild := st.NewChild()
 
 		// set key3 on child
-		err := stChild.Set("address", key, value, true)
+		err := stChild.Set("address", key, value)
 		require.NoError(t, err)
 
 		// read before merge
-		v, err := st.Get("address", key, true)
+		v, err := st.Get("address", key)
 		require.NoError(t, err)
 		require.Equal(t, len(v), 0)
 
@@ -73,7 +73,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		// read key3 on parent
-		v, err = st.Get("address", key, true)
+		v, err = st.Get("address", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
@@ -82,7 +82,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		key := "key4"
 		value := createByteArray(4)
 		// set key4 on parent
-		err := st.Set("address", key, value, true)
+		err := st.Set("address", key, value)
 		require.NoError(t, err)
 
 		// now should be part of the ledger
@@ -99,12 +99,12 @@ func TestState_MaxValueSize(t *testing.T) {
 
 	// update should pass
 	value := createByteArray(5)
-	err := st.Set("address", "key", value, true)
+	err := st.Set("address", "key", value)
 	require.NoError(t, err)
 
 	// update shouldn't pass
 	value = createByteArray(7)
-	err = st.Set("address", "key", value, true)
+	err = st.Set("address", "key", value)
 	require.Error(t, err)
 }
 
@@ -113,19 +113,19 @@ func TestState_MaxKeySize(t *testing.T) {
 	st := state.NewState(view, state.DefaultParameters().WithMaxKeySizeAllowed(4))
 
 	// read
-	_, err := st.Get("1", "2", true)
+	_, err := st.Get("1", "2")
 	require.NoError(t, err)
 
 	// read
-	_, err = st.Get("123", "234", true)
+	_, err = st.Get("123", "234")
 	require.Error(t, err)
 
 	// update
-	err = st.Set("1", "2", []byte{}, true)
+	err = st.Set("1", "2", []byte{})
 	require.NoError(t, err)
 
 	// read
-	err = st.Set("123", "234", []byte{}, true)
+	err = st.Set("123", "234", []byte{})
 	require.Error(t, err)
 
 }
@@ -139,17 +139,17 @@ func TestState_MaxInteraction(t *testing.T) {
 				meter.DefaultParameters().WithStorageInteractionLimit(12)))
 
 	// read - interaction 2
-	_, err := st.Get("1", "2", true)
+	_, err := st.Get("1", "2")
 	require.Equal(t, st.InteractionUsed(), uint64(2))
 	require.NoError(t, err)
 
 	// read - interaction 8
-	_, err = st.Get("123", "234", true)
+	_, err = st.Get("123", "234")
 	require.Equal(t, st.InteractionUsed(), uint64(8))
 	require.NoError(t, err)
 
 	// read - interaction 14
-	_, err = st.Get("234", "345", true)
+	_, err = st.Get("234", "345")
 	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
@@ -161,7 +161,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	stChild := st.NewChild()
 
 	// update - 0
-	err = stChild.Set("1", "2", []byte{'A'}, true)
+	err = stChild.Set("1", "2", []byte{'A'})
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
@@ -171,17 +171,17 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(3))
 
 	// read - interaction 3 (already in read cache)
-	_, err = st.Get("1", "2", true)
+	_, err = st.Get("1", "2")
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(3))
 
 	// read - interaction 5
-	_, err = st.Get("2", "3", true)
+	_, err = st.Get("2", "3")
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(5))
 
 	// read - interaction 7
-	_, err = st.Get("3", "4", true)
+	_, err = st.Get("3", "4")
 	require.Error(t, err)
 
 }

@@ -31,6 +31,4 @@ type View interface {
 type Ledger interface {
 	Set(owner, key string, value flow.RegisterValue) error
 	Get(owner, key string) (flow.RegisterValue, error)
-	Touch(owner, key string) error
-	Delete(owner, key string) error
 }

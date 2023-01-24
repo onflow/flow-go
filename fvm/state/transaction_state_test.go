@@ -54,18 +54,18 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 	key := "key"
 	val := createByteArray(2)
 
-	err = txn.Set(addr, key, val, true)
+	err = txn.Set(addr, key, val)
 	require.NoError(t, err)
 
-	v, err := nestedState2.Get(addr, key, true)
+	v, err := nestedState2.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 
-	v, err = nestedState1.Get(addr, key, true)
+	v, err = nestedState1.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -77,11 +77,11 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id1))
 
-	v, err = nestedState1.Get(addr, key, true)
+	v, err = nestedState1.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -91,7 +91,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 0, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(txn.MainTransactionId()))
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 }
@@ -177,19 +177,19 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	addr := "address"
 	key := "key"
 
-	v, err := restrictedNestedState2.Get(addr, key, true)
+	v, err := restrictedNestedState2.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = restrictedNestedState1.Get(addr, key, true)
+	v, err = restrictedNestedState1.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = nestedState.Get(addr, key, true)
+	v, err = nestedState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -202,7 +202,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 		state.DefaultParameters(),
 	)
 
-	err = cachedState.Set(addr, key, val, true)
+	err = cachedState.Set(addr, key, val)
 	require.NoError(t, err)
 
 	err = txn.AttachAndCommit(cachedState)
@@ -211,19 +211,19 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 3, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(restrictedId2))
 
-	v, err = restrictedNestedState2.Get(addr, key, true)
+	v, err = restrictedNestedState2.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 
-	v, err = restrictedNestedState1.Get(addr, key, true)
+	v, err = restrictedNestedState1.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = nestedState.Get(addr, key, true)
+	v, err = nestedState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -236,15 +236,15 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 2, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(restrictedId1))
 
-	v, err = restrictedNestedState1.Get(addr, key, true)
+	v, err = restrictedNestedState1.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 
-	v, err = nestedState.Get(addr, key, true)
+	v, err = nestedState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -255,11 +255,11 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id1))
 
-	v, err = nestedState.Get(addr, key, true)
+	v, err = nestedState.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
@@ -269,7 +269,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.Equal(t, 0, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(mainId))
 
-	v, err = mainState.Get(addr, key, true)
+	v, err = mainState.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 }
@@ -290,7 +290,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 		_, err := txn.BeginNestedTransaction()
 		require.NoError(t, err)
 
-		err = txn.Set(addr, key, val, true)
+		err = txn.Set(addr, key, val)
 		require.NoError(t, err)
 	}
 
@@ -303,7 +303,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 		_, err := txn.BeginParseRestrictedNestedTransaction(loc)
 		require.NoError(t, err)
 
-		err = txn.Set(addr, key, val, true)
+		err = txn.Set(addr, key, val)
 		require.NoError(t, err)
 	}
 
@@ -322,7 +322,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 
 	require.Greater(t, state.InteractionUsed(), uint64(0))
 
-	v, err := state.Get(addr, key, true)
+	v, err := state.Get(addr, key)
 	require.NoError(t, err)
 	require.Nil(t, v)
 }
@@ -339,7 +339,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 	key := "key"
 	val := createByteArray(2)
 
-	err = txn.Set(addr, key, val, true)
+	err = txn.Set(addr, key, val)
 	require.NoError(t, err)
 
 	var otherId state.NestedTransactionId
@@ -358,7 +358,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 
 	require.True(t, txn.IsCurrent(id))
 
-	v, err := txn.Get(addr, key, true)
+	v, err := txn.Get(addr, key)
 	require.NoError(t, err)
 	require.Equal(t, val, v)
 }
@@ -486,40 +486,40 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 func TestPauseAndResume(t *testing.T) {
 	txn := newTestTransactionState()
 
-	val, err := txn.Get("addr", "key", true)
+	val, err := txn.Get("addr", "key")
 	require.NoError(t, err)
 	require.Nil(t, val)
 
 	id1, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	err = txn.Set("addr", "key", createByteArray(2), true)
+	err = txn.Set("addr", "key", createByteArray(2))
 	require.NoError(t, err)
 
-	val, err = txn.Get("addr", "key", true)
+	val, err = txn.Get("addr", "key")
 	require.NoError(t, err)
 	require.NotNil(t, val)
 
 	pausedState, err := txn.Pause(id1)
 	require.NoError(t, err)
 
-	val, err = txn.Get("addr", "key", true)
+	val, err = txn.Get("addr", "key")
 	require.NoError(t, err)
 	require.Nil(t, val)
 
 	txn.Resume(pausedState)
 
-	val, err = txn.Get("addr", "key", true)
+	val, err = txn.Get("addr", "key")
 	require.NoError(t, err)
 	require.NotNil(t, val)
 
-	err = txn.Set("addr2", "key2", createByteArray(2), true)
+	err = txn.Set("addr2", "key2", createByteArray(2))
 	require.NoError(t, err)
 
 	_, err = txn.Commit(id1)
 	require.NoError(t, err)
 
-	val, err = txn.Get("addr2", "key2", true)
+	val, err = txn.Get("addr2", "key2")
 	require.NoError(t, err)
 	require.NotNil(t, val)
 }
@@ -530,10 +530,10 @@ func TestInvalidCommittedStateModification(t *testing.T) {
 	id1, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	err = txn.Set("addr", "key", createByteArray(2), true)
+	err = txn.Set("addr", "key", createByteArray(2))
 	require.NoError(t, err)
 
-	_, err = txn.Get("addr", "key", true)
+	_, err = txn.Get("addr", "key")
 	require.NoError(t, err)
 
 	committedState, err := txn.Commit(id1)
@@ -545,10 +545,10 @@ func TestInvalidCommittedStateModification(t *testing.T) {
 
 	txn.Resume(committedState)
 
-	err = txn.Set("addr", "key", createByteArray(2), true)
+	err = txn.Set("addr", "key", createByteArray(2))
 	require.ErrorContains(t, err, "cannot Set on a committed state")
 
-	_, err = txn.Get("addr", "key", true)
+	_, err = txn.Get("addr", "key")
 	require.ErrorContains(t, err, "cannot Get on a committed state")
 
 	_, err = txn.Commit(id1)
