@@ -31,6 +31,8 @@ const (
 	PublicKeyKeyPrefix = "public_key_"
 )
 
+// TODO(patrick): make State implement the View interface.
+//
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
@@ -43,27 +45,23 @@ type State struct {
 	view             View
 	meter            *meter.Meter
 	updatedAddresses map[flow.Address]struct{}
-	stateLimits
-}
 
-type stateLimits struct {
-	maxKeySizeAllowed   uint64
-	maxValueSizeAllowed uint64
+	// NOTE: parent and child state shares the same limits controller
+	*limitsController
 }
 
 type StateParameters struct {
 	meter.MeterParameters
 
-	stateLimits
+	maxKeySizeAllowed   uint64
+	maxValueSizeAllowed uint64
 }
 
 func DefaultParameters() StateParameters {
 	return StateParameters{
-		MeterParameters: meter.DefaultParameters(),
-		stateLimits: stateLimits{
-			maxKeySizeAllowed:   DefaultMaxKeySize,
-			maxValueSizeAllowed: DefaultMaxValueSize,
-		},
+		MeterParameters:     meter.DefaultParameters(),
+		maxKeySizeAllowed:   DefaultMaxKeySize,
+		maxValueSizeAllowed: DefaultMaxValueSize,
 	}
 }
 
@@ -94,10 +92,37 @@ func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParamet
 // is integrated.
 //
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
+func (params StateParameters) WithMaxInteractionSizeAllowed(
+	limit uint64,
+) StateParameters {
 	newParams := params
-	newParams.MeterParameters = newParams.MeterParameters.WithStorageInteractionLimit(limit)
+	newParams.MeterParameters = newParams.MeterParameters.
+		WithStorageInteractionLimit(limit)
 	return newParams
+}
+
+type limitsController struct {
+	enforceLimits       bool
+	maxKeySizeAllowed   uint64
+	maxValueSizeAllowed uint64
+}
+
+func newLimitsController(params StateParameters) *limitsController {
+	return &limitsController{
+		enforceLimits:       true,
+		maxKeySizeAllowed:   params.maxKeySizeAllowed,
+		maxValueSizeAllowed: params.maxValueSizeAllowed,
+	}
+}
+
+func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
+	if f == nil {
+		return
+	}
+	current := controller.enforceLimits
+	controller.enforceLimits = false
+	f()
+	controller.enforceLimits = current
 }
 
 func (s *State) View() View {
@@ -118,7 +143,7 @@ func NewState(view View, params StateParameters) *State {
 		view:             view,
 		meter:            m,
 		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      params.stateLimits,
+		limitsController: newLimitsController(params),
 	}
 }
 
@@ -132,7 +157,7 @@ func (s *State) NewChildWithMeterParams(
 		view:             s.view.NewChild(),
 		meter:            meter.NewMeter(params),
 		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      s.stateLimits,
+		limitsController: s.limitsController,
 	}
 }
 
@@ -157,7 +182,7 @@ func (s *State) UpdatedRegisters() flow.RegisterEntries {
 }
 
 // Get returns a register value given owner and key
-func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
+func (s *State) Get(owner, key string) (flow.RegisterValue, error) {
 	if s.committed {
 		return nil, fmt.Errorf("cannot Get on a committed state")
 	}
@@ -165,7 +190,7 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 	var value []byte
 	var err error
 
-	if enforceLimit {
+	if s.enforceLimits {
 		if err = s.checkSize(owner, key, []byte{}); err != nil {
 			return nil, err
 		}
@@ -181,18 +206,18 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 	err = s.meter.MeterStorageRead(
 		meter.StorageInteractionKey{Owner: owner, Key: key},
 		value,
-		enforceLimit)
+		s.enforceLimits)
 
 	return value, err
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
+func (s *State) Set(owner, key string, value flow.RegisterValue) error {
 	if s.committed {
 		return fmt.Errorf("cannot Set on a committed state")
 	}
 
-	if enforceLimit {
+	if s.enforceLimits {
 		if err := s.checkSize(owner, key, value); err != nil {
 			return err
 		}
@@ -208,7 +233,7 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 	err := s.meter.MeterStorageWrite(
 		meter.StorageInteractionKey{Owner: owner, Key: key},
 		value,
-		enforceLimit,
+		s.enforceLimits,
 	)
 	if err != nil {
 		return err
@@ -227,7 +252,10 @@ func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) er
 		return fmt.Errorf("cannot MeterComputation on a committed state")
 	}
 
-	return s.meter.MeterComputation(kind, intensity)
+	if s.enforceLimits {
+		return s.meter.MeterComputation(kind, intensity)
+	}
+	return nil
 }
 
 // TotalComputationUsed returns total computation used
@@ -251,7 +279,11 @@ func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
 		return fmt.Errorf("cannot MeterMemory on a committed state")
 	}
 
-	return s.meter.MeterMemory(kind, intensity)
+	if s.enforceLimits {
+		return s.meter.MeterMemory(kind, intensity)
+	}
+
+	return nil
 }
 
 // MemoryIntensities returns computation intensities
@@ -274,7 +306,11 @@ func (s *State) MeterEmittedEvent(byteSize uint64) error {
 		return fmt.Errorf("cannot MeterEmittedEvent on a committed state")
 	}
 
-	return s.meter.MeterEmittedEvent(byteSize)
+	if s.enforceLimits {
+		return s.meter.MeterEmittedEvent(byteSize)
+	}
+
+	return nil
 }
 
 func (s *State) TotalEmittedEventBytes() uint64 {
