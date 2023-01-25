@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -583,12 +584,14 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.BaseConfig.BindAddr,
 			networkKey,
 			builder.SporkID,
-			builder.LibP2PResourceManagerConfig).
+			builder.LibP2PResourceManagerConfig,
+			builder.ConnectionManagerConfig).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					subscription.UnstakedRole, builder.IdentityProvider,
 				),
 			).
+			SetConnectionManager(connmgr.NullConnMgr{}). // we override the connection manager with a no-op connection manager as specified by godoc.
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,

@@ -136,6 +136,7 @@ type LibP2PNodeBuilder struct {
 	resourceManager             network.ResourceManager
 	resourceManagerCfg          *ResourceManagerConfig
 	connManager                 connmgr.ConnManager
+	connManagerCfg              *connection.ManagerConfig
 	connGater                   connmgr.ConnectionGater
 	idProvider                  module.IdentityProvider
 	gossipSubFactory            GossipSubFactoryFunc
@@ -148,12 +149,15 @@ type LibP2PNodeBuilder struct {
 	createNode                  CreateNodeFunc
 }
 
-func NewNodeBuilder(logger zerolog.Logger,
+func NewNodeBuilder(
+	logger zerolog.Logger,
 	metrics module.LibP2PMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
-	rCfg *ResourceManagerConfig) *LibP2PNodeBuilder {
+	rCfg *ResourceManagerConfig,
+	mCfg *connection.ManagerConfig) *LibP2PNodeBuilder {
+
 	return &LibP2PNodeBuilder{
 		logger:              logger,
 		sporkID:             sporkID,
@@ -164,6 +168,7 @@ func NewNodeBuilder(logger zerolog.Logger,
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 		metrics:             metrics,
 		resourceManagerCfg:  rCfg,
+		connManagerCfg:      mCfg,
 	}
 }
 
@@ -286,8 +291,17 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
 	}
 
+	// if the connection manager is not set, we set it to the default one.
 	if builder.connManager != nil {
 		opts = append(opts, libp2p.ConnectionManager(builder.connManager))
+	} else {
+		// setting up default connection manager, by hooking in the connection manager metrics reporter.
+		mgr, err := connection.NewConnManager(builder.logger, builder.metrics, builder.connManagerCfg)
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p connection manager: %w", err)
+		}
+		opts = append(opts, libp2p.ConnectionManager(mgr))
+		builder.logger.Info().Msg("libp2p connection manager is set to default with metrics")
 	}
 
 	if builder.connGater != nil {

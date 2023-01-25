@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/connection"
 
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -102,7 +103,8 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		p2pbuilder.DefaultResourceManagerConfig(),
+		connection.DefaultConnManagerConfig()).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
@@ -337,6 +339,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			// stream creation should fail
 			_, err := this.CreateStream(ctx, other.Host().ID())
 			require.Error(t, err)
+			fmt.Println(err)
 			require.True(t, flownet.IsPeerUnreachableError(err))
 
 			// runs the error checkers if any.

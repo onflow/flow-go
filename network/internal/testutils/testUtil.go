@@ -378,7 +378,8 @@ func generateLibP2PNode(t *testing.T,
 		unittest.DefaultAddress,
 		key,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		p2pbuilder.DefaultResourceManagerConfig(),
+		connection.DefaultConnManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t))
 

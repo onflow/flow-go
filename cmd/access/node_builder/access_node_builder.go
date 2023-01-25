@@ -1057,10 +1057,6 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
-		if err != nil {
-			return nil, fmt.Errorf("could not create connection manager: %w", err)
-		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
@@ -1068,14 +1064,14 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			bindAddress,
 			networkKey,
 			builder.SporkID,
-			builder.LibP2PResourceManagerConfig).
+			builder.LibP2PResourceManagerConfig,
+			builder.ConnectionManagerConfig).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					flow.RoleAccess, builder.IdentityProvider,
 				),
 			).
-			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 				return dht.NewDHT(
 					ctx,
