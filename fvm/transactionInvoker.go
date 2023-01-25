@@ -278,7 +278,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	if executor.errs.CollectedError() {
 		invalidator = nil
-		executor.errorExecution()
+		executor.txnState.RunWithAllLimitsDisabled(executor.errorExecution)
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -405,9 +405,6 @@ func (executor *transactionExecutor) normalExecution() (
 
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
-	executor.txnState.DisableAllLimitEnforcements()
-	defer executor.txnState.EnableAllLimitEnforcements()
-
 	// log transaction as failed
 	executor.env.Logger().Info().
 		Err(executor.errs.ErrorOrNil()).
@@ -460,6 +457,7 @@ func (executor *transactionExecutor) commit(
 	// if tx failed this will only contain fee deduction events
 	executor.proc.Events = executor.env.Events()
 	executor.proc.ServiceEvents = executor.env.ServiceEvents()
+	executor.proc.ConvertedServiceEvents = executor.env.ConvertedServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

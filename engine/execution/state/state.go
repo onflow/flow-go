@@ -232,13 +232,6 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	return flow.StateCommitment(commit), trieUpdate, nil
 }
 
-//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.End()
-//
-//	return CommitDelta(s.ls, delta, baseState)
-//}
-
 func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
 
 	query, err := makeQuery(commit, registerIDs)
