@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the access node server
@@ -39,8 +38,8 @@ type Config struct {
 	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
-	MaxMsgSize                int                              // GRPC max message size
-	MaxExecutionDataMsgSize   int                              // GRPC max message size for block execution data
+	MaxMsgSize                uint                             // GRPC max message size
+	MaxExecutionDataMsgSize   uint                             // GRPC max message size for block execution data
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
 	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
@@ -94,14 +93,10 @@ func NewBuilder(log zerolog.Logger,
 
 	log = log.With().Str("engine", "rpc").Logger()
 
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxMsgSize),
-		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
