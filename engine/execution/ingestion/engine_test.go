@@ -1147,7 +1147,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	me := module.NewMockLocal(ctrl)
 
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
-	startState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	// mock execution state conversion and signing of
@@ -1172,8 +1171,10 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	cr := executionUnittest.ComputationResultFixture(nil)
 	cr.ExecutableBlock = executableBlock
+	startState := unittest.StateCommitmentFixture()
+	cr.ExecutableBlock.StartState = &startState
 
-	er, err := e.saveExecutionResults(context.Background(), cr, startState)
+	er, err := e.saveExecutionResults(context.Background(), cr)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)
