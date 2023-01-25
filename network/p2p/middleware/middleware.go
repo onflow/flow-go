@@ -685,8 +685,6 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
-// The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
-// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
 	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
@@ -705,7 +703,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
 		violation := &slashing.Violation{
-			PeerID: peerID.String(), Channel: channel, Protocol: protocol, Err: err,
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
@@ -713,7 +711,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &slashing.Violation{
-			PeerID: peerID.String(), Channel: channel, Protocol: protocol, Err: err,
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return

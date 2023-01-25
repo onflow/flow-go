@@ -30,6 +30,7 @@ type ViolationsConsumer interface {
 type Violation struct {
 	Identity *flow.Identity
 	PeerID   string
+	OriginID flow.Identifier
 	MsgType  string
 	Channel  channels.Channel
 	Protocol message.ProtocolType
