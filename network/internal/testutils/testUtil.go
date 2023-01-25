@@ -120,6 +120,9 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	o := &optsConfig{
 		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
 		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
+		connectionGater: NewConnectionGater(func(p peer.ID) error {
+			return nil
+		}),
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -146,6 +149,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
+		opts = append(opts, withConnectionGater(o.connectionGater))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
@@ -267,6 +271,7 @@ type optsConfig struct {
 	networkMetrics                module.NetworkMetrics
 	peerManagerFilters            []p2p.PeerFilter
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	connectionGater               connmgr.ConnectionGater
 }
 
 func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
@@ -303,6 +308,12 @@ func WithPeerManagerFilters(filters ...p2p.PeerFilter) func(*optsConfig) {
 func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithConnectionGater(connectionGater connmgr.ConnectionGater) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.connectionGater = connectionGater
 	}
 }
 
@@ -390,6 +401,12 @@ func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration
 func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetRateLimiterDistributor(distributor)
+	}
+}
+
+func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetConnectionGater(connectionGater)
 	}
 }
 
