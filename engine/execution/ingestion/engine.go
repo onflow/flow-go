@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"regexp"
 	"sync"
 	"time"
 
@@ -1206,9 +1208,29 @@ func (e *Engine) fetchCollection(
 		)
 		return fmt.Errorf("could not find guarantors: %w", err)
 	}
+
+	filters := []flow.IdentityFilter{
+		filter.HasNodeID(guarantors...),
+	}
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// Using only the dapper run LNs seems to aleviate the issue. This will be removed once a
+	// proper fix is in place.
+	if os.Getenv("DAPPER_LN_ONLY_OVERRIDE") != "" {
+		var onlyDapperRegex = regexp.MustCompile(`.*onflow.org:3569$`)
+
+		// onlyDapper(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
+		// onlyDapper(Identity("verification-049.hello.org:3569")) => false
+		onlyDapper := func(identity *flow.Identity) bool {
+			return onlyDapperRegex.MatchString(identity.Address)
+		}
+
+		filters = append(filters, onlyDapper)
+	}
+
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
-		filter.HasNodeID(guarantors...),
+		filters...,
 	))
 
 	return nil
