@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
