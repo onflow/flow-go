@@ -180,7 +180,7 @@ Many HotStuff data models are built on top of basic data models defined in `/mod
 The HotStuff state machine exposes some details about its internal progress as notification through the `hotstuff.Consumer`.
 The following figure depicts at which points notifications are emitted. 
 
-![](/docs/StateMachine_wirth_notifications.png)
+![](/docs/StateMachine_with_notifications.png)
 
 We have implemented a telemetry system (`hotstuff.notifications.TelemetryConsumer`) which implements the `Consumer` interface.
 The `TelemetryConsumer` tracks all events as belonging together that were emitted during a path through the state machine as well as events from components that perform asynchronous processing(`VoteAggregator`, `TimeoutAggregator`).
