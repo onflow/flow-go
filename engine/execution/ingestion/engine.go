@@ -1214,18 +1214,16 @@ func (e *Engine) fetchCollection(
 	}
 
 	// This is included to temporarily work around an issue observed on a small number of ENs.
-	// Using only the dapper run LNs seems to aleviate the issue. This will be removed once a
+	// Using only the onflow LNs seems to aleviate the issue. This will be removed once a
 	// proper fix is in place.
-	if os.Getenv("DAPPER_LN_ONLY_OVERRIDE") != "" {
-		var onlyDapperRegex = regexp.MustCompile(`.*onflow.org:3569$`)
+	if os.Getenv("ONFLOW_LN_ONLY_OVERRIDE") != "" {
+		var onlyOnflowRegex = regexp.MustCompile(`.*onflow.org:3569$`)
 
-		// onlyDapper(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
-		// onlyDapper(Identity("verification-049.hello.org:3569")) => false
-		onlyDapper := func(identity *flow.Identity) bool {
-			return onlyDapperRegex.MatchString(identity.Address)
-		}
-
-		filters = append(filters, onlyDapper)
+		// func(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
+		// func(Identity("verification-049.hello.org:3569")) => false
+		filters = append(filters, func(identity *flow.Identity) bool {
+			return onlyOnflowRegex.MatchString(identity.Address)
+		})
 	}
 
 	// queue the collection to be requested from one of the guarantors
