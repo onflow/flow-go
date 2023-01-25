@@ -527,7 +527,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
-			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			_, what, err := codec.InterfaceFromMessageCode(codec.MessageCode(msg.Payload[0]))
 			if err != nil {
 				violation.Err = err
 				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
@@ -646,7 +646,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload[0])
+	maxSize, err := unicastMaxMsgSizeByCode(codec.MessageCode(msg.Payload[0]))
 	if err != nil {
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
 			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
@@ -667,7 +667,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload[0], channel, message.ProtocolTypeUnicast)
+		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, codec.MessageCode(msg.Payload[0]), channel, message.ProtocolTypeUnicast)
 		if err != nil {
 			m.log.
 				Error().
@@ -830,7 +830,7 @@ func unicastMaxMsgSize(messageType string) int {
 }
 
 // unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
-func unicastMaxMsgSizeByCode(messageCode uint8) (int, error) {
+func unicastMaxMsgSizeByCode(messageCode codec.MessageCode) (int, error) {
 	_, messageType, err := codec.InterfaceFromMessageCode(messageCode)
 	if err != nil {
 		return 0, err

@@ -304,7 +304,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	invalidMessageCode := byte('X')
+	invalidMessageCode := codec.MessageCode(byte('X'))
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
@@ -351,7 +351,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 			e, err := unittest.NetworkCodec().Encode(msg)
 			require.NoError(u.T(), err)
 			// manipulate message code byte
-			e[0] = invalidMessageCode
+			e[0] = invalidMessageCode.Uint8()
 			return e, nil
 		},
 		message.ProtocolTypeUnicast)
@@ -420,7 +420,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 			e, err := unittest.NetworkCodec().Encode(msg)
 			require.NoError(u.T(), err)
 			// manipulate message code byte
-			e[0] = modifiedMessageCode
+			e[0] = modifiedMessageCode.Uint8()
 			return e, nil
 		},
 		message.ProtocolTypeUnicast)

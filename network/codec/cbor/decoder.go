@@ -36,7 +36,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, codec.NewInvalidEncodingErr(fmt.Errorf("empty data"))
 	}
 
-	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgInterface, what, err := codec.InterfaceFromMessageCode(codec.MessageCode(data[0]))
 	if err != nil {
 		return nil, err
 	}

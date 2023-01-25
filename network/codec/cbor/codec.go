@@ -60,7 +60,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// encode / append the envelope code
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire<1(cbor)envelope2payload")
 	var data bytes.Buffer
-	data.WriteByte(code)
+	data.WriteByte(code.Uint8())
 	//binstat.LeaveVal(bs1, int64(data.Len()))
 
 	// encode the payload
@@ -98,7 +98,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgInterface, what, err := codec.InterfaceFromMessageCode(codec.MessageCode(data[0]))
 	if err != nil {
 		return nil, err
 	}

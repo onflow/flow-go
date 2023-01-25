@@ -10,8 +10,14 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 )
 
+type MessageCode uint8
+
+func (m MessageCode) Uint8() uint8 {
+	return uint8(m)
+}
+
 const (
-	CodeMin uint8 = iota + 1
+	CodeMin MessageCode = iota + 1
 
 	// consensus
 	CodeBlockProposal
@@ -64,7 +70,7 @@ const (
 )
 
 // MessageCodeFromInterface returns the correct Code based on the underlying type of message v.
-func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
+func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
@@ -148,7 +154,7 @@ func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
 // of the message code represents.
 // Expected error returns during normal operations:
 //   - ErrUnknownMsgCode if message code does not match any of the configured message codes above.
-func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
+func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:

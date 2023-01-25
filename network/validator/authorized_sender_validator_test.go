@@ -26,7 +26,7 @@ type TestCase struct {
 	GetIdentity func(pid peer.ID) (*flow.Identity, bool)
 	Channel     channels.Channel
 	Message     interface{}
-	MessageCode uint8
+	MessageCode codec.MessageCode
 	MessageStr  string
 	Protocols   message.Protocols
 }
@@ -267,7 +267,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCommittee)
 
 		// unknown message types are rejected
-		msgType, err := authorizedSenderValidator.Validate(pid, byte('x'), channels.ConsensusCommittee, message.ProtocolTypeUnicast)
+		msgType, err := authorizedSenderValidator.Validate(pid, codec.MessageCode(byte('x')), channels.ConsensusCommittee, message.ProtocolTypeUnicast)
 		require.True(s.T(), codec.IsErrUnknownMsgCode(err))
 		require.Equal(s.T(), "", msgType)
 
