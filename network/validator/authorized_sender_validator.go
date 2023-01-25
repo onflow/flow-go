@@ -124,7 +124,7 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 	// get message auth config
 	conf, err := message.GetMessageAuthConfig(iFace)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not get authorization config for interface %T: %w", iFace, err)
 	}
 
 	// handle special case for cluster prefixed channels
