@@ -17,6 +17,22 @@ type ExecutionResult struct {
 	ExecutionDataID  Identifier
 }
 
+func NewExecutionResult(
+	previousResultID Identifier,
+	blockID Identifier,
+	chunks ChunkList,
+	serviceEvents ServiceEventList,
+	executionDataID Identifier,
+) *ExecutionResult {
+	return &ExecutionResult{
+		PreviousResultID: previousResultID,
+		BlockID:          blockID,
+		Chunks:           chunks,
+		ServiceEvents:    serviceEvents,
+		ExecutionDataID:  executionDataID,
+	}
+}
+
 // ID returns the hash of the execution result body
 func (er ExecutionResult) ID() Identifier {
 	return MakeID(er)

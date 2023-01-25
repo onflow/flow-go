@@ -14,12 +14,6 @@ import (
 // TODO If the executor will be a separate process/machine we would need to rework
 // sending view as local data, but that would be much greater refactor of storage anyway
 
-type ComputationOrder struct {
-	Block      *entity.ExecutableBlock
-	View       *delta.View
-	StartState flow.StateCommitment
-}
-
 type ComputationResult struct {
 	ExecutableBlock        *entity.ExecutableBlock
 	StateSnapshots         []*delta.SpockSnapshot
@@ -28,6 +22,7 @@ type ComputationResult struct {
 	Events                 []flow.EventsList
 	EventsHashes           []flow.Identifier
 	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
 	TransactionResults     []flow.TransactionResult
 	TransactionResultIndex []int
 	ComputationIntensities meter.MeteredComputationIntensities
@@ -42,6 +37,7 @@ func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult
 		ExecutableBlock:        block,
 		Events:                 make([]flow.EventsList, numCollections),
 		ServiceEvents:          make(flow.EventsList, 0),
+		ConvertedServiceEvents: make(flow.ServiceEventList, 0),
 		TransactionResults:     make([]flow.TransactionResult, 0),
 		TransactionResultIndex: make([]int, 0),
 		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
@@ -60,6 +56,9 @@ func (cr *ComputationResult) AddTransactionResult(
 		cr.Events[collectionIndex],
 		txn.Events...)
 	cr.ServiceEvents = append(cr.ServiceEvents, txn.ServiceEvents...)
+	cr.ConvertedServiceEvents = append(
+		cr.ConvertedServiceEvents,
+		txn.ConvertedServiceEvents...)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,

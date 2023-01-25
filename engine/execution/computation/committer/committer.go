@@ -49,7 +49,7 @@ func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCo
 
 func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
 	// get all deduplicated register IDs
-	allIds := view.AllRegisters()
+	allIds := view.AllRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
 		keys = append(keys, execState.RegisterIDToKey(id))
