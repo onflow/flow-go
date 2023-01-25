@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -86,16 +84,14 @@ type Checkpointer struct {
 	wal            *DiskWAL
 	keyByteSize    int
 	forestCapacity int
-	outputVersion  uint16 // the output checkpoint version, only support VersionV5 or VersionV6
 }
 
-func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int, outputVersion uint16) *Checkpointer {
+func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
 		keyByteSize:    keyByteSize,
 		forestCapacity: forestCapacity,
-		outputVersion:  outputVersion,
 	}
 }
 
@@ -248,7 +244,8 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
 	fileName := NumberToFilename(to)
-	err = StoreCheckpointByVersion(c.outputVersion, tries, c.wal.dir, fileName, &c.wal.log)
+
+	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, &c.wal.log)
 
 	if err != nil {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
@@ -276,10 +273,6 @@ func (c *Checkpointer) Dir() string {
 	return c.dir
 }
 
-func (c *Checkpointer) OutputVersion() uint16 {
-	return c.outputVersion
-}
-
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
 func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 
@@ -301,18 +294,6 @@ func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger)
 		targetName: fullname,
 		Writer:     writer,
 	}, nil
-}
-
-func StoreCheckpointByVersion(outputVersion uint16, tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
-	switch outputVersion {
-	case VersionV5:
-		return StoreCheckpointV5(dir, fileName, logger, tries...)
-	case VersionV6:
-		// during normal operation,  single thread is used in order to minimize the memory footprint,
-		return StoreCheckpointV6SingleThread(tries, dir, fileName, logger)
-	default:
-		return fmt.Errorf("only support output checkpoint version VersionV5 and VersionV6, but got :%v", outputVersion)
-	}
 }
 
 // StoreCheckpointV5 writes the given tries to checkpoint file, and also appends
@@ -1023,96 +1004,6 @@ func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error)
 	return tries, nil
 }
 
-// ReadLastTrieRootHashFromCheckpoint returns last trie's root hash from checkpoint file f.
-// All returned errors indicate that the given checkpoint file is eiter corrupted or
-// incompatible.  As the function is side-effect free, all failures are simple a no-op.
-func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
-
-	// read checkpoint version
-	header := make([]byte, headerSize)
-	n, err := f.Read(header)
-	if err != nil || n != headerSize {
-		return hash.DummyHash, errors.New("failed to read checkpoint header")
-	}
-
-	magic := binary.BigEndian.Uint16(header)
-	version := binary.BigEndian.Uint16(header[encMagicSize:])
-
-	if magic != MagicBytesCheckpointHeader {
-		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
-	}
-
-	if version > MaxVersion {
-		return hash.DummyHash, fmt.Errorf("unsupported version %d in checkpoint", version)
-	}
-
-	if version <= 3 {
-		_, err = f.Seek(-(hash.HashLen + crc32SumSize), 2 /* relative from end */)
-		if err != nil {
-			return hash.DummyHash, errors.New("invalid checkpoint")
-		}
-	} else {
-		_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crc32SumSize), 2 /* relative from end */)
-		if err != nil {
-			return hash.DummyHash, errors.New("invalid checkpoint")
-		}
-	}
-
-	var lastTrieRootHash hash.Hash
-	n, err = f.Read(lastTrieRootHash[:])
-	if err != nil || n != hash.HashLen {
-		return hash.DummyHash, errors.New("failed to read last trie root hash from checkpoint")
-	}
-
-	return lastTrieRootHash, nil
-}
-
-// EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files
-// in dir from Linux page cache.  It returns list of files that Linux was
-// successfully advised to evict and first error encountered (if any).
-// Even after error advising eviction, it continues to advise eviction of remaining files.
-func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) ([]string, error) {
-	var err error
-	matches, err := filepath.Glob(filepath.Join(dir, checkpointFilenamePrefix+"*"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to enumerate checkpoints: %w", err)
-	}
-	evictedFileNames := make([]string, 0, len(matches))
-	for _, fn := range matches {
-		base := filepath.Base(fn)
-		if !strings.HasPrefix(base, checkpointFilenamePrefix) {
-			continue
-		}
-		justNumber := base[len(checkpointFilenamePrefix):]
-		_, err := strconv.Atoi(justNumber)
-		if err != nil {
-			continue
-		}
-		evictErr := evictFileFromLinuxPageCacheByName(fn, false, logger)
-		if evictErr != nil {
-			if err == nil {
-				err = evictErr // Save first evict error encountered
-			}
-			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
-			continue
-		}
-		evictedFileNames = append(evictedFileNames, fn)
-	}
-	// return the first error encountered
-	return evictedFileNames, err
-}
-
-// evictFileFromLinuxPageCacheByName advises Linux to evict the file from Linux page cache.
-func evictFileFromLinuxPageCacheByName(fileName string, fsync bool, logger *zerolog.Logger) error {
-	f, err := os.Open(fileName)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	return evictFileFromLinuxPageCache(f, fsync, logger)
-}
-
 // evictFileFromLinuxPageCache advises Linux to evict a file from Linux page cache.
 // A use case is when a new checkpoint is loaded or created, Linux may cache big
 // checkpoint files in memory until evictFileFromLinuxPageCache causes them to be
@@ -1126,13 +1017,13 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 		return err
 	}
 
+	size := int64(0)
 	fstat, err := f.Stat()
 	if err == nil {
-		fsize := fstat.Size()
-		logger.Debug().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
-	} else {
-		logger.Debug().Msgf("advised Linux to evict file %s from page cache", f.Name())
+		size = fstat.Size()
 	}
+
+	logger.Info().Str("filename", f.Name()).Int64("size_mb", size/1024/1024).Msg("evicted file from Linux page cache")
 	return nil
 }
 

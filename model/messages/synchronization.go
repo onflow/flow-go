@@ -44,12 +44,30 @@ type BatchRequest struct {
 // that should correspond to the request.
 type BlockResponse struct {
 	Nonce  uint64
-	Blocks []*flow.Block
+	Blocks []UntrustedBlock
+}
+
+func (br *BlockResponse) BlocksInternal() []*flow.Block {
+	internal := make([]*flow.Block, len(br.Blocks))
+	for i, block := range br.Blocks {
+		block := block
+		internal[i] = block.ToInternal()
+	}
+	return internal
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
 // consensus.
 type ClusterBlockResponse struct {
 	Nonce  uint64
-	Blocks []*cluster.Block
+	Blocks []UntrustedClusterBlock
+}
+
+func (br *ClusterBlockResponse) BlocksInternal() []*cluster.Block {
+	internal := make([]*cluster.Block, len(br.Blocks))
+	for i, block := range br.Blocks {
+		block := block
+		internal[i] = block.ToInternal()
+	}
+	return internal
 }

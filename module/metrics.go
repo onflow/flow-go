@@ -3,6 +3,8 @@ package module
 import (
 	"time"
 
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -78,21 +80,16 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
-type NetworkMetrics interface {
+type LibP2PMetrics interface {
+	GossipSubRouterMetrics
 	ResolverMetrics
 	DHTMetrics
-	NetworkSecurityMetrics
-	GossipSubRouterMetrics
-	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string, messageType string)
+	rcmgr.MetricsReporter
+	LibP2PConnectionMetrics
+}
 
-	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
-
-	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string, messageType string)
-
-	// Message receive queue metrics
+// NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
+type NetworkInboundQueueMetrics interface {
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
 
@@ -101,22 +98,42 @@ type NetworkMetrics interface {
 
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
+}
 
-	DirectMessageStarted(topic string)
-
-	DirectMessageFinished(topic string)
-
-	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
+// NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
+type NetworkCoreMetrics interface {
+	NetworkInboundQueueMetrics
+	// OutboundMessageSent collects metrics related to a message sent by the node.
+	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
+	// InboundMessageReceived collects metrics related to a message received by the node.
+	InboundMessageReceived(sizeBytes int, topic string, protocol string, messageType string)
+	// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+	DuplicateInboundMessagesDropped(topic string, protocol string, messageType string)
+	// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingStarted(topic string)
+	// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingCompleted(topic string)
+	// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 	MessageProcessingStarted(topic string)
-
-	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+	// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+	// the number of messages being processed by the node.
 	MessageProcessingFinished(topic string, duration time.Duration)
+}
 
+// LibP2PConnectionMetrics encapsulates the metrics collectors for the connection manager of the libp2p node.
+type LibP2PConnectionMetrics interface {
 	// OutboundConnections updates the metric tracking the number of outbound connections of this node
 	OutboundConnections(connectionCount uint)
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+}
+
+// NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
+type NetworkMetrics interface {
+	LibP2PMetrics
+	NetworkSecurityMetrics
+	NetworkCoreMetrics
 }
 
 type EngineMetrics interface {
@@ -463,6 +480,28 @@ type AccessMetrics interface {
 	ConnectionFromPoolEvicted()
 }
 
+type ExecutionResultStats struct {
+	ComputationUsed                 uint64
+	MemoryUsed                      uint64
+	EventCounts                     int
+	EventSize                       int
+	NumberOfRegistersTouched        int
+	NumberOfBytesWrittenToRegisters int
+	NumberOfCollections             int
+	NumberOfTransactions            int
+}
+
+func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
+	stats.ComputationUsed += other.ComputationUsed
+	stats.MemoryUsed += other.MemoryUsed
+	stats.EventCounts += other.EventCounts
+	stats.EventSize += other.EventSize
+	stats.NumberOfRegistersTouched += other.NumberOfRegistersTouched
+	stats.NumberOfBytesWrittenToRegisters += other.NumberOfBytesWrittenToRegisters
+	stats.NumberOfCollections += other.NumberOfCollections
+	stats.NumberOfTransactions += other.NumberOfTransactions
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
@@ -484,20 +523,13 @@ type ExecutionMetrics interface {
 	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
-		txCounts, colCounts int)
+	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
-		numberOfRegistersTouched, totalBytesWrittenToRegisters int,
-		txCounts int)
+	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(dur time.Duration,

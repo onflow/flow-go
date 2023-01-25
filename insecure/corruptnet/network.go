@@ -14,9 +14,9 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
@@ -424,7 +424,7 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 
 func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return ingestion.GenerateExecutionReceipt(n.me, n.receiptHasher, n.spockHasher, result, []*delta.SpockSnapshot{})
+	return ingestion.GenerateExecutionReceipt(n.me, n.receiptHasher, result, []crypto.Signature{})
 }
 
 func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
@@ -538,12 +538,14 @@ func (n *Network) HandleIncomingEvent(event interface{}, channel channels.Channe
 
 	msg, err := n.eventToIngressMessage(event, channel, originId)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not convert event to ingress message")
+		lg.Error().Err(err).Msg("could not convert event to ingress message")
+		return false
 	}
 
 	err = n.attackerInboundStream.Send(msg)
 	if err != nil {
 		lg.Error().Err(err).Msg("could not send message to attack orchestrator to observe")
+		return false
 	}
 
 	lg.Info().Msg("ingress event successfully sent to attack orchestrator")

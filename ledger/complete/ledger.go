@@ -336,7 +336,6 @@ func (l *Ledger) ExportCheckpointAt(
 	postCheckpointReporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
-	version int,
 ) (ledger.State, error) {
 
 	l.logger.Info().Msgf(
@@ -448,14 +447,7 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
 	}
 
-	switch version {
-	case 5:
-		err = realWAL.StoreCheckpointV5(outputDir, outputFile, &l.logger, newTrie)
-	case 6:
-		err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
-	default:
-		return ledger.State(hash.DummyHash), fmt.Errorf("invalid version:%v", version)
-	}
+	err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.

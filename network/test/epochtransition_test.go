@@ -156,7 +156,7 @@ func (suite *MutableIdentityTableSuite) TearDownTest() {
 		cancel()
 	}
 	networks := append(suite.testNodes.networks(), suite.removedTestNodes.networks()...)
-	testutils.StopNetworks(suite.T(), networks, 3*time.Second)
+	testutils.StopComponents(suite.T(), networks, 3*time.Second)
 }
 
 // setupStateMock setup state related mocks (all networks share the same state mock)

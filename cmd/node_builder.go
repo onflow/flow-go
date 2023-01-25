@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -32,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -108,11 +112,6 @@ type NodeBuilder interface {
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
 
-	// MustNot asserts that the given error must not occur.
-	// If the error is nil, returns a nil log event (which acts as a no-op).
-	// If the error is not nil, returns a fatal log event containing the error.
-	MustNot(err error) *zerolog.Event
-
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() (Node, error)
@@ -144,6 +143,7 @@ type BaseConfig struct {
 	AdminCert                   string
 	AdminKey                    string
 	AdminClientCAs              string
+	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
 	DynamicStartupANAddress     string
@@ -156,6 +156,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
@@ -193,10 +194,11 @@ type NetworkConfig struct {
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	PeerUpdateInterval         time.Duration
-	UnicastMessageTimeout      time.Duration
-	DNSCacheTTL                time.Duration
+	UnicastBandwidthBurstLimit  int
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -248,6 +250,9 @@ type NodeConfig struct {
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
+
+	// NodeBlockListDistributor notifies consumers of updates to the node block list
+	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -273,18 +278,21 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastRateLimitLockoutDuration: 10,
 			UnicastRateLimitDryRun:          true,
 			DNSCacheTTL:                     dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
+		debugLogLimit:    2000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,
@@ -310,7 +318,7 @@ func DefaultBaseConfig() *BaseConfig {
 }
 
 // DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
-// to define the list of depenencies that must be ready before starting the component.
+// to define the list of dependencies that must be ready before starting the component.
 type DependencyList struct {
 	components []module.ReadyDoneAware
 }

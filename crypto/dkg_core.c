@@ -11,7 +11,7 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_t a, const int a_size, const byte x){
+void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_size, const byte x){
     bn_t image;
     bn_new(image);
     Zr_polynomialImage(image, y, a, a_size, x);

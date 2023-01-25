@@ -344,7 +344,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
-	weight := uint64(1000)
+	weight := uint64(flow.DefaultInitialWeight)
 	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 

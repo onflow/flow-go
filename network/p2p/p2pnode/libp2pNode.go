@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -53,11 +53,11 @@ type Node struct {
 	component.Component
 	sync.RWMutex
 	uniMgr      *unicast.Manager
-	host        host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub      *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger      zerolog.Logger                          // used to provide logging
-	topics      map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs        map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub      p2p.PubSubAdapter
+	logger      zerolog.Logger                      // used to provide logging
+	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
 	routing     routing.Routing
 	pCache      *ProtocolPeerCache
 	peerManager *connection.PeerManager
@@ -75,8 +75,8 @@ func NewNode(
 		uniMgr:      uniMgr,
 		host:        host,
 		logger:      logger.With().Str("component", "libp2p-node").Logger(),
-		topics:      make(map[channels.Topic]*pubsub.Topic),
-		subs:        make(map[channels.Topic]*pubsub.Subscription),
+		topics:      make(map[channels.Topic]p2p.Topic),
+		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: peerManager,
 	}
@@ -151,6 +151,13 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
+	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
+	// protocol state.
+	n.logger.Warn().
+		Str("peer_id", peerID.String()).
+		Bool(logging.KeySuspicious, true).
+		Msg("disconnected from peer")
+
 	return nil
 }
 
@@ -220,7 +227,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 
 // Subscribe subscribes the node to the given topic and returns the subscription
 // All errors returned from this function can be considered benign.
-func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -229,9 +236,7 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if err := n.pubSub.RegisterTopicValidator(
-			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
-		); err != nil {
+		if err := n.pubSub.RegisterTopicValidator(topic.String(), topicValidator); err != nil {
 			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
 			return nil, fmt.Errorf("failed to register topic validator: %w", err)
 		}
@@ -383,7 +388,7 @@ func (n *Node) Routing() routing.Routing {
 
 // SetPubSub sets the node's pubsub implementation.
 // SetPubSub may be called at most once.
-func (n *Node) SetPubSub(ps *pubsub.PubSub) {
+func (n *Node) SetPubSub(ps p2p.PubSubAdapter) {
 	if n.pubSub != nil {
 		n.logger.Fatal().Msg("pubSub already set")
 	}

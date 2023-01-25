@@ -38,13 +38,14 @@ const (
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
-	ContractServiceAccountFunction_setupNewAccount           = "setupNewAccount"
-	ContractServiceAccountFunction_defaultTokenBalance       = "defaultTokenBalance"
-	ContractServiceAccountFunction_deductTransactionFee      = "deductTransactionFee"
-	ContractStorageFeesFunction_calculateAccountCapacity     = "calculateAccountCapacity"
-	ContractStorageFeesFunction_calculateAccountsCapacity    = "calculateAccountsCapacity"
-	ContractStorageFeesFunction_defaultTokenAvailableBalance = "defaultTokenAvailableBalance"
-	ContractDeploymentAuditsFunction_useVoucherForDeploy     = "useVoucherForDeploy"
+	ContractServiceAccountFunction_setupNewAccount                            = "setupNewAccount"
+	ContractServiceAccountFunction_defaultTokenBalance                        = "defaultTokenBalance"
+	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
+	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
+	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
+	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
+	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
+	ContractDeploymentAuditsFunction_useVoucherForDeploy                      = "useVoucherForDeploy"
 )
 
 // SystemContract represents a system contract on a particular chain.

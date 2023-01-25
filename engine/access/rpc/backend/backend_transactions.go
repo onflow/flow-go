@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
@@ -186,7 +187,7 @@ func (b *backendTransactions) SendRawTransaction(
 func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
-	txErr := convertStorageError(err)
+	txErr := rpc.ConvertStorageError(err)
 
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
@@ -205,15 +206,16 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
 
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.ByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		transactions = append(transactions, collection.Transactions...)
@@ -237,7 +239,7 @@ func (b *backendTransactions) GetTransactionResult(
 	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
 
-	txErr := convertStorageError(err)
+	txErr := rpc.ConvertStorageError(err)
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
@@ -259,7 +261,7 @@ func (b *backendTransactions) GetTransactionResult(
 	// find the block for the transaction
 	block, err := b.lookupBlock(txID)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	var blockID flow.Identifier
@@ -274,14 +276,14 @@ func (b *backendTransactions) GetTransactionResult(
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
 		blockHeight = block.Header.Height
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, rpc.ConvertStorageError(err)
 		}
 	}
 
 	// derive status of the transaction
 	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
@@ -301,12 +303,13 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]*access.TransactionResult, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
-	req := execproto.GetTransactionsByBlockIDRequest{
+	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
@@ -336,7 +339,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		for _, txID := range collection.Transactions {
@@ -348,7 +351,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			// tx body is irrelevant to status if it's in an executed block
 			txStatus, err := b.deriveTransactionStatus(nil, true, block)
 			if err != nil {
-				return nil, convertStorageError(err)
+				return nil, rpc.ConvertStorageError(err)
 			}
 
 			results = append(results, &access.TransactionResult{
@@ -387,7 +390,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 		if err != nil {
-			return nil, convertStorageError(err)
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		results = append(results, &access.TransactionResult{
@@ -414,11 +417,11 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// create request and forward to EN
-	req := execproto.GetTransactionByIndexRequest{
+	req := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
 		Index:   index,
 	}
@@ -442,7 +445,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// convert to response, cache and return
@@ -638,7 +641,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
-	req := execproto.GetTransactionResultRequest{
+	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: transactionID,
 	}
@@ -672,7 +675,7 @@ func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionResultRequest,
+	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -704,7 +707,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionResultRequest,
+	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -712,7 +715,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResult(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
@@ -725,7 +728,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionsByBlockIDRequest,
+	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
 
@@ -762,7 +765,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionsByBlockIDRequest,
+	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -770,7 +773,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
@@ -783,7 +786,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionByIndexRequest,
+	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -821,7 +824,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionByIndexRequest,
+	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -829,7 +832,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)

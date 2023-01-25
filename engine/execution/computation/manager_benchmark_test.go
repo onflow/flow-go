@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -21,13 +20,12 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -47,11 +45,16 @@ type testAccounts struct {
 	seq      uint64
 }
 
-func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num int) *testAccounts {
+func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAccounts {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	addresses, err := testutil.CreateAccounts(
+		vm,
+		ledger,
+		derived.NewEmptyDerivedBlockData(),
+		privateKeys,
+		chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -68,12 +71,12 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 
 func mustFundAccounts(
 	b *testing.B,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	ledger state.View,
 	execCtx fvm.Context,
 	accs *testAccounts,
 ) {
-	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	execCtx = fvm.NewContextFromParent(
 		execCtx,
 		fvm.WithDerivedBlockData(derivedBlockData))
@@ -126,12 +129,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
@@ -142,11 +144,19 @@ func BenchmarkComputeBlock(b *testing.B) {
 	)
 
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		tracer,
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(b, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(
-		programs.DefaultDerivedDataCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{

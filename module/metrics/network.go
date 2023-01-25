@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -18,6 +19,8 @@ const (
 )
 
 type NetworkCollector struct {
+	*LibP2PResourceManagerMetrics
+	*GossipSubMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
@@ -34,16 +37,6 @@ type NetworkCollector struct {
 	dnsCacheInvalidationCount    prometheus.Counter
 	dnsLookupRequestDroppedCount prometheus.Counter
 	routingTableSize             prometheus.Gauge
-
-	// TODO: encapsulate these in a separate GossipSub collector.
-	gossipSubReceivedIHaveCount                  prometheus.Counter
-	gossipSubReceivedIWantCount                  prometheus.Counter
-	gossipSubReceivedGraftCount                  prometheus.Counter
-	gossipSubReceivedPruneCount                  prometheus.Counter
-	gossipSubIncomingRpcAcceptedFullyCount       prometheus.Counter
-	gossipSubIncomingRpcAcceptedOnlyControlCount prometheus.Counter
-	gossipSubIncomingRpcRejectedCount            prometheus.Counter
-	gossipSubReceivedPublishMessageCount         prometheus.Counter
 
 	// authorization, rate limiting metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
@@ -64,12 +57,15 @@ func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	}
 }
 
-func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *NetworkCollector {
 	nc := &NetworkCollector{}
 
 	for _, opt := range opts {
 		opt(nc)
 	}
+
+	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
+	nc.GossipSubMetrics = NewGossipSubMetrics(nc.prefix)
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -78,7 +74,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.inboundMessageSize = promauto.NewHistogramVec(
@@ -88,7 +84,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.duplicateMessagesDropped = promauto.NewCounterVec(
@@ -97,7 +93,7 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage},
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
 	nc.dnsLookupDuration = promauto.NewHistogram(
@@ -237,96 +233,22 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
-	nc.gossipSubReceivedIHaveCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_ihave_total",
-			Help:      "number of received ihave messages from gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubReceivedIWantCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_iwant_total",
-			Help:      "number of received iwant messages from gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubReceivedGraftCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_graft_total",
-			Help:      "number of received graft messages from gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubReceivedPruneCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_prune_total",
-			Help:      "number of received prune messages from gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubIncomingRpcAcceptedFullyCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_incoming_rpc_accepted_fully_total",
-			Help:      "number of incoming rpc messages accepted fully by gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubIncomingRpcAcceptedOnlyControlCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_incoming_rpc_accepted_only_control_total",
-			Help:      "number of incoming rpc messages accepted only control messages by gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubIncomingRpcRejectedCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_incoming_rpc_rejected_total",
-			Help:      "number of incoming rpc messages rejected by gossipsub protocol",
-		},
-	)
-
-	nc.gossipSubReceivedPublishMessageCount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
-			Name:      nc.prefix + "gossipsub_received_publish_message_total",
-			Help:      "number of received publish messages from gossipsub protocol",
-		},
-	)
-
 	return nc
 }
 
-// NetworkMessageSent tracks the message size of the last message sent out on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
-	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// OutboundMessageSent collects metrics related to a message sent by the node.
+func (nc *NetworkCollector) OutboundMessageSent(sizeBytes int, topic, protocol, messageType string) {
+	nc.outboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkMessageReceived tracks the message size of the last message received on the wire
-// in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
-	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+// InboundMessageReceived collects metrics related to a message received by the node.
+func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic, protocol, messageType string) {
+	nc.inboundMessageSize.WithLabelValues(topic, protocol, messageType).Observe(float64(sizeBytes))
 }
 
-// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
-func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
-	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
+// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, messageType string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic, protocol, messageType).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
@@ -341,15 +263,18 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
+// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageStarted(topic string) {
+// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingStarted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
 }
 
-func (nc *NetworkCollector) DirectMessageFinished(topic string) {
+// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+func (nc *NetworkCollector) UnicastMessageSendingCompleted(topic string) {
 	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
 }
 
@@ -361,7 +286,8 @@ func (nc *NetworkCollector) RoutingTablePeerRemoved() {
 	nc.routingTableSize.Dec()
 }
 
-// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+// the number of messages being processed by the node.
 func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
 	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
@@ -411,56 +337,4 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 // OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
 func (nc *NetworkCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
-}
-
-// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes.
-// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-func (nc *NetworkCollector) OnIWantReceived(count int) {
-	nc.gossipSubReceivedIWantCount.Add(float64(count))
-}
-
-// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes.
-// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
-func (nc *NetworkCollector) OnIHaveReceived(count int) {
-	nc.gossipSubReceivedIHaveCount.Add(float64(count))
-}
-
-// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes.
-// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
-func (nc *NetworkCollector) OnGraftReceived(count int) {
-	nc.gossipSubReceivedGraftCount.Add(float64(count))
-}
-
-// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes.
-// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
-func (nc *NetworkCollector) OnPruneReceived(count int) {
-	nc.gossipSubReceivedPruneCount.Add(float64(count))
-}
-
-// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
-// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
-// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
-func (nc *NetworkCollector) OnIncomingRpcAcceptedFully() {
-	nc.gossipSubIncomingRpcAcceptedFullyCount.Inc()
-}
-
-// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
-// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
-// included in the RPC are not accepted.
-// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
-// validation.
-func (nc *NetworkCollector) OnIncomingRpcAcceptedOnlyForControlMessages() {
-	nc.gossipSubIncomingRpcAcceptedOnlyControlCount.Inc()
-}
-
-// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
-// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
-func (nc *NetworkCollector) OnIncomingRpcRejected() {
-	nc.gossipSubIncomingRpcRejectedCount.Inc()
-}
-
-// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
-// RPC message.
-func (nc *NetworkCollector) OnPublishedGossipMessagesReceived(count int) {
-	nc.gossipSubReceivedPublishMessageCount.Add(float64(count))
 }

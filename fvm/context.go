@@ -4,11 +4,13 @@ import (
 	"math"
 
 	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -34,7 +36,9 @@ type Context struct {
 
 	TransactionExecutorParams
 
-	DerivedBlockData *programs.DerivedBlockData
+	DerivedBlockData *derived.DerivedBlockData
+
+	tracing.TracerSpan
 
 	environment.EnvironmentParams
 }
@@ -175,14 +179,6 @@ func WithServiceEventCollectionEnabled() Option {
 	}
 }
 
-// WithExtensiveTracing sets the extensive tracing
-func WithExtensiveTracing() Option {
-	return func(ctx Context) Context {
-		ctx.ExtensiveTracing = true
-		return ctx
-	}
-}
-
 // WithBlocks sets the block storage provider for a virtual machine context.
 //
 // The VM uses the block storage provider to provide historical block information to
@@ -210,6 +206,22 @@ func WithMetricsReporter(mr environment.MetricsReporter) Option {
 func WithTracer(tr module.Tracer) Option {
 	return func(ctx Context) Context {
 		ctx.Tracer = tr
+		return ctx
+	}
+}
+
+// WithSpan sets the trace span for a virtual machine context.
+func WithSpan(span otelTrace.Span) Option {
+	return func(ctx Context) Context {
+		ctx.Span = span
+		return ctx
+	}
+}
+
+// WithExtensiveTracing sets the extensive tracing
+func WithExtensiveTracing() Option {
+	return func(ctx Context) Context {
+		ctx.ExtensiveTracing = true
 		return ctx
 	}
 }
@@ -353,7 +365,7 @@ func WithReusableCadenceRuntimePool(
 
 // WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
+func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 	return func(ctx Context) Context {
 		ctx.DerivedBlockData = derivedBlockData
 		return ctx

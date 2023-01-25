@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -18,7 +19,7 @@ type UnsafeRandomGenerator interface {
 }
 
 type unsafeRandomGenerator struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 
 	blockHeader *flow.Header
 
@@ -52,7 +53,7 @@ func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
 }
 
 func NewUnsafeRandomGenerator(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	blockHeader *flow.Header,
 ) UnsafeRandomGenerator {
 	gen := &unsafeRandomGenerator{
@@ -86,7 +87,7 @@ func (gen *unsafeRandomGenerator) seed() {
 // Its also not thread safe because each thread needs to be deterministically seeded with a different seed.
 // This is Ok because a single transaction has a single UnsafeRandomGenerator and is run in a single thread.
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
-	defer gen.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvUnsafeRandom).End()
+	defer gen.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvUnsafeRandom).End()
 
 	gen.seed()
 

@@ -115,8 +115,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	header.ChainID = "test"
 	header.Height = 11
 	msg := &messages.BlockProposal{
-		Header:  header,
-		Payload: block.Payload,
+		Block: messages.UntrustedBlockFromInternal(block),
 	}
 
 	done := func() <-chan struct{} {

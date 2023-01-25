@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -70,7 +71,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		err = convertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -89,7 +90,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	arguments [][]byte,
 ) ([]byte, error) {
 
-	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
@@ -164,14 +165,14 @@ func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte
 	}
 }
 
-func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
 	}
 	defer closer.Close()
 
-	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)

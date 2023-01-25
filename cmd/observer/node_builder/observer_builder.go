@@ -618,7 +618,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
 func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkCoreMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
@@ -727,7 +727,8 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
@@ -848,7 +849,8 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.Metrics.Network,
 			builder.BaseConfig.BindAddr,
 			networkKey,
-			builder.SporkID).
+			builder.SporkID,
+			builder.LibP2PResourceManagerConfig).
 			SetSubscriptionFilter(
 				subscription.NewRoleBasedFilter(
 					subscription.UnstakedRole, builder.IdentityProvider,
@@ -938,7 +940,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 
 			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
-			builder.initMiddleware(node.NodeID, node.Metrics.Network, libp2pNode, msgValidators...)
+			builder.initMiddleware(node.NodeID, libp2pNode, msgValidators...)
 
 			// topology is nil since it is automatically managed by libp2p
 			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
@@ -1030,25 +1032,23 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
+	validators ...network.MessageValidator,
+) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		builder.Logger,
-		libp2pNode,
-		nodeID,
-		networkMetrics,
+		libp2pNode, nodeID,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
 		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
+		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }
 

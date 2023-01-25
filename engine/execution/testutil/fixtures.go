@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -188,9 +188,9 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	view state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -198,9 +198,9 @@ func CreateAccounts(
 }
 
 func CreateAccountsWithSimpleAddresses(
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	view state.View,
-	derivedBlockData *programs.DerivedBlockData,
+	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -284,7 +284,7 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
+func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check

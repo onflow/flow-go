@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -94,7 +95,7 @@ type accountCreator struct {
 
 	isServiceAccountEnabled bool
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	meter   Meter
 	metrics MetricsReporter
 
@@ -128,7 +129,7 @@ func NewAccountCreator(
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
 	systemContracts *SystemContracts,
@@ -148,8 +149,7 @@ func NewAccountCreator(
 func (creator *accountCreator) bytes() ([]byte, error) {
 	stateBytes, err := creator.txnState.Get(
 		"",
-		state.AddressStateKey,
-		creator.txnState.EnforceLimits())
+		state.AddressStateKey)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -196,8 +196,7 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	err = creator.txnState.Set(
 		"",
 		state.AddressStateKey,
-		addressGenerator.Bytes(),
-		creator.txnState.EnforceLimits())
+		addressGenerator.Bytes())
 	if err != nil {
 		return address, fmt.Errorf(
 			"failed to update the state with address generator state: %w",
@@ -262,7 +261,7 @@ func (creator *accountCreator) CreateAccount(
 	runtime.Address,
 	error,
 ) {
-	defer creator.tracer.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
+	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
 	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
 	if err != nil {

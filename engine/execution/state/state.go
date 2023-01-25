@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -153,20 +154,19 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+func RegisterEntriesToKeysValues(
+	entries flow.RegisterEntries,
+) (
+	[]ledger.Key,
+	[]ledger.Value,
+) {
+	keys := make([]ledger.Key, len(entries))
+	values := make([]ledger.Value, len(entries))
+	for i, entry := range entries {
+		keys[i] = RegisterIDToKey(entry.Key)
+		values[i] = entry.Value
 	}
-	return keys
-}
-
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
-	}
-	return vals
+	return keys, values
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
@@ -212,17 +212,13 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 }
 
 type RegisterUpdatesHolder interface {
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	UpdatedRegisters() flow.RegisterEntries
 }
 
 func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	ids, values := ruh.RegisterUpdates()
+	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
 
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
@@ -235,13 +231,6 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 
 	return flow.StateCommitment(commit), trieUpdate, nil
 }
-
-//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.End()
-//
-//	return CommitDelta(s.ls, delta, baseState)
-//}
 
 func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
 
@@ -418,6 +407,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := s.blocks.ByID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve block: %w", err)
@@ -508,50 +498,18 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.End()
 	}
 
-	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
-		var blockID flow.Identifier
-		err := operation.RetrieveExecutedBlock(&blockID)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup executed block: %w", err)
-		}
-
-		var highest flow.Header
-		err = operation.RetrieveHeader(blockID, &highest)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve executed header: %w", err)
-		}
-
-		if header.Height <= highest.Height {
-			return nil
-		}
-		err = operation.UpdateExecutedBlock(header.ID())(txn)
-		if err != nil {
-			return fmt.Errorf("cannot update highest executed block: %w", err)
-		}
-
-		return nil
-	})
+	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
 	var blockID flow.Identifier
-	var highest flow.Header
-	err := s.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutedBlock(&blockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
-		}
-		err = operation.RetrieveHeader(blockID, &highest)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
-		}
-		return nil
-	})
+	var height uint64
+	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return highest.Height, blockID, nil
+	return height, blockID, nil
 }
 
 // IsBlockExecuted returns whether the block has been executed.

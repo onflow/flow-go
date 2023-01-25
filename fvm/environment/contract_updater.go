@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -35,8 +35,8 @@ func DefaultContractUpdaterParams() ContractUpdaterParams {
 }
 
 type sortableContractUpdates struct {
-	keys    []programs.ContractUpdateKey
-	updates []programs.ContractUpdate
+	keys    []ContractUpdateKey
+	updates []ContractUpdate
 }
 
 func (lists *sortableContractUpdates) Len() int {
@@ -78,7 +78,7 @@ type ContractUpdater interface {
 	// OperationNotSupportedError.
 	RemoveAccountContractCode(address runtime.Address, name string) error
 
-	Commit() ([]programs.ContractUpdateKey, error)
+	Commit() ([]ContractUpdateKey, error)
 
 	Reset()
 }
@@ -125,7 +125,7 @@ func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
 }
 
 func (updater ParseRestrictedContractUpdater) Commit() (
-	[]programs.ContractUpdateKey,
+	[]ContractUpdateKey,
 	error,
 ) {
 	return updater.impl.Commit()
@@ -152,7 +152,7 @@ func (NoContractUpdater) RemoveAccountContractCode(
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
-func (NoContractUpdater) Commit() ([]programs.ContractUpdateKey, error) {
+func (NoContractUpdater) Commit() ([]ContractUpdateKey, error) {
 	return nil, nil
 }
 
@@ -277,25 +277,25 @@ func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
 		string(code[:]))
 }
 
-type contractUpdater struct {
-	tracer          *Tracer
+type ContractUpdaterImpl struct {
+	tracer          tracing.TracerSpan
 	meter           Meter
 	accounts        Accounts
 	transactionInfo TransactionInfo
 
-	draftUpdates map[programs.ContractUpdateKey]programs.ContractUpdate
+	draftUpdates map[ContractUpdateKey]ContractUpdate
 
 	ContractUpdaterStubs
 }
 
-var _ ContractUpdater = &contractUpdater{}
+var _ ContractUpdater = &ContractUpdaterImpl{}
 
 func NewContractUpdaterForTesting(
 	accounts Accounts,
 	stubs ContractUpdaterStubs,
-) *contractUpdater {
+) *ContractUpdaterImpl {
 	updater := NewContractUpdater(
-		nil,
+		tracing.NewTracerSpan(),
 		nil,
 		accounts,
 		nil,
@@ -309,7 +309,7 @@ func NewContractUpdaterForTesting(
 }
 
 func NewContractUpdater(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 	transactionInfo TransactionInfo,
@@ -318,8 +318,8 @@ func NewContractUpdater(
 	logger *ProgramLogger,
 	systemContracts *SystemContracts,
 	runtime *Runtime,
-) *contractUpdater {
-	updater := &contractUpdater{
+) *ContractUpdaterImpl {
+	updater := &ContractUpdaterImpl{
 		tracer:          tracer,
 		meter:           meter,
 		accounts:        accounts,
@@ -337,12 +337,12 @@ func NewContractUpdater(
 	return updater
 }
 
-func (updater *contractUpdater) UpdateAccountContractCode(
+func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 	address runtime.Address,
 	name string,
 	code []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(
+	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvUpdateAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
@@ -357,7 +357,7 @@ func (updater *contractUpdater) UpdateAccountContractCode(
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	err = updater.setContract(
+	err = updater.SetContract(
 		address,
 		name,
 		code,
@@ -369,11 +369,11 @@ func (updater *contractUpdater) UpdateAccountContractCode(
 	return nil
 }
 
-func (updater *contractUpdater) RemoveAccountContractCode(
+func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 	address runtime.Address,
 	name string,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(
+	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvRemoveAccountContractCode).End()
 
 	err := updater.meter.MeterComputation(
@@ -388,7 +388,7 @@ func (updater *contractUpdater) RemoveAccountContractCode(
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	err = updater.removeContract(
+	err = updater.RemoveContract(
 		address,
 		name,
 		updater.transactionInfo.SigningAccounts())
@@ -399,7 +399,7 @@ func (updater *contractUpdater) RemoveAccountContractCode(
 	return nil
 }
 
-func (updater *contractUpdater) setContract(
+func (updater *ContractUpdaterImpl) SetContract(
 	address runtime.Address,
 	name string,
 	code []byte,
@@ -439,12 +439,12 @@ func (updater *contractUpdater) setContract(
 		}
 	}
 
-	contractUpdateKey := programs.ContractUpdateKey{
-		Address: flowAddress,
+	contractUpdateKey := ContractUpdateKey{
+		Address: address,
 		Name:    name,
 	}
 
-	updater.draftUpdates[contractUpdateKey] = programs.ContractUpdate{
+	updater.draftUpdates[contractUpdateKey] = ContractUpdate{
 		ContractUpdateKey: contractUpdateKey,
 		Code:              code,
 	}
@@ -452,7 +452,7 @@ func (updater *contractUpdater) setContract(
 	return nil
 }
 
-func (updater *contractUpdater) removeContract(
+func (updater *ContractUpdaterImpl) RemoveContract(
 	address runtime.Address,
 	name string,
 	signingAccounts []runtime.Address,
@@ -466,27 +466,26 @@ func (updater *contractUpdater) removeContract(
 					"accounts"))
 	}
 
-	add := flow.Address(address)
-	uk := programs.ContractUpdateKey{Address: add, Name: name}
-	u := programs.ContractUpdate{ContractUpdateKey: uk}
+	uk := ContractUpdateKey{Address: address, Name: name}
+	u := ContractUpdate{ContractUpdateKey: uk}
 	updater.draftUpdates[uk] = u
 
 	return nil
 }
 
-func (updater *contractUpdater) Commit() ([]programs.ContractUpdateKey, error) {
+func (updater *ContractUpdaterImpl) Commit() ([]ContractUpdateKey, error) {
 	updatedKeys, updateList := updater.updates()
 	updater.Reset()
 
 	var err error
 	for _, v := range updateList {
 		if len(v.Code) > 0 {
-			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
+			err = updater.accounts.SetContract(v.Name, flow.BytesToAddress(v.Address.Bytes()), v.Code)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			err = updater.accounts.DeleteContract(v.Name, v.Address)
+			err = updater.accounts.DeleteContract(v.Name, flow.BytesToAddress(v.Address.Bytes()))
 			if err != nil {
 				return nil, err
 			}
@@ -496,23 +495,23 @@ func (updater *contractUpdater) Commit() ([]programs.ContractUpdateKey, error) {
 	return updatedKeys, nil
 }
 
-func (updater *contractUpdater) Reset() {
-	updater.draftUpdates = make(map[programs.ContractUpdateKey]programs.ContractUpdate)
+func (updater *ContractUpdaterImpl) Reset() {
+	updater.draftUpdates = make(map[ContractUpdateKey]ContractUpdate)
 }
 
-func (updater *contractUpdater) hasUpdates() bool {
+func (updater *ContractUpdaterImpl) HasUpdates() bool {
 	return len(updater.draftUpdates) > 0
 }
 
-func (updater *contractUpdater) updates() (
-	[]programs.ContractUpdateKey,
-	[]programs.ContractUpdate,
+func (updater *ContractUpdaterImpl) updates() (
+	[]ContractUpdateKey,
+	[]ContractUpdate,
 ) {
 	if len(updater.draftUpdates) == 0 {
 		return nil, nil
 	}
-	keys := make([]programs.ContractUpdateKey, 0, len(updater.draftUpdates))
-	updates := make([]programs.ContractUpdate, 0, len(updater.draftUpdates))
+	keys := make([]ContractUpdateKey, 0, len(updater.draftUpdates))
+	updates := make([]ContractUpdate, 0, len(updater.draftUpdates))
 	for key, update := range updater.draftUpdates {
 		keys = append(keys, key)
 		updates = append(updates, update)
@@ -522,7 +521,7 @@ func (updater *contractUpdater) updates() (
 	return keys, updates
 }
 
-func (updater *contractUpdater) isAuthorizedForDeployment(
+func (updater *ContractUpdaterImpl) isAuthorizedForDeployment(
 	signingAccounts []runtime.Address,
 ) bool {
 	if updater.RestrictedDeploymentEnabled() {
@@ -533,7 +532,7 @@ func (updater *contractUpdater) isAuthorizedForDeployment(
 	return true
 }
 
-func (updater *contractUpdater) isAuthorizedForRemoval(
+func (updater *ContractUpdaterImpl) isAuthorizedForRemoval(
 	signingAccounts []runtime.Address,
 ) bool {
 	if updater.RestrictedRemovalEnabled() {
@@ -544,7 +543,7 @@ func (updater *contractUpdater) isAuthorizedForRemoval(
 	return true
 }
 
-func (updater *contractUpdater) isAuthorized(
+func (updater *ContractUpdaterImpl) isAuthorized(
 	signingAccounts []runtime.Address,
 	path cadence.Path,
 ) bool {

@@ -129,12 +129,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	block := proposal.Block.ToInternal()
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", logging.Entity(proposal.Header)).
-		Hex("parent_id", proposal.Header.ParentID[:]).
-		Hex("signer", proposal.Header.ProposerID[:]).
+		Uint64("block_view", block.Header.View).
+		Hex("block_id", logging.Entity(block.Header)).
+		Hex("parent_id", block.Header.ParentID[:]).
+		Hex("signer", block.Header.ProposerID[:]).
 		Logger()
 
 	log.Info().Msg("block proposal submitted for propagation")

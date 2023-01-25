@@ -22,8 +22,8 @@ const (
 )
 
 const (
-	globalStateFulfilledHeight = iota + 1 // latest fulfilled block height
-	globalStatePrunedHeight               // latest pruned block height
+	globalStateFulfilledHeight byte = iota + 1 // latest fulfilled block height
+	globalStatePrunedHeight                    // latest pruned block height
 )
 
 const cidsPerBatch = 16 // number of cids to track per batch

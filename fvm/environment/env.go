@@ -7,8 +7,9 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -19,7 +20,10 @@ type Environment interface {
 	runtime.Interface
 
 	// Tracer
-	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
+	StartChildSpan(
+		name trace.SpanName,
+		options ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan
 
 	Meter
 
@@ -34,11 +38,27 @@ type Environment interface {
 	Logs() []string
 
 	// EventEmitter
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
+	Events() flow.EventsList
+	ServiceEvents() flow.EventsList
+	ConvertedServiceEvents() flow.ServiceEventList
 
 	// SystemContracts
-	AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error)
+	AccountsStorageCapacity(
+		addresses []common.Address,
+		payer common.Address,
+		maxTxFees uint64,
+	) (
+		cadence.Value,
+		error,
+	)
+	CheckPayerBalanceAndGetMaxTxFees(
+		payer flow.Address,
+		inclusionEffort uint64,
+		executionEffort uint64,
+	) (
+		cadence.Value,
+		error,
+	)
 	DeductTransactionFees(
 		payer flow.Address,
 		inclusionEffort uint64,
@@ -57,7 +77,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
 	FlushPendingUpdates() (
-		programs.ModifiedSetsInvalidator,
+		derived.TransactionInvalidator,
 		error,
 	)
 
@@ -75,7 +95,6 @@ type EnvironmentParams struct {
 
 	RuntimeParams
 
-	TracerParams
 	ProgramLoggerParams
 
 	EventEmitterParams
@@ -92,7 +111,6 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		ServiceAccountEnabled: true,
 
 		RuntimeParams:         DefaultRuntimeParams(),
-		TracerParams:          DefaultTracerParams(),
 		ProgramLoggerParams:   DefaultProgramLoggerParams(),
 		EventEmitterParams:    DefaultEventEmitterParams(),
 		BlockInfoParams:       DefaultBlockInfoParams(),

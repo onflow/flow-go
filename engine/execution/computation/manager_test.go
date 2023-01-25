@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -21,32 +20,28 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/environment"
-
 	"github.com/onflow/flow-go/engine/execution"
-	state2 "github.com/onflow/flow-go/engine/execution/state"
-	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -63,7 +58,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -119,12 +114,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -134,10 +128,18 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov)
 	require.NoError(t, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(10)
+	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -156,9 +158,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
-	compUsed, memUsed := returnedComputationResult.BlockComputationAndMemoryUsed()
-	assert.True(t, compUsed > 0)
-	assert.True(t, memUsed > 0)
+	stats := returnedComputationResult.BlockStats()
+	assert.True(t, stats.ComputationUsed > 0)
+	assert.True(t, stats.MemoryUsed > 0)
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -177,6 +179,8 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture([][]flow.Identifier{
 		{unittest.IdentifierFixture()},
@@ -187,16 +191,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		computationResult: computationResult,
 	}
 
-	derivedChainData, err := programs.NewDerivedChainData(10)
+	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
-
-	fakeUploader := &FakeUploader{}
 
 	manager := &Manager{
 		blockComputer:    blockComputer,
 		me:               me,
 		derivedChainData: derivedChainData,
-		uploaders:        []uploader.Uploader{fakeUploader},
 		tracer:           trace.NewNoopTracer(),
 	}
 
@@ -205,11 +206,6 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
 	require.NoError(t, err)
-
-	retrievedResult, has := fakeUploader.data[computationResult.ExecutableBlock.ID()]
-	require.True(t, has)
-
-	assert.Equal(t, computationResult, retrievedResult)
 }
 
 func TestExecuteScript(t *testing.T) {
@@ -220,6 +216,8 @@ func TestExecuteScript(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	vm := fvm.NewVirtualMachine()
 
@@ -239,10 +237,7 @@ func TestExecuteScript(t *testing.T) {
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -259,10 +254,9 @@ func TestExecuteScript(t *testing.T) {
 		nil,
 		execCtx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -284,6 +278,8 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, fmt.Errorf("error getting register")
@@ -301,10 +297,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -321,10 +314,9 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		nil,
 		execCtx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
 		},
@@ -346,10 +338,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -366,13 +355,12 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       scriptLogThreshold,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
 		},
@@ -396,10 +384,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -416,13 +401,12 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Millisecond,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
@@ -446,10 +430,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -466,13 +447,12 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil,
 		ctx,
 		committer.NewNoopViewCommitter(),
-		nil,
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       1 * time.Second,
 			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
-			NewCustomVirtualMachine: func() computer.VirtualMachine {
+			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
 		},
@@ -518,20 +498,8 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.DerivedBlockData) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) (*execution.ComputationResult, error) {
 	return f.computationResult, nil
-}
-
-type FakeUploader struct {
-	data map[flow.Identifier]*execution.ComputationResult
-}
-
-func (f *FakeUploader) Upload(computationResult *execution.ComputationResult) error {
-	if f.data == nil {
-		f.data = make(map[flow.Identifier]*execution.ComputationResult)
-	}
-	f.data[computationResult.ExecutableBlock.ID()] = computationResult
-	return nil
 }
 
 func noopView() *delta.View {
@@ -552,9 +520,8 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
-		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -592,9 +559,8 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
-		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
@@ -646,7 +612,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -695,12 +661,11 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -717,11 +682,12 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		trace.NewNoopTracer(),
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
+		me,
 		prov,
 	)
 	require.NoError(t, err)
 
-	derivedChainData, err := programs.NewDerivedChainData(10)
+	derivedChainData, err := derived.NewDerivedChainData(10)
 	require.NoError(t, err)
 
 	engine := &Manager{
@@ -787,17 +753,16 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		ctx,
 		committer.NewNoopViewCommitter(),
 		nil,
-		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     programs.DefaultDerivedDataCacheSize,
+			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
 			ScriptLogThreshold:       DefaultScriptLogThreshold,
 			ScriptExecutionTimeLimit: timeout,
 		},
 	)
-	vm := manager.vm.(*fvm.VirtualMachine)
+	vm := manager.vm
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
-	derivedBlockData := programs.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
@@ -829,6 +794,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
