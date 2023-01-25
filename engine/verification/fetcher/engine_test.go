@@ -2,6 +2,7 @@ package fetcher_test
 
 import (
 	"fmt"
+	verificationeng "github.com/onflow/flow-go/engine/verification"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ type FetcherEngineTestSuite struct {
 	results               *storage.ExecutionResults           // to retrieve execution result of an assigned chunk
 	receipts              *storage.ExecutionReceipts          // used to find executor of the chunk
 	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
+	//stopCxontrol          *verificationeng.StopControl
 }
 
 // setupTest initiates a test suite prior to each test.
@@ -79,7 +81,7 @@ func newFetcherEngineWithStop(s *FetcherEngineTestSuite, stopAtHeight uint64) *f
 		s.results,
 		s.receipts,
 		s.requester,
-		stopAtHeight)
+		verificationeng.NewStopControl(stopAtHeight, s.state, s.log))
 
 	e.WithChunkConsumerNotifier(s.chunkConsumerNotifier)
 	return e

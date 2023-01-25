@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	verificationengine "github.com/onflow/flow-go/engine/verification"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -104,6 +105,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 		followerEng *follower.Engine           // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
+
+		stopControl *verificationengine.StopControl
 	)
 
 	v.FlowNodeBuilder.
@@ -193,6 +196,10 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
+		Module("stop control", func(nodeConfig *NodeConfig) error {
+			stopControl = verificationengine.NewStopControl(v.verConf.stopAtHeight, nodeConfig.State, nodeConfig.Logger)
+			return nil
+		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
@@ -249,7 +256,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				requesterEngine,
-				v.verConf.stopAtHeight)
+				stopControl)
 
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
@@ -285,7 +292,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkAssigner,
 				chunkQueue,
 				chunkConsumer,
-				v.verConf.stopAtHeight)
+				stopControl)
 
 			return assignerEngine, nil
 		}).

@@ -3,8 +3,7 @@ package assigner
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
-
+	"github.com/onflow/flow-go/engine/verification"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -33,8 +32,9 @@ type Engine struct {
 	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
-	stopAtHeight          uint64
-	stopAtBlockID         atomic.Value
+	//stopAtHeight          uint64
+	//stopAtBlockID         atomic.Value
+	stopControl *verification.StopControl
 }
 
 func New(
@@ -46,7 +46,7 @@ func New(
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
-	stopAtHeight uint64,
+	stopControl *verification.StopControl,
 ) *Engine {
 	e := &Engine{
 		unit:             engine.NewUnit(),
@@ -58,9 +58,8 @@ func New(
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
-		stopAtHeight:     stopAtHeight,
+		stopControl:      stopControl,
 	}
-	e.stopAtBlockID.Store(flow.ZeroID)
 	return e
 }
 
@@ -120,7 +119,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 // processChunk receives a chunk that belongs to execution result id. It creates a chunk locator
 // for the chunk and stores the chunk locator in the chunks queue.
 //
-// Note that the chunk is assume to be legitimately assigned to this verification node
+// Note that the chunk is assumed to be legitimately assigned to this verification node
 // (through the chunk assigner), and belong to the execution result.
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
@@ -183,19 +182,21 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	// or stopping at all - blocks can still be verified in a system, or emergency sealing can be on.
 	// This is also safe even if this function runs concurrently and/or on blocks out of order -
 	// once certain height is sealed there is no point in verifying at and below it anyway.
-	if e.stopAtHeight > 0 {
-		highestSealed, err := e.highestSealed()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("cannot query highest sealed height")
-			return
-		}
-		if highestSealed >= e.stopAtHeight-1 {
-			// start crash sequence
-			// TODO put restart sentinel in a DB with restart height of e.stopHeight-1, after restart VN star processing at e.stopHeight
+	e.stopControl.Finalized()
 
-			e.log.Fatal().Msgf("block sealed at height %d - stopping node, since stop at %d requested", highestSealed, e.stopAtHeight)
-		}
-	}
+	//if e.stopAtHeight > 0 {
+	//	highestSealed, err := e.highestSealed()
+	//	if err != nil {
+	//		e.log.Fatal().Err(err).Msg("cannot query highest sealed height")
+	//		return
+	//	}
+	//	if highestSealed >= e.stopAtHeight-1 {
+	//		// start crash sequence
+	//		// TODO put restart sentinel in a DB with restart height of e.stopHeight-1, after restart VN star processing at e.stopHeight
+	//
+	//		e.log.Fatal().Msgf("block sealed at height %d - stopping node, since stop at %d requested", highestSealed, e.stopAtHeight)
+	//	}
+	//}
 
 	// keeps track of total assigned, processed and skipped chunks in
 	// this block for logging.
@@ -232,17 +233,22 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		for _, chunk := range chunkList {
 
 			// is chunk's block at or above stop height, skip completely
-			if e.stopAtHeight > 0 {
-				heightForBlock, err := e.heightForBlock(chunk.BlockID)
-				if err != nil {
-					resultLog.Fatal().Err(err).Msg("cannot query height for a block")
-					return
-				}
-				if heightForBlock >= e.stopAtHeight {
-					heightSkippedChunksCount++
-					continue
-				}
+			skip, err := e.stopControl.ShouldSkipChunk(chunk)
+			if skip {
+				heightSkippedChunksCount++
+				continue
 			}
+			//if e.stopAtHeight > 0 {
+			//	heightForBlock, err := e.heightForBlock(chunk.BlockID)
+			//	if err != nil {
+			//		resultLog.Fatal().Err(err).Msg("cannot query height for a block")
+			//		return
+			//	}
+			//	if heightForBlock >= e.stopAtHeight {
+			//		heightSkippedChunksCount++
+			//		continue
+			//	}
+			//}
 
 			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
