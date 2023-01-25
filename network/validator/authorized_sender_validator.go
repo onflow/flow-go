@@ -118,7 +118,7 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 	// this will be used to get the message auth configuration.
 	iFace, _, err := codec.InterfaceFromMessageCode(msgCode)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not extract interface from message code %v: %w", msgCode, err)
 	}
 
 	// get message auth config
