@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -336,6 +337,14 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 }
 
 // OnRateLimitedPeer tracks the number of rate limited messages seen on the network.
-func (nc *NetworkCollector) OnRateLimitedPeer(_ peer.ID, role, msgType, topic, reason string) {
+func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
+	nc.logger.Warn().
+		Str("peer_id", peerID.String()).
+		Str("role", role).
+		Str("message_type", msgType).
+		Str("topic", topic).
+		Str("reason", reason).
+		Bool(logging.KeySuspicious, true).
+		Msg("unicast peer rate limited")
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
 }
