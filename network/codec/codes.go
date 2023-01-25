@@ -65,78 +65,79 @@ const (
 
 // MessageCodeFromInterface returns the correct Code based on the underlying type of message v.
 func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
+	s := what(v)
 	switch v.(type) {
 	// consensus
 	case *messages.BlockProposal:
-		return CodeBlockProposal, "message.BlockProposal", nil
+		return CodeBlockProposal, s, nil
 	case *messages.BlockVote:
-		return CodeBlockVote, "messages.BlockVote", nil
+		return CodeBlockVote, s, nil
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
-		return CodeClusterBlockProposal, "messages.ClusterBlockProposal", nil
+		return CodeClusterBlockProposal, s, nil
 	case *messages.ClusterBlockVote:
-		return CodeClusterBlockVote, "messages.ClusterBlockVote", nil
+		return CodeClusterBlockVote, s, nil
 	case *messages.ClusterBlockResponse:
-		return CodeClusterBlockResponse, "messages.ClusterBlockResponse", nil
+		return CodeClusterBlockResponse, s, nil
 
 	// protocol state sync
 	case *messages.SyncRequest:
-		return CodeSyncRequest, "messages.SyncRequest", nil
+		return CodeSyncRequest, s, nil
 	case *messages.SyncResponse:
-		return CodeSyncResponse, "messages.SyncResponse", nil
+		return CodeSyncResponse, s, nil
 	case *messages.RangeRequest:
-		return CodeRangeRequest, "messages.RangeRequest", nil
+		return CodeRangeRequest, s, nil
 	case *messages.BatchRequest:
-		return CodeBatchRequest, "messages.BatchRequest", nil
+		return CodeBatchRequest, s, nil
 	case *messages.BlockResponse:
-		return CodeBlockResponse, "messages.BlockResponse", nil
+		return CodeBlockResponse, s, nil
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
-		return CodeCollectionGuarantee, "flow.CollectionGuarantee", nil
+		return CodeCollectionGuarantee, s, nil
 	case *flow.TransactionBody:
-		return CodeTransactionBody, "flow.TransactionBody", nil
+		return CodeTransactionBody, s, nil
 	case *flow.Transaction:
-		return CodeTransaction, "flow.Transaction", nil
+		return CodeTransaction, s, nil
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
-		return CodeExecutionReceipt, "flow.ExecutionReceipt", nil
+		return CodeExecutionReceipt, s, nil
 	case *flow.ResultApproval:
-		return CodeResultApproval, "flow.ResultApproval", nil
+		return CodeResultApproval, s, nil
 
 	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
-		return CodeExecutionStateSyncRequest, "messages.ExecutionStateSyncRequest", nil
+		return CodeExecutionStateSyncRequest, s, nil
 	case *messages.ExecutionStateDelta:
-		return CodeExecutionStateDelta, "messages.ExecutionStateDelta", nil
+		return CodeExecutionStateDelta, s, nil
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
-		return CodeChunkDataRequest, "messages.ChunkDataRequest", nil
+		return CodeChunkDataRequest, s, nil
 	case *messages.ChunkDataResponse:
-		return CodeChunkDataResponse, "messages.ChunkDataResponse", nil
+		return CodeChunkDataResponse, s, nil
 
 	// result approvals
 	case *messages.ApprovalRequest:
-		return CodeApprovalRequest, "messages.ApprovalRequest", nil
+		return CodeApprovalRequest, s, nil
 	case *messages.ApprovalResponse:
-		return CodeApprovalResponse, "messages.ApprovalResponse", nil
+		return CodeApprovalResponse, s, nil
 
 	// generic entity exchange engines
 	case *messages.EntityRequest:
-		return CodeEntityRequest, "messages.EntityRequest", nil
+		return CodeEntityRequest, s, nil
 	case *messages.EntityResponse:
-		return CodeEntityResponse, "messages.EntityResponse", nil
+		return CodeEntityResponse, s, nil
 
 	// testing
 	case *message.TestMessage:
-		return CodeEcho, "message.TestMessage", nil
+		return CodeEcho, s, nil
 
 	// dkg
 	case *messages.DKGMessage:
-		return CodeDKGMessage, "messages.DKGMessage", nil
+		return CodeDKGMessage, s, nil
 
 	default:
 		return 0, "", fmt.Errorf("invalid encode type (%T)", v)
@@ -151,77 +152,81 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &messages.BlockProposal{}, "messages.BlockProposal", nil
+		return &messages.BlockProposal{}, what(messages.BlockProposal{}), nil
 	case CodeBlockVote:
-		return &messages.BlockVote{}, "messages.BlockVote", nil
+		return &messages.BlockVote{}, what(messages.BlockVote{}), nil
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &messages.ClusterBlockProposal{}, "messages.ClusterBlockProposal", nil
+		return &messages.ClusterBlockProposal{}, what(messages.ClusterBlockProposal{}), nil
 	case CodeClusterBlockVote:
-		return &messages.ClusterBlockVote{}, "messages.ClusterBlockVote", nil
+		return &messages.ClusterBlockVote{}, what(messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
-		return &messages.ClusterBlockResponse{}, "messages.ClusterBlockResponse", nil
+		return &messages.ClusterBlockResponse{}, what(messages.ClusterBlockResponse{}), nil
 
 	// protocol state sync
 	case CodeSyncRequest:
-		return &messages.SyncRequest{}, "messages.SyncRequest", nil
+		return &messages.SyncRequest{}, what(messages.SyncRequest{}), nil
 	case CodeSyncResponse:
-		return &messages.SyncResponse{}, "messages.SyncResponse", nil
+		return &messages.SyncResponse{}, what(messages.SyncResponse{}), nil
 	case CodeRangeRequest:
-		return &messages.RangeRequest{}, "messages.RangeRequest", nil
+		return &messages.RangeRequest{}, what(messages.RangeRequest{}), nil
 	case CodeBatchRequest:
-		return &messages.BatchRequest{}, "messages.BatchRequest", nil
+		return &messages.BatchRequest{}, what(messages.BatchRequest{}), nil
 	case CodeBlockResponse:
-		return &messages.BlockResponse{}, "messages.BlockResponse", nil
+		return &messages.BlockResponse{}, what(messages.BlockResponse{}), nil
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &flow.CollectionGuarantee{}, "flow.CollectionGuarantee", nil
+		return &flow.CollectionGuarantee{}, what(flow.CollectionGuarantee{}), nil
 	case CodeTransactionBody:
-		return &flow.TransactionBody{}, "flow.TransactionBody", nil
+		return &flow.TransactionBody{}, what(flow.TransactionBody{}), nil
 	case CodeTransaction:
-		return &flow.Transaction{}, "flow.Transaction", nil
+		return &flow.Transaction{}, what(flow.Transaction{}), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return &flow.ExecutionReceipt{}, "flow.ExecutionReceipt", nil
+		return &flow.ExecutionReceipt{}, what(flow.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		return &flow.ResultApproval{}, "flow.ResultApproval", nil
+		return &flow.ResultApproval{}, what(flow.ResultApproval{}), nil
 
 	// execution state synchronization
 	case CodeExecutionStateSyncRequest:
-		return &messages.ExecutionStateSyncRequest{}, "messages.ExecutionStateSyncRequest", nil
+		return &messages.ExecutionStateSyncRequest{}, what(messages.ExecutionStateSyncRequest{}), nil
 	case CodeExecutionStateDelta:
-		return &messages.ExecutionStateDelta{}, "messages.ExecutionStateDelta", nil
+		return &messages.ExecutionStateDelta{}, what(messages.ExecutionStateDelta{}), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
-		return &messages.ChunkDataRequest{}, "messages.ChunkDataRequest", nil
+		return &messages.ChunkDataRequest{}, what(messages.ChunkDataRequest{}), nil
 	case CodeChunkDataResponse:
-		return &messages.ChunkDataResponse{}, "messages.ChunkDataResponse", nil
+		return &messages.ChunkDataResponse{}, what(messages.ChunkDataResponse{}), nil
 
 	// result approvals
 	case CodeApprovalRequest:
-		return &messages.ApprovalRequest{}, "messages.ApprovalRequest", nil
+		return &messages.ApprovalRequest{}, what(messages.ApprovalRequest{}), nil
 	case CodeApprovalResponse:
-		return &messages.ApprovalResponse{}, "messages.ApprovalResponse", nil
+		return &messages.ApprovalResponse{}, what(messages.ApprovalResponse{}), nil
 
 	// generic entity exchange engines
 	case CodeEntityRequest:
-		return &messages.EntityRequest{}, "messages.EntityRequest", nil
+		return &messages.EntityRequest{}, what(messages.EntityRequest{}), nil
 	case CodeEntityResponse:
-		return &messages.EntityResponse{}, "messages.EntityResponse", nil
+		return &messages.EntityResponse{}, what(messages.EntityResponse{}), nil
 
 	// dkg
 	case CodeDKGMessage:
-		return &messages.DKGMessage{}, "messages.DKGMessage", nil
+		return &messages.DKGMessage{}, what(messages.DKGMessage{}), nil
 
 	// test messages
 	case CodeEcho:
-		return &message.TestMessage{}, "message.TestMessage", nil
+		return &message.TestMessage{}, what(message.TestMessage{}), nil
 
 	default:
 		return nil, "", NewUnknownMsgCodeErr(code)
 	}
+}
+
+func what(v interface{}) string {
+	return fmt.Sprintf("%T", v)
 }
