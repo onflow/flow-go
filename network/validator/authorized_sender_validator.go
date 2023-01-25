@@ -116,13 +116,13 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 
 	// attempt to get the message interface from the message code encoded into the first byte of the message payload
 	// this will be used to get the message auth configuration.
-	iFace, _, err := codec.InterfaceFromMessageCode(msgCode)
+	msgInterface, _, err := codec.InterfaceFromMessageCode(msgCode)
 	if err != nil {
 		return "", err
 	}
 
 	// get message auth config
-	conf, err := message.GetMessageAuthConfig(iFace)
+	conf, err := message.GetMessageAuthConfig(msgInterface)
 	if err != nil {
 		return "", err
 	}
