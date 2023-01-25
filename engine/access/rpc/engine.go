@@ -160,6 +160,7 @@ func NewBuilder(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		ConnectionsCache:          cache,
 		CacheSize:                 cacheSize,
+		MaxMsgSize:                config.MaxMsgSize,
 		AccessMetrics:             accessMetrics,
 		Log:                       log,
 	}
