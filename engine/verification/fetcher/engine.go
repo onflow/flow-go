@@ -192,7 +192,8 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, blockHeight, nil
 	}
 
-	// skip chunk if it verifies a block at or above stop height
+	// skip chunk if it verifies a block at or above stop height\
+	// this should never happen since no chunks should be added to the queue by assigner engine
 	if e.stopAtHeight > 0 && blockHeight >= e.stopAtHeight {
 		e.log.Warn().Msgf("Skipping chunk %s - height  %d at or above stop height requested (%d)", chunkID, blockHeight, e.stopAtHeight)
 		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.

@@ -173,18 +173,35 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 // processes the chunks assigned to this verification node by pushing them to the chunks consumer.
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
-	if e.stopAtHeight > 0 && block.Header.Height == e.stopAtHeight {
-		e.stopAtBlockID.Store(block.ID())
-	}
-
 	blockID := block.ID()
 	// we should always notify block consumer before returning.
 	defer e.blockConsumerNotifier.Notify(blockID)
 
-	// keeps track of total assigned and processed chunks in
+	// if max sealed is at or above stop height-1, we can safely crash, knowing
+	// that there are no more receipts to verify.
+	// We must use equal or greater since we cannot assume all VNs are stopping at the same height
+	// or stopping at all - blocks can still be verified in a system, or emergency sealing can be on.
+	// This is also safe even if this function runs concurrently and/or on blocks out of order -
+	// once certain height is sealed there is no point in verifying at and below it anyway.
+	if e.stopAtHeight > 0 {
+		highestSealed, err := e.highestSealed()
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("cannot query highest sealed height")
+			return
+		}
+		if highestSealed >= e.stopAtHeight-1 {
+			// start crash sequence
+			// TODO put restart sentinel in a DB with restart height of e.stopHeight-1, after restart VN star processing at e.stopHeight
+
+			e.log.Fatal().Msgf("block sealed at height %d - stopping node, since stop at %d requested", highestSealed, e.stopAtHeight)
+		}
+	}
+
+	// keeps track of total assigned, processed and skipped chunks in
 	// this block for logging.
 	assignedChunksCount := uint64(0)
 	processedChunksCount := uint64(0)
+	heightSkippedChunksCount := uint64(0)
 
 	lg := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
@@ -211,12 +228,20 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		}
 
 		assignedChunksCount += uint64(len(chunkList))
+
 		for _, chunk := range chunkList {
 
-			if e.stopAtHeight > 0 && e.stopAtBlockID.Load() == chunk.BlockID {
-				resultLog.Fatal().
-					Hex("chunk_id", logging.ID(chunk.ID())).
-					Msgf("Chunk for block at finalized height %d received - stopping node", e.stopAtHeight)
+			// is chunk's block at or above stop height, skip completely
+			if e.stopAtHeight > 0 {
+				heightForBlock, err := e.heightForBlock(chunk.BlockID)
+				if err != nil {
+					resultLog.Fatal().Err(err).Msg("cannot query height for a block")
+					return
+				}
+				if heightForBlock >= e.stopAtHeight {
+					heightSkippedChunksCount++
+					continue
+				}
 			}
 
 			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
@@ -238,6 +263,8 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
+		Uint64("total_processed_chunks", processedChunksCount).
+		Uint64("total_skipped_chunks", heightSkippedChunksCount).
 		Msg("finished processing finalized block")
 }
 
@@ -312,6 +339,22 @@ func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk,
 		processed, err = e.processChunk(chunk, resultID, blockHeight)
 	})
 	return processed, err
+}
+
+func (e *Engine) highestSealed() (uint64, error) {
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return 0, fmt.Errorf("cannot query head of sealed state: %w", err)
+	}
+	return sealed.Height, nil
+}
+
+func (e *Engine) heightForBlock(id flow.Identifier) (uint64, error) {
+	header, err := e.state.AtBlockID(id).Head()
+	if err != nil {
+		return 0, fmt.Errorf("cannot query state at block %s: %w", id, err)
+	}
+	return header.Height, nil
 }
 
 // assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
