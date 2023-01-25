@@ -41,7 +41,7 @@ func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer
 // PubSubMessageValidator wraps Validate and returns PubSubMessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Channel) PubSubMessageValidator {
 	return func(from peer.ID, msg *message.Message) p2p.ValidationResult {
-		_, err := av.Validate(from, codec.MessageCode(msg.Payload[0]), channel, message.ProtocolTypePubSub)
+		_, err := av.Validate(from, msg.Payload, channel, message.ProtocolTypePubSub)
 		if err != nil {
 			return p2p.ValidationReject
 		}
@@ -55,7 +55,7 @@ func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Cha
 // Otherwise, the message is rejected. The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
-func (av *AuthorizedSenderValidator) Validate(from peer.ID, msgCode codec.MessageCode, channel channels.Channel, protocol message.ProtocolType) (string, error) {
+func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, channel channels.Channel, protocol message.ProtocolType) (string, error) {
 	// NOTE: Gossipsub messages from unstaked nodes should be rejected by the libP2P node topic validator
 	// before they reach message validators. If a message from a unstaked peer gets to this point
 	// something terrible went wrong.
@@ -64,6 +64,13 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msgCode codec.Messag
 		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, Protocol: protocol, Err: ErrIdentityUnverified}
 		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		return "", ErrIdentityUnverified
+	}
+
+	msgCode, err := codec.MessageCodeFromPayload(payload)
+	if err != nil {
+		violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, Protocol: protocol, Err: err}
+		av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return "", err
 	}
 
 	msgType, err := av.isAuthorizedSender(identity, channel, msgCode, protocol)

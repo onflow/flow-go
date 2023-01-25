@@ -233,6 +233,17 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	}
 }
 
+// MessageCodeFromPayload checks the length of the payload bytes before returning the first byte encoded MessageCode.
+// Expected error returns during normal operations:
+//   - ErrInvalidEncoding if payload is empty
+func MessageCodeFromPayload(payload []byte) (MessageCode, error) {
+	if len(payload) == 0 {
+		return 0, NewInvalidEncodingErr(fmt.Errorf("empty payload"))
+	}
+
+	return MessageCode(payload[0]), nil
+}
+
 func what(v interface{}) string {
 	return fmt.Sprintf("%T", v)
 }
