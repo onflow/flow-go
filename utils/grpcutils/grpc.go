@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultMaxMsgSize use 16MB as the default message size limit.
+// DefaultMaxMsgSize use 20MB as the default message size limit.
 // grpc library default is 4MB
 const DefaultMaxMsgSize = 1024 * 1024 * 20
 
