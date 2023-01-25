@@ -10,7 +10,7 @@ While BLST exports multiple functions and tools, the implementation in Flow cryp
 
 The folder contains:
 - BLST LICENSE file
-- all <blst>/src files (C source files)
+- all <blst>/src/*.c and <blst>/src/*.h files (C source files)
 - all <blst>/build   (assembly generated files)
 - <blst>/bindings/blst.h  (headers of external functions)
 - <blst>/bindings/blst_aux.h (headers of external aux functions)
