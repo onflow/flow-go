@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -195,7 +196,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 			Text: "TestUpdateNodeAddresses",
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 	// message should fail to send because no address is known yet
 	// for the new identity
@@ -308,7 +309,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 				Text: fmt.Sprintf("hello-%d", i),
 			},
 			unittest.NetworkCodec().Encode,
-			network.ProtocolTypeUnicast)
+			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
 		err = m.mws[0].SendDirect(msg)
 
@@ -414,7 +415,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 			Text: string(b),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	// update the addresses
@@ -494,7 +495,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 			Text: expectedPayload,
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
@@ -507,7 +508,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
 			require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())                            // sender id
 			require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0])                         // target id
-			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
 			require.Equal(m.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 		})
 
@@ -552,7 +553,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 				Text: expectedPayloadText,
 			},
 			unittest.NetworkCodec().Encode,
-			network.ProtocolTypeUnicast)
+			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
 
 		m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
@@ -565,7 +566,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 				require.Equal(m.T(), testChannel, msg.Channel())                      // channel
 				require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())    // sender id
 				require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0]) // target id
-				require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())     // protocol
+				require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())     // protocol
 
 				// payload
 				decodedPayload := msg.DecodedPayload().(*libp2pmessage.TestMessage).Text
@@ -615,7 +616,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			Text: expectedSendMsg,
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	// reply from last node to the first node.
@@ -627,7 +628,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			Text: expectedReplyMsg,
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	// last node
@@ -642,7 +643,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
 			require.Equal(m.T(), m.ids[first].NodeID, msg.OriginId())                                     // sender id
 			require.Equal(m.T(), lastNode, msg.TargetIDs()[0])                                            // target id
-			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
 			require.Equal(m.T(), expectedSendMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
 			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
@@ -665,7 +666,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), testChannel, msg.Channel())                                               // channel
 			require.Equal(m.T(), m.ids[last].NodeID, msg.OriginId())                                       // sender id
 			require.Equal(m.T(), firstNode, msg.TargetIDs()[0])                                            // target id
-			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())                              // protocol
+			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                              // protocol
 			require.Equal(m.T(), expectedReplyMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 			// event id
 			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
@@ -707,7 +708,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		testChannel,
 		event,
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	// sends a direct message from first node to the last node
@@ -735,7 +736,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 		channels.ProvideChunks,
 		event,
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	// expect one message to be received by the target
@@ -748,7 +749,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 			require.Equal(m.T(), channels.ProvideChunks, msg.Channel())
 			require.Equal(m.T(), m.ids[sourceIndex].NodeID, msg.OriginId())
 			require.Equal(m.T(), targetNode, msg.TargetIDs()[0])
-			require.Equal(m.T(), network.ProtocolTypeUnicast, msg.Protocol())
+			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())
 
 			eventId, err := network.EventId(msg.Channel(), msg.Proto().Payload)
 			require.NoError(m.T(), err)
@@ -788,7 +789,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 		testChannel,
 		event,
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypePubSub)
+		message.ProtocolTypePubSub)
 	require.NoError(m.T(), err)
 
 	// sends a direct message from first node to the last node
@@ -825,7 +826,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 			Text: string("hello1"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
@@ -853,7 +854,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 			Text: string("hello2"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(m.T(), err)
 
 	err = m.mws[first].Publish(message2)

@@ -2,7 +2,7 @@ package slashing
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	network "github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -31,7 +31,7 @@ type Violation struct {
 	Identity *flow.Identity
 	PeerID   string
 	MsgType  string
-	Channel  network.Channel
-	Protocol message.Protocol
+	Channel  channels.Channel
+	Protocol message.ProtocolType
 	Err      error
 }

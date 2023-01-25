@@ -523,7 +523,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
 			violation := &slashing.Violation{
-				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast,
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
 			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
@@ -618,7 +618,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 // processPubSubMessages processes messages received from the pubsub subscription.
 func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID) {
-	m.processAuthenticatedMessage(msg, peerID, network.ProtocolTypePubSub)
+	m.processAuthenticatedMessage(msg, peerID, message.ProtocolTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -649,7 +649,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload[0])
 	if err != nil {
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
-			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
 		})
 		return
 	}
@@ -667,7 +667,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload[0], channel, message.ProtocolUnicast)
+		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload[0], channel, message.ProtocolTypeUnicast)
 		if err != nil {
 			m.log.
 				Error().
@@ -680,14 +680,14 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 		}
 	}
 
-	m.processAuthenticatedMessage(msg, remotePeer, network.ProtocolTypeUnicast)
+	m.processAuthenticatedMessage(msg, remotePeer, message.ProtocolTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol network.ProtocolType) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
 	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
@@ -705,7 +705,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
 		violation := &slashing.Violation{
-			PeerID: peerID.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+			PeerID: peerID.String(), Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
@@ -713,7 +713,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &slashing.Violation{
-			PeerID: peerID.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
+			PeerID: peerID.String(), Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return

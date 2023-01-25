@@ -41,7 +41,7 @@ func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer
 // PubSubMessageValidator wraps Validate and returns PubSubMessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Channel) PubSubMessageValidator {
 	return func(from peer.ID, msg *message.Message) p2p.ValidationResult {
-		_, err := av.Validate(from, msg.Payload[0], channel, message.ProtocolPublish)
+		_, err := av.Validate(from, msg.Payload[0], channel, message.ProtocolTypePubSub)
 		if err != nil {
 			return p2p.ValidationReject
 		}
@@ -55,7 +55,7 @@ func (av *AuthorizedSenderValidator) PubSubMessageValidator(channel channels.Cha
 // Otherwise, the message is rejected. The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
-func (av *AuthorizedSenderValidator) Validate(from peer.ID, msgCode uint8, channel channels.Channel, protocol message.Protocol) (string, error) {
+func (av *AuthorizedSenderValidator) Validate(from peer.ID, msgCode uint8, channel channels.Channel, protocol message.ProtocolType) (string, error) {
 	// NOTE: Gossipsub messages from unstaked nodes should be rejected by the libP2P node topic validator
 	// before they reach message validators. If a message from a unstaked peer gets to this point
 	// something terrible went wrong.
@@ -109,7 +109,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, msgCode uint8, chann
 //   - message.UnknownMsgTypeErr if message auth config us not found for the msg
 //   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
-func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msgCode uint8, protocol message.Protocol) (string, error) {
+func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msgCode uint8, protocol message.ProtocolType) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}

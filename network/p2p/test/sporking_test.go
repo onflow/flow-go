@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -274,7 +275,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypePubSub)
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	sentData, err := sentMsg.Proto().Marshal()
@@ -307,7 +308,7 @@ func testOneToKMessagingFails(ctx context.Context,
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypePubSub)
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	sentData, err := sentMsg.Proto().Marshal()
