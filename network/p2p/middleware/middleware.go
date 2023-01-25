@@ -700,20 +700,30 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 	channel := channels.Channel(msg.ChannelID)
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-	if codec.IsErrUnknownMsgCode(err) {
+	switch {
+	case codec.IsErrUnknownMsgCode(err):
 		// slash peer if message contains unknown message code byte
 		violation := &slashing.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
-	}
-	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
+	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &slashing.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	case err != nil:
+		// this condition should never happen and indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return
 	}
 
