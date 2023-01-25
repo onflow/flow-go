@@ -16,7 +16,7 @@ const stopHeight = 50
 
 func TestVNStopAtHeight(t *testing.T) {
 	testingSuite := new(TestVNStopAtHeightSuite)
-	testingSuite.extraVNs = 19 // 10 VNs total
+	testingSuite.extraVNs = 9 // 10 VNs total
 	testingSuite.VNsFlag = fmt.Sprintf("--stop-at-height=%d", stopHeight)
 	suite.Run(t, testingSuite)
 }
@@ -63,6 +63,11 @@ func (s *TestVNStopAtHeightSuite) TestVNStopAtHeight() {
 			}()
 		}
 	}
+	// end of debug
 	require.NoError(s.T(), err)
 
+	highestSealed, sealed := s.BlockState.HighestSealed()
+	require.True(s.T(), sealed)
+	// in this case when all VNs stop at the same height, sealing should halt at precisely one block before given stop
+	require.Equal(s.T(), highestSealed.Header.Height, uint64(stopHeight)-1)
 }
