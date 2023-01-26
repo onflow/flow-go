@@ -590,6 +590,12 @@ func TestSealingSegment(t *testing.T) {
 	})
 }
 
+// TestSealingSegment_FailureCases verifies that SealingSegment construction fails with expected sentinel
+// errors in case the caller
+func TestSealingSegment_FailureCases(t *testing.T) {
+
+}
+
 // TestBootstrapSealingSegmentWithExtraBlocks test sealing segment where the segment blocks contain collection
 // guarantees referencing blocks prior to the sealing segment. After bootstrapping from sealing segment we should be able to
 // extend with B7 with contains a guarantee referring B1.
