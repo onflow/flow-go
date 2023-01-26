@@ -52,6 +52,7 @@ var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
 var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
+var epochCommitServiceEvent, _ = convert.ServiceEvent(testChain, epochCommitEvent)
 
 var serviceEventsList = []flow.ServiceEvent{
 	*epochSetupServiceEvent,
@@ -401,7 +402,7 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 		return fmt.Errorf("invokable is not a transaction")
 	}
 
-	tx.ServiceEvents = []flow.Event{epochSetupEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochSetupServiceEvent}
 
 	// add "default" interaction expected in tests
 	_, _ = led.Get("00", "")
@@ -424,7 +425,7 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 		return fmt.Errorf("invokable is not a transaction")
 	}
 	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	tx.ServiceEvents = []flow.Event{epochCommitEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochCommitServiceEvent}
 
 	return nil
 }

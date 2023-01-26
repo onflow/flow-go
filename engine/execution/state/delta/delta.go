@@ -1,9 +1,6 @@
 package delta
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -36,8 +33,18 @@ func (d Delta) Set(owner, key string, value flow.RegisterValue) {
 	d.Data[k] = value
 }
 
+// UpdatedRegisterIDs returns all register ids that were updated by this delta.
+// The returned ids are unsorted.
+func (d Delta) UpdatedRegisterIDs() []flow.RegisterID {
+	ids := make([]flow.RegisterID, 0, len(d.Data))
+	for key := range d.Data {
+		ids = append(ids, key)
+	}
+	return ids
+}
+
 // UpdatedRegisters returns all registers that were updated by this delta.
-// ids are returned sorted, in ascending order
+// The returned entries are sorted by ids in ascending order.
 func (d Delta) UpdatedRegisters() flow.RegisterEntries {
 	entries := make(flow.RegisterEntries, 0, len(d.Data))
 	for key, value := range d.Data {
@@ -84,31 +91,4 @@ func (d Delta) RegisterIDs() []flow.RegisterID {
 		ids = append(ids, k)
 	}
 	return ids
-}
-
-func (d Delta) MarshalJSON() ([]byte, error) {
-	m := make(flow.RegisterEntries, len(d.Data))
-	for key, value := range d.Data {
-		m = append(m, flow.RegisterEntry{Key: key, Value: value})
-	}
-	return json.Marshal(m)
-}
-
-func (d *Delta) UnmarshalJSON(data []byte) error {
-
-	var m flow.RegisterEntries
-
-	err := json.Unmarshal(data, &m)
-	if err != nil {
-		return fmt.Errorf("cannot umarshal Delta: %w", err)
-	}
-	dd := make(map[flow.RegisterID]flow.RegisterValue, len(m))
-
-	for _, value := range m {
-		dd[value.Key] = value.Value
-	}
-
-	d.Data = dd
-
-	return nil
 }
