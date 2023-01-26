@@ -77,10 +77,19 @@ func (v *SimpleView) Get(owner, key string) (flow.RegisterValue, error) {
 	return nil, nil
 }
 
-// returns all the registers that has been touched
-func (v *SimpleView) AllRegisters() []flow.RegisterID {
+// returns all the register ids that has been touched
+func (v *SimpleView) AllRegisterIDs() []flow.RegisterID {
 	res := make([]flow.RegisterID, 0, len(v.Ledger.RegisterTouches))
 	for k := range v.Ledger.RegisterTouches {
+		res = append(res, k)
+	}
+	return res
+}
+
+// returns all the register ids that has been updated
+func (v *SimpleView) UpdatedRegisterIDs() []flow.RegisterID {
+	res := make([]flow.RegisterID, 0, len(v.Ledger.RegisterUpdated))
+	for k := range v.Ledger.RegisterUpdated {
 		res = append(res, k)
 	}
 	return res
@@ -97,14 +106,6 @@ func (v *SimpleView) UpdatedRegisters() flow.RegisterEntries {
 			})
 	}
 	return entries
-}
-
-func (v *SimpleView) Touch(owner, key string) error {
-	return v.Ledger.Touch(owner, key)
-}
-
-func (v *SimpleView) Delete(owner, key string) error {
-	return v.Ledger.Delete(owner, key)
 }
 
 func (v *SimpleView) Payloads() []ledger.Payload {
@@ -170,22 +171,6 @@ func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
 	k := flow.RegisterID{Owner: owner, Key: key}
 	m.RegisterTouches[k] = struct{}{}
 	return m.Registers[k], nil
-}
-
-func (m *MapLedger) Touch(owner, key string) error {
-	m.Lock()
-	defer m.Unlock()
-
-	m.RegisterTouches[flow.RegisterID{Owner: owner, Key: key}] = struct{}{}
-	return nil
-}
-
-func (m *MapLedger) Delete(owner, key string) error {
-	m.Lock()
-	defer m.Unlock()
-
-	delete(m.RegisterTouches, flow.RegisterID{Owner: owner, Key: key})
-	return nil
 }
 
 func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {

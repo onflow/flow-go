@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -119,7 +118,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	events := make(flow.EventsList, 0)
-	serviceEvents := make(flow.EventsList, 0)
+	serviceEvents := make(flow.ServiceEventList, 0)
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
@@ -193,7 +192,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 
 		events = append(events, tx.Events...)
-		serviceEvents = append(serviceEvents, tx.ServiceEvents...)
+		serviceEvents = append(serviceEvents, tx.ConvertedServiceEvents...)
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
@@ -238,23 +237,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	if systemChunk {
-
-		computedServiceEvents := make(flow.ServiceEventList, len(serviceEvents))
-
-		for i, serviceEvent := range serviceEvents {
-			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
-			if err != nil {
-				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
-			}
-			computedServiceEvents[i] = *realServiceEvent
-		}
-
-		equal, err := result.ServiceEvents.EqualTo(computedServiceEvents)
+		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error while compariong service events: %w", err)
+			return nil, nil, fmt.Errorf("error while comparing service events: %w", err)
 		}
 		if !equal {
-			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, computedServiceEvents, chIndex, execResID), nil
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID), nil
 		}
 	}
 
