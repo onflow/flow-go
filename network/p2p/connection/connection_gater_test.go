@@ -141,6 +141,8 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithMetricsCollector(node2Metrics),
+		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
+		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
 			return nil // allow all connections.
 		})))
@@ -179,6 +181,8 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithMetricsCollector(node2Metrics),
+		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
+		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
 			return fmt.Errorf("disallowed connection") // rejecting all connections.
 		})))
