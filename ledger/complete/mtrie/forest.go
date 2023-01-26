@@ -125,7 +125,7 @@ func (f *Forest) ReadSingleLeafHash(r *ledger.TrieReadSingleValue) (hash.Hash, e
 		return hash.DummyHash, fmt.Errorf("could not find leaf node with path %v", r.Path)
 	}
 
-	return leaf.Hash(), nil
+	return leaf.ExpandedLeafHash(), nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)

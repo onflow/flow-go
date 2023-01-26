@@ -197,6 +197,11 @@ func (n *Node) Hash() hash.Hash {
 	return n.hashValue
 }
 
+// ExpandedLeafHash returns the hash of the fully expanded leaf node
+func (n *Node) ExpandedLeafHash() hash.Hash {
+	return n.leafNodeHash
+}
+
 // Height returns the Node's height.
 // Per definition, the height of a node v in a tree is the number
 // of edges on the longest downward path between v and a tree leaf.

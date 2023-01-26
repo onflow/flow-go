@@ -182,7 +182,7 @@ func (l *Ledger) GetSingleValueFromStorage(query *ledger.QuerySingleValue) (valu
 		return nil, err
 	}
 
-	payload, err := l.payloadStorage.Get(leafHash)
+	_, payload, err := l.payloadStorage.Get(leafHash)
 	if err != nil {
 		return nil, fmt.Errorf("could not get payload with leaf hash %v from storage: %w", leafHash, err)
 	}
@@ -297,7 +297,8 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
-	err = l.addTrieUpdateToStorage(trieUpdate)
+	leafNodeUpdates := toLeafNodeUpdates(trieUpdate)
+	err = l.payloadStorage.Add(leafNodeUpdates)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not add trie update to storage: %w", err)
 	}
@@ -312,8 +313,40 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	return ledger.State(newTrie.RootHash()), nil
 }
 
-func (l *Ledger) addTrieUpdateToStorage(trieUpdate *ledger.TrieUpdate) error {
-	return l.payloadStorage.Add(trieUpdate.Payloads)
+// toLeafNodeUpdates converts the trie updates into the leaf nodes updates to be stored in storage
+func toLeafNodeUpdates(trieUpdate *ledger.TrieUpdate) []ledger.LeafNode {
+	paths := trieUpdate.Paths
+	payloads := trieUpdate.Payloads
+
+	deduplicatedPaths := make([]ledger.Path, 0, len(paths))
+	deduplicatedPayloads := make([]ledger.Payload, 0, len(paths))
+	payloadMap := make(map[ledger.Path]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
+	for i, path := range paths {
+		payload := payloads[i]
+		// check if we already have encountered an update for the respective register
+		if idx, ok := payloadMap[path]; ok {
+			deduplicatedPayloads[idx] = *payload
+		} else {
+			payloadMap[path] = len(deduplicatedPaths)
+			deduplicatedPaths = append(deduplicatedPaths, path)
+			deduplicatedPayloads = append(deduplicatedPayloads, *payload)
+		}
+	}
+
+	leafs := make([]ledger.LeafNode, 0, len(deduplicatedPayloads))
+
+	for i, path := range deduplicatedPaths {
+		payload := deduplicatedPayloads[i]
+		// TODO: skip if payload.Value is empty
+		hash := ledger.ComputeFullyExpandedLeafValue(path, &payload)
+		leafs = append(leafs, ledger.LeafNode{
+			Hash:    hash,
+			Path:    path,
+			Payload: payload,
+		})
+	}
+
+	return leafs
 }
 
 // Prove provides proofs for a ledger query and errors (if any).
