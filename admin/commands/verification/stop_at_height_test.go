@@ -1,18 +1,20 @@
-package execution
+package verification
 
 import (
 	"context"
+	"github.com/onflow/flow-go/engine/verification"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage/mock"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/admin"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
 )
 
 func TestCommandParsing(t *testing.T) {
-	cmd := StopENAtHeightCommand{}
+	cmd := StopVNAtHeightCommand{}
 
 	t.Run("happy path", func(t *testing.T) {
 
@@ -26,12 +28,11 @@ func TestCommandParsing(t *testing.T) {
 		err := cmd.Validator(req)
 		require.NoError(t, err)
 
-		require.IsType(t, StopENAtHeightReq{}, req.ValidatorData)
+		require.IsType(t, StopVNAtHeightReq{}, req.ValidatorData)
 
-		parsedReq := req.ValidatorData.(StopENAtHeightReq)
+		parsedReq := req.ValidatorData.(StopVNAtHeightReq)
 
 		require.Equal(t, uint64(21), parsedReq.height)
-		require.Equal(t, true, parsedReq.crash)
 	})
 
 	t.Run("empty", func(t *testing.T) {
@@ -88,23 +89,23 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopControl := ingestion.NewStopControl(zerolog.Nop(), false, 0)
+	state := new(protocol.State)
+	cp := new(mock.ConsumerProgress)
+	cp.On("ProcessedIndex").Return(uint64(0), nil)
 
-	cmd := NewStopENAtHeightCommand(stopControl)
+	stopControl, err := verification.NewStopControl(zerolog.Nop(), state, cp)
+
+	cmd := NewStopVNAtHeightCommand(stopControl)
 
 	req := &admin.CommandRequest{
-		ValidatorData: StopENAtHeightReq{
+		ValidatorData: StopVNAtHeightReq{
 			height: 37,
-			crash:  true,
 		},
 	}
 
-	_, err := cmd.Handler(context.TODO(), req)
+	_, err = cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	height, crash := stopControl.GetStopHeight()
-
-	require.Equal(t, stopControl.GetState(), ingestion.StopControlSet)
+	height := stopControl.GetStopHeight()
 	require.Equal(t, uint64(37), height)
-	require.Equal(t, true, crash)
 }

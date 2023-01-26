@@ -1,6 +1,7 @@
 package assigner_test
 
 import (
+	"github.com/onflow/flow-go/engine/verification"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,8 @@ type AssignerEngineTestSuite struct {
 
 	// identities
 	verIdentity *flow.Identity // verification node
+
+	stopControl *verification.StopControl
 }
 
 // mockChunkAssigner mocks the chunk assigner of this test suite to assign the chunks based on the input assignment.
@@ -66,9 +69,19 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 
 // SetupTest initiates the test setups prior to each test.
 func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
+
+	state := &protocol.State{}
+	cp := new(storage.ConsumerProgress)
+	cp.On("ProcessedIndex").Return(uint64(0), nil)
+
+	stopControl, err := verification.NewStopControl(zerolog.Nop(), state, cp)
+	if err != nil {
+		panic(err)
+	}
+
 	s := &AssignerEngineTestSuite{
 		me:               &module.Local{},
-		state:            &protocol.State{},
+		state:            state,
 		snapshot:         &protocol.Snapshot{},
 		metrics:          &module.VerificationMetrics{},
 		tracer:           trace.NewNoopTracer(),
@@ -77,6 +90,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 		notifier:         &module.ProcessingNotifier{},
+		stopControl:      stopControl,
 	}
 
 	for _, apply := range options {
@@ -115,7 +129,8 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *assigner.Engine {
 		s.state,
 		s.assigner,
 		s.chunksQueue,
-		s.newChunkListener, 0)
+		s.newChunkListener,
+		s.stopControl)
 
 	e.WithBlockConsumerNotifier(s.notifier)
 

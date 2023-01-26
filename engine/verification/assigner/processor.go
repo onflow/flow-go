@@ -8,7 +8,7 @@ import (
 // FinalizedBlockProcessor should be implemented by the verification node engine responsible
 // for processing execution receipts included in a finalized block.
 //
-// In the current version, the assigner engine is responsible of processing execution receipts
+// In the current version, the assigner engine is responsible for processing execution receipts
 // included in a finalized block.
 // From the architectural perspective, FinalizedBlockProcessor aligns as following on the verification pipeline:
 // -----------------------------                           ------------------                                  --------------------------

@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/admin/commands"
+	verificationcommands "github.com/onflow/flow-go/admin/commands/verification"
+	verificationengine "github.com/onflow/flow-go/engine/verification"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -104,10 +107,15 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 		followerEng *follower.Engine           // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
+
+		stopControl *verificationengine.StopControl
 	)
 
 	v.FlowNodeBuilder.
 		PreInit(DynamicStartPreInit).
+		AdminCommand("stop-at-height", func(node *NodeConfig) commands.AdminCommand {
+			return verificationcommands.NewStopVNAtHeightCommand(stopControl)
+		}).
 		Module("mutable follower state", func(node *NodeConfig) error {
 			var err error
 			// For now, we only support state implementations from package badger.
@@ -193,6 +201,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
+		Module("stop control", func(nodeConfig *NodeConfig) error {
+			var err error
+			stopControl, err = verificationengine.NewStopControl(nodeConfig.Logger, nodeConfig.State, processedBlockHeight)
+			return err
+		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
@@ -249,7 +262,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				requesterEngine,
-				v.verConf.stopAtHeight)
+				stopControl)
 
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
@@ -285,7 +298,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkAssigner,
 				chunkQueue,
 				chunkConsumer,
-				v.verConf.stopAtHeight)
+				stopControl)
 
 			return assignerEngine, nil
 		}).

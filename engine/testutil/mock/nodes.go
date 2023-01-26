@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"github.com/onflow/flow-go/engine/verification"
 	"os"
 	"sync"
 	"testing"
@@ -281,4 +282,6 @@ type VerificationNode struct {
 	AssignerEngine  *assigner.Engine
 	FetcherEngine   *fetcher.Engine
 	RequesterEngine *verificationrequester.Engine
+
+	StopControl *verification.StopControl
 }

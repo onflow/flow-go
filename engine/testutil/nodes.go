@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/verification"
 	"math"
 	"path/filepath"
 	"testing"
@@ -932,6 +933,11 @@ func VerificationNode(t testing.TB,
 		require.NoError(t, err)
 	}
 
+	if node.StopControl == nil {
+		node.StopControl, err = verification.NewStopControl(node.Log, node.State, node.ProcessedBlockHeight)
+		require.NoError(t, err)
+	}
+
 	if node.FetcherEngine == nil {
 		node.FetcherEngine = fetcher.New(node.Log,
 			collector,
@@ -944,7 +950,7 @@ func VerificationNode(t testing.TB,
 			node.Results,
 			node.Receipts,
 			node.RequesterEngine,
-			0,
+			node.StopControl,
 		)
 	}
 
@@ -968,7 +974,7 @@ func VerificationNode(t testing.TB,
 			assigner,
 			node.ChunksQueue,
 			node.ChunkConsumer,
-			0)
+			node.StopControl)
 	}
 
 	if node.BlockConsumer == nil {

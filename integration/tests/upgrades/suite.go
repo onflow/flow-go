@@ -22,10 +22,11 @@ type Suite struct {
 	suite.Suite
 	log zerolog.Logger
 	lib.TestnetStateTracker
-	cancel  context.CancelFunc
-	net     *testnet.FlowNetwork
-	ghostID flow.Identifier
-	exe1ID  flow.Identifier
+	cancel   context.CancelFunc
+	net      *testnet.FlowNetwork
+	ghostID  flow.Identifier
+	exe1ID   flow.Identifier
+	extraVNs uint
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -65,6 +66,13 @@ type AdminCommandResponse struct {
 func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, data any, output any) error {
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
+	return s.SendAdminCommand(ctx, enContainer.Ports[testnet.ExeNodeAdminPort], command, data, output)
+}
+
+// SendAdminCommand sends admin command to given port. Data will be serialized to JSON and sent as data part of the command request.
+// Response will be deserialized into output object.
+// It bubbles up errors from (un)marshalling of data and handling the request
+func (s *Suite) SendAdminCommand(ctx context.Context, port string, command string, data any, output any) error {
 	request := AdminCommandRequest{
 		CommandName: command,
 		Data:        data,
@@ -76,7 +84,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
-		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Ports[testnet.ExeNodeAdminPort]),
+		fmt.Sprintf("http://localhost:%s/admin/run_command", port),
 		bytes.NewBuffer(marshal),
 	)
 	if err != nil {
@@ -137,6 +145,15 @@ func (s *Suite) SetupTest() {
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
 
+	verificationNodes := make([]testnet.NodeConfig, s.extraVNs+1)
+
+	for i := uint(0); i <= s.extraVNs; i++ {
+		var nodeConfig testnet.NodeConfig
+
+		nodeConfig = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.InfoLevel))
+		verificationNodes[i] = nodeConfig
+	}
+
 	s.exe1ID = unittest.IdentifierFixture()
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
@@ -144,10 +161,11 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
 	}
+
+	confs = append(confs, verificationNodes...)
 
 	netConfig := testnet.NewNetworkConfig(
 		"upgrade_tests",

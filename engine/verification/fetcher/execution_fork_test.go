@@ -25,8 +25,8 @@ import (
 // once the chunk data pack arrives, a verifiable chunk is shaped for each of those duplicate chunks, and
 // verifiable chunks are pushed to verifier engine.
 func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// resultsA and resultB belong to an execution fork and their first chunk (statusA and statusB)
 	// is duplicate and assigned to this verification node.

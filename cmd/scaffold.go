@@ -146,7 +146,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.Enabled, "profiler-enabled", defaultConfig.profilerConfig.Enabled, "whether to enable the auto-profiler")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.UploaderEnabled, "profile-uploader-enabled", defaultConfig.profilerConfig.UploaderEnabled,
 		"whether to enable automatic profile upload to Google Cloud Profiler. "+
-			"For autoupload to work forllowing should be true: "+
+			"For autoupload to work following should be true: "+
 			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
 			"2) node is running in GCE. "+
 			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")

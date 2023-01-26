@@ -110,6 +110,9 @@ const (
 	// VerNodeMetricsPort is the name used for the verification node metrics server port
 	VerNodeMetricsPort = "verification-metrics-port"
 
+	// VerNodeAdminPort is the name used for the verification node Admin API port.
+	VerNodeAdminPort
+
 	// ConNodeMetricsPort is the name used for the consensus node metrics server port
 	ConNodeMetricsPort = "con-metrics-port"
 
@@ -1104,6 +1107,14 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				// tests only start 1 verification node
 				nodeContainer.AddFlag("chunk-alpha", "1")
 			}
+
+			hostAdminPort := testingdock.RandomPort(t)
+			containerAdminPort := "9002/tcp"
+
+			nodeContainer.bindPort(hostAdminPort, containerAdminPort)
+
+			nodeContainer.AddFlag("admin-addr", fmt.Sprintf("%s:9002", nodeContainer.Name()))
+			nodeContainer.Ports[VerNodeAdminPort] = hostAdminPort
 
 			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			// nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
