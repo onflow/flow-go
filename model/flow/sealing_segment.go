@@ -11,14 +11,13 @@ import (
 // a new node to join the network.
 // DETAILED SPECIFICATION: ./sealing_segment.md
 //
-//   ├═══════════┤  ├───────────────────────┤
-//    ExtraBlocks   ^          Blocks       ^
-//                  B                      Head
+//	├═══════════┤  ├───────────────────────┤
+//	 ExtraBlocks   ^          Blocks       ^
+//	               B                      head
 //
-// Lets denote the highest block in the sealing segment as `head`. Per convention,
-// `head` must be a finalized block.
-// Consider the fork leading up to head. The highest block in the fork leading up to head that is sealed,
-// we denote as B.
+// Lets denote the highest block in the sealing segment as `head`. Per convention, `head` must be a
+// finalized block. Consider the chain of blocks leading up to `head` (included). The highest block
+// in chain leading up to `head` that is sealed, we denote as B.
 type SealingSegment struct {
 	// Blocks contain the chain `B <- ... <- Head` in ascending height order.
 	// Formally, Blocks contains exactly (not more!) the history to satisfy condition
@@ -30,7 +29,7 @@ type SealingSegment struct {
 	// ExtraBlocks [optional] holds ancestors of `Blocks` in ascending height order.
 	// Formally, ExtraBlocks contains at least the additional history to satisfy conditions
 	// (see sealing_segment.md for details):
-	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	//  (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 	// (iii) The sealing segment holds the history of all non-expired collection guarantees, i.e.
 	//       limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	// (Potentially longer history is permitted)
