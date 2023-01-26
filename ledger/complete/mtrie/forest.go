@@ -110,8 +110,22 @@ func (f *Forest) ReadSingleValue(r *ledger.TrieReadSingleValue) (ledger.Value, e
 	}
 
 	payload := trie.ReadSinglePayload(r.Path)
-	// no need to deep copy, because the payload is from storage, and always be a copy
 	return payload.Value(), nil
+}
+
+func (f *Forest) ReadSingleLeafHash(r *ledger.TrieReadSingleValue) (hash.Hash, error) {
+	// lookup the trie by rootHash
+	trie, err := f.GetTrie(r.RootHash)
+	if err != nil {
+		return hash.DummyHash, err
+	}
+
+	leaf, found := trie.ReadLeafNode(r.Path)
+	if !found {
+		return hash.DummyHash, fmt.Errorf("could not find leaf node with path %v", r.Path)
+	}
+
+	return leaf.Hash(), nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)

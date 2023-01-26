@@ -235,7 +235,7 @@ func findLeafNode(path ledger.Path, head *node.Node) (*node.Node, bool) {
 		return head, true
 	}
 
-	return ledger.EmptyPayload(), false
+	return nil, false
 }
 
 // UnsafeRead reads payloads for the given paths.

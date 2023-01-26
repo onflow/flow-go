@@ -40,6 +40,7 @@ type Ledger struct {
 	logger            zerolog.Logger
 	trieUpdateCh      chan *WALTrieUpdate
 	pathFinderVersion uint8
+	payloadStorage    ledger.PayloadStorage
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -168,6 +169,36 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	return value, nil
 }
 
+// GetSingleValueFromStorage reads value of a single given key at the given state from storage
+func (l *Ledger) GetSingleValueFromStorage(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+	start := time.Now()
+	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
+	leafHash, err := l.forest.ReadSingleLeafHash(trieRead)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := l.payloadStorage.Get(leafHash)
+	if err != nil {
+		return nil, fmt.Errorf("could not get payload with leaf hash %v from storage: %w", leafHash, err)
+	}
+
+	value = payload.Value()
+
+	l.metrics.ReadValuesNumber(1)
+	readDuration := time.Since(start)
+	l.metrics.ReadDuration(readDuration)
+
+	durationPerValue := time.Duration(readDuration.Nanoseconds()) * time.Nanosecond
+	l.metrics.ReadDurationPerItem(durationPerValue)
+
+	return value, nil
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
@@ -266,6 +297,11 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
+	err = l.addTrieUpdateToStorage(trieUpdate)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not add trie update to storage: %w", err)
+	}
+
 	err = l.forest.AddTrie(newTrie)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
@@ -274,6 +310,10 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	trieCh <- newTrie
 
 	return ledger.State(newTrie.RootHash()), nil
+}
+
+func (l *Ledger) addTrieUpdateToStorage(trieUpdate *ledger.TrieUpdate) error {
+	return l.payloadStorage.Add(trieUpdate.Payloads)
 }
 
 // Prove provides proofs for a ledger query and errors (if any).

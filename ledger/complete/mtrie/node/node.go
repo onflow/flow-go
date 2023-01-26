@@ -31,12 +31,13 @@ type Node struct {
 	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
-	lChild    *Node           // Left Child
-	rChild    *Node           // Right Child
-	height    int             // height where the Node is at
-	path      ledger.Path     // the storage path (dummy value for interim nodes)
-	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
-	hashValue hash.Hash       // hash value of node (cached)
+	lChild       *Node           // Left Child
+	rChild       *Node           // Right Child
+	height       int             // height where the Node is at
+	path         ledger.Path     // the storage path (dummy value for interim nodes)
+	payload      *ledger.Payload // the payload this node is storing (leaf nodes only)
+	hashValue    hash.Hash       // hash value of node (cached)
+	leafNodeHash hash.Hash       // hash value of the fully expanded leaf node (leaf nodes only)
 }
 
 // NewNode creates a new Node.
@@ -76,6 +77,7 @@ func NewLeaf(path ledger.Path,
 		payload: payload,
 	}
 	n.hashValue = n.computeHash()
+	n.leafNodeHash = n.hashValue
 	return n
 }
 
@@ -122,11 +124,11 @@ func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
 	if rChild == nil && lChild.IsLeaf() {
 		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
-		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h}
+		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h, leafNodeHash: lChild.leafNodeHash}
 	}
 	if lChild == nil && rChild.IsLeaf() {
 		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
-		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h}
+		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h, leafNodeHash: rChild.leafNodeHash}
 	}
 
 	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
