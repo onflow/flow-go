@@ -182,7 +182,10 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	// or stopping at all - blocks can still be verified in a system, or emergency sealing can be on.
 	// This is also safe even if this function runs concurrently and/or on blocks out of order -
 	// once certain height is sealed there is no point in verifying at and below it anyway.
-	e.stopControl.Finalized()
+	err := e.stopControl.Finalized(block.Header.Height)
+	if err != nil {
+		e.log.Warn().Err(err).Msg("error while handling finalized height in stop control")
+	}
 
 	//if e.stopAtHeight > 0 {
 	//	highestSealed, err := e.highestSealed()

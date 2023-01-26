@@ -303,6 +303,25 @@ func (c *Container) Start() error {
 	return nil
 }
 
+// Restart restarts this container.
+func (c *Container) Restart() error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
+	defer cancel()
+
+	err := c.net.cli.ContainerRestart(ctx, c.ID, &checkContainerTimeout)
+	if err != nil {
+		return fmt.Errorf("could not restart container: %w", err)
+	}
+
+	err = c.waitForCondition(ctx, containerRunning)
+	if err != nil {
+		return fmt.Errorf("error waiting for container to start: %w", err)
+	}
+
+	return nil
+}
+
 // Disconnect disconnects this container from the network.
 func (c *Container) Disconnect() error {
 

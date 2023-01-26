@@ -161,7 +161,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
+			return executionCommands.NewStopENAtHeightCommand(exeNode.stopControl)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand(exeNode.blockDataUploader)

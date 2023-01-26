@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/admin/commands"
+	verificationcommands "github.com/onflow/flow-go/admin/commands/verification"
 	verificationengine "github.com/onflow/flow-go/engine/verification"
 	"time"
 
@@ -111,6 +113,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 	v.FlowNodeBuilder.
 		PreInit(DynamicStartPreInit).
+		AdminCommand("stop-at-height", func(node *NodeConfig) commands.AdminCommand {
+			return verificationcommands.NewStopVNAtHeightCommand(stopControl)
+		}).
 		Module("mutable follower state", func(node *NodeConfig) error {
 			var err error
 			// For now, we only support state implementations from package badger.
@@ -197,8 +202,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return err
 		}).
 		Module("stop control", func(nodeConfig *NodeConfig) error {
-			stopControl = verificationengine.NewStopControl(v.verConf.stopAtHeight, nodeConfig.State, nodeConfig.Logger)
-			return nil
+			var err error
+			stopControl, err = verificationengine.NewStopControl(nodeConfig.Logger, nodeConfig.State, processedBlockHeight)
+			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error

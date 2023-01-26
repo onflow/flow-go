@@ -1,7 +1,10 @@
 package upgrades
 
 import (
+	"context"
 	"fmt"
+	"github.com/onflow/flow-go/integration/testnet"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,12 +15,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const stopHeight = 50
+//const stopHeight = 50
 
 func TestVNStopAtHeight(t *testing.T) {
 	testingSuite := new(TestVNStopAtHeightSuite)
 	testingSuite.extraVNs = 9 // 10 VNs total
-	testingSuite.VNsFlag = fmt.Sprintf("--stop-at-height=%d", stopHeight)
 	suite.Run(t, testingSuite)
 }
 
@@ -27,25 +29,76 @@ type TestVNStopAtHeightSuite struct {
 
 func (s *TestVNStopAtHeightSuite) TestVNStopAtHeight() {
 
-	// wait for some blocks being finalized
-	s.BlockState.WaitForHighestFinalizedProgress(s.T(), stopHeight)
+	// wait for some blocks being finalized and sealed
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), 20)
+	s.BlockState.WaitForSealed(s.T(), 20)
 
-	shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight)
-
+	shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), 20)
 	s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
 
 	vnContainers := s.net.ContainersByRole(flow.RoleVerification)
 
-	// all VNs should stop
+	// issue admin command to all VNs
 	errGrp := errgroup.Group{}
+
+	// make sure all VNs have stop at height command
+	for i, vnContainer := range vnContainers {
+		i := i
+		vnContainer := vnContainer
+		errGrp.Go(func() error {
+			commandsList := AdminCommandListCommands{}
+
+			err := s.SendAdminCommand(context.Background(), vnContainer.Ports[testnet.VerNodeAdminPort], "list-commands", struct{}{}, &commandsList)
+			require.NoError(s.T(), err)
+			require.Contains(s.T(), commandsList, "stop-at-height")
+
+			fmt.Printf("VN[%d] commands => %s\n", i, strings.Join(commandsList, ", "))
+
+			return err
+		})
+	}
+	err := errGrp.Wait()
+	require.NoError(s.T(), err)
+
+	// issue stop command to all nodes
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+
+	// stop in 30 blocks
+	stopHeight := currentFinalized + 30
+
+	stopAtHeightRequest := StopAtHeightRequest{
+		Height: stopHeight,
+	}
+
+	for i, vnContainer := range vnContainers {
+		i := i
+		vnContainer := vnContainer
+		errGrp.Go(func() error {
+
+			var commandResponse string
+			err = s.SendAdminCommand(context.Background(), vnContainer.Ports[testnet.VerNodeAdminPort], "stop-at-height", stopAtHeightRequest, &commandResponse)
+			require.NoError(s.T(), err)
+
+			require.Equal(s.T(), "ok", commandResponse)
+
+			fmt.Printf("VN[%d] responded => %s\n", i, commandResponse)
+
+			return err
+		})
+	}
+	err = errGrp.Wait()
+	require.NoError(s.T(), err)
+
+	// all VNs should stop
+	errGrp = errgroup.Group{}
 
 	for _, vnContainer := range vnContainers {
 		vnContainer := vnContainer
 		errGrp.Go(func() error {
-			return vnContainer.WaitForContainerStopped(10 * time.Second)
+			return vnContainer.WaitForContainerStopped(15 * time.Second)
 		})
 	}
-	err := errGrp.Wait()
+	err = errGrp.Wait()
 
 	// for debugging containers stopped
 	if err != nil {
@@ -57,9 +110,9 @@ func (s *TestVNStopAtHeightSuite) TestVNStopAtHeight() {
 			go func() {
 				defer wg.Done()
 
-				err, running := vnContainer.IsRunning(5 * time.Second)
-				require.NoError(s.T(), err)
+				err, running := vnContainer.IsRunning(10 * time.Second)
 				fmt.Printf("DEBUG VN[%d] running => %t\n", i, running)
+				require.NoError(s.T(), err)
 			}()
 		}
 	}
@@ -69,5 +122,24 @@ func (s *TestVNStopAtHeightSuite) TestVNStopAtHeight() {
 	highestSealed, sealed := s.BlockState.HighestSealed()
 	require.True(s.T(), sealed)
 	// in this case when all VNs stop at the same height, sealing should halt at precisely one block before given stop
-	require.Equal(s.T(), highestSealed.Header.Height, uint64(stopHeight)-1)
+	require.Equal(s.T(), uint64(stopHeight)-1, highestSealed.Header.Height)
+
+	//s.log.Info().Msg("")
+	fmt.Printf("MAKSIO NODES GOING UP NOW\n")
+
+	// now, start nodes again, and they should resume verification and sealing should continue
+	errGrp = errgroup.Group{}
+
+	for _, vnContainer := range vnContainers {
+		vnContainer := vnContainer
+		errGrp.Go(func() error {
+			return vnContainer.Restart()
+		})
+	}
+	err = errGrp.Wait()
+	require.NoError(s.T(), err)
+
+	// wait for sealing to pickup
+	s.BlockState.WaitForSealed(s.T(), stopHeight+20)
+
 }

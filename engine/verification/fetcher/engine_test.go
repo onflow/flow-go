@@ -43,17 +43,19 @@ type FetcherEngineTestSuite struct {
 	results               *storage.ExecutionResults           // to retrieve execution result of an assigned chunk
 	receipts              *storage.ExecutionReceipts          // used to find executor of the chunk
 	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
-	//stopCxontrol          *verificationeng.StopControl
+	stopControl           *verificationeng.StopControl
 }
 
 // setupTest initiates a test suite prior to each test.
-func setupTest() *FetcherEngineTestSuite {
+func setupTest(t *testing.T) *FetcherEngineTestSuite {
+	logger := unittest.Logger()
+	state := &protocol.State{}
 	s := &FetcherEngineTestSuite{
-		log:                   unittest.Logger(),
+		log:                   logger,
 		metrics:               &module.VerificationMetrics{},
 		tracer:                trace.NewNoopTracer(),
 		verifier:              &mocknetwork.Engine{},
-		state:                 &protocol.State{},
+		state:                 state,
 		pendingChunks:         &mempool.ChunkStatuses{},
 		headers:               &storage.Headers{},
 		blocks:                &storage.Blocks{},
@@ -63,11 +65,16 @@ func setupTest() *FetcherEngineTestSuite {
 		requester:             &mockfetcher.ChunkDataPackRequester{},
 	}
 
+	stopControl, err := verificationeng.NewStopControl(logger, state, &MockConsumerProgress{0, nil})
+	require.NoError(t, err)
+
+	s.stopControl = stopControl
+
 	return s
 }
 
 // newFetcherEngineWithStop returns a fetcher engine for testing with stop at height set
-func newFetcherEngineWithStop(s *FetcherEngineTestSuite, stopAtHeight uint64) *fetcher.Engine {
+func newFetcherEngineWithStop(t *testing.T, s *FetcherEngineTestSuite, stopAtHeight uint64) *fetcher.Engine {
 	s.requester.On("WithChunkDataPackHandler", mock.AnythingOfType("*fetcher.Engine")).Return()
 
 	e := fetcher.New(s.log,
@@ -81,15 +88,20 @@ func newFetcherEngineWithStop(s *FetcherEngineTestSuite, stopAtHeight uint64) *f
 		s.results,
 		s.receipts,
 		s.requester,
-		verificationeng.NewStopControl(stopAtHeight, s.state, s.log))
+		s.stopControl)
+
+	if stopAtHeight > 0 {
+		_, err := s.stopControl.SetStopHeight(stopAtHeight)
+		require.NoError(t, err)
+	}
 
 	e.WithChunkConsumerNotifier(s.chunkConsumerNotifier)
 	return e
 }
 
 // newFetcherEngine returns a fetcher engine for testing.
-func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
-	return newFetcherEngineWithStop(s, 0)
+func newFetcherEngine(t *testing.T, s *FetcherEngineTestSuite) *fetcher.Engine {
+	return newFetcherEngineWithStop(t, s, 0)
 }
 
 func TestProcessAssignedChunkHappyPath(t *testing.T) {
@@ -130,8 +142,8 @@ func TestProcessAssignedChunkHappyPath(t *testing.T) {
 // Once the verifier engine returns, the fetcher engine should notify the chunk consumer that it is done with
 // this chunk.
 func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a result with specified chunk number and assigned chunk numbers
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
@@ -195,8 +207,8 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 // If fetcher engine fails on removing a pending chunk status, it means that it has already been processed, and hence,
 // it should drop it gracefully, without notifying the verifier or chunk consumer.
 func TestChunkResponse_RemovingStatusFails(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
 	block, result, statuses, _, collMap := completeChunkStatusListFixture(t, 2, 1)
@@ -230,8 +242,8 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 // The fetcher engine then should remove chunk request status from memory, and notify the
 // chunk consumer that it is done processing this chunk.
 func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
@@ -373,8 +385,8 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 func testInvalidChunkDataResponse(t *testing.T,
 	alterChunkDataResponse func(*flow.ChunkDataPack),
 	mockStateFunc func(flow.Identity, *protocol.State, flow.Identifier)) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
@@ -413,8 +425,8 @@ func testInvalidChunkDataResponse(t *testing.T,
 // - After requesting it to the network, requester informs fetcher engine that the chunk belongs to a sealed block.
 // - More than one copy of the same response arrive at different time intervals, while the first copy has been handled.
 func TestChunkResponse_MissingStatus(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
@@ -449,8 +461,8 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 // it drops it without processing it any further and and notifies consumer
 // that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
+	s := setupTest(t)
+	e := newFetcherEngine(t, s)
 
 	// creates a single chunk locator, and mocks its corresponding block sealed.
 	block := unittest.BlockFixture()
@@ -482,7 +494,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 // it drops it without processing it any further and notifies consumer
 // that it is done with processing that chunk.
 func TestStopAtHeight(t *testing.T) {
-	s := setupTest()
+	s := setupTest(t)
 
 	headerA := unittest.BlockHeaderFixture()
 	headerB := unittest.BlockHeaderWithParentFixture(headerA)
@@ -490,7 +502,7 @@ func TestStopAtHeight(t *testing.T) {
 	fmt.Printf("A = %d B = %d\n", headerA.Height, headerB.Height)
 
 	// stop at blockB, meaning it blockA will be last to verify
-	e := newFetcherEngineWithStop(s, headerB.Height)
+	e := newFetcherEngineWithStop(t, s, headerB.Height)
 
 	resultA := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(headerA.ID()))
 	resultB := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(headerB.ID()))
@@ -1049,3 +1061,14 @@ func TestTransactionOffsetForChunk(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+type MockConsumerProgress struct {
+	processedIndex uint64
+	err            error
+}
+
+func (m *MockConsumerProgress) ProcessedIndex() (uint64, error) {
+	return m.processedIndex, m.err
+}
+func (m MockConsumerProgress) InitProcessedIndex(defaultIndex uint64) error { panic("implement me") }
+func (m MockConsumerProgress) SetProcessedIndex(processed uint64) error     { panic("implement me") }

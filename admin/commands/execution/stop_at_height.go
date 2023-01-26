@@ -10,22 +10,22 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 )
 
-var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
+var _ commands.AdminCommand = (*StopENAtHeightCommand)(nil)
 
-// StopAtHeightCommand will send a signal to engine to stop/crash EN
+// StopENAtHeightCommand will send a signal to engine to stop/crash EN
 // at given height
-type StopAtHeightCommand struct {
+type StopENAtHeightCommand struct {
 	stopControl *ingestion.StopControl
 }
 
-// NewStopAtHeightCommand creates a new StopAtHeightCommand object
-func NewStopAtHeightCommand(sah *ingestion.StopControl) *StopAtHeightCommand {
-	return &StopAtHeightCommand{
+// NewStopENAtHeightCommand creates a new StopENAtHeightCommand object
+func NewStopENAtHeightCommand(sah *ingestion.StopControl) *StopENAtHeightCommand {
+	return &StopENAtHeightCommand{
 		stopControl: sah,
 	}
 }
 
-type StopAtHeightReq struct {
+type StopENAtHeightReq struct {
 	height uint64
 	crash  bool
 }
@@ -33,8 +33,8 @@ type StopAtHeightReq struct {
 // Handler method sets the stop height parameters.
 // Errors only if setting of stop height parameters fails.
 // Returns "ok" if successful.
-func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
-	sah := req.ValidatorData.(StopAtHeightReq)
+func (s *StopENAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+	sah := req.ValidatorData.(StopENAtHeightReq)
 
 	oldHeight, oldCrash, err := s.stopControl.SetStopHeight(sah.height, sah.crash)
 
@@ -47,7 +47,7 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 	return "ok", nil
 }
 
-// Validator checks the inputs for StopAtHeight command.
+// Validator checks the inputs for StopENAtHeight command.
 // It expects the following fields in the Data field of the req object:
 //   - height in a numeric format
 //   - crash, a boolean
@@ -55,7 +55,7 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 // Additionally, height must be a positive integer. If a float value is provided, only the integer part is used.
 // The following sentinel errors are expected during normal operations:
 // * `admin.InvalidAdminReqError` if any required field is missing or in a wrong format
-func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
+func (s *StopENAtHeightCommand) Validator(req *admin.CommandRequest) error {
 
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
@@ -79,7 +79,7 @@ func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 		return admin.NewInvalidAdminReqParameterError("crash", "must be bool", result)
 	}
 
-	req.ValidatorData = StopAtHeightReq{
+	req.ValidatorData = StopENAtHeightReq{
 		height: uint64(height),
 		crash:  crash,
 	}

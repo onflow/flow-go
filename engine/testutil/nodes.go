@@ -934,7 +934,8 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.StopControl == nil {
-		node.StopControl = verification.NewStopControl(0, node.State, node.Log)
+		node.StopControl, err = verification.NewStopControl(node.Log, node.State, node.ProcessedBlockHeight)
+		require.NoError(t, err)
 	}
 
 	if node.FetcherEngine == nil {
