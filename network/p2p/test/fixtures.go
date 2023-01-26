@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -60,6 +59,7 @@ func NodeFixture(
 		Address:     unittest.DefaultAddress,
 		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
 		Role:        flow.RoleCollection,
+		Metrics:     metrics.NewNoopCollector(),
 	}
 
 	for _, opt := range opts {
@@ -73,13 +73,12 @@ func NodeFixture(
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(logger, noopMetrics)
-	resourceManager := testutils.NewResourceManager(t)
+	connManager := connection.NewConnManager(logger, parameters.Metrics)
+	// resourceManager := testutils.NewResourceManager(t)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		parameters.Metrics,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
@@ -89,11 +88,11 @@ func NodeFixture(
 			return p2pdht.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
-				noopMetrics,
+				parameters.Metrics,
 				parameters.DhtOptions...,
 			)
 		}).
-		SetResourceManager(resourceManager).
+		// SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
 
 	if parameters.ConnGater != nil {
@@ -153,6 +152,7 @@ type NodeFixtureParameters struct {
 	ConnGater          connmgr.ConnectionGater
 	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
+	Metrics            module.LibP2PMetrics
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
@@ -221,6 +221,12 @@ func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOptio
 func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Logger = logger
+	}
+}
+
+func WithMetricsCollector(metrics module.LibP2PMetrics) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.Metrics = metrics
 	}
 }
 
