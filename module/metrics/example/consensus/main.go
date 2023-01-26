@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,14 +66,16 @@ func main() {
 
 			collProvider := channels.TestNetworkChannel.String()
 			collIngest := channels.TestMetricsChannel.String()
+			protocol1 := network.ProtocolTypeUnicast.String()
+			protocol2 := network.ProtocolTypePubSub.String()
 			message1 := "CollectionRequest"
 			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
+			collector.OutboundMessageSent(rand.Intn(1000), collProvider, protocol1, message1)
+			collector.OutboundMessageSent(rand.Intn(1000), collIngest, protocol2, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
+			collector.InboundMessageReceived(rand.Intn(1000), collProvider, protocol1, message1)
+			collector.InboundMessageReceived(rand.Intn(1000), collIngest, protocol2, message2)
 
 			time.Sleep(1 * time.Second)
 		}

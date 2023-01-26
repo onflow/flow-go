@@ -3,13 +3,12 @@ package ratelimit
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
 type NoopRateLimiter struct{}
 
-func (n *NoopRateLimiter) Allow(_ peer.ID, _ *message.Message) bool {
+func (n *NoopRateLimiter) Allow(_ peer.ID, _ int) bool {
 	return true
 }
 

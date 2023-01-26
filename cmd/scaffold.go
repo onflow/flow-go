@@ -414,15 +414,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
-		fnb.Metrics.Network,
 		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
-		mwOpts...,
-	)
+		mwOpts...)
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -680,6 +678,17 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// registers mempools as a Component so that its Ready method is invoked upon startup
 		fnb.Component("mempools metrics", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			return mempools, nil
+		})
+
+		// metrics enabled, report node info metrics as post init event
+		fnb.PostInit(func(nodeConfig *NodeConfig) error {
+			nodeInfoMetrics := metrics.NewNodeInfoCollector()
+			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
+			if err != nil {
+				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Semver(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			return nil
 		})
 	}
 	return nil

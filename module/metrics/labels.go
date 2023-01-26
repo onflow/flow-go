@@ -6,6 +6,7 @@ const (
 	LabelProposer            = "proposer"
 	EngineLabel              = "engine"
 	LabelResource            = "resource"
+	LabelProtocol            = "protocol"
 	LabelMessage             = "message"
 	LabelNodeID              = "nodeid"
 	LabelNodeAddress         = "nodeaddress"
@@ -16,11 +17,6 @@ const (
 	LabelComputationKind     = "computationKind"
 	LabelConnectionDirection = "direction"
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
-)
-
-const (
-	ChannelOneToOne         = "OneToOne"
-	ChannelOneToOneUnstaked = "OneToOneUnstaked"
 )
 
 const (

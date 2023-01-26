@@ -36,6 +36,7 @@ const (
 	PrometheusTargetsFile    = "./targets.nodes.json"
 	DefaultAccessGatewayName = "access_1"
 	DefaultObserverName      = "observer"
+	DefaultGOMAXPROCS        = 8
 	DefaultMaxObservers      = 1000
 	DefaultCollectionCount   = 3
 	DefaultConsensusCount    = 3
@@ -517,10 +518,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
 			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
 			fmt.Sprintf("OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=%s,num=%s", role, num),
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
+			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
 		},
 		Labels: map[string]string{
 			"com.dapperlabs.role": role,

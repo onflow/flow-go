@@ -124,7 +124,7 @@ type LibP2PNodeBuilder struct {
 	addr                        string
 	networkKey                  fcrypto.PrivateKey
 	logger                      zerolog.Logger
-	metrics                     module.NetworkMetrics
+	metrics                     module.LibP2PMetrics
 	basicResolver               madns.BasicResolver
 	subscriptionFilter          pubsub.SubscriptionFilter
 	resourceManager             network.ResourceManager
@@ -143,7 +143,7 @@ type LibP2PNodeBuilder struct {
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
-	metrics module.NetworkMetrics,
+	metrics module.LibP2PMetrics,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
@@ -444,7 +444,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
