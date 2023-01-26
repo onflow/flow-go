@@ -14,6 +14,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEncodeDecodePayload(t *testing.T) {
+	path := testutils.PathByUint8(0)
+	payload := testutils.LightPayload8('A', 'a')
+	scratch := make([]byte, 1024*4)
+
+	// encode the payload
+	encoded, err := EncodePayload(path, payload, scratch)
+	require.NoError(t, err, "can not encode payload")
+
+	// decode the payload
+	decodedPath, decodedPayload, err := DecodePayload(encoded)
+	require.NoError(t, err)
+
+	// decoded should be the same as original
+	require.Equal(t, path, decodedPath)
+	require.True(t, payload.Equals(decodedPayload))
+
+	// encode again the decoded leaf node
+	encodedAgain, err := EncodePayload(decodedPath, decodedPayload, scratch)
+	require.NoError(t, err)
+
+	require.Equal(t, encoded, encodedAgain)
+}
+
 func TestEncodeDecodeLeafNode(t *testing.T) {
 	leafNode := leafNodeFixture()
 	scratch := make([]byte, 1024*4)

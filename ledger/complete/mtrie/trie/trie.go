@@ -198,7 +198,7 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 	}
 }
 
-// ReadSinglePayload reads and returns a payload for a single path.
+// ReadSinglePayload reads and returns a payload for a single path from root
 func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
 	leafNode, _ := findLeafNode(path, mt.root)
 
@@ -287,8 +287,9 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 
 	// reached an interim node
 	if len(paths) == 1 {
-		// call readSinglePayload to skip partition and recursive calls when there is only one path
-		payloads[0] = readSinglePayload(paths[0], head)
+		// call findLeafNode to skip partition and recursive calls when there is only one path
+		leaf, _ := findLeafNode(paths[0], head)
+		payloads[0] = leaf.Payload()
 		return
 	}
 
