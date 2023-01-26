@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -63,7 +64,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 			connection, err = grpc.Dial(
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
 				return err

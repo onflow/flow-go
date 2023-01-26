@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
@@ -789,8 +790,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
@@ -808,8 +809,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
-					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-					grpc.WithInsecure()) //nolint:staticcheck
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+					grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return err
 				}
