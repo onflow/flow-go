@@ -32,6 +32,8 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
+var _ protocol.Snapshot = (*Snapshot)(nil)
+
 func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
