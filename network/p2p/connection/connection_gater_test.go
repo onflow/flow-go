@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -96,6 +97,48 @@ func TestConnectionGating(t *testing.T) {
 		// now both nodes should be able to connect to each other.
 		p2ptest.EnsureStreamCreationInBothDirections(t, ctx, []p2p.LibP2PNode{node1, node2})
 	})
+}
+
+// TestConnectionGating_ResourceAllocation_DisAllowListing tests resource allocation when a connection from an allow-listed node is established.
+func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+
+	node1, node1Id := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus))
+
+	node2Metrics := mockmodule.NewLibP2PMetrics(t)
+	node2Metrics.On("AllowConn", network.DirInbound, true).Return()
+	node2, node2Id := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithMetricsCollector(node2Metrics),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+			return fmt.Errorf("disallowed connection") // rejecting all connections.
+		})))
+
+	nodes := []p2p.LibP2PNode{node1, node2}
+	ids := flow.IdentityList{&node1Id, &node2Id}
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
+
+	// now node2 should be able to connect to node1.
+	p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2})
+
+	// as node-2 connection gater is rejecting all connections, none of the following resource allocation methods should be called.
+	node2Metrics.AssertNotCalled(t, "AllowService", mock.Anything)               // no service is allowed, e.g., libp2p.identify
+	node2Metrics.AssertNotCalled(t, "AllowPeer", mock.Anything)                  // no peer is allowed to be attached to the connection.
+	node2Metrics.AssertNotCalled(t, "AllowMemory", mock.Anything)                // no memory is EVER allowed to be used during the test.
+	node2Metrics.AssertNotCalled(t, "AllowStream", mock.Anything, mock.Anything) // no stream is allowed to be created.
 }
 
 // TestConnectionGater_InterceptUpgrade tests the connection gater only upgrades the connections to the allow-listed peers.
