@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -53,13 +54,14 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
-		HandlerFunc: func(network.Stream) {},
-		Unicasts:    nil,
-		Key:         NetworkingKeyFixtures(t),
-		Address:     unittest.DefaultAddress,
-		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
-		Role:        flow.RoleCollection,
-		Metrics:     metrics.NewNoopCollector(),
+		HandlerFunc:     func(network.Stream) {},
+		Unicasts:        nil,
+		Key:             NetworkingKeyFixtures(t),
+		Address:         unittest.DefaultAddress,
+		Logger:          unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:            flow.RoleCollection,
+		Metrics:         metrics.NewNoopCollector(),
+		ResourceManager: testutils.NewResourceManager(t),
 	}
 
 	for _, opt := range opts {
@@ -74,7 +76,6 @@ func NodeFixture(
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
 	connManager := connection.NewConnManager(logger, parameters.Metrics)
-	// resourceManager := testutils.NewResourceManager(t)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
@@ -92,8 +93,11 @@ func NodeFixture(
 				parameters.DhtOptions...,
 			)
 		}).
-		// SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
+
+	if parameters.ResourceManager != nil {
+		builder.SetResourceManager(parameters.ResourceManager)
+	}
 
 	if parameters.ConnGater != nil {
 		builder.SetConnectionGater(parameters.ConnGater)
@@ -153,6 +157,7 @@ type NodeFixtureParameters struct {
 	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 	Metrics            module.LibP2PMetrics
+	ResourceManager    network.ResourceManager
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
@@ -227,6 +232,14 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 func WithMetricsCollector(metrics module.LibP2PMetrics) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Metrics = metrics
+	}
+}
+
+// WithDefaultResourceManager sets the resource manager to nil, which will cause the node to use the default resource manager.
+// Otherwise, it uses the resource manager provided by the test (the infinite resource manager).
+func WithDefaultResourceManager() NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ResourceManager = nil
 	}
 }
 
