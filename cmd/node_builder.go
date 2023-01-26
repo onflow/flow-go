@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -249,6 +250,9 @@ type NodeConfig struct {
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
+
+	// NodeBlockListDistributor notifies consumers of updates to the node block list
+	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -314,7 +318,7 @@ func DefaultBaseConfig() *BaseConfig {
 }
 
 // DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
-// to define the list of depenencies that must be ready before starting the component.
+// to define the list of dependencies that must be ready before starting the component.
 type DependencyList struct {
 	components []module.ReadyDoneAware
 }

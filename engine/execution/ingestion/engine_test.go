@@ -386,12 +386,13 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 func TestChunkIndexIsSet(t *testing.T) {
 
 	i := mathRand.Int()
-	chunk := execution.GenerateChunk(i,
-		unittest.StateCommitmentFixture(),
-		unittest.StateCommitmentFixture(),
+	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
+		i,
+		unittest.StateCommitmentFixture(),
+		21,
 		unittest.IdentifierFixture(),
-		21)
+		unittest.StateCommitmentFixture())
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
@@ -399,15 +400,16 @@ func TestChunkIndexIsSet(t *testing.T) {
 
 func TestChunkNumberOfTxsIsSet(t *testing.T) {
 
-	i := mathRand.Uint64()
-	chunk := execution.GenerateChunk(3,
-		unittest.StateCommitmentFixture(),
-		unittest.StateCommitmentFixture(),
+	i := int(mathRand.Uint32())
+	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		i,
 		unittest.IdentifierFixture(),
-		i)
+		unittest.StateCommitmentFixture())
 
-	assert.Equal(t, i, chunk.NumberOfTransactions)
+	assert.Equal(t, i, int(chunk.NumberOfTransactions))
 }
 
 func TestExecuteOneBlock(t *testing.T) {
@@ -1145,7 +1147,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	me := module.NewMockLocal(ctrl)
 
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
-	startState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	// mock execution state conversion and signing of
@@ -1170,8 +1171,10 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	cr := executionUnittest.ComputationResultFixture(nil)
 	cr.ExecutableBlock = executableBlock
+	startState := unittest.StateCommitmentFixture()
+	cr.ExecutableBlock.StartState = &startState
 
-	er, err := e.saveExecutionResults(context.Background(), cr, startState)
+	er, err := e.saveExecutionResults(context.Background(), cr)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)

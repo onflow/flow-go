@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -357,15 +356,35 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
+				chunk = flow.NewChunk(
+					executableBlock.ID(),
+					i,
+					startState,
+					len(completeCollection.Transactions),
+					eventsHash,
+					endState)
+				chunkDataPack = flow.NewChunkDataPack(
+					chunk.ID(),
+					chunk.StartState,
+					computationResult.Proofs[i],
+					&collection)
 			} else {
 				// generates chunk data pack fixture for system chunk
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
+				chunk = flow.NewChunk(
+					executableBlock.ID(),
+					i,
+					startState,
+					1,
+					eventsHash,
+					endState)
+				chunkDataPack = flow.NewChunkDataPack(
+					chunk.ID(),
+					chunk.StartState,
+					computationResult.Proofs[i],
+					nil)
 			}
 
 			chunks = append(chunks, chunk)
