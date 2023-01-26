@@ -132,8 +132,8 @@ When comparing to HotStuff, in Jolteon views can be changed only after observing
   
 A central, non-trivial functionality of the PaceMaker is to _skip views_. 
 Specifically, given a QC or TC with view `V` or , the Pacemaker will skip ahead to view `V + 1` if `currentView ≤ V`.
-  
-<img src="https://github.com/onflow/flow-go/blob/master/docs/PaceMaker.png" width="200">
+
+![](/docs/PaceMaker.png)
  
  
 
