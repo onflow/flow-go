@@ -99,6 +99,65 @@ func TestConnectionGating(t *testing.T) {
 	})
 }
 
+// TestConnectionGating_ResourceAllocation_AllowListing tests resource allocation when a connection from an allow-listed node is established.
+// The test directly mocks the underlying resource manager metrics of the libp2p native resource manager to ensure that the
+// expected set of resources are allocated for the connection upon establishment.
+func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+
+	node1, node1Id := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus))
+
+	node2Metrics := mockmodule.NewLibP2PMetrics(t)
+	// libp2p native resource manager metrics:
+	// we expect exactly 1 connection to be established from node1 to node2 (inbound for node 2).
+	node2Metrics.On("AllowConn", network.DirInbound, true).Return().Once()
+	// we expect the libp2p.identify service to be used to establish the connection.
+	node2Metrics.On("AllowService", "libp2p.identify").Return()
+	// we expect the node2 attaching node1 to the incoming connection.
+	node2Metrics.On("AllowPeer", node1.Host().ID()).Return()
+	// we expect node2 allocate memory for the incoming connection.
+	node2Metrics.On("AllowMemory", mock.Anything)
+	// we expect node2 to allow the stream to be created.
+	node2Metrics.On("AllowStream", node1.Host().ID(), mock.Anything)
+	// we expect node2 to attach protocol to the created stream.
+	node2Metrics.On("AllowProtocol", mock.Anything).Return()
+
+	// Flow-level resource allocation metrics:
+	// We expect both of the following to be called as they are called together in the same function.
+	node2Metrics.On("InboundConnections", mock.Anything).Return()
+	node2Metrics.On("OutboundConnections", mock.Anything).Return()
+
+	// we create node2 with a connection gater that allows all connections and the mocked metrics collector.
+	node2, node2Id := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithMetricsCollector(node2Metrics),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+			return nil // allow all connections.
+		})))
+
+	nodes := []p2p.LibP2PNode{node1, node2}
+	ids := flow.IdentityList{&node1Id, &node2Id}
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
+
+	// now node-1 should be able to connect to node-2.
+	p2pfixtures.EnsureStreamCreation(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2})
+
+	node2Metrics.AssertExpectations(t)
+}
+
 // TestConnectionGating_ResourceAllocation_DisAllowListing tests resource allocation when a connection from an allow-listed node is established.
 func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
