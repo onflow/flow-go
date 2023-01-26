@@ -70,8 +70,10 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	key := atree.SlabIndexToLedgerKey(index)
 	a.txnState.RunWithAllLimitsDisabled(func() {
 		err = a.txnState.Set(
-			string(address.Bytes()),
-			string(key),
+			flow.RegisterID{
+				Owner: string(address.Bytes()),
+				Key:   string(key),
+			},
 			[]byte{})
 	})
 	if err != nil {
@@ -417,17 +419,25 @@ func (a *StatefulAccounts) setAccountStatusStorageUsed(address flow.Address, sta
 	return nil
 }
 
+// TODO(patrick): use RegisterID as input key
 func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
-	return a.txnState.Get(string(address.Bytes()), key)
+	return a.txnState.Get(flow.RegisterID{
+		Owner: string(address.Bytes()),
+		Key:   key,
+	})
 }
 
+// TODO(patrick): use RegisterID as input key
 // SetValue sets a value in address' storage
 func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, key, value)
 	if err != nil {
 		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", state.PrintableKey(key), address, err)
 	}
-	return a.txnState.Set(string(address.Bytes()), key, value)
+	return a.txnState.Set(flow.RegisterID{
+		Owner: string(address.Bytes()),
+		Key:   key},
+		value)
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, key string, value flow.RegisterValue) error {
