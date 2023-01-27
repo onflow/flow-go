@@ -85,19 +85,6 @@ func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParamet
 	return newParams
 }
 
-// TODO(patrick): rm once https://github.com/onflow/flow-emulator/pull/245
-// is integrated.
-//
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func (params StateParameters) WithMaxInteractionSizeAllowed(
-	limit uint64,
-) StateParameters {
-	newParams := params
-	newParams.MeterParameters = newParams.MeterParameters.
-		WithStorageInteractionLimit(limit)
-	return newParams
-}
-
 type limitsController struct {
 	enforceLimits       bool
 	maxKeySizeAllowed   uint64
