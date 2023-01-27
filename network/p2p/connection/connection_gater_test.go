@@ -267,22 +267,18 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
-
-	// Checks that only the allowed nodes can establish an upgradable connection.
-	// We intentionally mock this after checking for communication silence.
-	// As no connection to/from a disallowed node should ever reach the upgradable connection stage.
+	// Checks that only an allowed REMOTE node can establish an upgradable connection.
 	connectionGater.On("InterceptUpgraded", mock.Anything).Run(func(args mock.Arguments) {
 		conn, ok := args.Get(0).(network.Conn)
 		require.True(t, ok)
 
+		// we don't check for the local peer as with v0.24 of libp2p, the local peer may be able to upgrade an empty connection
+		// even though the remote peer has already disconnected and rejected the connection.
 		remote := conn.RemotePeer()
 		require.False(t, disallowedPeerIds.Has(remote))
-
-		local := conn.LocalPeer()
-		require.False(t, disallowedPeerIds.Has(local))
 	}).Return(true, control.DisconnectReason(0))
 
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
 }
 
