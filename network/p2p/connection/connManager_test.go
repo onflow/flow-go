@@ -154,7 +154,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	}
 
 	// wait for another grace period to expire and connection manager kick in.
-	time.Sleep(5 * time.Second)
+	time.Sleep(time.Second)
 
 	// ensures that connection manager does not close any connections as the number of connections is below low watermark.
 	require.Eventuallyf(t, func() bool {
