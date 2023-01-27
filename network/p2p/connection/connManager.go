@@ -41,7 +41,7 @@ func DefaultConnManagerConfig() *ManagerConfig {
 	}
 }
 
-// ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
+// ConnManager provides an implementation of Libp2p's ConnManager interface (https://pkg.go.dev/github.com/libp2p/go-libp2p/core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
 // Current implementation primarily acts as a wrapper around libp2p's BasicConnMgr (https://pkg.go.dev/github.com/libp2p/go-libp2p/p2p/net/connmgr#BasicConnMgr).
 // However, we override the notifiee callback to add additional functionality so that it provides metrics and logging instrumentation for Flow.
