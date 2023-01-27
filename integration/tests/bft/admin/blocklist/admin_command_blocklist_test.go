@@ -29,7 +29,7 @@ func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	a.Orchestrator.sendAuthorizedMsgs(a.T())
 	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
-	require.Equal(a.T(), int64(10), a.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", 10, a.Orchestrator.unauthorizedEventsReceived.Load()))
+	require.Equal(a.T(), int64(numOfAuthorizedEvents), a.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, a.Orchestrator.unauthorizedEventsReceived.Load()))
 
 	// after blocking node a.senderVN we should not receive any messages from that node. We wait for
 	// 500 milliseconds to reduce the small chance of a race condition between the time a node is blocked

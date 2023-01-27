@@ -17,6 +17,14 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+const (
+	// numOfAuthorizedEvents number of events to send before blocking the sender node via the block list command.
+	numOfAuthorizedEvents = 10
+
+	// numOfUnauthorizedEvents number of events to send after blocking the sender node via the block list command.
+	numOfUnauthorizedEvents = 10
+)
+
 // AdminBlockListAttackOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages received before and after the senderVN is blocked by the receiverEN via the admin blocklist command.
 type AdminBlockListAttackOrchestrator struct {
 	sync.Mutex
@@ -117,7 +125,7 @@ func (a *AdminBlockListAttackOrchestrator) Register(orchestratorNetwork insecure
 // sendAuthorizedMsgs publishes a number of authorized messages from the senderVN. Authorized messages are messages
 // that are sent before the senderVN is blocked.
 func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < numOfAuthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackFixture(a.t, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
@@ -129,7 +137,7 @@ func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 // sendUnauthorizedMsgs publishes a number of unauthorized messages. Unauthorized messages are messages that are sent
 // after the senderVN is blocked via the admin blocklist command. These messages are not expected to be received.
 func (a *AdminBlockListAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < numOfUnauthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackFixture(a.t, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.orchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
