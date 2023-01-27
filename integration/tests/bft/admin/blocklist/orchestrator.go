@@ -86,8 +86,10 @@ func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.In
 	// Track any unauthorized events that are received, these events are sent after the admin blocklist command
 	// is used to block the sender node.
 	if _, ok := a.unauthorizedEvents[event.FlowProtocolEventID]; ok {
-		a.unauthorizedEventsReceived.Inc()
-		lg.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
+		if event.OriginID == a.senderVN {
+			a.unauthorizedEventsReceived.Inc()
+			lg.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
+		}
 	}
 
 	// track all authorized events sent before the sender node is blocked.

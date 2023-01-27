@@ -154,6 +154,7 @@ type FlowNetwork struct {
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
+	AdminPortsByNodeID          map[flow.Identifier]string
 	root                        *flow.Block
 	result                      *flow.ExecutionResult
 	seal                        *flow.Seal
@@ -646,6 +647,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
+		AdminPortsByNodeID:          make(map[flow.Identifier]string),
 		CorruptedPortMapping:        make(map[flow.Identifier]string),
 		root:                        root,
 		seal:                        seal,
@@ -973,9 +975,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			hostPort := testingdock.RandomPort(t)
 			containerPort := "9000/tcp"
-
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostAdminPort := testingdock.RandomPort(t)
+			containerAdminPort := "9002/tcp"
+			nodeContainer.bindPort(hostAdminPort, containerAdminPort)
+			net.AdminPortsByNodeID[nodeConf.NodeID] = hostAdminPort
 			// uncomment this code to expose the metrics server for each node
 			// hostMetricsPort := testingdock.RandomPort(t)
 			// containerMetricsPort := "8080/tcp"
@@ -1003,8 +1008,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			hostAdminPort := testingdock.RandomPort(t)
 			containerAdminPort := "9002/tcp"
 
-			nodeContainer.bindPort(hostPort, containerPort)
 			nodeContainer.bindPort(hostAdminPort, containerAdminPort)
+			net.AdminPortsByNodeID[nodeConf.NodeID] = hostAdminPort
+			nodeContainer.bindPort(hostPort, containerPort)
 
 			// hostMetricsPort := testingdock.RandomPort(t)
 			// containerMetricsPort := "8080/tcp"
@@ -1059,6 +1065,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+
+			hostAdminPort := testingdock.RandomPort(t)
+			containerAdminPort := "9002/tcp"
+			nodeContainer.bindPort(hostAdminPort, containerAdminPort)
+			net.AdminPortsByNodeID[nodeConf.NodeID] = hostAdminPort
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")

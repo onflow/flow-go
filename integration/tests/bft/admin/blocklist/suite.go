@@ -1,7 +1,10 @@
 package blocklist
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -112,7 +115,6 @@ func (s *Suite) SetupSuite() {
 	)
 
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.BftTestnet)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.net.Start(ctx)
@@ -149,7 +151,18 @@ func (s *Suite) SetupSuite() {
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
 func (s *Suite) TearDownSuite() {
-	//s.net.Remove()
-	//s.cancel()
-	//unittest.RequireCloseBefore(s.T(), s.orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	s.net.Remove()
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+}
+
+// blockNode submit request to our EN admin server to block sender VN.
+func (s *Suite) blockNode(nodeID flow.Identifier) {
+	url := fmt.Sprintf("http://0.0.0.0:%s/admin/run_command", s.net.AdminPortsByNodeID[s.receiverEN])
+	body := fmt.Sprintf(`{"commandName": "set-config", "data": {"network-id-provider-blocklist": ["%s"]}}`, nodeID.String())
+	reqBody := bytes.NewBuffer([]byte(body))
+	resp, err := http.Post(url, "application/json", reqBody)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 200, resp.StatusCode)
+	require.NoError(s.T(), resp.Body.Close())
 }
