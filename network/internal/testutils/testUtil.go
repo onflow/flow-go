@@ -54,44 +54,51 @@ type PeerTag struct {
 	Tag  string
 }
 
+// TagWatchingConnManager implements connection.ConnManager struct, and manages connections with tags. It
+// also maintains a set of observers that it notifies when a tag is added or removed from a peer.
 type TagWatchingConnManager struct {
 	*connection.ConnManager
 	observers map[observable.Observer]struct{}
 	obsLock   sync.RWMutex
 }
 
-func (cwcm *TagWatchingConnManager) Subscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
+// Subscribe allows an observer to subscribe to receive notifications when a tag is added or removed from a peer.
+func (tw *TagWatchingConnManager) Subscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
 	var void struct{}
-	cwcm.observers[observer] = void
+	tw.observers[observer] = void
 }
 
-func (cwcm *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
-	delete(cwcm.observers, observer)
+// Unsubscribe allows an observer to unsubscribe from receiving notifications.
+func (tw *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
+	delete(tw.observers, observer)
 }
 
-func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	cwcm.ConnManager.Protect(id, tag)
-	for obs := range cwcm.observers {
+// Protect adds a tag to a peer. It also notifies all observers that a tag has been added to a peer.
+func (tw *TagWatchingConnManager) Protect(id peer.ID, tag string) {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	tw.ConnManager.Protect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 }
 
-func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	res := cwcm.ConnManager.Unprotect(id, tag)
-	for obs := range cwcm.observers {
+// Unprotect removes a tag from a peer. It also notifies all observers that a tag has been removed from a peer.
+func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	res := tw.ConnManager.Unprotect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 	return res
 }
 
+// NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
 func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *connection.ManagerConfig) (*TagWatchingConnManager, error) {
 	cm, err := connection.NewConnManager(log, metrics, config)
 	if err != nil {
