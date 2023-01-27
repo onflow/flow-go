@@ -154,7 +154,7 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 		return nil, err
 	}
 	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
-	value, err = l.forest.ReadSingleValue(trieRead)
+	value, err = l.forest.ReadSingleValue(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -177,17 +177,10 @@ func (l *Ledger) GetSingleValueFromStorage(query *ledger.QuerySingleValue) (valu
 		return nil, err
 	}
 	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
-	leafHash, err := l.forest.ReadSingleLeafHash(trieRead)
+	value, err = l.forest.ReadSingleValue(trieRead, l.payloadStorage)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get value: %w", err)
 	}
-
-	_, payload, err := l.payloadStorage.Get(leafHash)
-	if err != nil {
-		return nil, fmt.Errorf("could not get payload with leaf hash %v from storage: %w", leafHash, err)
-	}
-
-	value = payload.Value()
 
 	l.metrics.ReadValuesNumber(1)
 	readDuration := time.Since(start)
@@ -208,7 +201,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	values, err = l.forest.Read(trieRead)
+	values, err = l.forest.Read(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +280,7 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	// `trieCh` is used to send created trie to Compactor.
 	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 
-	newTrie, err := l.forest.NewTrie(trieUpdate)
+	newTrie, err := l.forest.NewTrie(trieUpdate, l.payloadStorage)
 	walError := <-resultCh
 
 	if err != nil {
@@ -362,7 +355,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	}
 
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	batchProof, err := l.forest.Proofs(trieRead)
+	batchProof, err := l.forest.Proofs(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
@@ -448,7 +441,7 @@ func (l *Ledger) ExportCheckpointAt(
 		// preCheckpointReporters, which doesn't use the payloads.
 	} else {
 		// get all payloads
-		payloads = t.AllPayloads()
+		payloads = t.AllPayloads(l.payloadStorage)
 		payloadSize := len(payloads)
 
 		// migrate payloads
@@ -491,7 +484,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 		// no need to prune the data since it has already been prunned through migrations
 		applyPruning := false
-		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning, l.payloadStorage)
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 		}
@@ -540,7 +533,7 @@ func (l *Ledger) ExportCheckpointAt(
 	if noMigration {
 		// when there is no mgiration, we generate the payloads now before
 		// running the postCheckpointReporters
-		payloads = newTrie.AllPayloads()
+		payloads = newTrie.AllPayloads(l.payloadStorage)
 	}
 
 	// running post checkpoint reporters
