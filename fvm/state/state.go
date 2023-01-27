@@ -166,6 +166,11 @@ func (s *State) InteractionUsed() uint64 {
 	return s.meter.TotalBytesOfStorageInteractions()
 }
 
+// BytesWritten returns the amount of total ledger bytes written
+func (s *State) BytesWritten() uint64 {
+	return s.meter.TotalBytesWrittenToStorage()
+}
+
 // UpdatedRegisterIDs returns the lists of register ids that were updated.
 func (s *State) UpdatedRegisterIDs() []flow.RegisterID {
 	return s.view.UpdatedRegisterIDs()
