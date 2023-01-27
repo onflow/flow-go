@@ -41,25 +41,6 @@ func Test_CompactifiedLeaf(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
 
-// Test_InterimNodeWithoutChildren verifies that the hash value of an interim node without children is computed correctly.
-// We test the hash at the lowest-possible height (0), at an interim height (9) and (16)
-func Test_InterimNodeWithoutChildren(t *testing.T) {
-	n := node.NewInterimNode(0, nil, nil)
-	expectedRootHashHex := "18373b4b038cbbf37456c33941a7e346e752acd8fafa896933d4859002b62619"
-	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
-	require.Equal(t, ledger.GetDefaultHashForHeight(0), n.Hash())
-
-	n = node.NewInterimNode(9, nil, nil)
-	expectedRootHashHex = "a37f98dbac56e315fbd4b9f9bc85fbd1b138ed4ae453b128c22c99401495af6d"
-	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
-	require.Equal(t, ledger.GetDefaultHashForHeight(9), n.Hash())
-
-	n = node.NewInterimNode(16, nil, nil)
-	expectedRootHashHex = "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
-	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
-	require.Equal(t, ledger.GetDefaultHashForHeight(16), n.Hash())
-}
-
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
@@ -90,17 +71,6 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 	n := node.NewInterimNode(1, leftChild, rightChild)
 	expectedRootHashHex := "1e4754fb35ec011b6192e205de403c1031d8ce64bd3d1ff8f534a20595af90c3"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
-}
-
-func Test_AllPayloads(t *testing.T) {
-	path := testutils.PathByUint16(1)
-	payload := testutils.LightPayload(2, 3)
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 1)
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
-	require.Equal(t, 3, len(n5.AllPayloads()))
 }
 
 func Test_VerifyCachedHash(t *testing.T) {

@@ -31,35 +31,31 @@ type Node struct {
 	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
-	lChild       *Node           // Left Child
-	rChild       *Node           // Right Child
-	height       int             // height where the Node is at
-	path         ledger.Path     // the storage path (dummy value for interim nodes) TO BE REMOVED
-	payload      *ledger.Payload // the payload this node is storing (leaf nodes only) TO BE REMOVED
-	hashValue    hash.Hash       // hash value of node (cached)
-	leafNodeHash hash.Hash       // hash value of the fully expanded leaf node (leaf nodes only)
+	lChild       *Node     // Left Child
+	rChild       *Node     // Right Child
+	height       int       // height where the Node is at
+	hashValue    hash.Hash // hash value of node (cached)
+	leafNodeHash hash.Hash // hash value of the fully expanded leaf node (leaf nodes only)
 }
 
-// NewNode creates a new Node.
-// UNCHECKED requirement: combination of values must conform to
-// a valid node type (see documentation of `Node` for details)
-func NewNode(height int,
-	lchild,
-	rchild *Node,
-	path ledger.Path,
-	payload *ledger.Payload,
-	hashValue hash.Hash,
-) *Node {
-	n := &Node{
-		lChild:    lchild,
-		rChild:    rchild,
-		height:    height,
-		path:      path,
-		hashValue: hashValue,
-		payload:   payload,
-	}
-	return n
-}
+// // NewNode creates a new Node.
+// // UNCHECKED requirement: combination of values must conform to
+// // a valid node type (see documentation of `Node` for details)
+// func NewNode(height int,
+// 	lchild,
+// 	rchild *Node,
+// 	hashValue hash.Hash,
+// 	leafNodeHash hash.Hash,
+// ) *Node {
+// 	n := &Node{
+// 		lChild:       lchild,
+// 		rChild:       rchild,
+// 		height:       height,
+// 		hashValue:    hashValue,
+// 		leafNodeHash: leafNodeHash,
+// 	}
+// 	return n
+// }
 
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
@@ -69,29 +65,57 @@ func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
 	height int,
 ) *Node {
-	n := &Node{
-		lChild:  nil,
-		rChild:  nil,
-		height:  height,
-		path:    path,
-		payload: payload,
+	leafNodeHash := computeLeafNodeHash(path, payload, 0)
+
+	hashValue := leafNodeHash
+	if height > 0 {
+		// TODO compute hashValue using the leafNodeHash, save 1 hash operation
+		hashValue = computeLeafNodeHash(path, payload, height)
 	}
-	n.hashValue = n.computeHash()
-	n.leafNodeHash = n.hashValue
+
+	n := &Node{
+		lChild:       nil,
+		rChild:       nil,
+		height:       height,
+		hashValue:    hashValue,
+		leafNodeHash: leafNodeHash,
+	}
+
 	return n
+}
+
+func computeLeafNodeHash(path ledger.Path, payload *ledger.Payload, height int) hash.Hash {
+	return ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), height)
+}
+
+func computeInterimNodeHash(lChild, rChild *Node, height int) hash.Hash {
+	var h1, h2 hash.Hash
+	if lChild != nil {
+		h1 = lChild.Hash()
+	} else {
+		h1 = ledger.GetDefaultHashForHeight(height - 1)
+	}
+
+	if rChild != nil {
+		h2 = rChild.Hash()
+	} else {
+		h2 = ledger.GetDefaultHashForHeight(height - 1)
+	}
+	return hash.HashInterNode(h1, h2)
 }
 
 // NewInterimNode creates a new interim Node.
 // UNCHECKED requirement:
 //   - for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
+	hashValue := computeInterimNodeHash(lchild, rchild, height)
 	n := &Node{
-		lChild:  lchild,
-		rChild:  rchild,
-		height:  height,
-		payload: nil,
+		lChild:       lchild,
+		rChild:       rchild,
+		height:       height,
+		hashValue:    hashValue,
+		leafNodeHash: hash.DummyHash, // interim node has no leaf node hash
 	}
-	n.hashValue = n.computeHash()
 	return n
 }
 
@@ -124,11 +148,11 @@ func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
 	if rChild == nil && lChild.IsLeaf() {
 		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
-		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h, leafNodeHash: lChild.leafNodeHash}
+		return &Node{lChild: nil, rChild: nil, height: height, hashValue: h, leafNodeHash: lChild.leafNodeHash}
 	}
 	if lChild == nil && rChild.IsLeaf() {
 		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
-		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h, leafNodeHash: rChild.leafNodeHash}
+		return &Node{lChild: nil, rChild: nil, height: height, hashValue: h, leafNodeHash: rChild.leafNodeHash}
 	}
 
 	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
@@ -145,44 +169,21 @@ func (n *Node) IsDefaultNode() bool {
 	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
 }
 
-// computeHash returns the hashValue of the node
-func (n *Node) computeHash() hash.Hash {
-	// check for leaf node
-	if n.lChild == nil && n.rChild == nil {
-		// if payload is non-nil, compute the hash based on the payload content
-		if n.payload != nil {
-			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value(), n.height)
-		}
-		// if payload is nil, return the default hash
-		return ledger.GetDefaultHashForHeight(n.height)
-	}
-
-	// this is an interim node at least one of lChild or rChild is not nil.
-	var h1, h2 hash.Hash
-	if n.lChild != nil {
-		h1 = n.lChild.Hash()
-	} else {
-		h1 = ledger.GetDefaultHashForHeight(n.height - 1)
-	}
-
-	if n.rChild != nil {
-		h2 = n.rChild.Hash()
-	} else {
-		h2 = ledger.GetDefaultHashForHeight(n.height - 1)
-	}
-	return hash.HashInterNode(h1, h2)
-}
-
 // VerifyCachedHash verifies the hash of a node is valid
 func verifyCachedHashRecursive(n *Node) bool {
 	if n == nil {
+		return true
+	}
+	// since we no longer store payload on leaf node, its hash
+	// can't be verified, we assume the hash is correct
+	if n.IsLeaf() {
 		return true
 	}
 	if !verifyCachedHashRecursive(n.lChild) || !verifyCachedHashRecursive(n.rChild) {
 		return false
 	}
 
-	computedHash := n.computeHash()
+	computedHash := computeInterimNodeHash(n.lChild, n.rChild, n.height)
 	return n.hashValue == computedHash
 }
 
@@ -207,21 +208,6 @@ func (n *Node) ExpandedLeafHash() hash.Hash {
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
 	return n.height
-}
-
-// Path returns a pointer to the Node's register storage path.
-// If the node is not a leaf, the function returns `nil`.
-func (n *Node) Path() *ledger.Path {
-	if n.IsLeaf() {
-		return &n.path
-	}
-	return nil
-}
-
-// Payload returns the the Node's payload.
-// Do NOT MODIFY returned slices!
-func (n *Node) Payload() *ledger.Payload {
-	return n.payload
 }
 
 // LeftChild returns the the Node's left child.
@@ -250,32 +236,9 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 	if n.lChild != nil {
 		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", subpath+"0"))
 	}
-	payloadSize := 0
-	if n.payload != nil {
-		payloadSize = n.payload.Size()
-	}
 	hashStr := hex.EncodeToString(n.hashValue[:])
 	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
-	return fmt.Sprintf("%v%v: (path:%v, payloadSize:%d hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, payloadSize, hashStr, subpath, n, left, right)
-}
-
-// AllPayloads returns the payload of this node and all payloads of the subtrie
-func (n *Node) AllPayloads() []ledger.Payload {
-	return n.appendSubtreePayloads([]ledger.Payload{})
-}
-
-// appendSubtreePayloads appends the payloads of the subtree with this node as root
-// to the provided Payload slice. Follows same pattern as Go's native append method.
-func (n *Node) appendSubtreePayloads(result []ledger.Payload) []ledger.Payload {
-	if n == nil {
-		return result
-	}
-	if n.IsLeaf() {
-		return append(result, *n.Payload())
-	}
-	result = n.lChild.appendSubtreePayloads(result)
-	result = n.rChild.appendSubtreePayloads(result)
-	return result
+	return fmt.Sprintf("%v%v: (hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, hashStr, subpath, n, left, right)
 }
 
 // AllLeafNodes returns all subtree leaf nodes from this subtrie
