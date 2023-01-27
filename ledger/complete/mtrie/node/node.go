@@ -34,8 +34,8 @@ type Node struct {
 	lChild       *Node           // Left Child
 	rChild       *Node           // Right Child
 	height       int             // height where the Node is at
-	path         ledger.Path     // the storage path (dummy value for interim nodes)
-	payload      *ledger.Payload // the payload this node is storing (leaf nodes only)
+	path         ledger.Path     // the storage path (dummy value for interim nodes) TO BE REMOVED
+	payload      *ledger.Payload // the payload this node is storing (leaf nodes only) TO BE REMOVED
 	hashValue    hash.Hash       // hash value of node (cached)
 	leafNodeHash hash.Hash       // hash value of the fully expanded leaf node (leaf nodes only)
 }

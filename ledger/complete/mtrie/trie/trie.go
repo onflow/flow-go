@@ -404,7 +404,7 @@ func update(
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
+		n = node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 		if payloads[0].IsEmpty() {
 			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
 			return n, 0, 0, nodeHeight
