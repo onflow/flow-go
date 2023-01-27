@@ -158,12 +158,12 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 	}
 
 	accountStatus := NewAccountStatus()
-	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, state.AccountStatusKey, accountStatus.ToBytes())))
-
-	err = a.setAccountStatus(newAddress, accountStatus)
+	storageUsedByTheStatusItself := uint64(RegisterSize(newAddress, state.AccountStatusKey, accountStatus.ToBytes()))
+	err = a.setAccountStatusStorageUsed(newAddress, accountStatus, storageUsedByTheStatusItself)
 	if err != nil {
 		return fmt.Errorf("failed to create a new account: %w", err)
 	}
+
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
@@ -404,9 +404,13 @@ func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) err
 		return fmt.Errorf("failed to set storage used: %w", err)
 	}
 
-	status.SetStorageUsed(used)
+	return a.setAccountStatusStorageUsed(address, status, used)
+}
 
-	err = a.setAccountStatus(address, status)
+func (a *StatefulAccounts) setAccountStatusStorageUsed(address flow.Address, status *AccountStatus, newUsed uint64) error {
+	status.SetStorageUsed(newUsed)
+
+	err := a.setAccountStatus(address, status)
 	if err != nil {
 		return fmt.Errorf("failed to set storage used: %w", err)
 	}

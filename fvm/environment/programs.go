@@ -88,6 +88,12 @@ func (programs *Programs) set(
 		return err
 	}
 
+	if state.BytesWritten() > 0 {
+		// This should never happen. Loading a program should not write to the state.
+		// If this happens, it indicates an implementation error.
+		return fmt.Errorf("cannot set program. State was written to during program parsing")
+	}
+
 	// Get collected dependencies of the loaded program.
 	stackLocation, dependencies, err := programs.dependencyStack.pop()
 	if err != nil {

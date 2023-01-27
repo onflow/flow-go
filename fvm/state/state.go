@@ -1,14 +1,12 @@
 package state
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -42,9 +40,8 @@ type State struct {
 	// bookkeeping purpose).
 	committed bool
 
-	view             View
-	meter            *meter.Meter
-	updatedAddresses map[flow.Address]struct{}
+	view  View
+	meter *meter.Meter
 
 	// NOTE: parent and child state shares the same limits controller
 	*limitsController
@@ -142,7 +139,6 @@ func NewState(view View, params StateParameters) *State {
 		committed:        false,
 		view:             view,
 		meter:            m,
-		updatedAddresses: make(map[flow.Address]struct{}),
 		limitsController: newLimitsController(params),
 	}
 }
@@ -156,7 +152,6 @@ func (s *State) NewChildWithMeterParams(
 		committed:        false,
 		view:             s.view.NewChild(),
 		meter:            meter.NewMeter(params),
-		updatedAddresses: make(map[flow.Address]struct{}),
 		limitsController: s.limitsController,
 	}
 }
@@ -169,6 +164,11 @@ func (s *State) NewChild() *State {
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (s *State) InteractionUsed() uint64 {
 	return s.meter.TotalBytesOfStorageInteractions()
+}
+
+// BytesWritten returns the amount of total ledger bytes written
+func (s *State) BytesWritten() uint64 {
+	return s.meter.TotalBytesWrittenToStorage()
 }
 
 // UpdatedRegisterIDs returns the lists of register ids that were updated.
@@ -237,10 +237,6 @@ func (s *State) Set(owner, key string, value flow.RegisterValue) error {
 	)
 	if err != nil {
 		return err
-	}
-
-	if address, isAddress := addressFromOwner(owner); isAddress {
-		s.updatedAddresses[address] = struct{}{}
 	}
 
 	return nil
@@ -330,28 +326,7 @@ func (s *State) MergeState(other *State) error {
 
 	s.meter.MergeMeter(other.meter)
 
-	// apply address updates
-	for k, v := range other.updatedAddresses {
-		s.updatedAddresses[k] = v
-	}
-
 	return nil
-}
-
-// UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
-func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
-
-	for k := range s.updatedAddresses {
-		addresses = append(addresses, k)
-	}
-
-	slices.SortFunc(addresses, func(a, b flow.Address) bool {
-		// reverse order to maintain compatibility with previous implementation.
-		return bytes.Compare(a[:], b[:]) >= 0
-	})
-
-	return addresses
 }
 
 func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
@@ -364,16 +339,6 @@ func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
 		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
 	}
 	return nil
-}
-
-func addressFromOwner(owner string) (flow.Address, bool) {
-	ownerBytes := []byte(owner)
-	if len(ownerBytes) != flow.AddressLength {
-		// not an address
-		return flow.EmptyAddress, false
-	}
-	address := flow.BytesToAddress(ownerBytes)
-	return address, true
 }
 
 // IsFVMStateKey returns true if the key is controlled by the fvm env and

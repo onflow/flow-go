@@ -387,7 +387,7 @@ func (executor *transactionExecutor) normalExecution() (
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState.UpdatedAddresses(),
+			executor.txnState,
 			executor.proc.Transaction.Payer,
 			maxTxFees)
 	})
