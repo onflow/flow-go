@@ -19,11 +19,7 @@ const (
 
 type MeteredComputationIntensities map[common.ComputationKind]uint
 type MeteredMemoryIntensities map[common.MemoryKind]uint
-type MeteredStorageInteractionMap map[StorageInteractionKey]uint64
-
-type StorageInteractionKey struct {
-	Owner, Key string
-}
+type MeteredStorageInteractionMap map[flow.RegisterID]uint64
 
 // MeterExecutionInternalPrecisionBytes are the amount of bytes that are used internally by the WeigthedMeter
 // to allow for metering computation smaller than one unit of computation. This allows for more fine weights.
@@ -365,7 +361,7 @@ type Meter struct {
 	computationIntensities MeteredComputationIntensities
 	memoryIntensities      MeteredMemoryIntensities
 
-	storageUpdateSizeMap     map[StorageInteractionKey]uint64
+	storageUpdateSizeMap     map[flow.RegisterID]uint64
 	totalStorageBytesRead    uint64
 	totalStorageBytesWritten uint64
 
@@ -466,9 +462,10 @@ func (m *Meter) TotalMemoryEstimate() uint64 {
 // MeterStorageRead captures storage read bytes count and returns an error
 // if it goes beyond the total interaction limit and limit is enforced
 func (m *Meter) MeterStorageRead(
-	storageKey StorageInteractionKey,
+	storageKey flow.RegisterID,
 	value flow.RegisterValue,
-	enforceLimit bool) error {
+	enforceLimit bool,
+) error {
 
 	// all reads are on a View which only read from storage at the first read of a given key
 	if _, ok := m.storageUpdateSizeMap[storageKey]; !ok {
@@ -483,9 +480,10 @@ func (m *Meter) MeterStorageRead(
 // MeterStorageRead captures storage written bytes count and returns an error
 // if it goes beyond the total interaction limit and limit is enforced
 func (m *Meter) MeterStorageWrite(
-	storageKey StorageInteractionKey,
+	storageKey flow.RegisterID,
 	value flow.RegisterValue,
-	enforceLimit bool) error {
+	enforceLimit bool,
+) error {
 	// all writes are on a View which only writes the latest updated value to storage at commit
 	if old, ok := m.storageUpdateSizeMap[storageKey]; ok {
 		m.totalStorageBytesWritten -= old
@@ -522,14 +520,17 @@ func (m *Meter) TotalBytesOfStorageInteractions() uint64 {
 	return m.TotalBytesReadFromStorage() + m.TotalBytesWrittenToStorage()
 }
 
-func getStorageKeyValueSize(storageKey StorageInteractionKey,
-	value flow.RegisterValue) uint64 {
+func getStorageKeyValueSize(
+	storageKey flow.RegisterID,
+	value flow.RegisterValue,
+) uint64 {
 	return uint64(len(storageKey.Owner) + len(storageKey.Key) + len(value))
 }
 
 func GetStorageKeyValueSizeForTesting(
-	storageKey StorageInteractionKey,
-	value flow.RegisterValue) uint64 {
+	storageKey flow.RegisterID,
+	value flow.RegisterValue,
+) uint64 {
 	return getStorageKeyValueSize(storageKey, value)
 }
 

@@ -204,7 +204,7 @@ func (s *State) Get(owner, key string) (flow.RegisterValue, error) {
 	}
 
 	err = s.meter.MeterStorageRead(
-		meter.StorageInteractionKey{Owner: owner, Key: key},
+		flow.RegisterID{Owner: owner, Key: key},
 		value,
 		s.enforceLimits)
 
@@ -231,7 +231,7 @@ func (s *State) Set(owner, key string, value flow.RegisterValue) error {
 	}
 
 	err := s.meter.MeterStorageWrite(
-		meter.StorageInteractionKey{Owner: owner, Key: key},
+		flow.RegisterID{Owner: owner, Key: key},
 		value,
 		s.enforceLimits,
 	)
