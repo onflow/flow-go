@@ -22,13 +22,13 @@ func NewLoggerNotifiee(logger zerolog.Logger, metrics module.LibP2PConnectionMet
 	}
 }
 
-func (l *LoggerNotifiee) Listen(n network.Network, multiaddr multiaddr.Multiaddr) {
+func (l *LoggerNotifiee) Listen(_ network.Network, multiaddr multiaddr.Multiaddr) {
 	// just log the multiaddress on which we listen
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
+	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen started")
 }
 
-func (l *LoggerNotifiee) ListenClose(n network.Network, multiaddr multiaddr.Multiaddr) {
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen started")
+func (l *LoggerNotifiee) ListenClose(_ network.Network, multiaddr multiaddr.Multiaddr) {
+	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
 }
 
 func (l *LoggerNotifiee) Connected(n network.Network, conn network.Conn) {
