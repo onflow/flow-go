@@ -345,10 +345,6 @@ func (s *TransactionState) Set(
 	return s.currentState().Set(owner, key, value)
 }
 
-func (s *TransactionState) UpdatedAddresses() []flow.Address {
-	return s.currentState().UpdatedAddresses()
-}
-
 func (s *TransactionState) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
