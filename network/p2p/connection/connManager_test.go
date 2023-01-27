@@ -105,8 +105,8 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	cfg := &connection.ManagerConfig{
 		HighWatermark: 4,               // whenever the number of connections exceeds 4, connection manager prune connections.
 		LowWatermark:  2,               // connection manager prune connections until the number of connections is 2.
-		GracePeriod:   1 * time.Second, // extra connections will be pruned if they are older than a second (just for testing).
-		SilencePeriod: 5 * time.Second, // connection manager prune checking kicks in every 5 seconds (just for testing).
+		GracePeriod:   500 * time.Millisecond, // extra connections will be pruned if they are older than a second (just for testing).
+		SilencePeriod:  time.Second, // connection manager prune checking kicks in every 5 seconds (just for testing).
 	}
 	thisConnMgr, err := connection.NewConnManager(
 		unittest.Logger(),
