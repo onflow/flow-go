@@ -196,7 +196,7 @@ func main() {
 			create := func(epoch uint64) mempool.Transactions {
 				var heroCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 				if node.BaseConfig.HeroCacheMetricsEnable {
-					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch)
+					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegistery, epoch)
 				}
 				return herocache.NewTransactions(
 					uint32(txLimit),
@@ -388,7 +388,7 @@ func main() {
 
 			var collectionRequestMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if node.HeroCacheMetricsEnable {
-				collectionRequestMetrics = metrics.CollectionRequestsQueueMetricFactory(node.MetricsRegisterer)
+				collectionRequestMetrics = metrics.CollectionRequestsQueueMetricFactory(node.MetricsRegistery)
 			}
 			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
 

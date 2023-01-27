@@ -1021,7 +1021,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 
 			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegistery)
 			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,

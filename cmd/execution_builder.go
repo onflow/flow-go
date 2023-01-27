@@ -491,7 +491,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if node.HeroCacheMetricsEnable {
-		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegistery)
 	}
 	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 	exeNode.providerEngine, err = exeprovider.New(
@@ -669,7 +669,7 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	// that all WAL updates are completed before closing opened WAL segment.
 	var err error
 	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+		node.MetricsRegistery, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
@@ -914,7 +914,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 
 	var receiptRequestQueueMetric module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if node.HeroCacheMetricsEnable {
-		receiptRequestQueueMetric = metrics.ReceiptRequestsQueueMetricFactory(node.MetricsRegisterer)
+		receiptRequestQueueMetric = metrics.ReceiptRequestsQueueMetricFactory(node.MetricsRegistery)
 	}
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 

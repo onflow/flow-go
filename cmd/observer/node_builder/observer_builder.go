@@ -927,7 +927,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegistery)
 			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,

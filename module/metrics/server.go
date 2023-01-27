@@ -7,9 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
+
+const endpoint = "/metrics"
 
 // Server is the http server that will be serving the /metrics request for prometheus
 type Server struct {
@@ -19,12 +22,17 @@ type Server struct {
 
 // NewServer creates a new server that will start on the specified port,
 // and responds to only the `/metrics` endpoint
-func NewServer(log zerolog.Logger, port uint) *Server {
+func NewServer(log zerolog.Logger, port uint, reg *prometheus.Registry) *Server {
 	addr := ":" + strconv.Itoa(int(port))
 
 	mux := http.NewServeMux()
-	endpoint := "/metrics"
-	mux.Handle(endpoint, promhttp.Handler())
+	mux.Handle(endpoint, promhttp.HandlerFor(
+		reg,
+		promhttp.HandlerOpts{
+			// Opt into OpenMetrics to support exemplars.
+			EnableOpenMetrics: true,
+		},
+	))
 	log.Info().Str("address", addr).Str("endpoint", endpoint).Msg("metrics server started")
 
 	m := &Server{

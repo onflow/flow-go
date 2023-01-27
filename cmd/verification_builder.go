@@ -127,7 +127,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return err
 		}).
 		Module("verification metrics", func(node *NodeConfig) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegistery)
 			return nil
 		}).
 		Module("chunk status memory pool", func(node *NodeConfig) error {

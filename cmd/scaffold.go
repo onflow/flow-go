@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
@@ -254,8 +256,8 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 		var dnsIpCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		var dnsTxtCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if fnb.HeroCacheMetricsEnable {
-			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
-			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegistery)
+			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegistery)
 		}
 
 		cache := herocache.NewDNSCache(
@@ -423,7 +425,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
-		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegistery)
 	}
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
@@ -467,7 +469,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.MetricsRegistery)
 		return server, nil
 	})
 }
@@ -652,7 +654,11 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		Bitswap:        metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.MetricsEnabled {
-		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
+		fnb.MetricsRegistery = prometheus.NewRegistry()
+		fnb.MetricsRegistery.MustRegister(collectors.NewBuildInfoCollector())
+		fnb.MetricsRegistery.MustRegister(collectors.NewGoCollector(
+			collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
+		))
 
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 

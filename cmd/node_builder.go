@@ -207,26 +207,26 @@ type NetworkConfig struct {
 type NodeConfig struct {
 	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
-	Logger            zerolog.Logger
-	NodeID            flow.Identifier
-	Me                module.Local
-	Tracer            module.Tracer
-	ConfigManager     *updatable_configs.Manager
-	MetricsRegisterer prometheus.Registerer
-	Metrics           Metrics
-	DB                *badger.DB
-	SecretsDB         *badger.DB
-	Storage           Storage
-	ProtocolEvents    *events.Distributor
-	State             protocol.State
-	Resolver          madns.BasicResolver
-	Middleware        network.Middleware
-	Network           network.Network
-	PingService       network.PingService
-	MsgValidators     []network.MessageValidator
-	FvmOptions        []fvm.Option
-	StakingKey        crypto.PrivateKey
-	NetworkKey        crypto.PrivateKey
+	Logger           zerolog.Logger
+	NodeID           flow.Identifier
+	Me               module.Local
+	Tracer           module.Tracer
+	ConfigManager    *updatable_configs.Manager
+	MetricsRegistery *prometheus.Registry
+	Metrics          Metrics
+	DB               *badger.DB
+	SecretsDB        *badger.DB
+	Storage          Storage
+	ProtocolEvents   *events.Distributor
+	State            protocol.State
+	Resolver         madns.BasicResolver
+	Middleware       network.Middleware
+	Network          network.Network
+	PingService      network.PingService
+	MsgValidators    []network.MessageValidator
+	FvmOptions       []fvm.Option
+	StakingKey       crypto.PrivateKey
+	NetworkKey       crypto.PrivateKey
 
 	// list of dependencies for network peer manager startup
 	PeerManagerDependencies *DependencyList
