@@ -25,8 +25,6 @@ func TestAdminCommandBlockList(t *testing.T) {
 // the blocklist admin command. The receiver node is expected to receive messages like normal before blocking the sender, after blocking the sender
 // it should not receive any messages.
 func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
-	fmt.Println("SENDER_VN", a.senderVN.String())
-	fmt.Println("RECEIVER_EN", a.receiverEN.String())
 	// send some authorized messages indicating the network is working as expected
 	a.Orchestrator.sendAuthorizedMsgs(a.T())
 	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
