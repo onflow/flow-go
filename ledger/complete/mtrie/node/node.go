@@ -73,15 +73,28 @@ func NewLeaf(path ledger.Path,
 		hashValue = computeLeafNodeHash(path, payload, height)
 	}
 
-	n := &Node{
+	return &Node{
 		lChild:       nil,
 		rChild:       nil,
 		height:       height,
 		hashValue:    hashValue,
 		leafNodeHash: leafNodeHash,
 	}
+}
 
-	return n
+func NewLeafWithHash(path ledger.Path, payload *ledger.Payload, height int, hashValue hash.Hash) *Node {
+	leafNodeHash := hashValue
+	if height > 0 {
+		leafNodeHash = computeLeafNodeHash(path, payload, 0)
+	}
+
+	return &Node{
+		lChild:       nil,
+		rChild:       nil,
+		height:       height,
+		hashValue:    hashValue,
+		leafNodeHash: leafNodeHash,
+	}
 }
 
 func computeLeafNodeHash(path ledger.Path, payload *ledger.Payload, height int) hash.Hash {
@@ -109,14 +122,17 @@ func computeInterimNodeHash(lChild, rChild *Node, height int) hash.Hash {
 //   - for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	hashValue := computeInterimNodeHash(lchild, rchild, height)
-	n := &Node{
+	return NewInterimNodeWithHash(height, lchild, rchild, hashValue)
+}
+
+func NewInterimNodeWithHash(height int, lchild, rchild *Node, hashValue hash.Hash) *Node {
+	return &Node{
 		lChild:       lchild,
 		rChild:       rchild,
 		height:       height,
 		hashValue:    hashValue,
 		leafNodeHash: hash.DummyHash, // interim node has no leaf node hash
 	}
-	return n
 }
 
 // NewInterimCompactifiedNode creates a new compactified interim Node. For compactification,

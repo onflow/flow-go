@@ -171,7 +171,7 @@ func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []
 // of using append.  This function uses len(scratch) and ignores cap(scratch),
 // so any extra capacity will not be utilized.
 // If len(scratch) < 1024, then a new buffer will be allocated and used.
-func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
+func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, ledger.Path, *ledger.Payload, error) {
 
 	// minBufSize should be large enough for interim node and leaf node with small payload.
 	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
@@ -187,7 +187,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 
 	_, err := io.ReadFull(reader, scratch[:fixLengthSize])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read fixed-length part of serialized node: %w", err)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to read fixed-length part of serialized node: %w", err)
 	}
 
 	pos := 0
@@ -197,7 +197,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	pos += encNodeTypeSize
 
 	if nType != byte(leafNodeType) && nType != byte(interimNodeType) {
-		return nil, fmt.Errorf("failed to decode node type %d", nType)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to decode node type %d", nType)
 	}
 
 	// Decode height (2 bytes)
@@ -207,7 +207,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Decode and create hash.Hash (32 bytes)
 	nodeHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
 	}
 
 	if nType == byte(leafNodeType) {
@@ -216,23 +216,23 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		encPath := scratch[:encPathSize]
 		_, err := io.ReadFull(reader, encPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read path of serialized node: %w", err)
+			return nil, ledger.DummyPath, nil, fmt.Errorf("failed to read path of serialized node: %w", err)
 		}
 
 		// Decode and create ledger.Path.
 		path, err := ledger.ToPath(encPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode path of serialized node: %w", err)
+			return nil, ledger.DummyPath, nil, fmt.Errorf("failed to decode path of serialized node: %w", err)
 		}
 
 		// Read encoded payload data and create ledger.Payload.
 		payload, err := readPayloadFromReader(reader, scratch)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
+			return nil, ledger.DummyPath, nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
 		}
 
-		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
-		return node, nil
+		node := node.NewLeafWithHash(path, payload, int(height), nodeHash)
+		return node, path, payload, nil
 	}
 
 	// Read interim node
@@ -240,7 +240,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Read left and right child index (16 bytes)
 	_, err = io.ReadFull(reader, scratch[:encNodeIndexSize*2])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read child index of serialized node: %w", err)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to read child index of serialized node: %w", err)
 	}
 
 	pos = 0
@@ -255,17 +255,17 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Get left child node by node index
 	lchild, err := getNode(lchildIndex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find left child node of serialized node: %w", err)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to find left child node of serialized node: %w", err)
 	}
 
 	// Get right child node by node index
 	rchild, err := getNode(rchildIndex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find right child node of serialized node: %w", err)
+		return nil, ledger.DummyPath, nil, fmt.Errorf("failed to find right child node of serialized node: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
-	return n, nil
+	n := node.NewInterimNodeWithHash(int(height), lchild, rchild, nodeHash)
+	return n, ledger.DummyPath, nil, nil
 }
 
 // EncodeTrie encodes trie in the following format:

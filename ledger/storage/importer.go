@@ -7,40 +7,45 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/rs/zerolog"
 )
 
 // ImportLeafNodesFromCheckpoint takes a checkpoint file specified by the dir and fileName,
 // reads all the leaf nodes from the checkpoint file, and store them into the given
 // storage store.
-// func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.Logger, store ledger.Storage) error {
-// 	tries, err := wal.OpenAndReadCheckpointV6(dir, fileName, logger)
-// 	if err != nil {
-// 		return fmt.Errorf("could not read tries: %w", err)
-// 	}
-//
-// 	if len(tries) == 0 {
-// 		return fmt.Errorf("could not find any trie root")
-// 	}
-//
-// 	trie := tries[len(tries)-1]
-// 	leafNodes := trie.AllLeafNodes()
-//
-// 	err = importLeafNodesConcurrently(leafNodes, logger, store)
-// 	if err != nil {
-// 		return fmt.Errorf("fail to store the leafNode to store: %w", err)
-// 	}
-//
-// 	return nil
-// }
-//
-// func importLeafNodesConcurrently(leafNodes []*node.Node, logger *zerolog.Logger, store ledger.Storage) error {
-// 	jobs := make(chan *node.Node, len(leafNodes))
-// 	results := make(chan error, len(leafNodes))
+func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.Logger, store ledger.PayloadStorage) error {
+	leafNodes, err := wal.ReadLeafNodesFromCheckpoint(dir, fileName, logger)
+	if err != nil {
+		return fmt.Errorf("could not read tries: %w", err)
+	}
+
+	batchSize := 10
+	batch := make([]ledger.LeafNode, 0, batchSize)
+	for _, leafNode := range leafNodes {
+		batch = append(batch, *leafNode)
+		if len(batch) >= batchSize {
+			err := store.Add(batch)
+			if err != nil {
+				return fmt.Errorf("could not store leaf nodes: %w", err)
+			}
+		}
+	}
+
+	if len(batch) > 0 {
+		err := store.Add(batch)
+		if err != nil {
+			return fmt.Errorf("could not store leaf nodes: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// func importLeafNodesConcurrently(jobs <-chan *ledger.LeafNode, logger *zerolog.Logger, store ledger.Storage) error {
+// 	results := make(chan error)
 //
 // 	nWorker := 10
-// 	if len(leafNodes) < nWorker {
-// 		nWorker = len(leafNodes)
-// 	}
 //
 // 	ctx, cancel := context.WithCancel(context.Background())
 // 	defer cancel()
@@ -67,12 +72,6 @@ import (
 // 		}()
 // 	}
 //
-// 	// buffer all jobs
-// 	for _, leafNode := range leafNodes {
-// 		jobs <- leafNode
-// 	}
-// 	close(jobs)
-//
 // 	logProgress := util.LogProgress("importing leaf nodes to storage", len(leafNodes), logger)
 // 	// waiting for results
 // 	for i := 0; i < len(leafNodes); i++ {
@@ -83,19 +82,6 @@ import (
 // 		}
 // 	}
 //
-// 	return nil
-// }
-//
-// func storeLeafNode(store ledger.Storage, leafNode *node.Node, scratch []byte) error {
-// 	hash, encoded, err := EncodeLeafNode(leafNode, scratch)
-// 	if err != nil {
-// 		return fmt.Errorf("could not encode leaf node: %w", err)
-// 	}
-//
-// 	err = store.Set(hash, encoded)
-// 	if err != nil {
-// 		return fmt.Errorf("could not store encoded leaf node: %w", err)
-// 	}
 // 	return nil
 // }
 
