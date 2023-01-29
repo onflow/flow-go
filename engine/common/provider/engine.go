@@ -78,7 +78,8 @@ func New(
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
-		filter.HasWeight(true),
+		// TODO: disabling this on TESTNET only to work around an issue in the staking contract where all ANs were reset to 0 weight
+		// filter.HasWeight(true),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 
