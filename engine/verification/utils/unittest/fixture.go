@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -13,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -34,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -269,10 +266,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -362,15 +356,35 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
+				chunk = flow.NewChunk(
+					executableBlock.ID(),
+					i,
+					startState,
+					len(completeCollection.Transactions),
+					eventsHash,
+					endState)
+				chunkDataPack = flow.NewChunkDataPack(
+					chunk.ID(),
+					chunk.StartState,
+					computationResult.Proofs[i],
+					&collection)
 			} else {
 				// generates chunk data pack fixture for system chunk
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
+				chunk = flow.NewChunk(
+					executableBlock.ID(),
+					i,
+					startState,
+					1,
+					eventsHash,
+					endState)
+				chunkDataPack = flow.NewChunkDataPack(
+					chunk.ID(),
+					chunk.StartState,
+					computationResult.Proofs[i],
+					nil)
 			}
 
 			chunks = append(chunks, chunk)

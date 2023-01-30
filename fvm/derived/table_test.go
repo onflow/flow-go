@@ -832,13 +832,13 @@ type testValueComputer struct {
 
 func (computer *testValueComputer) Compute(
 	txnState *state.TransactionState,
-	key string,
+	key flow.RegisterID,
 ) (
 	int,
 	error,
 ) {
 	computer.called = true
-	_, err := txnState.Get("addr", key, true)
+	_, err := txnState.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -847,9 +847,9 @@ func (computer *testValueComputer) Compute(
 }
 
 func TestTxnDerivedDataGetOrCompute(t *testing.T) {
-	blockDerivedData := NewEmptyTable[string, int]()
+	blockDerivedData := NewEmptyTable[flow.RegisterID, int]()
 
-	key := "key"
+	key := flow.RegisterID{Owner: "addr", Key: "key"}
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
@@ -865,7 +865,7 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[flow.RegisterID{Owner: "addr", Key: key}]
+		_, ok := view.Ledger.RegisterTouches[key]
 		assert.True(t, ok)
 
 		// Commit to setup the next test.
@@ -886,7 +886,7 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[flow.RegisterID{Owner: "addr", Key: key}]
+		_, ok := view.Ledger.RegisterTouches[key]
 		assert.True(t, ok)
 	})
 }

@@ -2,15 +2,13 @@ package environment
 
 import (
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type ContractUpdateKey struct {
-	Address flow.Address
+	Address common.Address
 	Name    string
 }
 
@@ -40,11 +38,10 @@ func NewDerivedDataInvalidator(
 }
 
 func meterParamOverridesUpdated(env *facadeEnvironment) bool {
-	updatedRegisterIds, _ := env.txnState.RegisterUpdates()
-
 	serviceAccount := string(env.chain.ServiceAddress().Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
-	for _, registerId := range updatedRegisterIds {
+
+	for _, registerId := range env.txnState.UpdatedRegisterIDs() {
 		// The meter param override values are stored in the service account.
 		if registerId.Owner != serviceAccount {
 			continue
@@ -91,11 +88,32 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	location common.AddressLocation,
-	program *interpreter.Program,
+	program *derived.Program,
 	state *state.State,
 ) bool {
-	// TODO(rbtz): switch to fine grain invalidation.
-	return invalidator.ShouldInvalidateEntries()
+	if invalidator.MeterParamOverridesUpdated {
+		// if meter parameters changed we need to invalidate all programs
+		return true
+	}
+
+	// if an account was (un)frozen we need to invalidate all
+	// programs that depend on any contract on that address.
+	for _, frozenAccount := range invalidator.FrozenAccounts {
+		_, ok := program.Dependencies[frozenAccount]
+		if ok {
+			return true
+		}
+	}
+
+	// invalidate all programs depending on any of the contracts that were updated
+	// A program has itself listed as a dependency, so that this simpler.
+	for _, key := range invalidator.ContractUpdateKeys {
+		_, ok := program.Dependencies[key.Address]
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 type MeterParamOverridesInvalidator struct {

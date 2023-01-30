@@ -22,7 +22,7 @@ import (
 
 func createAccount(
 	t *testing.T,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
@@ -64,7 +64,7 @@ const (
 
 func addAccountKey(
 	t *testing.T,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	ctx fvm.Context,
 	view state.View,
 	derivedBlockData *derived.DerivedBlockData,
@@ -100,7 +100,7 @@ func addAccountKey(
 
 func addAccountCreator(
 	t *testing.T,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
@@ -127,7 +127,7 @@ func addAccountCreator(
 
 func removeAccountCreator(
 	t *testing.T,
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	chain flow.Chain,
 	ctx fvm.Context,
 	view state.View,
@@ -267,7 +267,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Remove account from account creator whitelist.
+		// Remove account from account creator allowlist.
 		//
 		// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
 		//
@@ -287,7 +287,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Add account to account creator whitelist.
+		// Add account to account creator allowlist.
 		//
 		// Will emit AccountCreatorAdded(accountCreator: accountCreator).
 		//
@@ -351,7 +351,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Single account",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				payer := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := flow.NewTransactionBody().
@@ -380,7 +380,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Multiple accounts",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				const count = 3
 
 				payer := createAccount(t, vm, chain, ctx, view, derivedBlockData)
@@ -427,7 +427,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 		newVMTest().
 			withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				payer := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := flow.NewTransactionBody().
@@ -446,7 +446,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
@@ -463,7 +463,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				payer := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 				addAccountCreator(t, vm, chain, ctx, view, derivedBlockData, payer)
 
@@ -484,7 +484,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
 			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				payer := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 				addAccountCreator(t, vm, chain, ctx, view, derivedBlockData, payer)
 
@@ -555,7 +555,7 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Add to empty key list %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					before, err := vm.GetAccount(ctx, address, view)
@@ -595,7 +595,7 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Add to non-empty key list %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					publicKey1 := addAccountKey(t, vm, ctx, view, derivedBlockData, address, test.apiVersion)
@@ -644,7 +644,7 @@ func TestAddAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Invalid key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
@@ -687,7 +687,7 @@ func TestAddAccountKey(t *testing.T) {
 	for _, test := range multipleKeysTests {
 		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					before, err := vm.GetAccount(ctx, address, view)
@@ -743,7 +743,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			t.Run(hashAlgo,
 				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+					run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 						address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 						privateKey, err := unittest.AccountKeyDefaultFixture()
@@ -823,7 +823,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Non-existent key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					const keyCount = 2
@@ -869,7 +869,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Existing key %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					const keyCount = 2
@@ -912,7 +912,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					const keyCount = 2
@@ -978,7 +978,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	for _, test := range multipleKeysTests {
 		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 					address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 					const keyCount = 2
@@ -1031,7 +1031,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Non-existent key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				const keyCount = 2
@@ -1067,7 +1067,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Existing key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				const keyCount = 2
@@ -1117,7 +1117,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Key added by a different api version",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				const keyCount = 2
@@ -1169,7 +1169,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				const keyCount = 2
@@ -1238,7 +1238,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				account := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := transferTokensTx(chain).
@@ -1275,7 +1275,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1300,7 +1300,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, _ state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1331,7 +1331,7 @@ func TestAccountBalanceFields(t *testing.T) {
 		).withBootstrapProcedureOptions(
 			fvm.WithStorageMBPerFLOW(1000_000_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				account := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := transferTokensTx(chain).
@@ -1368,7 +1368,7 @@ func TestAccountBalanceFields(t *testing.T) {
 		).withBootstrapProcedureOptions(
 			fvm.WithStorageMBPerFLOW(1_000_000_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1397,7 +1397,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				account := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := transferTokensTx(chain).
@@ -1440,7 +1440,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				account := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				txBody := transferTokensTx(chain).
@@ -1479,7 +1479,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
@@ -1508,7 +1508,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`

@@ -3,9 +3,7 @@ package testnet
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io/fs"
 	"math/rand"
 	gonet "net"
 	"os"
@@ -24,7 +22,6 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"
@@ -581,9 +578,15 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
-// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
-func integrationBootstrapDir() (string, error) {
-	return os.MkdirTemp(TmpRoot, integrationBootstrap)
+// tempDir creates a temporary directory at /tmp/flow-integration-bootstrap
+func tempDir(t *testing.T) string {
+	dir, err := os.MkdirTemp(TmpRoot, integrationBootstrap)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
+	})
+	return dir
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
@@ -612,8 +615,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	})
 
 	// create a temporary directory to store all bootstrapping files
-	bootstrapDir, err := integrationBootstrapDir()
-	require.Nil(t, err)
+	bootstrapDir := tempDir(t)
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
@@ -780,7 +782,7 @@ type ObserverConfig struct {
 	AccessGRPCSecurePort    string // Does not change the access node
 }
 
-func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (err error) {
 	// Find the public key for the access node
 	accessPublicKey := ""
 	for _, stakedConf := range net.BootstrapData.StakedConfs {
@@ -816,12 +818,14 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}()
 
 	// Setup directories
-	tmpdir, _ := os.MkdirTemp(TmpRoot, "flow-integration-node")
-	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
-	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
-	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	tmpdir := tempDir(t)
 
-	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
+	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
+	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
+
+	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	require.NoError(t, err)
 
 	observerUnsecurePort := testingdock.RandomPort(t)
 	observerSecurePort := testingdock.RandomPort(t)
@@ -831,71 +835,71 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	net.ObserverPorts[ObserverNodeAPISecurePort] = observerSecurePort
 	net.ObserverPorts[ObserverNodeAPIProxyPort] = observerHttpPort
 
-	container, err := net.cli.ContainerCreate(ctx,
-		&container.Config{
-			Image: conf.ObserverImage,
-			Cmd: []string{
-				fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
-				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
-				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
-				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
-				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-				"--bind=0.0.0.0:0",
-				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
-				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
-				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
-				"--bootstrapdir=/bootstrap",
-				"--datadir=/data/protocol",
-				"--secretsdir=/data/secrets",
-				"--loglevel=DEBUG",
-				fmt.Sprintf("--profiler-enabled=%t", false),
-				fmt.Sprintf("--tracer-enabled=%t", false),
-				"--profiler-dir=/profiler",
-				"--profiler-interval=2m",
-			},
-			ExposedPorts: nat.PortSet{
-				"9000": struct{}{},
-				"9001": struct{}{},
-				"8000": struct{}{},
-			},
+	containerConfig := &container.Config{
+		Image: conf.ObserverImage,
+		User:  currentUser(),
+		Cmd: []string{
+			fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
+			fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+			fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
+			fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
+			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
+			"--bind=0.0.0.0:0",
+			fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
+			fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
+			fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secrets",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", false),
+			fmt.Sprintf("--tracer-enabled=%t", false),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
 		},
-		&container.HostConfig{
-			AutoRemove: true,
-			Binds: []string{
-				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
-				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
-				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
-			},
-			PortBindings: nat.PortMap{
-				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
-				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
-				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
-			},
-		},
-		&network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				net.config.Name: {
-					NetworkID: net.network.ID(),
-				},
-			},
-		},
-		conf.ObserverName,
-	)
 
-	if err != nil {
-		return nil, err
+		ExposedPorts: nat.PortSet{
+			"9000": struct{}{},
+			"9001": struct{}{},
+			"8000": struct{}{},
+		},
+	}
+	containerHostConfig := &container.HostConfig{
+		Binds: []string{
+			fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+			fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+			fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+		},
+		PortBindings: nat.PortMap{
+			"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+			"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+			"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
+		},
 	}
 
-	err = net.cli.ContainerStart(ctx, container.ID, types.ContainerStartOptions{})
-	if err != nil {
-		return nil, err
+	containerOpts := testingdock.ContainerOpts{
+		ForcePull:   false,
+		Config:      containerConfig,
+		HostConfig:  containerHostConfig,
+		Name:        conf.ObserverName,
+		HealthCheck: testingdock.HealthCheckCustom(healthcheckAccessGRPC(observerUnsecurePort)),
 	}
 
-	containerID := container.ID
-	return func() {
-		// shutdown func
-		_ = net.cli.ContainerStop(ctx, containerID, nil)
-	}, nil
+	suiteContainer := net.suite.Container(containerOpts)
+
+	nodeContainer := &Container{
+		Ports:   make(map[string]string),
+		datadir: tmpdir,
+		net:     net,
+		opts:    &containerOpts,
+	}
+
+	nodeContainer.Container = suiteContainer
+	net.Containers[nodeContainer.Name()] = nodeContainer
+
+	net.network.After(suiteContainer)
+
+	return nil
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -922,13 +926,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
-	// get a temporary directory in the host. On macOS the default tmp
-	// directory is NOT accessible to Docker by default, so we use /tmp
-	// instead.
-	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-integration-node")
-	if err != nil {
-		return fmt.Errorf("could not get tmp dir: %w", err)
-	}
+	tmpdir := tempDir(t)
 
 	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
@@ -941,27 +939,19 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	// create a directory for the node database
-	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
-	err = os.Mkdir(flowDataDir, 0700)
-	require.NoError(t, err)
+	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
 
 	// create the profiler dir for the node
-	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
 	t.Logf("create profiler dir: %v", flowProfilerDir)
-	err = os.MkdirAll(flowProfilerDir, 0755)
-	if err != nil && !errors.Is(err, fs.ErrExist) {
-		panic(err)
-	}
 
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
 	// bootstrapping from different root state snapshots and epochs
-	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
-	err = os.Mkdir(nodeBootstrapDir, 0700)
-	require.NoError(t, err)
+	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
 
 	// copy bootstrap files to node-specific bootstrap directory
-	err = io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
+	err := io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
@@ -1181,6 +1171,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	require.NoError(net.t, err)
+}
+
+func (net *FlowNetwork) makeDir(t *testing.T, base string, dir string) string {
+	flowDataDir := filepath.Join(base, dir)
+	err := os.Mkdir(flowDataDir, 0700)
+	require.NoError(t, err)
+	return flowDataDir
 }
 
 func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {

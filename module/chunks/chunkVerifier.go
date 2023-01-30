@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -23,14 +22,14 @@ import (
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm             computer.VirtualMachine
+	vm             fvm.VM
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
 	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm computer.VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
+func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
@@ -119,7 +118,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	events := make(flow.EventsList, 0)
-	serviceEvents := make(flow.EventsList, 0)
+	serviceEvents := make(flow.ServiceEventList, 0)
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
@@ -193,7 +192,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 
 		events = append(events, tx.Events...)
-		serviceEvents = append(serviceEvents, tx.ServiceEvents...)
+		serviceEvents = append(serviceEvents, tx.ConvertedServiceEvents...)
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
@@ -238,36 +237,25 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	if systemChunk {
-
-		computedServiceEvents := make(flow.ServiceEventList, len(serviceEvents))
-
-		for i, serviceEvent := range serviceEvents {
-			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
-			if err != nil {
-				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
-			}
-			computedServiceEvents[i] = *realServiceEvent
-		}
-
-		equal, err := result.ServiceEvents.EqualTo(computedServiceEvents)
+		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error while compariong service events: %w", err)
+			return nil, nil, fmt.Errorf("error while comparing service events: %w", err)
 		}
 		if !equal {
-			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, computedServiceEvents, chIndex, execResID), nil
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID), nil
 		}
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
-	regs, values := chunkView.Delta().RegisterUpdates()
+	keys, values := executionState.RegisterEntriesToKeysValues(
+		chunkView.Delta().UpdatedRegisters())
 
 	update, err := ledger.NewUpdate(
 		ledger.State(chunkDataPack.StartState),
-		executionState.RegisterIDSToKeys(regs),
-		executionState.RegisterValuesToValues(values),
-	)
+		keys,
+		values)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}

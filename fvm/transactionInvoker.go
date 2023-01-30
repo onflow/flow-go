@@ -81,18 +81,15 @@ func newTransactionExecutor(
 	txnState *state.TransactionState,
 	derivedTxnData *derived.DerivedTransactionData,
 ) *transactionExecutor {
-	span := proc.StartSpanFromProcTraceSpan(
-		ctx.Tracer,
-		trace.FVMExecuteTransaction)
+	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	ctx.Span = span
 	ctx.TxIndex = proc.TxIndex
-	ctx.TxId = proc.Transaction.ID()
+	ctx.TxId = proc.ID
 	ctx.TxBody = proc.Transaction
 
 	env := environment.NewTransactionEnvironment(
-		ctx.TracerSpan,
+		span,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)
@@ -214,7 +211,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 func (executor *transactionExecutor) execute() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
@@ -227,7 +224,7 @@ func (executor *transactionExecutor) execute() error {
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
 		err := executor.CheckAndIncrementSequenceNumber(
-			executor.ctx.Tracer,
+			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState)
 		if err != nil {
@@ -281,7 +278,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	if executor.errs.CollectedError() {
 		invalidator = nil
-		executor.errorExecution()
+		executor.txnState.RunWithAllLimitsDisabled(executor.errorExecution)
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -390,7 +387,7 @@ func (executor *transactionExecutor) normalExecution() (
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState.UpdatedAddresses(),
+			executor.txnState,
 			executor.proc.Transaction.Payer,
 			maxTxFees)
 	})
@@ -408,9 +405,6 @@ func (executor *transactionExecutor) normalExecution() (
 
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
-	executor.txnState.DisableAllLimitEnforcements()
-	defer executor.txnState.EnableAllLimitEnforcements()
-
 	// log transaction as failed
 	executor.env.Logger().Info().
 		Err(executor.errs.ErrorOrNil()).
@@ -463,6 +457,7 @@ func (executor *transactionExecutor) commit(
 	// if tx failed this will only contain fee deduction events
 	executor.proc.Events = executor.env.Events()
 	executor.proc.ServiceEvents = executor.env.ServiceEvents()
+	executor.proc.ConvertedServiceEvents = executor.env.ConvertedServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

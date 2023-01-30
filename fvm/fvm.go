@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -67,9 +65,13 @@ type Procedure interface {
 	ExecutionTime() derived.LogicalTime
 }
 
-func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
-	return runtime.NewInterpreterRuntime(config)
+// VM runs procedures
+type VM interface {
+	Run(Context, Procedure, state.View) error
+	GetAccount(Context, flow.Address, state.View) (*flow.Account, error)
 }
+
+var _ VM = (*VirtualMachine)(nil)
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
@@ -168,12 +170,13 @@ func (vm *VirtualMachine) GetAccount(
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derviedTxnData)
 	account, err := env.GetAccount(address)
 	if err != nil {
-		if errors.IsALedgerFailure(err) {
+		if errors.IsLedgerFailure(err) {
 			return nil, fmt.Errorf(
 				"cannot get account, this error usually happens if the "+
 					"reference block for this query is not set to a recent "+

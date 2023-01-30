@@ -52,6 +52,7 @@ var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
 var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
+var epochCommitServiceEvent, _ = convert.ServiceEvent(testChain, epochCommitEvent)
 
 var serviceEventsList = []flow.ServiceEvent{
 	*epochSetupServiceEvent,
@@ -239,10 +240,16 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
 
-	ids := make([]flow.RegisterID, 0)
-	values := make([]flow.RegisterValue, 0)
-	ids = append(ids, id1, id2)
-	values = append(values, value1, value2)
+	entries := flow.RegisterEntries{
+		{
+			Key:   id1,
+			Value: value1,
+		},
+		{
+			Key:   id2,
+			Value: value2,
+		},
+	}
 
 	var verifiableChunkData verification.VerifiableChunkData
 
@@ -258,12 +265,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		<-compactor.Done()
 	}()
 
-	keys := executionState.RegisterIDSToKeys(ids)
-	update, err := ledger.NewUpdate(
-		f.InitialState(),
-		keys,
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values := executionState.RegisterEntriesToKeysValues(entries)
+	update, err := ledger.NewUpdate(f.InitialState(), keys, values)
 
 	require.NoError(t, err)
 
@@ -276,15 +279,15 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	proof, err := f.Prove(query)
 	require.NoError(t, err)
 
-	ids = []flow.RegisterID{id2}
-	values = [][]byte{UpdatedValue2}
+	entries = flow.RegisterEntries{
+		{
+			Key:   id2,
+			Value: UpdatedValue2,
+		},
+	}
 
-	keys = executionState.RegisterIDSToKeys(ids)
-	update, err = ledger.NewUpdate(
-		startState,
-		keys,
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values = executionState.RegisterEntriesToKeysValues(entries)
+	update, err = ledger.NewUpdate(startState, keys, values)
 	require.NoError(t, err)
 
 	endState, _, err := f.Set(update)
@@ -399,7 +402,7 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 		return fmt.Errorf("invokable is not a transaction")
 	}
 
-	tx.ServiceEvents = []flow.Event{epochSetupEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochSetupServiceEvent}
 
 	// add "default" interaction expected in tests
 	_, _ = led.Get("00", "")
@@ -422,7 +425,7 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 		return fmt.Errorf("invokable is not a transaction")
 	}
 	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	tx.ServiceEvents = []flow.Event{epochCommitEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochCommitServiceEvent}
 
 	return nil
 }

@@ -144,29 +144,6 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 	})
 }
 
-// Some old account could be created without key count register
-// we recreate it in a test
-func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
-	view := utils.NewSimpleView()
-
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	accounts := environment.NewAccounts(txnState)
-	address := flow.HexToAddress("01")
-
-	err := accounts.Create(nil, address)
-	require.NoError(t, err)
-
-	err = view.Delete(
-		string(address.Bytes()),
-		"public_key_count")
-
-	require.NoError(t, err)
-
-	require.NotPanics(t, func() {
-		_, _ = accounts.Get(address)
-	})
-}
-
 func TestAccounts_SetContracts(t *testing.T) {
 
 	address := flow.HexToAddress("0x01")

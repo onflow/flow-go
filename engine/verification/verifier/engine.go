@@ -317,14 +317,12 @@ func GenerateResultApproval(
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
 
-	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
-			attribute.String("result_id", ch.Result.ID().String()),
-			attribute.String("origin_id", originID.String()),
-		)
-	}
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
+	span.SetAttributes(
+		attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
+		attribute.String("result_id", ch.Result.ID().String()),
+		attribute.String("origin_id", originID.String()),
+	)
 	defer span.End()
 
 	// increments number of received verifiable chunks

@@ -145,16 +145,16 @@ func blockNothing(channel channels.Channel, event interface{}, sender, receiver 
 
 // block all messages sent by or received by a list of denied nodes
 func blockNodes(denyList ...*Node) BlockOrDelayFunc {
-	blackList := make(map[flow.Identifier]*Node, len(denyList))
+	denyMap := make(map[flow.Identifier]*Node, len(denyList))
 	for _, n := range denyList {
-		blackList[n.id.ID()] = n
+		denyMap[n.id.ID()] = n
 	}
 	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
-		if _, ok := blackList[sender.id.ID()]; ok {
+		if _, ok := denyMap[sender.id.ID()]; ok {
 			return block, 0
 		}
-		if _, ok := blackList[receiver.id.ID()]; ok {
+		if _, ok := denyMap[receiver.id.ID()]; ok {
 			return block, 0
 		}
 		return notBlock, 0

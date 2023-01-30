@@ -22,6 +22,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
 	sema "github.com/onflow/cadence/runtime/sema"
@@ -282,6 +284,22 @@ func (_m *Environment) ComputationUsed() uint64 {
 	return r0
 }
 
+// ConvertedServiceEvents provides a mock function with given fields:
+func (_m *Environment) ConvertedServiceEvents() flow.ServiceEventList {
+	ret := _m.Called()
+
+	var r0 flow.ServiceEventList
+	if rf, ok := ret.Get(0).(func() flow.ServiceEventList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.ServiceEventList)
+		}
+	}
+
+	return r0
+}
+
 // CreateAccount provides a mock function with given fields: payer
 func (_m *Environment) CreateAccount(payer common.Address) (common.Address, error) {
 	ret := _m.Called(payer)
@@ -366,15 +384,15 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 }
 
 // Events provides a mock function with given fields:
-func (_m *Environment) Events() []flow.Event {
+func (_m *Environment) Events() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -1045,15 +1063,15 @@ func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int
 }
 
 // ServiceEvents provides a mock function with given fields:
-func (_m *Environment) ServiceEvents() []flow.Event {
+func (_m *Environment) ServiceEvents() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -1123,13 +1141,20 @@ func (_m *Environment) SigningAccounts() []common.Address {
 	return r0
 }
 
-// StartChildSpan provides a mock function with given fields: name
-func (_m *Environment) StartChildSpan(name trace.SpanName) tracing.TracerSpan {
-	ret := _m.Called(name)
+// StartChildSpan provides a mock function with given fields: name, options
+func (_m *Environment) StartChildSpan(name trace.SpanName, options ...oteltrace.SpanStartOption) tracing.TracerSpan {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 tracing.TracerSpan
-	if rf, ok := ret.Get(0).(func(trace.SpanName) tracing.TracerSpan); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(trace.SpanName, ...oteltrace.SpanStartOption) tracing.TracerSpan); ok {
+		r0 = rf(name, options...)
 	} else {
 		r0 = ret.Get(0).(tracing.TracerSpan)
 	}

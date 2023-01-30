@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -35,12 +35,13 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -49,6 +50,31 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
+	endState := flow.StateCommitment(startState)
+	endState[0] += 1
+	return endState
+}
+
+type fakeCommitter struct {
+	callCount int
+}
+
+func (committer *fakeCommitter) CommitView(
+	view state.View,
+	startState flow.StateCommitment,
+) (
+	flow.StateCommitment,
+	[]byte,
+	*ledger.TrieUpdate,
+	error,
+) {
+	committer.callCount++
+
+	endState := incStateCommitment(startState)
+	return endState, []byte{byte(committer.callCount)}, nil, nil
+}
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
@@ -73,10 +99,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		committer := new(computermock.ViewCommitter)
-		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
-			Times(2 + 1) // 2 txs in collection + system chunk
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionCollectionExecuted",
@@ -96,11 +121,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
+		exemetrics.On(
+			"ExecutionChunkDataPackGenerated",
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -136,6 +165,58 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
+		assert.Len(t, result.Chunks, 1+1)         // +1 system chunk
+		assert.Len(t, result.ChunkDataPacks, 1+1) // +1 system chunk
+
+		require.Equal(t, 2, committer.callCount)
+
+		// regular collection chunk
+		chunk1 := result.Chunks[0]
+
+		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, uint(0), chunk1.CollectionIndex)
+		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
+		assert.Equal(t, result.EventsHashes[0], chunk1.EventCollection)
+
+		assert.Equal(t, *block.StartState, chunk1.StartState)
+
+		expectedChunk1EndState := incStateCommitment(*block.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk1.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
+		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
+
+		chunkDataPack1 := result.ChunkDataPacks[0]
+
+		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
+		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
+		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
+		assert.NotNil(t, chunkDataPack1.Collection)
+
+		// system chunk is special case, but currently also 1 tx
+		chunk2 := result.Chunks[1]
+		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, uint(1), chunk2.CollectionIndex)
+		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, result.EventsHashes[1], chunk2.EventCollection)
+
+		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
+
+		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
+
+		assert.NotEqual(t, *block.StartState, chunk2.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
+		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
+		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
+
+		chunkDataPack2 := result.ChunkDataPacks[1]
+
+		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
+		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
+		assert.Nil(t, chunkDataPack2.Collection)
+
+		assert.Equal(t, expectedChunk2EndState, result.EndState)
 
 		assertEventHashesMatch(t, 1+1, result)
 
@@ -150,10 +231,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -244,10 +322,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -291,10 +366,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -417,22 +489,27 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 		require.NoError(t, err)
 
-		serviceEventA := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochSetup.Address),
-				},
-				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
-			},
+		payload, err := json.Decode(nil, []byte(fixtures.EpochSetupFixtureJSON))
+		require.NoError(t, err)
+
+		serviceEventA, ok := payload.(cadence.Event)
+		require.True(t, ok)
+
+		serviceEventA.EventType.Location = common.AddressLocation{
+			Address: common.Address(serviceEvents.EpochSetup.Address),
 		}
-		serviceEventB := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochCommit.Address),
-				},
-				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
-			},
+		serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
+
+		payload, err = json.Decode(nil, []byte(fixtures.EpochCommitFixtureJSON))
+		require.NoError(t, err)
+
+		serviceEventB, ok := payload.(cadence.Event)
+		require.True(t, ok)
+
+		serviceEventB.EventType.Location = common.AddressLocation{
+			Address: common.Address(serviceEvents.EpochCommit.Address),
 		}
+		serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
 		// events to emit for each iteration/transaction
 		events := make([][]cadence.Event, totalTransactionCount)
@@ -470,10 +547,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -560,10 +634,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -663,10 +734,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -879,10 +947,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	require.NoError(t, err)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -966,11 +1031,15 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system chunk tx
 
+	metrics.On(
+		"ExecutionChunkDataPackGenerated",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),

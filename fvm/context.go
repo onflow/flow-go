@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -178,14 +179,6 @@ func WithServiceEventCollectionEnabled() Option {
 	}
 }
 
-// WithExtensiveTracing sets the extensive tracing
-func WithExtensiveTracing() Option {
-	return func(ctx Context) Context {
-		ctx.ExtensiveTracing = true
-		return ctx
-	}
-}
-
 // WithBlocks sets the block storage provider for a virtual machine context.
 //
 // The VM uses the block storage provider to provide historical block information to
@@ -217,7 +210,24 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
-// TODO(patrick): remove after emulator has been updated.
+// WithSpan sets the trace span for a virtual machine context.
+func WithSpan(span otelTrace.Span) Option {
+	return func(ctx Context) Context {
+		ctx.Span = span
+		return ctx
+	}
+}
+
+// WithExtensiveTracing sets the extensive tracing
+func WithExtensiveTracing() Option {
+	return func(ctx Context) Context {
+		ctx.ExtensiveTracing = true
+		return ctx
+	}
+}
+
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/306
+// is merged and integrated.
 //
 // WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.

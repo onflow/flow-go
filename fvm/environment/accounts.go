@@ -68,11 +68,14 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
 	// this way the getValue would load this value from deltas
 	key := atree.SlabIndexToLedgerKey(index)
-	err = a.txnState.Set(
-		string(address.Bytes()),
-		string(key),
-		[]byte{},
-		false)
+	a.txnState.RunWithAllLimitsDisabled(func() {
+		err = a.txnState.Set(
+			flow.RegisterID{
+				Owner: string(address.Bytes()),
+				Key:   string(key),
+			},
+			[]byte{})
+	})
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
 	}
@@ -157,12 +160,12 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 	}
 
 	accountStatus := NewAccountStatus()
-	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, state.AccountStatusKey, accountStatus.ToBytes())))
-
-	err = a.setAccountStatus(newAddress, accountStatus)
+	storageUsedByTheStatusItself := uint64(RegisterSize(newAddress, state.AccountStatusKey, accountStatus.ToBytes()))
+	err = a.setAccountStatusStorageUsed(newAddress, accountStatus, storageUsedByTheStatusItself)
 	if err != nil {
 		return fmt.Errorf("failed to create a new account: %w", err)
 	}
+
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
@@ -403,34 +406,38 @@ func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) err
 		return fmt.Errorf("failed to set storage used: %w", err)
 	}
 
-	status.SetStorageUsed(used)
+	return a.setAccountStatusStorageUsed(address, status, used)
+}
 
-	err = a.setAccountStatus(address, status)
+func (a *StatefulAccounts) setAccountStatusStorageUsed(address flow.Address, status *AccountStatus, newUsed uint64) error {
+	status.SetStorageUsed(newUsed)
+
+	err := a.setAccountStatus(address, status)
 	if err != nil {
 		return fmt.Errorf("failed to set storage used: %w", err)
 	}
 	return nil
 }
 
+// TODO(patrick): use RegisterID as input key
 func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
-	return a.txnState.Get(
-		string(address.Bytes()),
-		key,
-		a.txnState.EnforceLimits())
+	return a.txnState.Get(flow.RegisterID{
+		Owner: string(address.Bytes()),
+		Key:   key,
+	})
 }
 
+// TODO(patrick): use RegisterID as input key
 // SetValue sets a value in address' storage
 func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, key, value)
 	if err != nil {
 		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", state.PrintableKey(key), address, err)
 	}
-	return a.txnState.Set(
-		string(address.Bytes()),
-		key,
-		value,
-		a.txnState.EnforceLimits())
-
+	return a.txnState.Set(flow.RegisterID{
+		Owner: string(address.Bytes()),
+		Key:   key},
+		value)
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, key string, value flow.RegisterValue) error {
@@ -486,25 +493,6 @@ func RegisterSize(address flow.Address, key string, value flow.RegisterValue) in
 	size += 2 + len(key)
 	size += len(value)
 	return size
-}
-
-// TODO replace with touch
-// TODO handle errors
-func (a *StatefulAccounts) touch(address flow.Address, key string) {
-	_, _ = a.txnState.Get(
-		string(address.Bytes()),
-		key,
-		a.txnState.EnforceLimits())
-}
-
-func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {
-	contractNames, err := a.getContractNames(address)
-	if err != nil {
-		panic(err)
-	}
-	if contractNames.Has(contractName) {
-		a.touch(address, ContractKey(contractName))
-	}
 }
 
 // GetContractNames gets a sorted list of names of contracts deployed on an address

@@ -4,13 +4,12 @@ import (
 	"sync"
 
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/306
 // is merged and integrated.
 type Programs struct {
 	lock sync.RWMutex
@@ -56,18 +55,18 @@ func (p *Programs) NextTxIndexForTestingOnly() uint32 {
 	return p.block.NextTxIndexForTestingOnly()
 }
 
-func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) GetForTestingOnly(location common.AddressLocation) (*derived.Program, *state.State, bool) {
 	return p.GetProgram(location)
 }
 
-func (p *Programs) GetProgram(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) GetProgram(location common.AddressLocation) (*derived.Program, *state.State, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.currentTxn.GetProgram(location)
 }
 
-func (p *Programs) SetProgram(location common.AddressLocation, program *interpreter.Program, state *state.State) {
+func (p *Programs) SetProgram(location common.AddressLocation, program *derived.Program, state *state.State) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 

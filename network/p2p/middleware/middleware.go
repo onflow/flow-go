@@ -65,7 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware = (*Middleware)(nil)
+	_ network.Middleware        = (*Middleware)(nil)
+	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -201,7 +202,6 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
-
 	return mw
 }
 
@@ -319,7 +319,9 @@ func (m *Middleware) start(ctx context.Context) error {
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
 // which this node should be directly connected to as peers. The peer ID list
-// returned will be filtered through any configured m.peerManagerFilters.
+// returned will be filtered through any configured m.peerManagerFilters. If the
+// underlying libp2p node has a peer manager configured this func will be used as the
+// peers provider.
 func (m *Middleware) topologyPeers() peer.IDSlice {
 	peerIDs := make([]peer.ID, 0)
 	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
@@ -342,6 +344,16 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	}
 
 	return peerIDs
+}
+
+// OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
+func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
+	for _, pid := range m.peerIDs(blockList) {
+		err := m.libP2PNode.RemovePeer(pid)
+		if err != nil {
+			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
+		}
+	}
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
@@ -694,7 +706,6 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			return
 		}
 	}
-
 	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
 }
 
