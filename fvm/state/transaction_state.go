@@ -328,21 +328,19 @@ func (s *TransactionState) RestartNestedTransaction(
 }
 
 func (s *TransactionState) Get(
-	owner string,
-	key string,
+	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
 	error,
 ) {
-	return s.currentState().Get(owner, key)
+	return s.currentState().Get(id)
 }
 
 func (s *TransactionState) Set(
-	owner string,
-	key string,
+	id flow.RegisterID,
 	value flow.RegisterValue,
 ) error {
-	return s.currentState().Set(owner, key, value)
+	return s.currentState().Set(id, value)
 }
 
 func (s *TransactionState) MeterComputation(

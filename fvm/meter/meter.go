@@ -9,14 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
-// is merged and integrated.
-const (
-	ComputationKindCreateAccount = 2006
-	ComputationKindGetValue      = 2020
-	ComputationKindSetValue      = 2026
-)
-
 type MeteredComputationIntensities map[common.ComputationKind]uint
 type MeteredMemoryIntensities map[common.MemoryKind]uint
 type MeteredStorageInteractionMap map[flow.RegisterID]uint64
