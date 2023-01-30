@@ -902,6 +902,24 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
+			// This is a temporary workaround on devnet40 to allow the historical AN1 to backfill collections efficiently from LN7 & LN16
+			ln7NodeID, err := flow.HexStringToIdentifier("436173657920417272696e67746f6e007a730cb8a965968a30fcaa1b151ae865")
+			if err != nil {
+				node.Logger.Fatal().Msgf("could not parse an1 node id: %v", err)
+			}
+			ln16NodeID, err := flow.HexStringToIdentifier("4d61636b656e7a6965204b696572616e00f6f67701306474b17e48210151b8fd")
+			if err != nil {
+				node.Logger.Fatal().Msgf("could not parse an1 node id: %v", err)
+			}
+
+			filters := filter.And(
+				filter.HasRole(flow.RoleCollection),
+				filter.Or(
+					filter.HasNodeID(ln7NodeID),
+					filter.HasNodeID(ln16NodeID),
+				),
+			)
+
 			builder.RequestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -909,7 +927,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filters,
 				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {

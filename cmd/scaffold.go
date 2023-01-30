@@ -975,12 +975,28 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
+		filters := []flow.IdentityFilter{
+			filter.HasRole(flow.RoleConsensus),
+			filter.Not(filter.HasNodeID(node.Me.NodeID())),
+			p2p.NotEjectedFilter,
+		}
+
+		an1NodeID, err := flow.HexStringToIdentifier("7248a10c73ac8134f03bcc3c0b4ad63e226360b09c073b37a57c18d951a50f51")
+		if err != nil {
+			return fmt.Errorf("could not parse an1 node id: %w", err)
+		}
+
+		// temporary workaround to force devnet40 historic AN1 to always sync from SN1
+		if node.Me.NodeID() == an1NodeID {
+			sn1NodeID, err := flow.HexStringToIdentifier("2062461e7b03145723ce3b2c81adf68eab3a4503696e498bc8bccb6bd770e403")
+			if err != nil {
+				return fmt.Errorf("could not parse sn1 node id: %w", err)
+			}
+			filters = append(filters, filter.HasNodeID(sn1NodeID))
+		}
+
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
-			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2p.NotEjectedFilter,
-			),
+			filter.And(filters...),
 			node.IdentityProvider,
 		)
 		return nil
