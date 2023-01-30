@@ -2,19 +2,19 @@ package blocklist
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/integration/tests/bft"
-	"github.com/onflow/flow-go/utils/logging"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/integration/tests/bft"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
