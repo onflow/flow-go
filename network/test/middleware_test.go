@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sync"
@@ -27,11 +28,13 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -309,9 +312,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
 	require.NoError(m.T(), err)
 
-	isConnected, err := libP2PNodes[0].IsConnected(expectedPID)
-	require.NoError(m.T(), err)
-	require.True(m.T(), isConnected)
+	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
 
 	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
@@ -336,10 +337,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
+
 	// ensure connection to rate limited peer is pruned
-	isConnected, err = libP2PNodes[0].IsConnected(expectedPID)
-	require.NoError(m.T(), err)
-	require.False(m.T(), isConnected)
+	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
+		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
+	})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
@@ -479,10 +482,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// peer should be removed by the peer manager.
 	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
 	require.NoError(m.T(), err)
-
-	isConnected, err := libP2PNodes[0].IsConnected(expectedPID)
-	require.NoError(m.T(), err)
-	require.True(m.T(), isConnected)
+	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
 
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
@@ -496,10 +496,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
+	
 	// ensure connection to rate limited peer is pruned
-	isConnected, err = libP2PNodes[0].IsConnected(expectedPID)
-	require.NoError(m.T(), err)
-	require.False(m.T(), isConnected)
+	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
+		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
+	})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
