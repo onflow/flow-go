@@ -172,7 +172,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		ValidateRootSnapshot(badgerState.SanityCheckConsensusNodeRootSnapshotValidity).
+		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil

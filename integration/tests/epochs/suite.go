@@ -168,60 +168,58 @@ type StakedNodeOperationInfo struct {
 // 4. Add additional funds to staking account for storage
 // 5. Create Staking collection for node
 // 6. Register node using staking collection object
+// 7. Add the node to the approved list
+//
 // NOTE: assumes staking occurs in first epoch (counter 0)
+// NOTE 2: This function performs steps 1-6 in one custom transaction, to reduce
+// the time taken by each test case. Individual transactions for each step can be
+// found in Git history, for example: 9867056a8b7246655047bc457f9000398f6687c0.
 func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
 
 	stakingAccountKey, networkingKey, stakingKey, machineAccountKey, machineAccountPubKey := s.generateAccountKeys(role)
 	nodeID := flow.MakeID(stakingKey.PublicKey().Encode())
-	fullAccountKey := sdk.NewAccountKey().
+	fullStakingAcctKey := sdk.NewAccountKey().
 		SetPublicKey(stakingAccountKey.PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	// create staking account
-	stakingAccountAddress, err := s.createAccount(
-		ctx,
-		fullAccountKey,
-		s.client.Account(),
-		s.client.SDKServiceAddress(),
-	)
-	require.NoError(s.T(), err)
-
 	_, stakeAmount, err := s.client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
 
-	// fund account with token amount to stake
-	result, err := s.fundAccount(ctx, stakingAccountAddress, fmt.Sprintf("%f", stakeAmount+10.0))
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
-
-	stakingAccount, err := s.client.GetAccount(stakingAccountAddress)
-	require.NoError(s.T(), err)
-
-	// create staking collection
-	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
-
 	containerName := s.getTestContainerName(role)
 
-	// register node using staking collection
-	result, machineAccountAddr, err := s.SubmitStakingCollectionRegisterNodeTx(
-		ctx,
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	// create and register node
+	tx, err := utils.MakeCreateAndSetupNodeTx(
 		env,
-		stakingAccountKey,
-		stakingAccount,
+		s.client.Account(),
+		sdk.Identifier(latestBlockID),
+		fullStakingAcctKey,
+		fmt.Sprintf("%f", stakeAmount+10.0),
 		nodeID,
 		role,
 		testnet.GetPrivateNodeInfoAddress(containerName),
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
-		fmt.Sprintf("%f", stakeAmount),
 		machineAccountPubKey,
 	)
-
 	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, tx)
+	require.NoError(s.T(), err)
+	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	require.NoError(s.T(), err)
+	s.client.Account().Keys[0].SequenceNumber++
 	require.NoError(s.T(), result.Error)
+
+	accounts := s.client.CreatedAccounts(result)
+	stakingAccountAddress := accounts[0]
+	var machineAccountAddr sdk.Address
+	if role == flow.RoleCollection || role == flow.RoleConsensus {
+		machineAccountAddr = accounts[1]
+	}
 
 	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
@@ -233,7 +231,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NodeID:                  nodeID,
 		Role:                    role,
 		StakingAccountAddress:   stakingAccountAddress,
-		FullAccountKey:          fullAccountKey,
+		FullAccountKey:          fullStakingAcctKey,
 		StakingAccountKey:       stakingAccountKey,
 		StakingKey:              stakingKey,
 		NetworkingKey:           networkingKey,
@@ -242,32 +240,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
-}
-
-// transfers tokens to receiver from service account
-func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmount string) (*sdk.TransactionResult, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	env := utils.LocalnetEnv()
-	transferTx, err := utils.MakeTransferTokenTx(
-		env,
-		receiver,
-		s.client.Account(),
-		0,
-		tokenAmount,
-		sdk.Identifier(latestBlockID),
-	)
-	require.NoError(s.T(), err)
-
-	err = s.client.SignAndSendTransaction(ctx, transferTx)
-	require.NoError(s.T(), err)
-
-	result, err := s.client.WaitForSealed(ctx, transferTx.ID())
-	require.NoError(s.T(), err)
-	s.client.Account().Keys[0].SequenceNumber++
-
-	return result, nil
 }
 
 // generates initial keys needed to bootstrap account
@@ -297,7 +269,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	return
 }
 
-// creates a new flow account, can be used to test staking
+// createAccount creates a new flow account, can be used to test staking
 func (s *Suite) createAccount(ctx context.Context,
 	accountKey *sdk.AccountKey,
 	payerAccount *sdk.Account,
@@ -311,129 +283,6 @@ func (s *Suite) createAccount(ctx context.Context,
 
 	payerAccount.Keys[0].SequenceNumber++
 	return addr, nil
-}
-
-// creates a staking collection for the given node
-func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
-	require.NoError(s.T(), err)
-
-	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
-		env,
-		stakingAccount,
-		0,
-		signer,
-		s.client.SDKServiceAddress(),
-		sdk.Identifier(latestBlockID),
-	)
-	require.NoError(s.T(), err)
-
-	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
-	require.NoError(s.T(), err)
-
-	result, err := s.client.WaitForSealed(ctx, createStakingCollectionTx.ID())
-	require.NoError(s.T(), err)
-	stakingAccount.Keys[0].SequenceNumber++
-
-	return result, nil
-}
-
-// SubmitStakingCollectionRegisterNodeTx submits tx that calls StakingCollection.registerNode
-func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
-	ctx context.Context,
-	env templates.Environment,
-	accountKey sdkcrypto.PrivateKey,
-	stakingAccount *sdk.Account,
-	nodeID flow.Identifier,
-	role flow.Role,
-	networkingAddress string,
-	networkingKey string,
-	stakingKey string,
-	amount string,
-	machineKey *sdk.AccountKey,
-) (*sdk.TransactionResult, sdk.Address, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
-	require.NoError(s.T(), err)
-
-	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
-		env,
-		stakingAccount,
-		0,
-		signer,
-		s.client.SDKServiceAddress(),
-		sdk.Identifier(latestBlockID),
-		nodeID,
-		role,
-		networkingAddress,
-		networkingKey,
-		stakingKey,
-		amount,
-		machineKey,
-	)
-	require.NoError(s.T(), err)
-
-	err = s.client.SignAndSendTransaction(ctx, registerNodeTx)
-	require.NoError(s.T(), err)
-
-	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
-	require.NoError(s.T(), err)
-	stakingAccount.Keys[0].SequenceNumber++
-
-	if role == flow.RoleCollection || role == flow.RoleConsensus {
-		var machineAccountAddr sdk.Address
-		for _, event := range result.Events {
-			if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
-				accountCreatedEvent := sdk.AccountCreatedEvent(event)
-				machineAccountAddr = accountCreatedEvent.Address()
-				break
-			}
-		}
-
-		require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
-		return result, machineAccountAddr, nil
-	}
-
-	return result, sdk.Address{}, nil
-}
-
-// SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
-func (s *Suite) SubmitStakingCollectionCloseStakeTx(
-	ctx context.Context,
-	env templates.Environment,
-	accountKey sdkcrypto.PrivateKey,
-	stakingAccount *sdk.Account,
-	nodeID flow.Identifier,
-) (*sdk.TransactionResult, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
-	require.NoError(s.T(), err)
-
-	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
-		env,
-		stakingAccount,
-		0,
-		signer,
-		s.client.SDKServiceAddress(),
-		sdk.Identifier(latestBlockID),
-		nodeID,
-	)
-	require.NoError(s.T(), err)
-
-	err = s.client.SignAndSendTransaction(ctx, closeStakeTx)
-	require.NoError(s.T(), err)
-
-	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
-	require.NoError(s.T(), err)
-	stakingAccount.Keys[0].SequenceNumber++
-	return result, nil
 }
 
 // removeNodeFromProtocol removes the given node from the protocol.
@@ -479,7 +328,7 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 	return v
 }
 
-// SubmitSetApprovedListTx adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
+// SubmitSetApprovedListTx adds a node to the approved node list, this must be done when a node joins the protocol during the epoch staking phase
 func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
 	ids := make([]cadence.Value, 0)
 	for _, id := range identities {
@@ -639,6 +488,10 @@ func (s *Suite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, ex
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
 	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("asserted in epoch %d, phase %s, finalized height/view: %d/%d", expectedEpoch, expectedPhase, head.Height, head.View)
 }
 
 // AssertInEpoch requires actual epoch counter is equal to counter provided.
@@ -857,12 +710,14 @@ type DynamicEpochTransitionSuite struct {
 }
 
 func (s *DynamicEpochTransitionSuite) SetupTest() {
-	// use a longer staking auction length to accommodate staking operations for
-	// joining/leaving nodes
-	s.StakingAuctionLen = 200
+	// use a longer staking auction length to accommodate staking operations for joining/leaving nodes
+	// NOTE: this value is set fairly aggressively to ensure shorter test times.
+	// If flakiness due to failure to complete staking operations in time is observed,
+	// try increasing (by 10-20 views).
+	s.StakingAuctionLen = 50
 	s.DKGPhaseLen = 50
-	s.EpochLen = 500
-	s.EpochCommitSafetyThreshold = 50
+	s.EpochLen = 250
+	s.EpochCommitSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()

@@ -351,22 +351,34 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	return nil
 }
 
-// SanityCheckConsensusNodeRootSnapshotValidity performs a sanity check to make sure root snapshot has enough history
-// to participate in consensus, we require one of next conditions to pass:
-//  1. IsSporkRootSnapshot() == true - this is a snapshot build from a first block of spork.
-//  2. snapshot.SealingSegment().Len() >= transaction_expiry_limit - such snapshot
-//     has enough history to validate collection guarantees and can safely participate in consensus.
-func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) error {
+// ValidRootSnapshotContainsEntityExpiryRange performs a sanity check to make sure the
+// root snapshot has enough history to encompass at least one full entity expiry window.
+// Entities (in particular transactions and collections) may reference a block within
+// the past `flow.DefaultTransactionExpiry` blocks, so a new node must begin with at least
+// this many blocks worth of history leading up to the snapshot's root block.
+//
+// Currently, Access Nodes and Consensus Nodes require root snapshots passing this validator function.
+//
+//   - Consensus Nodes because they process guarantees referencing past blocks
+//   - Access Nodes because they index transactions referencing past blocks
+//
+// One of the following conditions must be satisfied to pass this validation:
+//  1. This is a snapshot build from a first block of spork
+//     -> there is no earlier history which transactions/collections could reference
+//  2. This snapshot sealing segment contains at least one expiry window of blocks
+//     -> all possible reference blocks in future transactions/collections will be within the initial history.
+//  3. This snapshot sealing segment includes the spork root block
+//     -> there is no earlier history which transactions/collections could reference
+func ValidRootSnapshotContainsEntityExpiryRange(snapshot protocol.Snapshot) error {
 	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(snapshot)
 	if err != nil {
 		return fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err)
 	}
-	// condition 1 satisfied
+	// Condition 1 satisfied
 	if isSporkRootSnapshot {
 		return nil
 	}
 
-	// check condition 2
 	head, err := snapshot.Head()
 	if err != nil {
 		return fmt.Errorf("could not query root snapshot head: %w", err)
@@ -384,7 +396,9 @@ func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) er
 
 	sealingSegmentLength := uint64(len(sealingSegment.AllBlocks()))
 	transactionExpiry := uint64(flow.DefaultTransactionExpiry)
-	blocksInSpork := head.Height - sporkRootBlockHeight
+	blocksInSpork := head.Height - sporkRootBlockHeight + 1 // range is inclusive on both ends
+
+	// Condition 3:
 	// check if head.Height - sporkRootBlockHeight < flow.DefaultTransactionExpiry
 	// this is the case where we bootstrap early into the spork and there is simply not enough blocks
 	if blocksInSpork < transactionExpiry {
@@ -393,6 +407,7 @@ func SanityCheckConsensusNodeRootSnapshotValidity(snapshot protocol.Snapshot) er
 			return fmt.Errorf("invalid root snapshot length, expecting exactly (%d), got (%d)", blocksInSpork, sealingSegmentLength)
 		}
 	} else {
+		// Condition 2:
 		// the distance to spork root is more than transaction expiry, we need at least `transactionExpiry` many blocks
 		if sealingSegmentLength < transactionExpiry {
 			return fmt.Errorf("invalid root snapshot length, expecting at least (%d), got (%d)",
