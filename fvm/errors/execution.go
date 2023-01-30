@@ -254,17 +254,16 @@ func NewCouldNotGetExecutionParameterFromStateError(
 		path)
 }
 
-// NewInvalidFVMStateAccessError constructs a new CodedError which indicates
-// that the cadence program attempted to directly access fvm's internal state.
-func NewInvalidFVMStateAccessError(
-	address flow.Address,
-	path string,
+// NewInvalidInternalStateAccessError constructs a new CodedError which
+// indicates that the cadence program attempted to directly access flow's
+// internal state.
+func NewInvalidInternalStateAccessError(
+	id flow.RegisterID,
 	opType string,
 ) CodedError {
 	return NewCodedError(
-		ErrCodeInvalidFVMStateAccessError,
-		"could not directly %s fvm internal state (address: %s: path: %s)",
+		ErrCodeInvalidInternalStateAccessError,
+		"could not directly %s flow internal state (%s)",
 		opType,
-		address,
-		path)
+		id)
 }

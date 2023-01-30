@@ -663,7 +663,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			string(address.Bytes()),
+			flow.AccountStatusKey,
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -761,7 +764,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			string(address.Bytes()),
+			flow.AccountStatusKey,
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -983,10 +989,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	registerTouches := view.Interactions().RegisterTouches()
 
 	// make sure check for account status has been registered
-	id := flow.RegisterID{
-		Owner: string(address.Bytes()),
-		Key:   state.AccountStatusKey,
-	}
+	id := flow.AccountStatusRegisterID(address)
 
 	require.Contains(t, registerTouches, id)
 }

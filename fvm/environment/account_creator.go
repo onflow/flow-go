@@ -19,11 +19,6 @@ const (
 	FlowFeesAccountIndex      = 4
 )
 
-var addressStateKey = flow.RegisterID{
-	Owner: "",
-	Key:   state.AddressStateKey,
-}
-
 type AddressGenerator interface {
 	Bytes() []byte
 	NextAddress() (flow.Address, error)
@@ -152,7 +147,7 @@ func NewAccountCreator(
 }
 
 func (creator *accountCreator) bytes() ([]byte, error) {
-	stateBytes, err := creator.txnState.Get(addressStateKey)
+	stateBytes, err := creator.txnState.Get(flow.AddressStateRegisterID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -196,7 +191,8 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	}
 
 	// update the ledger state
-	err = creator.txnState.Set(addressStateKey,
+	err = creator.txnState.Set(
+		flow.AddressStateRegisterID,
 		addressGenerator.Bytes())
 	if err != nil {
 		return address, fmt.Errorf(
