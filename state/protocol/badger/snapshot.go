@@ -3,8 +3,11 @@
 package badger
 
 import (
+	"encoding/hex"
 	"fmt"
+	"log"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -202,6 +205,10 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
+	// This is a temporary workaround on devnet40 to add the historical AN1's identity back into the
+	// identity table so it can backfill its protocol data after sporking to devnet41
+	identities = append(identities, getAccessNode1ID())
+
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
 
@@ -209,6 +216,41 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	identities = identities.Sort(order.Canonical)
 
 	return identities, nil
+}
+
+func getAccessNode1ID() *flow.Identity {
+	nodeID, err := flow.HexStringToIdentifier("7248a10c73ac8134f03bcc3c0b4ad63e226360b09c073b37a57c18d951a50f51")
+	if err != nil {
+		log.Fatalf("failed to decode AN1 node ID: %v", err)
+	}
+
+	b, err := hex.DecodeString("ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d46daeebf836f7445a2ac16741013b192959d8ad26998aff12f2adc67a99e1eb2988d")
+	if err != nil {
+		log.Fatalf("failed to decode AN1 network public key: %v", err)
+	}
+	networkPubKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, b)
+	if err != nil {
+		log.Fatalf("failed to decode network public key: %v", err)
+	}
+
+	b, err = hex.DecodeString("8476b232945af88d5988ec40c734c651a0846c42b38ff5dda5ed0143f03a2ed9208f23cbefcc713a01122b56d868ad240c850d46fc973bd57aecd52a53d69999ac0efaaa7180f2d0bb64586d1be9c2efddb50c933925def2323d301f59fcc03b")
+	if err != nil {
+		log.Fatalf("failed to decode AN1 staking public key: %v", err)
+	}
+	stakingPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, b)
+	if err != nil {
+		log.Fatalf("failed to decode staking public key: %v", err)
+	}
+
+	return &flow.Identity{
+		NodeID:        nodeID,
+		Address:       "access-001.devnet40.nodes.onflow.org:3569",
+		Role:          flow.RoleAccess,
+		Weight:        100,
+		Ejected:       false,
+		NetworkPubKey: networkPubKey,
+		StakingPubKey: stakingPubKey,
+	}
 }
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
