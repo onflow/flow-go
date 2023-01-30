@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
 )
 
@@ -20,9 +21,11 @@ func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.
 		return fmt.Errorf("could not read tries: %w", err)
 	}
 
+	logProgress := util.LogProgress("importing leaf nodes to storage", len(leafNodes), logger)
 	batchSize := 10
 	batch := make([]ledger.LeafNode, 0, batchSize)
-	for _, leafNode := range leafNodes {
+	for i, leafNode := range leafNodes {
+		logProgress(i)
 		batch = append(batch, *leafNode)
 		if len(batch) >= batchSize {
 			err := store.Add(batch)
