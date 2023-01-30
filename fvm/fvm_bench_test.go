@@ -262,9 +262,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
-	require.NoError(tb, err)
-	b.activeStateCommitment = endState
+	b.activeStateCommitment = computationResult.EndState
 
 	return computationResult
 }

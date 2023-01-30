@@ -270,24 +270,24 @@ func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint6
 	return createProposal(view, qc.View), nil
 }
 
-// BlacklistValidator is Validator mock that consider all proposals are valid unless the proposal's BlockID exists
+// DenylistValidator is Validator mock that consider all proposals are valid unless the proposal's BlockID exists
 // in the invalidProposals key or unverifiable key
-type BlacklistValidator struct {
+type DenylistValidator struct {
 	mocks.Validator
 	invalidProposals map[flow.Identifier]struct{}
 	unverifiable     map[flow.Identifier]struct{}
 	t                require.TestingT
 }
 
-func NewBlacklistValidator(t require.TestingT) *BlacklistValidator {
-	return &BlacklistValidator{
+func NewDenylistValidator(t require.TestingT) *DenylistValidator {
+	return &DenylistValidator{
 		invalidProposals: make(map[flow.Identifier]struct{}),
 		unverifiable:     make(map[flow.Identifier]struct{}),
 		t:                t,
 	}
 }
 
-func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
+func (v *DenylistValidator) ValidateProposal(proposal *model.Proposal) error {
 	// check if is invalid
 	_, ok := v.invalidProposals[proposal.Block.BlockID]
 	if ok {
@@ -327,7 +327,7 @@ type EventHandlerSuite struct {
 	committee      *Committee
 	voteAggregator *mocks.VoteAggregator
 	voter          *Voter
-	validator      *BlacklistValidator
+	validator      *DenylistValidator
 	notifier       hotstuff.Consumer
 
 	initView    uint64
@@ -351,7 +351,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.committee = NewCommittee()
 	es.voteAggregator = &mocks.VoteAggregator{}
 	es.voter = NewVoter(es.T(), finalized)
-	es.validator = NewBlacklistValidator(es.T())
+	es.validator = NewDenylistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := NewEventHandler(
