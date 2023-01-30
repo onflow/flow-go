@@ -267,7 +267,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Remove account from account creator whitelist.
+		// Remove account from account creator allowlist.
 		//
 		// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
 		//
@@ -287,7 +287,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Add account to account creator whitelist.
+		// Add account to account creator allowlist.
 		//
 		// Will emit AccountCreatorAdded(accountCreator: accountCreator).
 		//

@@ -730,8 +730,13 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	prevResultId := unittest.IdentifierFixture()
 
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), prevResultId, initialCommit, computationResult)
-	require.NoError(t, err)
+	chdps := computationResult.ChunkDataPacks
+	er := flow.NewExecutionResult(
+		prevResultId,
+		executableBlock.ID(),
+		computationResult.Chunks,
+		computationResult.ConvertedServiceEvents,
+		computationResult.ExecutionDataID)
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
