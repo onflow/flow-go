@@ -189,9 +189,9 @@ func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
 	_m.Called(count)
 }
 
-// OnRateLimitedUnicastMessage provides a mock function with given fields: role, msgType, topic, reason
-func (_m *NetworkMetrics) OnRateLimitedUnicastMessage(role string, msgType string, topic string, reason string) {
-	_m.Called(role, msgType, topic, reason)
+// OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
+func (_m *NetworkMetrics) OnRateLimitedPeer(pid peer.ID, role string, msgType string, topic string, reason string) {
+	_m.Called(pid, role, msgType, topic, reason)
 }
 
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense

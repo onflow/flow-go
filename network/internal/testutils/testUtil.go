@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -47,6 +48,15 @@ import (
 )
 
 var sporkID = unittest.IdentifierFixture()
+
+// RateLimitConsumer p2p.RateLimiterConsumer fixture that invokes a callback when rate limit event is consumed.
+type RateLimitConsumer struct {
+	callback func(pid peer.ID, role, msgType, topic, reason string) // callback func that will be invoked on rate limit
+}
+
+func (r *RateLimitConsumer) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+	r.callback(pid, role, msgType, topic, reason)
+}
 
 type PeerTag struct {
 	Peer peer.ID
@@ -107,7 +117,13 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
+	o := &optsConfig{
+		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
+		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
+		connectionGater: NewConnectionGater(func(p peer.ID) error {
+			return nil
+		}),
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -132,6 +148,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
+		opts = append(opts, withConnectionGater(o.connectionGater))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
@@ -160,6 +178,7 @@ func GenerateMiddlewares(t *testing.T,
 		peerUpdateInterval:  connection.DefaultPeerUpdateInterval,
 		unicastRateLimiters: ratelimit.NoopRateLimiters(),
 		networkMetrics:      metrics.NewNoopCollector(),
+		peerManagerFilters:  []p2p.PeerFilter{},
 	}
 
 	for _, opt := range opts {
@@ -185,7 +204,8 @@ func GenerateMiddlewares(t *testing.T,
 			translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			consumer,
-			middleware.WithUnicastRateLimiters(o.unicastRateLimiters))
+			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
+			middleware.WithPeerManagerFilters(o.peerManagerFilters))
 	}
 	return mws, idProviders
 }
@@ -243,12 +263,21 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts              []func(*flow.Identity)
-	dhtPrefix           string
-	dhtOpts             []dht.Option
-	unicastRateLimiters *ratelimit.RateLimiters
-	peerUpdateInterval  time.Duration
-	networkMetrics      module.NetworkMetrics
+	idOpts                        []func(*flow.Identity)
+	dhtPrefix                     string
+	dhtOpts                       []dht.Option
+	unicastRateLimiters           *ratelimit.RateLimiters
+	peerUpdateInterval            time.Duration
+	networkMetrics                module.NetworkMetrics
+	peerManagerFilters            []p2p.PeerFilter
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	connectionGater               connmgr.ConnectionGater
+}
+
+func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.unicastRateLimiterDistributor = distributor
+	}
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -270,9 +299,21 @@ func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	}
 }
 
+func WithPeerManagerFilters(filters ...p2p.PeerFilter) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.peerManagerFilters = filters
+	}
+}
+
 func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithConnectionGater(connectionGater connmgr.ConnectionGater) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.connectionGater = connectionGater
 	}
 }
 
@@ -354,6 +395,18 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
+	}
+}
+
+func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetRateLimiterDistributor(distributor)
+	}
+}
+
+func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetConnectionGater(connectionGater)
 	}
 }
 
@@ -463,4 +516,20 @@ func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater 
 	return connection.NewConnGater(unittest.Logger(),
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
+}
+
+// IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.
+func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
+	return func(p peer.ID) error {
+		if rateLimiter.IsRateLimited(p) {
+			return fmt.Errorf("peer is rate limited")
+		}
+
+		return nil
+	}
+}
+
+// NewRateLimiterConsumer returns a p2p.RateLimiterConsumer fixture that will invoke the callback provided.
+func NewRateLimiterConsumer(callback func(pid peer.ID, role, msgType, topic, reason string)) p2p.RateLimiterConsumer {
+	return &RateLimitConsumer{callback}
 }

@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sync"
@@ -24,15 +25,16 @@ import (
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -214,52 +216,47 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
-	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
-
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
 	limit := rate.Limit(5)
 
 	// burst per interval
 	burst := 5
 
-	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 1)
+	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 3)
 
-	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
-	// after 5 rate limits we will close ch. O
-	ch := make(chan struct{})
+	// we only expect messages from the first middleware on the test suite
+	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
+	require.NoError(m.T(), err)
+
+	// the onRateLimit call back we will use to keep track of how many times a rate limit happens.
 	rateLimits := atomic.NewUint64(0)
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount)
 
-		// we only expect messages from the first middleware on the test suite
-		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
-		require.NoError(m.T(), err)
+	onRateLimit := func(peerID peer.ID, role, msgType, topic, reason string) {
+		require.Equal(m.T(), reason, ratelimit.ReasonMessageCount.String())
 		require.Equal(m.T(), expectedPID, peerID)
-
 		// update hook calls
 		rateLimits.Inc()
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(messageRateLimiter,
-		&ratelimit.NoopRateLimiter{},
-		onRateLimit,
-		ratelimit.WithDisabledRateLimiting(false))
+	// setup rate limit distributor that will be used to track the number of rate limits via the onRateLimit callback.
+	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
+	distributor := ratelimit.NewUnicastRateLimiterDistributor()
+	distributor.AddConsumer(consumer)
+
+	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
+	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
+	connGater := testutils.NewConnectionGater(func(pid peer.ID) error {
+		if messageRateLimiter.IsRateLimited(pid) {
+			return fmt.Errorf("rate-limited peer")
+		}
+
+		return nil
+	})
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor), testutils.WithConnectionGater(connGater))
 
 	// create middleware
-	netmet := mock.NewNetworkMetrics(m.T())
-	calls := 0
-	netmet.On("InboundMessageReceived", mockery.Anything, mockery.Anything, mockery.Anything).Times(5).Run(func(args mockery.Arguments) {
-		calls++
-		if calls == 5 {
-			close(ch)
-		}
-	})
-	// we expect 5 messages to be processed the rest will be rate limited
-	defer netmet.AssertNumberOfCalls(m.T(), "InboundMessageReceived", 5)
-
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
 		m.logger,
 		ids,
@@ -267,16 +264,27 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		unittest.NetworkCodec(),
 		m.slashingViolationsConsumer,
 		testutils.WithUnicastRateLimiters(rateLimiters),
-		testutils.WithNetworkMetrics(netmet))
+		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
 
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	providers[0].SetIdentities(idList)
 
 	overlay := m.createOverlay(providers[0])
-	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
+
+	calls := atomic.NewUint64(0)
+	ch := make(chan struct{})
+	overlay.On("Receive", mockery.AnythingOfType("*network.IncomingMessageScope")).Return(nil).Run(func(args mockery.Arguments) {
+		calls.Inc()
+		if calls.Load() >= 5 {
+			close(ch)
+		}
+	})
 
 	newMw.SetOverlay(overlay)
 
@@ -291,16 +299,25 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	require.NoError(m.T(), newMw.Subscribe(testChannel))
 
-	idList := flow.IdentityList(append(m.ids, newId))
-
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// send 6 unicast messages, 5 should be allowed and the 6th should be rate limited
-	for i := 0; i < 6; i++ {
+	// add our sender node as a direct peer to our receiving node, this allows us to ensure
+	// that connections to peers that are rate limited are completely prune. IsConnected will
+	// return true only if the node is a direct peer of the other, after rate limiting this direct
+	// peer should be removed by the peer manager.
+	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
+	require.NoError(m.T(), err)
+
+	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
+
+	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
+	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
+	// handling of streams.
+	for i := 0; i < 10; i++ {
 		msg, err := network.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
@@ -310,13 +327,44 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-		err = m.mws[0].SendDirect(msg)
 
+		err = m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
 	}
 
 	// wait for all rate limits before shutting down middleware
-	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop rate limit test ch on time")
+
+	// sleep for 1 seconds to allow connection pruner to prune connections
+	time.Sleep(1 * time.Second)
+
+	// ensure connection to rate limited peer is pruned
+	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
+		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
+	})
+
+	// eventually the rate limited node should be able to reconnect and send messages
+	require.Eventually(m.T(), func() bool {
+		msg, err := network.NewOutgoingScope(
+			flow.IdentifierList{newId.NodeID},
+			testChannel,
+			&libp2pmessage.TestMessage{
+				Text: "hello",
+			},
+			unittest.NetworkCodec().Encode,
+			network.ProtocolTypeUnicast)
+		require.NoError(m.T(), err)
+		err = m.mws[0].SendDirect(msg)
+		if err != nil {
+			// we expect an error to be returned here because the connection gater will disallow connections
+			// to the rate limited peer until rate limit duration has passed. We expect the error returned to
+			// be IsPeerUnreachableError
+			require.True(m.T(), network.IsPeerUnreachableError(err))
+			return false
+		}
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
@@ -324,30 +372,29 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
-	require.Equal(m.T(), uint64(1), rateLimits.Load())
+	require.True(m.T(), rateLimits.Load() > 0)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
-	unittest.SkipUnless(m.T(), unittest.TEST_FLAKY, "disabling so that flaky metrics can be gathered before re-enabling")
-
 	//limiter limit will be set up to 1000 bytes/sec
 	limit := rate.Limit(1000)
 
 	//burst per interval
 	burst := 1000
 
-	// create test time
-	testtime := unittest.NewTestTime()
+	// we only expect messages from the first middleware on the test suite
+	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
+	require.NoError(m.T(), err)
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 1, p2p.WithGetTimeNowFunc(testtime.Now))
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 3)
 
-	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
+	// the onRateLimit call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
 	ch := make(chan struct{})
 	rateLimits := atomic.NewUint64(0)
-	onRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth)
+	onRateLimit := func(peerID peer.ID, role, msgType, topic, reason string) {
+		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth.String())
 
 		// we only expect messages from the first middleware on the test suite
 		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -358,28 +405,37 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		close(ch)
 	}
 
-	rateLimiters := ratelimit.NewRateLimiters(&ratelimit.NoopRateLimiter{},
-		bandwidthRateLimiter,
-		onRateLimit,
-		ratelimit.WithDisabledRateLimiting(false))
+	consumer := testutils.NewRateLimiterConsumer(onRateLimit)
+	distributor := ratelimit.NewUnicastRateLimiterDistributor()
+	distributor.AddConsumer(consumer)
+	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
+	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
+	// create connection gater, connection gater will refuse connections from rate limited nodes
+	connGater := testutils.NewConnectionGater(func(pid peer.ID) error {
+		if bandwidthRateLimiter.IsRateLimited(pid) {
+			return fmt.Errorf("rate-limited peer")
+		}
+
+		return nil
+	})
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor), testutils.WithConnectionGater(connGater))
 
 	// create middleware
-	opts := testutils.WithUnicastRateLimiters(rateLimiters)
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
 		m.logger,
 		ids,
 		libP2PNodes,
 		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer, opts)
+		m.slashingViolationsConsumer,
+		testutils.WithUnicastRateLimiters(rateLimiters),
+		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-
 	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 
@@ -420,22 +476,54 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
-	// for the duration of a simulated second we will send 3 messages. Each message is about
-	// 400 bytes, the 3rd message will put our limiter over the 1000 byte limit at 1200 bytes. Thus
-	// the 3rd message should be rate limited.
-	start := testtime.Now()
-	end := start.Add(time.Second)
-	for testtime.Now().Before(end) {
+	// add our sender node as a direct peer to our receiving node, this allows us to ensure
+	// that connections to peers that are rate limited are completely prune. IsConnected will
+	// return true only if the node is a direct peer of the other, after rate limiting this direct
+	// peer should be removed by the peer manager.
+	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
+	require.NoError(m.T(), err)
+	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
 
+	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
+	// as it is more than our allowed bandwidth of 1000 bytes.
+	for i := 0; i < 3; i++ {
 		err := m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
-
-		// send 3 messages
-		testtime.Advance(334 * time.Millisecond)
 	}
 
 	// wait for all rate limits before shutting down middleware
 	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
+
+	// sleep for 1 seconds to allow connection pruner to prune connections
+	time.Sleep(1 * time.Second)
+
+	// ensure connection to rate limited peer is pruned
+	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
+		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
+	})
+
+	// eventually the rate limited node should be able to reconnect and send messages
+	require.Eventually(m.T(), func() bool {
+		msg, err := network.NewOutgoingScope(
+			flow.IdentifierList{newId.NodeID},
+			testChannel,
+			&libp2pmessage.TestMessage{
+				Text: "",
+			},
+			unittest.NetworkCodec().Encode,
+			network.ProtocolTypeUnicast)
+		require.NoError(m.T(), err)
+		err = m.mws[0].SendDirect(msg)
+		if err != nil {
+			// we expect an error to be returned here because the connection gater will disallow connections
+			// to the rate limited peer until rate limit duration has passed. We expect the error returned to
+			// be IsPeerUnreachableError
+			require.True(m.T(), network.IsPeerUnreachableError(err))
+			return false
+		}
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
