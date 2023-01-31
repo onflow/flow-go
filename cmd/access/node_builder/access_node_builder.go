@@ -715,13 +715,14 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
 
+		sn1NodeID, err := flow.HexStringToIdentifier("2062461e7b03145723ce3b2c81adf68eab3a4503696e498bc8bccb6bd770e403")
+		if err != nil {
+			return fmt.Errorf("could not parse sn1 node id: %w", err)
+		}
+
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
-				filter.And(
-					filter.HasRole(flow.RoleConsensus),
-					filter.Not(filter.HasNodeID(node.Me.NodeID())),
-					p2p.NotEjectedFilter,
-				),
+				filter.HasNodeID(sn1NodeID),
 				builder.IdentityProvider,
 			)
 		}
@@ -912,12 +913,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Logger.Fatal().Msgf("could not parse an1 node id: %v", err)
 			}
 
-			filters := filter.And(
-				filter.HasRole(flow.RoleCollection),
-				filter.Or(
-					filter.HasNodeID(ln7NodeID),
-					filter.HasNodeID(ln16NodeID),
-				),
+			filters := filter.Or(
+				filter.HasNodeID(ln7NodeID),
+				filter.HasNodeID(ln16NodeID),
 			)
 
 			builder.RequestEng, err = requester.New(
