@@ -660,13 +660,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
-				require.NoError(t, err)
-				require.Nil(t, program)
-
-				err = r.Interface.SetProgram(
+				_, err := r.Interface.GetAndSetProgram(
 					contractLocation,
-					contractProgram,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
 				)
 				require.NoError(t, err)
 
@@ -757,22 +755,18 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
+				_, err := r.Interface.GetAndSetProgram(
+					contractLocation,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
+				)
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
 					return nil
 				}
-				if program == nil {
 
-					err = r.Interface.SetProgram(
-						contractLocation,
-						contractProgram,
-					)
-					require.NoError(t, err)
-
-				}
 				return runtime.Error{
 					Err: fmt.Errorf("TX reverted"),
 				}

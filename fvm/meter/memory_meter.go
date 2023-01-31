@@ -139,17 +139,19 @@ var (
 
 		// AST nodes
 
-		common.MemoryKindProgram:         220,
-		common.MemoryKindIdentifier:      17,
-		common.MemoryKindArgument:        49,
-		common.MemoryKindBlock:           25,
-		common.MemoryKindFunctionBlock:   25,
-		common.MemoryKindParameter:       25,
-		common.MemoryKindParameterList:   59,
-		common.MemoryKindTransfer:        1,
-		common.MemoryKindMembers:         276,
-		common.MemoryKindTypeAnnotation:  25,
-		common.MemoryKindDictionaryEntry: 33,
+		common.MemoryKindProgram:           220,
+		common.MemoryKindIdentifier:        17,
+		common.MemoryKindArgument:          49,
+		common.MemoryKindBlock:             25,
+		common.MemoryKindFunctionBlock:     25,
+		common.MemoryKindParameter:         25,
+		common.MemoryKindParameterList:     59,
+		common.MemoryKindTypeParameter:     42, // TODO: add actual memory
+		common.MemoryKindTypeParameterList: 42, // TODO: add actual memory
+		common.MemoryKindTransfer:          1,
+		common.MemoryKindMembers:           276,
+		common.MemoryKindTypeAnnotation:    25,
+		common.MemoryKindDictionaryEntry:   33,
 
 		common.MemoryKindFunctionDeclaration:        49,
 		common.MemoryKindCompositeDeclaration:       65,
