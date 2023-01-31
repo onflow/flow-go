@@ -471,7 +471,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	connectionPruning bool,
 	updateInterval time.Duration,
 	rCfg *ResourceManagerConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) NodeBuilder {
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) (NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
