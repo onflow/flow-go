@@ -73,19 +73,6 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, cha
 		localFinalizedHeight: 0,
 	}
 
-	block93156999, err := flow.HexStringToIdentifier("199f4de4959cb7854e0c7330bc4616b8ed5e95a45e3239dd4445a79df4414690")
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse block ID")
-	}
-
-	block93157000, err := flow.HexStringToIdentifier("57ffebc4c1e7cf3a59b42667e19f332344f0354946920338ad883a633e1d29c8")
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse block ID")
-	}
-
-	core.queueByBlockID(block93156999, 93156999)
-	core.queueByBlockID(block93157000, 93157000)
-
 	return core, nil
 }
 
