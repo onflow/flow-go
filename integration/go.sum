@@ -1336,8 +1336,6 @@ github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWK
 github.com/onflow/flow-ft/lib/go/templates v0.2.0 h1:oQQk5UthLS9KfKLkZVJg/XAVq8CXW7HAxSTu4HwBJkU=
 github.com/onflow/flow-ft/lib/go/templates v0.2.0/go.mod h1:qwkTElMcI+PnSBGIWGu1K9OYBLatNimWTC8un9qUji0=
 github.com/onflow/flow-go-sdk v0.13.0/go.mod h1:yqnSajzJVFfrTg68F4WXRR1Yzs1akqAjyscEDyFudPE=
-github.com/onflow/flow-go-sdk v0.29.1 h1:IufoMjQmmxdwF0WNi/NlHO0Gcdh5+1n2moQ/YMU1yY4=
-github.com/onflow/flow-go-sdk v0.29.1/go.mod h1:58y6+IddssbrUnrCdYXJuAh64cMHvxy+InUfBA3e8v0=
 github.com/onflow/flow-go-sdk v0.31.3-cadence-attachements h1:Zcy/BTCjBXxEfeAqRcezjr4quoCU3CuPkwyJdGUPcEI=
 github.com/onflow/flow-go-sdk v0.31.3-cadence-attachements/go.mod h1:3PhoNKb16AgXCfkJ580ob7wy5CCMNcM1iXFY7jhUNEw=
 github.com/onflow/flow-go/crypto v0.24.4 h1:SwEtoVS2TidCIHYCZMgQ7U2YsqhI9upnw94fhdHTubM=
