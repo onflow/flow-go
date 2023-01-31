@@ -100,7 +100,7 @@ func (m IncomingMessageScope) EventID() []byte {
 }
 
 func (m IncomingMessageScope) PayloadType() string {
-	return MessageType(m.msg.Payload)
+	return MessageType(m.decodedPayload)
 }
 
 // OutgoingMessageScope captures the context around an outgoing message that is about to be sent.

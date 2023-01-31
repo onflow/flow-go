@@ -143,12 +143,13 @@ func newFacadeEnvironment(
 
 func NewScriptEnvironment(
 	ctx context.Context,
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
 	txnState *state.TransactionState,
 	derivedTxnData DerivedTransactionData,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
-		tracing.NewTracerSpan(),
+		tracer,
 		params,
 		txnState,
 		derivedTxnData,

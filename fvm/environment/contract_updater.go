@@ -440,7 +440,7 @@ func (updater *ContractUpdaterImpl) SetContract(
 	}
 
 	contractUpdateKey := ContractUpdateKey{
-		Address: flowAddress,
+		Address: address,
 		Name:    name,
 	}
 
@@ -466,8 +466,7 @@ func (updater *ContractUpdaterImpl) RemoveContract(
 					"accounts"))
 	}
 
-	add := flow.Address(address)
-	uk := ContractUpdateKey{Address: add, Name: name}
+	uk := ContractUpdateKey{Address: address, Name: name}
 	u := ContractUpdate{ContractUpdateKey: uk}
 	updater.draftUpdates[uk] = u
 
@@ -481,12 +480,12 @@ func (updater *ContractUpdaterImpl) Commit() ([]ContractUpdateKey, error) {
 	var err error
 	for _, v := range updateList {
 		if len(v.Code) > 0 {
-			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
+			err = updater.accounts.SetContract(v.Name, flow.BytesToAddress(v.Address.Bytes()), v.Code)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			err = updater.accounts.DeleteContract(v.Name, v.Address)
+			err = updater.accounts.DeleteContract(v.Name, flow.BytesToAddress(v.Address.Bytes()))
 			if err != nil {
 				return nil, err
 			}

@@ -5,16 +5,18 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 )
 
 var _ commands.AdminCommand = (*ToggleUploaderCommand)(nil)
 
-type ToggleUploaderCommand struct{}
+type ToggleUploaderCommand struct {
+	uploadManager *uploader.Manager
+}
 
 func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	enabled := req.ValidatorData.(bool)
-	computation.SetUploaderEnabled(enabled)
+	t.uploadManager.SetEnabled(enabled)
 	return "ok", nil
 }
 
@@ -30,6 +32,8 @@ func (t *ToggleUploaderCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewToggleUploaderCommand() commands.AdminCommand {
-	return &ToggleUploaderCommand{}
+func NewToggleUploaderCommand(uploadManager *uploader.Manager) commands.AdminCommand {
+	return &ToggleUploaderCommand{
+		uploadManager: uploadManager,
+	}
 }

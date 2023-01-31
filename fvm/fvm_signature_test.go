@@ -159,7 +159,7 @@ func TestKeyListSignature(t *testing.T) {
 			t.Run("Single key", newVMTest().run(
 				func(
 					t *testing.T,
-					vm *fvm.VirtualMachine,
+					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
@@ -256,7 +256,7 @@ func TestKeyListSignature(t *testing.T) {
 			t.Run("Multiple keys", newVMTest().run(
 				func(
 					t *testing.T,
-					vm *fvm.VirtualMachine,
+					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
@@ -393,7 +393,7 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("verifyBLSPoP", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
@@ -504,7 +504,7 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("aggregateBLSSignatures", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
@@ -628,7 +628,7 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("aggregateBLSPublicKeys", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
@@ -752,7 +752,7 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("Combined Aggregations", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
