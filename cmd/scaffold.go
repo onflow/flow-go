@@ -988,11 +988,11 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// temporary workaround to force devnet40 historic AN1 to always sync from SN1
 		if node.Me.NodeID() == an1NodeID {
-			sn1NodeID, err := flow.HexStringToIdentifier("2062461e7b03145723ce3b2c81adf68eab3a4503696e498bc8bccb6bd770e403")
+			sn2NodeID, err := flow.HexStringToIdentifier("743d7eb1073a05f867fa67a1b775c32675afad761ffbd6ab59e2d49d60ea64d4")
 			if err != nil {
 				return fmt.Errorf("could not parse sn1 node id: %w", err)
 			}
-			filters = append(filters, filter.HasNodeID(sn1NodeID))
+			filters = append(filters, filter.HasNodeID(sn2NodeID))
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
