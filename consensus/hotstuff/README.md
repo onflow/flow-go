@@ -122,7 +122,7 @@ Flow's PaceMaker is an implementation of Active Pacemaker which communicates wit
 The timeout values are limited by lower and upper-bounds to ensure that the PaceMaker can change from large to small timeouts in a reasonable number of views. 
 The specific values for lower and upper timeout bounds are protocol-specified; we envision the bounds to be on the order of 1sec (lower bound) and one minute (upper bound).
 
-**Progress**, from the perspective of the PaceMaker is defined as entering view `V`
+**Progress**, from the perspective of the PaceMaker, is defined as entering view `V`
 for which the replica knows a QC or a TC with `V = QC.view + 1` or `V = TC.view + 1`. 
 In other words, we transition into the next view due to reaching quorum in the last view.
 In contrast to HotStuff, Jolteon only allows a transition into view `V+1` after observing a valid quorum for view `V`. There is no other, passive method for honest nodes to change views.
