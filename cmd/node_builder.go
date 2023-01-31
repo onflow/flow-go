@@ -252,6 +252,8 @@ type NodeConfig struct {
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeBlockListDistributor notifies consumers of updates to the node block list
 	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }

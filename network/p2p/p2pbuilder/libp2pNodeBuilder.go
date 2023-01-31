@@ -70,8 +70,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
-	rCfg *ResourceManagerConfig) LibP2PFactoryFunc {
-
+	rCfg *ResourceManagerConfig,
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
+) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
 			address,
@@ -86,7 +87,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerScoringEnabled,
 			connectionPruning,
 			updateInterval,
-			rCfg)
+			rCfg,
+			unicastRateLimiterDistributor)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -107,6 +109,7 @@ type NodeBuilder interface {
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -146,6 +149,7 @@ type LibP2PNodeBuilder struct {
 	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
+	rateLimiterDistributor      p2p.UnicastRateLimiterDistributor
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -236,6 +240,11 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 	return builder
 }
 
+func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeBuilder {
+	builder.rateLimiterDistributor = distributor
+	return builder
+}
+
 func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, cf GossipSubAdapterConfigFunc) NodeBuilder {
 	builder.gossipSubFactory = gf
 	builder.gossipSubConfigFunc = cf
@@ -315,6 +324,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 
 		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
+
+		if builder.rateLimiterDistributor != nil {
+			builder.rateLimiterDistributor.AddConsumer(peerManager)
+		}
 	}
 
 	node := builder.createNode(builder.logger, h, pCache, unicastManager, peerManager)
@@ -457,7 +470,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerScoringEnabled bool,
 	connectionPruning bool,
 	updateInterval time.Duration,
-	rCfg *ResourceManagerConfig) (NodeBuilder, error) {
+	rCfg *ResourceManagerConfig,
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) NodeBuilder {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -480,7 +494,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 			return dht.NewDHT(ctx, host, unicast.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(connectionPruning, updateInterval).
-		SetCreateNode(DefaultCreateNodeFunc)
+		SetCreateNode(DefaultCreateNodeFunc).
+		SetRateLimiterDistributor(unicastRateLimiterDistributor)
 
 	if peerScoringEnabled {
 		builder.EnableGossipSubPeerScoring(idProvider)
