@@ -5,11 +5,11 @@ We use a BFT consensus algorithm with deterministic finality in Flow for
 * Cluster of Collector Nodes: batching transactions into collections. 
 
 Flow uses a derivative of HotStuff 
-(see paper [HotStuff: BFT Consensus in the Lens of Blockchain (version 6)](https://arxiv.org/abs/1803.05069v6) for the original algorithm) called Jolteon(see paper [Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback](https://arxiv.org/abs/2106.10362).
+(see paper [HotStuff: BFT Consensus in the Lens of Blockchain (version 6)](https://arxiv.org/abs/1803.05069v6) for the original algorithm) called Jolteon (see paper [Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback](https://arxiv.org/abs/2106.10362).
 Our implementation is a mixture of HotStuff and Jolteon, the main modifications:
 * We employ the rules for locking on blocks and block finalization from Jolteon which is built on top of Event-Driven HotStuff. 
-Specifically, upon seeing a valid QC, the replica updates its highest known QC. It votes only for blocks that extend that QC(in case of happy path)
-or for blocks that contain a valid TC(in case of recovery path).
+Specifically, upon seeing a valid QC, the replica updates its highest known QC. It votes only for blocks that extend that QC (in case of happy path)
+or for blocks that contain a valid TC (in case of recovery path).
 We finalize a block when it has a 2-chain built on top where with the first chain link being _direct_. This is possible because of active protocol for recovery path.  
 * The way we progress though views follows the Jolteon protocol. We advance views when observing a valid QC or TC. A replica only votes or proposes for its current view.  
 * Flow's protocol as view synchronization component does not use Passive Pacemaker which was described in the paper, instead we use an Active Pacemaker from Jolteon protocol.
@@ -40,7 +40,7 @@ We exclude the entire logic for determining payload validity from the HotStuff c
 This functionality is encapsulated in the Chain Compliance Layer (CCL) which precedes HotStuff. 
 The CCL is designed to forward only fully validated blocks to the HotStuff core logic.
 The CCL forwards a block to the HotStuff core logic only if 
-* the block's header is valid(including QC),
+* the block's header is valid (including QC),
 * the block's payload is valid,
 * the block is connected to the most recently finalized block, and
 * all ancestors have previously been processed by HotStuff. 
@@ -57,7 +57,7 @@ Therefore, nodes include a `StakingSignature` (BLS with curve BLS12-381) in thei
 2. Construct a Source of Randomness as described in [Dfinity's Random Beacon](https://dfinity.org/pdf-viewer/library/dfinity-consensus.pdf).
 Therefore, consensus nodes include a `RandomBeaconSignature` (also BLS with curve BLS12-381, used in a threshold signature scheme) in their vote.  
 
-When the primary collects the votes, it verifies content of `SigData` it can contain only a `StakingSignature` or a pair `StakingSignature` + `RandomBeaconSignature`.
+When the primary collects the votes, it verifies the content of `SigData`, which can contain only a `StakingSignature` or a pair `StakingSignature` + `RandomBeaconSignature`.
 A `StakingSignature` must be present in all votes. 
 If either signature is invalid, the entire vote is discarded. From all valid votes, the
 `StakingSignatures` and the `RandomBeaconSignatures` are aggregated separately.
@@ -80,9 +80,7 @@ The figure below illustrates the dependencies of the core components and informa
 
 * `MessageHub` is responsible for relaying HotStuff messages, incoming messages are relayed to respective modules depending on message type.
 Outgoing messages are relayed to committee using p2p communication. 
-* `compliance.Core` is responsible for processing incoming blocks, caching if needed, validating, extending state and publishing to
-HotStuff for further processing. 
-* `compliance.Engine` performs work scheduling logic for `compliance.Core`, doesn't perform any business logic. 
+* `compliance.Engine` is responsible for processing incoming blocks, caching if needed, validating, extending state and publishing to HotStuff for further processing. Note: The embedded `compliance.Core` component is responsible for business logic and maintaining state, `compliance.Engine` schedules work and manages worker threads for the `Core`.
 * `EventLoop` buffers all incoming events, so `EventHandler` can process one event at a time in a single thread.
 * `EventHandler` orchestrates all HotStuff components and implements [HotStuff's state machine](/docs/StateMachine.png).
 The event handler is designed to be executed single-threaded.
@@ -91,11 +89,10 @@ The event handler is designed to be executed single-threaded.
 * `Forks` maintains an in-memory representation of all blocks `b`, whose view is larger or equal to the view of the latest finalized block (known to this specific replica).
 As blocks with missing ancestors are cached outside HotStuff (by the Chain Compliance Layer), 
 all blocks stored in `Forks` are guaranteed to be connected to the genesis block 
-(or the trusted checkpoint from which the replica started). `Forks` is implemented using `LevelledForest`: A blockchain forms a Tree, when removing all blocks
-with views strictly smaller than the last finalized block, the chain decomposes into multiple disconnected trees, in graph theory, such structure is a forest, to separate general graph-theoretical 
-concepts from the concrete blockchain application, `LevelledForest` refers to blocks as graph `vertices` and to a block's view number as `level`, 
-the `LevelledForest` is an in-memory data structure to store and maintain a levelled forest, it provides functions to add vertices, query vertices by their ID (block's hash), query vertices by level, query the children of a vertex, and prune vertices by level (remove them from memory).
-`Forks` tracks the finalized blocks and triggers finalization events whenever it observes a valid extension to the chain of finalized blocks.
+(or the trusted checkpoint from which the replica started). `Forks` tracks the finalized blocks and triggers finalization events whenever it observes a valid extension to the chain of finalized blocks. `Forks` is implemented using `LevelledForest`: A blockchain forms a Tree, when removing all blocks
+with views strictly smaller than the last finalized block, the chain decomposes into multiple disconnected trees (referred to as a forest in graph theory). 
+  - `LevelledForest` is an in-memory data structure to store and maintain a levelled forest. It provides functions to add vertices, query vertices by their ID (block's hash), query vertices by level, query the children of a vertex, and prune vertices by level (remove them from memory). To separate general graph-theoretical 
+concepts from the concrete blockchain application, `LevelledForest` refers to blocks as graph `vertices` and to a block's view number as `level`.
 * `Validator` validates the HotStuff-relevant aspects of
    - QC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, view number is strictly monotonously increasing
    - TC: total weight of all signers is more than 2/3 of committee weight, validity of signatures, proof for entering view. 
@@ -121,17 +118,17 @@ Conceptually, the PaceMaker interfaces with the `EventHandler` in two different 
 via a direct method call (see `PaceMaker interface`). If the PaceMaker changed the view in response, it returns 
 a `NewViewEvent` which will be synchronously processed by the  `EventHandler`.
 
-Flow's PaceMaker is an implementation of Active Pacemaker which communicates with other replicas after failing to make progress on happy path. It relies on broadcasting timeout object whenever no progress is made during current round. After collecting timeouts from supermajority of participants replica constructs a TC which can be used to enter next round `V = TC.View + 1`. For calculating round timeouts we use a truncated exponential backoff. We will increase round duration exponentially if no progress is made and exponentially decreasing timeouts on happy path. Protocol tolerates a few failures(`k=6`) before increasing round timeout. This value is the number of rounds we expect during happy path, after this many rounds, we will start increasing timeouts.
+Flow's PaceMaker is an implementation of Active Pacemaker which communicates with other replicas after failing to make progress on happy path. It relies on broadcasting timeout object whenever no progress is made during current round. After collecting timeouts from a supermajority of participants, the replica constructs a TC which can be used to enter the next round `V = TC.View + 1`. For calculating round timeouts we use a truncated exponential backoff. We will increase round duration exponentially if no progress is made and exponentially decrease timeouts on happy path. Protocol tolerates a few failures(`k=6`) before increasing round timeout. This value is the number of rounds we expect during happy path, after this many rounds, we will start increasing timeouts.
 The timeout values are limited by lower and upper-bounds to ensure that the PaceMaker can change from large to small timeouts in a reasonable number of views. 
 The specific values for lower and upper timeout bounds are protocol-specified; we envision the bounds to be on the order of 1sec (lower bound) and one minute (upper bound).
 
 **Progress**, from the perspective of the PaceMaker is defined as entering view `V`
 for which the replica knows a QC or a TC with `V = QC.view + 1` or `V = TC.view + 1`. 
 In other words, we transition into the next view due to reaching quorum in the last view.
-When comparing to HotStuff, in Jolteon views can be changed only after observing a valid quorum in the last view, otherwise replica is not allowed to change view. 
+In contrast to HotStuff, Jolteon only allows a transition into view `V+1` after observing a valid quorum for view `V`. There is no other, passive method for honest nodes to change views.
   
 A central, non-trivial functionality of the PaceMaker is to _skip views_. 
-Specifically, given a QC or TC with view `V` or , the Pacemaker will skip ahead to view `V + 1` if `currentView ≤ V`.
+Specifically, given a QC or TC with view `V`, the Pacemaker will skip ahead to view `V + 1` if `currentView ≤ V`.
 
 ![](/docs/PaceMaker.png)
  
@@ -159,7 +156,7 @@ For completeness, we list the component implemented in each sub-folder below:
 * `/consensus/hotstuff/integration` integration tests for verifying correct interaction of multiple HotStuff replicas
 * `/consensus/hotstuff/model` contains the HotStuff data models, including block proposal, vote, timeout, etc. 
 Many HotStuff data models are built on top of basic data models defined in `/model/flow/`.
-* `/consensus/hotstuff/notifications`: All relevant events within the HotStuff logic are exported though a notification system. Notifications are used by _some_ HotStuff components internally to drive core logic(events from `VoteAggregator` and `TimeoutAggregator`), they also notify other components within the same node of relevant progress and are used for collecting HotStuff metrics.
+* `/consensus/hotstuff/notifications`: All relevant events within the HotStuff logic are exported though a notification system. Notifications are used by _some_ HotStuff components internally to drive core logic (events from `VoteAggregator` and `TimeoutAggregator`), they also notify other components within the same node of relevant progress and are used for collecting HotStuff metrics.
 * `/consensus/hotstuff/pacemaker` contains the implementation of Flow's Active PaceMaker, as described above. Is responsible for protocol liveness. 
 * `/consensus/hotstuff/persister` for performance reasons, the implementation maintains the consensus state largely in-memory. The `persister` stores latest safety and liveness data persistently on disk. This allows recovery after a crash without the risk of equivocation.
 * `/consensus/hotstuff/safetyrules` tracks the latest vote, the latest timeout and determines whether to vote for a block and if it's safe to timeout current round.
@@ -183,7 +180,7 @@ The following figure depicts at which points notifications are emitted.
 ![](/docs/StateMachine_with_notifications.png)
 
 We have implemented a telemetry system (`hotstuff.notifications.TelemetryConsumer`) which implements the `Consumer` interface.
-The `TelemetryConsumer` tracks all events as belonging together that were emitted during a path through the state machine as well as events from components that perform asynchronous processing(`VoteAggregator`, `TimeoutAggregator`).
+The `TelemetryConsumer` tracks all events as belonging together that were emitted during a path through the state machine as well as events from components that perform asynchronous processing (`VoteAggregator`, `TimeoutAggregator`).
 Each `path` through the state machine is identified by a unique id.
 Generally, the `TelemetryConsumer` could export the collected data to a variety of backends.
 For now, we export the data to a logger.
