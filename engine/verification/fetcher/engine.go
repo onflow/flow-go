@@ -169,10 +169,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 
-	span, _, isSampled := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
-	if isSampled {
-		span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
-	}
+	span, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
+	span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
@@ -264,7 +262,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Bool("system_chunk", IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
 		Logger()
 
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
 	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)

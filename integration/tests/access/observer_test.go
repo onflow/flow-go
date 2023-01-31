@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -35,9 +34,7 @@ type ObserverSuite struct {
 }
 
 func (suite *ObserverSuite) TearDownTest() {
-	if suite.teardown != nil {
-		suite.teardown()
-	}
+	suite.net.Remove()
 }
 
 func (suite *ObserverSuite) SetupTest() {
@@ -82,9 +79,8 @@ func (suite *ObserverSuite) SetupTest() {
 
 	// start the network
 	ctx := context.Background()
-	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
+	err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
@@ -93,13 +89,7 @@ func (suite *ObserverSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
-	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
-
-	// set the teardown function
-	suite.teardown = func() {
-		stop()
-		suite.net.Remove()
-	}
+	suite.net.Start(ctx)
 }
 
 func (suite *ObserverSuite) TestObserverConnection() {
@@ -114,6 +104,30 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	// ping the observer while the access container is running
 	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
 	assert.NoError(t, err)
+}
+
+func (suite *ObserverSuite) TestObserverCompareRPCs() {
+	ctx := context.Background()
+	t := suite.T()
+
+	// get an observer and access client
+	observer, err := suite.getObserverClient()
+	assert.NoError(t, err)
+
+	access, err := suite.getAccessClient()
+	assert.NoError(t, err)
+
+	// verify that both clients return the same errors
+	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
+		t.Run(rpc.name, func(t *testing.T) {
+			accessErr := rpc.call(ctx, access)
+			observerErr := rpc.call(ctx, observer)
+			assert.Equal(t, accessErr, observerErr)
+		})
+	}
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
@@ -159,30 +173,6 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 		}
 	})
 
-}
-
-func (suite *ObserverSuite) TestObserverCompareRPCs() {
-	ctx := context.Background()
-	t := suite.T()
-
-	// get an observer and access client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
-
-	access, err := suite.getAccessClient()
-	assert.NoError(t, err)
-
-	// verify that both clients return the same errors
-	for _, rpc := range suite.getRPCs() {
-		if _, local := suite.local[rpc.name]; local {
-			continue
-		}
-		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access)
-			observerErr := rpc.call(ctx, observer)
-			assert.Equal(t, accessErr, observerErr)
-		})
-	}
 }
 
 func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {

@@ -6,15 +6,15 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
 
 func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
-	tracer module.Tracer,
+	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 ) error {
@@ -32,14 +32,12 @@ func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 }
 
 func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	tracer module.Tracer,
+	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
 	txnState *state.TransactionState,
 ) error {
 
-	defer proc.StartSpanFromProcTraceSpan(
-		tracer,
-		trace.FVMSeqNumCheckTransaction).End()
+	defer tracer.StartChildSpan(trace.FVMSeqNumCheckTransaction).End()
 
 	nestedTxnId, err := txnState.BeginNestedTransaction()
 	if err != nil {
