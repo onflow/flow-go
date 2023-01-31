@@ -2107,7 +2107,7 @@ func TestAuthAccountLinking(t *testing.T) {
 	t.Run("script",
 		newVMTest().run(func(
 			t *testing.T,
-			vm *fvm.VirtualMachine,
+			vm fvm.VM,
 			chain flow.Chain,
 			ctx fvm.Context,
 			view state.View,
@@ -2132,7 +2132,7 @@ func TestAuthAccountLinking(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		).run(func(
 			t *testing.T,
-			vm *fvm.VirtualMachine,
+			vm fvm.VM,
 			chain flow.Chain,
 			ctx fvm.Context,
 			view state.View,
