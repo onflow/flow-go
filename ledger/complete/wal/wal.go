@@ -96,8 +96,9 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
-			_, err := forest.Update(update)
-			return err
+			panic("Not implemented")
+			// _, err := forest.Update(update)
+			// return err
 		},
 		func(rootHash ledger.RootHash) error {
 			return nil

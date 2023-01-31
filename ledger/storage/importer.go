@@ -16,7 +16,7 @@ import (
 // reads all the leaf nodes from the checkpoint file, and store them into the given
 // storage store.
 func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.Logger, store ledger.PayloadStorage) error {
-	leafNodes, err := wal.ReadLeafNodesFromCheckpoint(dir, fileName, logger)
+	leafNodes, err := wal.ReadLeafNodesFromCheckpointV6(dir, fileName, logger)
 	if err != nil {
 		return fmt.Errorf("could not read tries: %w", err)
 	}

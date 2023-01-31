@@ -7,10 +7,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -19,9 +19,9 @@ import (
 func TestLeafNodeEncodingDecoding(t *testing.T) {
 
 	// Leaf node with nil payload
-	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNode := node.NewNode(255, nil, nil, hashValue1, hashValue2)
+	paths := testutils.RandomPaths(1)
+	payload := testutils.RandomPayload(1, 100)
+	leafNode := node.NewLeaf(paths[0], payload, 255)
 
 	t.Run("encode", func(t *testing.T) {
 		scratchBuffers := [][]byte{
@@ -33,15 +33,17 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 
 		for _, scratch := range scratchBuffers {
 			encodedNode := flattener.EncodeNode(leafNode, 0, 0, scratch)
+			require.Equal(t, 1+2+32+32, len(encodedNode), "encode leaf node should alway have 67 bytes")
 
 			reader := bytes.NewReader(encodedNode)
-			newNode, _, _, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 				return nil, fmt.Errorf("no call expected")
 			})
 			require.NoError(t, err)
 			require.Equal(t, leafNode.Height(), newNode.Height())
 			require.Equal(t, leafNode.Hash(), newNode.Hash())
 			require.Equal(t, leafNode.ExpandedLeafHash(), newNode.ExpandedLeafHash())
+			require.Equal(t, 0, reader.Len())
 		}
 	})
 }
@@ -60,10 +62,9 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 	for i := 0; i < count; i++ {
 		height := rand.Intn(257)
 
-		var hashValue hash.Hash
-		rand.Read(hashValue[:])
-
-		n := node.NewNode(height, nil, nil, hashValue, hashValue)
+		paths := testutils.RandomPaths(1)
+		payload := testutils.RandomPayload(1, 100)
+		n := node.NewLeaf(paths[0], payload, height)
 
 		encodedNode := flattener.EncodeNode(n, 0, 0, writeScratch)
 
@@ -76,12 +77,12 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		}
 
 		reader := bytes.NewReader(encodedNode)
-		newNode, _, _, err := flattener.ReadNode(reader, readScratch, func(nodeIndex uint64) (*node.Node, error) {
+		newNode, err := flattener.ReadNode(reader, readScratch, func(nodeIndex uint64) (*node.Node, error) {
 			return nil, fmt.Errorf("no call expected")
 		})
 		require.NoError(t, err)
-		assert.Equal(t, n, newNode)
-		assert.Equal(t, 0, reader.Len())
+		require.Equal(t, n, newNode)
+		require.Equal(t, 0, reader.Len())
 	}
 }
 
@@ -91,41 +92,18 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 	const rchildIndex = 2
 
 	// Child node
-	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	leafNode1 := node.NewNode(255, nil, nil, hashValue1, hashValue1)
+	paths := testutils.RandomPaths(1)
+	payload := testutils.RandomPayload(1, 100)
+	leafNode1 := node.NewLeaf(paths[0], payload, 255)
 
 	// Child node
-	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNode2 := node.NewNode(255, nil, nil, hashValue2, hashValue2)
+
+	paths = testutils.RandomPaths(1)
+	payload = testutils.RandomPayload(1, 100)
+	leafNode2 := node.NewLeaf(paths[0], payload, 255)
 
 	// Interim node
-	hashValue3 := hash.Hash([32]byte{3, 3, 3})
-	interimNode := node.NewNode(256, leafNode1, leafNode2, hashValue3, hash.DummyHash)
-
-	encodedInterimNode := []byte{
-		0x01,       // node type
-		0x01, 0x00, // height
-		0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // hash data
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // LIndex
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // RIndex
-	}
-
-	t.Run("encode", func(t *testing.T) {
-		scratchBuffers := [][]byte{
-			nil,
-			make([]byte, 0),
-			make([]byte, 16),
-			make([]byte, 1024),
-		}
-
-		for _, scratch := range scratchBuffers {
-			data := flattener.EncodeNode(interimNode, lchildIndex, rchildIndex, scratch)
-			assert.Equal(t, encodedInterimNode, data)
-		}
-	})
+	interimNode := node.NewInterimNode(254, leafNode1, leafNode2)
 
 	t.Run("decode", func(t *testing.T) {
 		scratchBuffers := [][]byte{
@@ -136,8 +114,9 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 		}
 
 		for _, scratch := range scratchBuffers {
+			encodedInterimNode := flattener.EncodeNode(interimNode, lchildIndex, rchildIndex, scratch)
 			reader := bytes.NewReader(encodedInterimNode)
-			newNode, _, _, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 				switch nodeIndex {
 				case lchildIndex:
 					return leafNode1, nil
@@ -148,8 +127,8 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 				}
 			})
 			require.NoError(t, err)
-			assert.Equal(t, interimNode, newNode)
-			assert.Equal(t, 0, reader.Len())
+			require.Equal(t, interimNode, newNode)
+			require.Equal(t, 0, reader.Len())
 		}
 	})
 
@@ -157,8 +136,9 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 		nodeNotFoundError := errors.New("failed to find node by index")
 		scratch := make([]byte, 1024)
 
+		encodedInterimNode := flattener.EncodeNode(interimNode, lchildIndex, rchildIndex, scratch)
 		reader := bytes.NewReader(encodedInterimNode)
-		newNode, _, _, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			return nil, nodeNotFoundError
 		})
 		require.Nil(t, newNode)
@@ -218,7 +198,7 @@ func TestTrieEncodingDecoding(t *testing.T) {
 
 			for _, scratch := range scratchBuffers {
 				encodedTrie := flattener.EncodeTrie(tc.trie, tc.rootNodeIndex, scratch)
-				assert.Equal(t, tc.encodedTrie, encodedTrie)
+				require.Equal(t, tc.encodedTrie, encodedTrie)
 
 				if len(scratch) > 0 {
 					if len(scratch) >= len(encodedTrie) {
@@ -249,10 +229,10 @@ func TestTrieEncodingDecoding(t *testing.T) {
 					return tc.trie.RootNode(), nil
 				})
 				require.NoError(t, err)
-				assert.Equal(t, tc.trie, trie)
-				assert.Equal(t, tc.trie.AllocatedRegCount(), trie.AllocatedRegCount())
-				assert.Equal(t, tc.trie.AllocatedRegSize(), trie.AllocatedRegSize())
-				assert.Equal(t, 0, reader.Len())
+				require.Equal(t, tc.trie, trie)
+				require.Equal(t, tc.trie.AllocatedRegCount(), trie.AllocatedRegCount())
+				require.Equal(t, tc.trie.AllocatedRegSize(), trie.AllocatedRegSize())
+				require.Equal(t, 0, reader.Len())
 			}
 		})
 

@@ -13,9 +13,12 @@ type PayloadStorage struct {
 	storage ledger.Storage
 }
 
+func NewPayloadStorage(store ledger.Storage) *PayloadStorage {
+	return &PayloadStorage{store}
+}
+
 func (s *PayloadStorage) Get(hash hash.Hash) (ledger.Path, *ledger.Payload, error) {
-	key := hash[:]
-	value, err := s.storage.Get(key)
+	value, err := s.storage.Get(hash)
 	if err != nil {
 		return ledger.DummyPath, nil, fmt.Errorf("could not get by hash: %w", err)
 	}
@@ -29,12 +32,12 @@ func (s *PayloadStorage) Get(hash hash.Hash) (ledger.Path, *ledger.Payload, erro
 }
 
 func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
-	keys := make([][]byte, 0, len(updates))
+	keys := make([]hash.Hash, 0, len(updates))
 	values := make([][]byte, 0, len(updates))
 	scratch := make([]byte, 1024*4)
 
 	for _, update := range updates {
-		key := update.Hash[:]
+		key := update.Hash
 		value, err := EncodePayload(update.Path, &update.Payload, scratch)
 		if err != nil {
 			return fmt.Errorf("could not encode payload: %w", err)

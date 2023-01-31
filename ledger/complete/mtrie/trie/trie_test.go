@@ -134,7 +134,7 @@ func Test_FullTrie(t *testing.T) {
 		payloads = append(payloads, *payload)
 		totalPayloadSize += uint64(payload.Size())
 	}
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, unittest.CreateMockPayloadStore())
 	require.NoError(t, err)
 	require.Equal(t, uint16(256), maxDepthTouched)
 	require.Equal(t, uint64(numberRegisters), updatedTrie.AllocatedRegCount())

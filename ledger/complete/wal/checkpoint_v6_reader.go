@@ -83,7 +83,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	return tries, nil
 }
 
-func ReadLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.Logger) (leafNodes []*ledger.LeafNode, errToReturn error) {
+func ReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (leafNodes []*ledger.LeafNode, errToReturn error) {
 	filepath := filePathCheckpointHeader(dir, fileName)
 
 	f, err := os.Open(filepath)
@@ -243,7 +243,7 @@ func readLeafNodeFromCheckpointSubtrie(dir string, fileName string, index int, c
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	leafNodes = make([]*ledger.LeafNode, 0, nodesCount+1)
 	for i := uint64(1); i <= nodesCount; i++ {
-		node, path, payload, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		node, path, payload, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -598,7 +598,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
-		node, _, _, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		node, _, _, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -758,7 +758,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// read the nodes from subtrie level to the root level
 	for i := uint64(1); i <= topLevelNodesCount; i++ {
-		node, _, _, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		node, _, _, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}

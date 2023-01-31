@@ -3,8 +3,8 @@ package ledger
 import "github.com/onflow/flow-go/ledger/common/hash"
 
 type Storage interface {
-	Get([]byte) ([]byte, error)
-	SetMul(keys [][]byte, values [][]byte) error
+	Get(hash.Hash) ([]byte, error)
+	SetMul(keys []hash.Hash, values [][]byte) error
 }
 
 type LeafNode struct {
