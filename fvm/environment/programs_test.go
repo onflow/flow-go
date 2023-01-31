@@ -193,7 +193,10 @@ func Test_Programs(t *testing.T) {
 
 		loadedCode := false
 		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			if key == environment.ContractKey("A") {
+			id := flow.ContractRegisterID(
+				flow.BytesToAddress([]byte(owner)),
+				"A")
+			if key == id.Key {
 				loadedCode = true
 			}
 
@@ -232,8 +235,11 @@ func Test_Programs(t *testing.T) {
 
 		// execute transaction again, this time make sure it doesn't load code
 		viewExecA2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+			id := flow.ContractRegisterID(
+				flow.BytesToAddress([]byte(owner)),
+				"A")
 			// this time we fail if a read of code occurs
-			require.NotEqual(t, key, environment.ContractKey("A"))
+			require.NotEqual(t, key, id.Key)
 
 			return mainView.Peek(owner, key)
 		})
@@ -341,9 +347,15 @@ func Test_Programs(t *testing.T) {
 
 		// execute transaction again, this time make sure it doesn't load code
 		viewExecB2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+			idA := flow.ContractRegisterID(
+				flow.BytesToAddress([]byte(owner)),
+				"A")
+			idB := flow.ContractRegisterID(
+				flow.BytesToAddress([]byte(owner)),
+				"B")
 			// this time we fail if a read of code occurs
-			require.NotEqual(t, key, environment.ContractKey("A"))
-			require.NotEqual(t, key, environment.ContractKey("B"))
+			require.NotEqual(t, key, idA.Key)
+			require.NotEqual(t, key, idB.Key)
 
 			return mainView.Peek(owner, key)
 		})
@@ -370,7 +382,10 @@ func Test_Programs(t *testing.T) {
 		// only because contract B has been called
 
 		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			require.NotEqual(t, key, environment.ContractKey("A"))
+			id := flow.ContractRegisterID(
+				flow.BytesToAddress([]byte(owner)),
+				"A")
+			require.NotEqual(t, key, id.Key)
 			return mainView.Peek(owner, key)
 		})
 

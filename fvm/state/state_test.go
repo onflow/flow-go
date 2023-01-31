@@ -2,11 +2,8 @@ package state_test
 
 import (
 	"testing"
-	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
@@ -192,34 +189,4 @@ func TestState_MaxInteraction(t *testing.T) {
 	_, err = st.Get(flow.RegisterID{Owner: "3", Key: "4"})
 	require.Error(t, err)
 
-}
-
-func TestState_IsFVMStateKey(t *testing.T) {
-	require.True(t, state.IsFVMStateKey("", state.UUIDKey))
-	require.True(t, state.IsFVMStateKey("", state.AddressStateKey))
-	require.False(t, state.IsFVMStateKey("", "other"))
-	require.False(t, state.IsFVMStateKey("Address", state.UUIDKey))
-	require.False(t, state.IsFVMStateKey("Address", state.AddressStateKey))
-	require.True(t, state.IsFVMStateKey("Address", "public_key_12"))
-	require.True(t, state.IsFVMStateKey("Address", state.ContractNamesKey))
-	require.True(t, state.IsFVMStateKey("Address", "code.MYCODE"))
-	require.True(t, state.IsFVMStateKey("Address", state.AccountStatusKey))
-	require.False(t, state.IsFVMStateKey("Address", "anything else"))
-}
-
-func TestAccounts_PrintableKey(t *testing.T) {
-	// slab with 189 should result in \\xbd
-	slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
-	key := string(atree.SlabIndexToLedgerKey(slabIndex))
-	require.False(t, utf8.ValidString(key))
-	printable := state.PrintableKey(key)
-	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "$189", printable)
-
-	// non slab invalid utf-8
-	key = "a\xc5z"
-	require.False(t, utf8.ValidString(key))
-	printable = state.PrintableKey(key)
-	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "#61c57a", printable)
 }
