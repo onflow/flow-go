@@ -111,10 +111,10 @@ func (mt *MTrie) String() string {
 //
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
-	sizes := make([]int, len(paths)) // pre-allocate slice for the result
 	panic("TO IMPLEMENT")
+	// sizes := make([]int, len(paths)) // pre-allocate slice for the result
 	// valueSizes(sizes, paths, mt.root)
-	return sizes
+	// return sizes
 }
 
 // valueSizes returns value sizes of all the registers in `paths“ in subtree with `head` as root node.

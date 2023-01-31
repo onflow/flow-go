@@ -38,24 +38,24 @@ type Node struct {
 	leafNodeHash hash.Hash // hash value of the fully expanded leaf node (leaf nodes only)
 }
 
-// // NewNode creates a new Node.
-// // UNCHECKED requirement: combination of values must conform to
-// // a valid node type (see documentation of `Node` for details)
-// func NewNode(height int,
-// 	lchild,
-// 	rchild *Node,
-// 	hashValue hash.Hash,
-// 	leafNodeHash hash.Hash,
-// ) *Node {
-// 	n := &Node{
-// 		lChild:       lchild,
-// 		rChild:       rchild,
-// 		height:       height,
-// 		hashValue:    hashValue,
-// 		leafNodeHash: leafNodeHash,
-// 	}
-// 	return n
-// }
+// NewNode creates a new Node.
+// UNCHECKED requirement: combination of values must conform to
+// a valid node type (see documentation of `Node` for details)
+func NewNode(height int,
+	lchild,
+	rchild *Node,
+	hashValue hash.Hash,
+	leafNodeHash hash.Hash,
+) *Node {
+	n := &Node{
+		lChild:       lchild,
+		rChild:       rchild,
+		height:       height,
+		hashValue:    hashValue,
+		leafNodeHash: leafNodeHash,
+	}
+	return n
+}
 
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative

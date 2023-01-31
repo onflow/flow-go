@@ -49,14 +49,10 @@ const PayloadEncodingVersion = 1
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := ledger.EncodedPayloadLengthWithoutPrefix(n.Payload(), PayloadEncodingVersion)
-
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
 		encHashSize +
-		encPathSize +
-		encPayloadLengthSize +
-		encPayloadSize
+		encHashSize
 
 	// buf uses received scratch buffer if it's large enough.
 	// Otherwise, a new buffer is allocated.
@@ -82,18 +78,10 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	copy(buf[pos:], hash[:])
 	pos += encHashSize
 
-	// Encode path (32 bytes path)
-	path := n.Path()
-	copy(buf[pos:], path[:])
-	pos += encPathSize
-
-	// Encode payload (4 bytes Big Endian for encoded payload length and n bytes encoded payload)
-	binary.BigEndian.PutUint32(buf[pos:], uint32(encPayloadSize))
-	pos += encPayloadLengthSize
-
-	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
-	// Returned buf is resliced to include appended payload.
-	buf = ledger.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), PayloadEncodingVersion)
+	// Encode hash (32 bytes hashValue)
+	leafHash := n.ExpandedLeafHash()
+	copy(buf[pos:], leafHash[:])
+	pos += encHashSize
 
 	return buf
 }
