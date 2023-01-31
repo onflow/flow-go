@@ -11,11 +11,6 @@ import (
 	"github.com/onflow/flow-go/utils/slices"
 )
 
-var uuidKey = flow.RegisterID{
-	Owner: "",
-	Key:   state.UUIDKey,
-}
-
 type UUIDGenerator interface {
 	GenerateUUID() (uint64, error)
 }
@@ -63,7 +58,7 @@ func NewUUIDGenerator(
 
 // GetUUID reads uint64 byte value for uuid from the state
 func (generator *uUIDGenerator) getUUID() (uint64, error) {
-	stateBytes, err := generator.txnState.Get(uuidKey)
+	stateBytes, err := generator.txnState.Get(flow.UUIDRegisterID)
 	if err != nil {
 		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
 	}
@@ -76,7 +71,7 @@ func (generator *uUIDGenerator) getUUID() (uint64, error) {
 func (generator *uUIDGenerator) setUUID(uuid uint64) error {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	err := generator.txnState.Set(uuidKey, bytes)
+	err := generator.txnState.Set(flow.UUIDRegisterID, bytes)
 	if err != nil {
 		return fmt.Errorf("cannot set uuid byte to state: %w", err)
 	}

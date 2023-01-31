@@ -1,24 +1,128 @@
 package flow
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
+
+const (
+	// Service level keys (owner is empty):
+	UUIDKey         = "uuid"
+	AddressStateKey = "account_address_state"
+
+	// Account level keys
+	AccountKeyPrefix   = "a."
+	AccountStatusKey   = AccountKeyPrefix + "s"
+	CodeKeyPrefix      = "code."
+	ContractNamesKey   = "contract_names"
+	PublicKeyKeyPrefix = "public_key_"
+)
+
+func addressToOwner(address Address) string {
+	return string(address.Bytes())
+}
 
 type RegisterID struct {
 	Owner string
 	Key   string
 }
 
+var AddressStateRegisterID = RegisterID{
+	Owner: "",
+	Key:   AddressStateKey,
+}
+
+var UUIDRegisterID = RegisterID{
+	Owner: "",
+	Key:   UUIDKey,
+}
+
+func AccountStatusRegisterID(address Address) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   AccountStatusKey,
+	}
+}
+
+func PublicKeyRegisterID(address Address, index uint64) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   fmt.Sprintf("public_key_%d", index),
+	}
+}
+
+func ContractNamesRegisterID(address Address) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   ContractNamesKey,
+	}
+}
+
+func ContractRegisterID(address Address, contractName string) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   CodeKeyPrefix + contractName,
+	}
+}
+
+func CadenceRegisterID(owner []byte, key []byte) RegisterID {
+	return RegisterID{
+		Owner: string(BytesToAddress(owner).Bytes()),
+		Key:   string(key),
+	}
+}
+
+// IsInternalState returns true if the register id is controlled by flow-go and
+// return false otherwise (key controlled by the cadence env).
+func (id RegisterID) IsInternalState() bool {
+	// check if is a service level key (owner is empty)
+	// cases:
+	//      - "", "uuid"
+	//      - "", "account_address_state"
+	if len(id.Owner) == 0 && (id.Key == UUIDKey || id.Key == AddressStateKey) {
+		return true
+	}
+
+	// check account level keys
+	// cases:
+	//      - address, "contract_names"
+	//      - address, "code.%s" (contract name)
+	//      - address, "public_key_%d" (index)
+	//      - address, "a.s" (account status)
+	return strings.HasPrefix(id.Key, PublicKeyKeyPrefix) ||
+		id.Key == ContractNamesKey ||
+		strings.HasPrefix(id.Key, CodeKeyPrefix) ||
+		id.Key == AccountStatusKey
+}
+
+// IsSlabIndex returns true if the key is a slab index for an account's ordered fields
+// map.
+//
+// In general, each account's regular fields are stored in ordered map known
+// only to cadence.  Cadence encodes this map into bytes and split the bytes
+// into slab chunks before storing the slabs into the ledger.
+func (id RegisterID) IsSlabIndex() bool {
+	return len(id.Key) == 9 && id.Key[0] == '$'
+}
+
+// TODO(patrick): pretty print flow internal register ids.
 // String returns formatted string representation of the RegisterID.
-// TODO(rbtz): remove after the merge of https://github.com/onflow/flow-emulator/pull/235
-// Deprecated: used only by emultor.
-func (r *RegisterID) String() string {
-	return fmt.Sprintf("%x/%x", r.Owner, r.Key)
+func (id RegisterID) String() string {
+	formattedKey := ""
+	if id.IsSlabIndex() {
+		i := uint64(binary.BigEndian.Uint64([]byte(id.Key[1:])))
+		formattedKey = fmt.Sprintf("$%d", i)
+	} else {
+		formattedKey = fmt.Sprintf("#%x", []byte(id.Key))
+	}
+
+	return fmt.Sprintf("%x/%s", id.Owner, formattedKey)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
