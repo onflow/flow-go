@@ -89,16 +89,16 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 
 	status := c.getRequestStatus(header.Height, header.ID())
 
-	// if we never asked for this block, discard it
-	if !status.WasQueued() {
-		log.Debug().Msg("discarding not queued block")
-		return false
-	}
-	// if we have already received this block, exit
-	if status.WasReceived() {
-		log.Debug().Msg("discarding not received block")
-		return false
-	}
+	// // if we never asked for this block, discard it
+	// if !status.WasQueued() {
+	// 	log.Debug().Msg("discarding not queued block")
+	// 	return false
+	// }
+	// // if we have already received this block, exit
+	// if status.WasReceived() {
+	// 	log.Debug().Msg("discarding not received block")
+	// 	return false
+	// }
 
 	// this is a new block, remember that we've seen it
 	status.Header = header
