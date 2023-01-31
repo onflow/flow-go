@@ -36,9 +36,9 @@ var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 	common.ComputationKindStatement:          1569,
 	common.ComputationKindLoop:               1569,
 	common.ComputationKindFunctionInvocation: 1569,
-	meter.ComputationKindGetValue:            808,
-	meter.ComputationKindCreateAccount:       2837670,
-	meter.ComputationKindSetValue:            765,
+	environment.ComputationKindGetValue:      808,
+	environment.ComputationKindCreateAccount: 2837670,
+	environment.ComputationKindSetValue:      765,
 }
 
 type vmTest struct {

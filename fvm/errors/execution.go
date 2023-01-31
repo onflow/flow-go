@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"strings"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
@@ -150,15 +148,14 @@ func NewEventLimitExceededError(
 // NewStateKeySizeLimitError constructs a CodedError which indicates that the
 // provided key has exceeded the size limit allowed by the storage.
 func NewStateKeySizeLimitError(
-	owner string,
-	key string,
+	id flow.RegisterID,
 	size uint64,
 	limit uint64,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeStateKeySizeLimitError,
 		"key %s has size %d which is higher than storage key size limit %d.",
-		strings.Join([]string{owner, key}, "/"),
+		id,
 		size,
 		limit)
 }
