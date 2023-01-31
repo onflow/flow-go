@@ -203,11 +203,11 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		}
 		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
 	}
+
 	ok, aggregatedKey, err := s.VerifyAggregate(indices, aggregatedSignature) // no errors expected (unless some public BLS keys are invalid)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
-
 	if !ok {
 		// check for identity signature (invalid aggregated signature)
 		if aggregatedKey.Equals(crypto.IdentityBLSPublicKey()) {
