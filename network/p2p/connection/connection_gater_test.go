@@ -81,12 +81,12 @@ func TestConnectionGating(t *testing.T) {
 		// add node2 to node1's allow list, but not the other way around.
 		node1Peers.Add(node2.Host().ID(), struct{}{})
 
+		// from node2 -> node1 should also NOT work, since node 1 is not in node2's allow list for dialing!
+		p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node2}, []p2p.LibP2PNode{node1})
+
 		// now node2 should be able to connect to node1.
 		// from node1 -> node2 shouldn't work
 		p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2})
-
-		// however, from node2 -> node1 should also NOT work, since node 1 is not in node2's allow list for dialing!
-		p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node2}, []p2p.LibP2PNode{node1})
 	})
 
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
