@@ -384,7 +384,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters(),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
 
@@ -399,7 +399,7 @@ func TestStorageLimits(t *testing.T) {
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 
 		// first read of key2
-		key2 := flow.RegisterID{Owner: "", Key: "2"}
+		key2 := flow.NewRegisterID("", "2")
 		val2 := []byte{0x3, 0x2, 0x1}
 		size2 := meter.GetStorageKeyValueSizeForTesting(key2, val2)
 
@@ -413,7 +413,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters(),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 		val2 := []byte{0x1, 0x2, 0x3, 0x4}
 
@@ -428,7 +428,7 @@ func TestStorageLimits(t *testing.T) {
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val2))
 
 		// first write of key2
-		key2 := flow.RegisterID{Owner: "", Key: "2"}
+		key2 := flow.NewRegisterID("", "2")
 		err = meter1.MeterStorageWrite(key2, val2, false)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(),
@@ -440,7 +440,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters().WithStorageInteractionLimit(1),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
 		err := meter1.MeterStorageRead(key1, val1, false /* not enforced */)
@@ -454,7 +454,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters().WithStorageInteractionLimit(testLimit),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
 		err := meter1.MeterStorageRead(key1, val1, true /* enforced */)
@@ -472,7 +472,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters().WithStorageInteractionLimit(testLimit),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
 		err := meter1.MeterStorageWrite(key1, val1, false /* not enforced */)
@@ -485,7 +485,7 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters().WithStorageInteractionLimit(testLimit),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
+		key1 := flow.NewRegisterID("", "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
 		err := meter1.MeterStorageWrite(key1, val1, true /* enforced */)
@@ -502,8 +502,8 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters(),
 		)
 
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
-		key2 := flow.RegisterID{Owner: "", Key: "2"}
+		key1 := flow.NewRegisterID("", "1")
+		key2 := flow.NewRegisterID("", "2")
 		val1 := []byte{0x1, 0x2, 0x3}
 		val2 := []byte{0x1, 0x2, 0x3, 0x4}
 		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
@@ -523,8 +523,8 @@ func TestStorageLimits(t *testing.T) {
 	})
 
 	t.Run("metering storage read and written - exceeding limit - not enforced", func(t *testing.T) {
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
-		key2 := flow.RegisterID{Owner: "", Key: "2"}
+		key1 := flow.NewRegisterID("", "1")
+		key2 := flow.NewRegisterID("", "2")
 		val1 := []byte{0x1, 0x2, 0x3}
 		val2 := []byte{0x1, 0x2, 0x3, 0x4}
 		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
@@ -548,8 +548,8 @@ func TestStorageLimits(t *testing.T) {
 	})
 
 	t.Run("metering storage read and written - exceeding limit - enforced", func(t *testing.T) {
-		key1 := flow.RegisterID{Owner: "", Key: "1"}
-		key2 := flow.RegisterID{Owner: "", Key: "2"}
+		key1 := flow.NewRegisterID("", "1")
+		key2 := flow.NewRegisterID("", "2")
 		val1 := []byte{0x1, 0x2, 0x3}
 		val2 := []byte{0x1, 0x2, 0x3, 0x4}
 		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
@@ -579,13 +579,13 @@ func TestStorageLimits(t *testing.T) {
 		meter1 := meter.NewMeter(
 			meter.DefaultParameters(),
 		)
-		readKey1 := flow.RegisterID{Owner: "", Key: "r1"}
+		readKey1 := flow.NewRegisterID("", "r1")
 		readVal1 := []byte{0x1, 0x2, 0x3}
 		readSize1 := meter.GetStorageKeyValueSizeForTesting(readKey1, readVal1)
 		err := meter1.MeterStorageRead(readKey1, readVal1, false)
 		require.NoError(t, err)
 
-		writeKey1 := flow.RegisterID{Owner: "", Key: "w1"}
+		writeKey1 := flow.NewRegisterID("", "w1")
 		writeVal1 := []byte{0x1, 0x2, 0x3, 0x4}
 		writeSize1 := meter.GetStorageKeyValueSizeForTesting(writeKey1, writeVal1)
 		err = meter1.MeterStorageWrite(writeKey1, writeVal1, false)
@@ -600,7 +600,7 @@ func TestStorageLimits(t *testing.T) {
 		err = meter2.MeterStorageRead(readKey1, readVal1, false)
 		require.NoError(t, err)
 
-		writeKey2 := flow.RegisterID{Owner: "", Key: "w2"}
+		writeKey2 := flow.NewRegisterID("", "w2")
 		writeVal2 := []byte{0x1, 0x2, 0x3, 0x4, 0x5}
 		writeSize2 := meter.GetStorageKeyValueSizeForTesting(writeKey2, writeVal2)
 		err = meter2.MeterStorageWrite(writeKey2, writeVal2, false)
