@@ -91,7 +91,7 @@ func (s *Seals) FinalizedSealForBlock(blockID flow.Identifier) (*flow.Seal, erro
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBySealedBlockID(blockID, &sealID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve seal for fork with head %x: %w", blockID, err)
+		return nil, fmt.Errorf("failed to retrieve seal for block %x: %w", blockID, err)
 	}
 	return s.ByID(sealID)
 }

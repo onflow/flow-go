@@ -84,6 +84,18 @@ func TestConvertBlockExecutionData(t *testing.T) {
 	// Fill the chunk execution datas with trie updates, collections, and events
 	minSerializedSize := uint64(10 * execution_data.DefaultMaxBlobSize)
 	for i := 0; i < numChunks; i++ {
+		// the service chunk sometimes does not have any trie updates
+		if i == numChunks-1 {
+			tx1 := unittest.TransactionBodyFixture()
+			// proposal key and payer are empty addresses for service tx
+			tx1.ProposalKey.Address = flow.EmptyAddress
+			tx1.Payer = flow.EmptyAddress
+			bed.ChunkExecutionDatas[i] = &execution_data.ChunkExecutionData{
+				Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+			}
+			continue
+		}
+
 		// Initialize collection
 		tx1 := unittest.TransactionBodyFixture()
 		tx2 := unittest.TransactionBodyFixture()
