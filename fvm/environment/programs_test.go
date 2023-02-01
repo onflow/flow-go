@@ -211,6 +211,8 @@ func Test_Programs(t *testing.T) {
 
 		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
 
 		// assert dependencies are correct
 		require.Len(t, entry.Value.Dependencies, 1)
@@ -257,7 +259,6 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
-
 		// deploy contract B
 		procContractB := fvm.Transaction(
 			contractDeployTx("B", contractBCode, addressB),
@@ -274,6 +275,9 @@ func Test_Programs(t *testing.T) {
 		require.Nil(t, entryB)
 		require.Nil(t, entryC)
 		require.NotNil(t, entryA)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
 	})
 
 	var viewExecB *delta.View
@@ -409,6 +413,8 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryB)
 		require.Nil(t, entryC)
 
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 2, cached)
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
@@ -448,6 +454,9 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
 		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressB.Bytes())])
 		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressC.Bytes())])
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 3, cached)
 	})
 }
 
