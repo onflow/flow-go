@@ -290,12 +290,6 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
-	leafNodeUpdates := toLeafNodeUpdates(trieUpdate)
-	err = l.payloadStorage.Add(leafNodeUpdates)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("could not add trie update to storage: %w", err)
-	}
-
 	err = l.forest.AddTrie(newTrie)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)

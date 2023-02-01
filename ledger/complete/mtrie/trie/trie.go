@@ -398,7 +398,51 @@ func NewTrieWithUpdatedRegisters(
 	if err != nil {
 		return nil, 0, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
+
+	// before returning the trie, add all payloads to storage
+	// TODO: avoid re-computing hash
+	leafNodeUpdates := toLeafNodeUpdates(updatedPaths, updatedPayloads)
+
+	err = payloadStorage.Add(leafNodeUpdates)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not update storage with leaf node updates: %w", err)
+	}
+
 	return updatedTrie, maxDepthTouched, nil
+}
+
+// toLeafNodeUpdates converts the trie updates into the leaf nodes updates to be stored in storage
+func toLeafNodeUpdates(paths []ledger.Path, payloads []ledger.Payload) []ledger.LeafNode {
+
+	deduplicatedPaths := make([]ledger.Path, 0, len(paths))
+	deduplicatedPayloads := make([]ledger.Payload, 0, len(paths))
+	payloadMap := make(map[ledger.Path]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
+	for i, path := range paths {
+		payload := payloads[i]
+		// check if we already have encountered an update for the respective register
+		if idx, ok := payloadMap[path]; ok {
+			deduplicatedPayloads[idx] = payload
+		} else {
+			payloadMap[path] = len(deduplicatedPaths)
+			deduplicatedPaths = append(deduplicatedPaths, path)
+			deduplicatedPayloads = append(deduplicatedPayloads, payload)
+		}
+	}
+
+	leafs := make([]ledger.LeafNode, 0, len(deduplicatedPayloads))
+
+	for i, path := range deduplicatedPaths {
+		payload := deduplicatedPayloads[i]
+		// TODO: skip if payload.Value is empty
+		hash := ledger.ComputeFullyExpandedLeafValue(path, &payload)
+		leafs = append(leafs, ledger.LeafNode{
+			Hash:    hash,
+			Path:    path,
+			Payload: payload,
+		})
+	}
+
+	return leafs
 }
 
 // updateResult is a wrapper of return values from update().
@@ -439,7 +483,6 @@ func update(
 		// check is a compactLeaf from a higher height is still left.
 		if compactLeaf != nil {
 			leafHash := compactLeaf.ExpandedLeafHash()
-			// TODO: handle error
 			compactPath, leafPayload, err := payloadStorage.Get(leafHash)
 			if err != nil {
 				return nil, 0, 0, 0, fmt.Errorf("could not get payload by leaf hash %v: %w", leafHash, err)
@@ -454,7 +497,8 @@ func update(
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		n = node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+		// TODO: remove deep copy
+		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
 		if payloads[0].IsEmpty() {
 			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
 			return n, 0, 0, nodeHeight, nil
@@ -466,8 +510,10 @@ func update(
 		// check if the parent node path is among the updated paths
 		found := false
 		parentLeafHash := parentNode.ExpandedLeafHash()
-		// TODO: handle error
-		parentPath, parentPayload, _ := payloadStorage.Get(parentLeafHash)
+		parentPath, parentPayload, err := payloadStorage.Get(parentLeafHash)
+		if err != nil {
+			return nil, 0, 0, 0, fmt.Errorf("could not get payload for parent leaf hash %v: %w", parentLeafHash, err)
+		}
 
 		for i, p := range paths {
 			if p == parentPath {
@@ -518,10 +564,9 @@ func update(
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
 		leafHash := compactLeaf.ExpandedLeafHash()
-		// TODO: handle error
 		leafPath, _, err := payloadStorage.Get(leafHash)
 		if err != nil {
-			return nil, 0, 0, 0, fmt.Errorf("could not payload from storage by hash %v: %w", leafHash, err)
+			return nil, 0, 0, 0, fmt.Errorf("could not get payload from storage by hash %v: %w", leafHash, err)
 		}
 
 		if bitutils.ReadBit(leafPath[:], depth) == 0 {
