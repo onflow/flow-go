@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
+	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -591,8 +592,100 @@ func TestSealingSegment(t *testing.T) {
 }
 
 // TestSealingSegment_FailureCases verifies that SealingSegment construction fails with expected sentinel
-// errors in case the caller
+// errors in case the caller violates the API contract:
+//  1. The lowest block that can serve as head of a SealingSegment is the node's local root block.
+//  2. Unfinalized blocks cannot serve as head of a SealingSegment. There are two distinct sub-cases:
+//     (2a) A pending block is chosen as head; at this height no block has been finalized.
+//     (2b) An orphaned block is chosen as head; at this height a block other than the orphaned has been finalized.
 func TestSealingSegment_FailureCases(t *testing.T) {
+	sporkRootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	sporkRoot, err := sporkRootSnapshot.Head()
+	require.NoError(t, err)
+
+	// SCENARIO 1.
+	// Here, we want to specifically test correct handling of the edge case, where a block exists in storage
+	// that has _lower height_ than the node's local root block. Such blocks are typically contained in the
+	// bootstrapping data, such that all entities referenced in the local root block can be resolved.
+	// Is is possible to retrieve blocks that are lower than the local root block from storage, directly
+	// via their ID. Despite these blocks existing in storage, SealingSegment construction should be
+	// because the known history is potentially insufficient when going below the root block.
+	t.Run("sealing segment from block below local state root", func(t *testing.T) {
+		// Step I: constructing bootstrapping snapshot with some short history:
+		//
+		//       ╭───── finalized blocks ─────╮
+		//    <-  b1  <-  b2  <-  b3(seal(b1))  <-
+		//                        └── head ──┘
+		//
+		b1 := unittest.BlockWithParentFixture(sporkRoot) // construct block b1, append to state and finalize
+		b2 := unittest.BlockWithParentFixture(b1.Header) // construct block b2, append to state and finalize
+		b3 := unittest.BlockWithParentFixture(b2.Header) // construct block b3 with seal for b1, append it to state and finalize
+		receipt, seal := unittest.ReceiptAndSealForBlock(b1)
+		b3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt), unittest.WithSeals(seal)))
+
+		multipleBlockSnapshot := snapshotAfter(t, sporkRootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			for _, b := range []*flow.Block{b1, b2, b3} {
+				buildFinalizedBlock(t, state, b)
+			}
+			require.NoError(t, state.Extend(context.Background(), unittest.BlockWithParentFixture(b3.Header))) // add child of b3 to ensure we have a QC for b3
+			return state.AtBlockID(b3.ID())
+		})
+
+		// Step 2: bootstrapping new state based on sealing segment whose head is block b3.
+		// Thereby, the state should have b3 as its local root block. In addition, the blocks contained in the sealing
+		// segment, such as b2 should be stored in the state.
+		util.RunWithFollowerProtocolState(t, multipleBlockSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			localStateRootBlock, err := state.Params().Root()
+			require.NoError(t, err)
+			assert.Equal(t, b3.ID(), localStateRootBlock.ID())
+
+			// verify that b2 is known to the protocol state, but constructing a sealing segment fails
+			_, err = state.AtBlockID(b2.ID()).Head()
+			require.NoError(t, err)
+			_, err = state.AtBlockID(b2.ID()).SealingSegment()
+			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
+
+			// lowest block that allows for sealing segment construction is root block:
+			_, err = state.AtBlockID(b3.ID()).SealingSegment()
+			require.NoError(t, err)
+		})
+	})
+
+	// SCENARIO 2a: A pending block is chosen as head; at this height no block has been finalized.
+	t.Run("sealing segment from unfinalized, pending block", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// add _unfinalized_ blocks b1 and b2 to state (block b5 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
+			b1 := unittest.BlockWithParentFixture(sporkRoot)
+			require.NoError(t, state.Extend(context.Background(), b1))
+			require.NoError(t, state.Extend(context.Background(), unittest.BlockWithParentFixture(b1.Header))) // adding block b5 (providing required QC for b1)
+
+			// consistency check: there should be no finalized block in the protocol state at height `b1.Height`
+			_, err := state.AtHeight(b1.Header.Height).Head() // expect statepkg.ErrUnknownSnapshotReference as only finalized blocks are indexed by height
+			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
+
+			// requesting a sealing segment from block b1 should fail, as b1 is not yet finalized
+			_, err = state.AtBlockID(b1.ID()).SealingSegment()
+			assert.True(t, protocol.IsUnfinalizedSealingSegmentError(err))
+		})
+	})
+
+	// SCENARIO 2b: An orphaned block is chosen as head; at this height a block other than the orphaned has been finalized.
+	t.Run("sealing segment from orphaned block", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			orphaned := unittest.BlockWithParentFixture(sporkRoot)
+			require.NoError(t, state.Extend(context.Background(), orphaned))
+			require.NoError(t, state.Extend(context.Background(), unittest.BlockWithParentFixture(orphaned.Header)))
+			buildFinalizedBlock(t, state, unittest.BlockWithParentFixture(sporkRoot))
+
+			// consistency check: the finalized block at height `orphaned.Height` should be different than `orphaned`
+			h, err := state.AtHeight(orphaned.Header.Height).Head()
+			require.NoError(t, err)
+			require.NotEqual(t, h.ID(), orphaned.ID())
+
+			// requesting a sealing segment from orphaned block should fail, as it is not finalized
+			_, err = state.AtBlockID(orphaned.ID()).SealingSegment()
+			assert.True(t, protocol.IsUnfinalizedSealingSegmentError(err))
+		})
+	})
 
 }
 

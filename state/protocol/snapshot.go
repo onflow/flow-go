@@ -90,7 +90,7 @@ type Snapshot interface {
 	// flow.SealingSegment.ExecutionResults field.
 	// Expected errors during normal operations:
 	//   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
-	//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain uninitialized blocks (including orphaned blocks)
+	//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block.

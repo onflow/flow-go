@@ -260,7 +260,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 //
 // Expected errors during normal operations:
 //   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
-//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain uninitialized blocks (including orphaned blocks)
+//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// Lets denote the highest block in the sealing segment `head` (initialized below).
 	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
