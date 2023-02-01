@@ -110,9 +110,12 @@ func TestState_MaxValueSize(t *testing.T) {
 
 func TestState_MaxKeySize(t *testing.T) {
 	view := utils.NewSimpleView()
-	st := state.NewState(view, state.DefaultParameters().WithMaxKeySizeAllowed(4))
+	st := state.NewState(
+		view,
+		// Note: owners are always 8 bytes
+		state.DefaultParameters().WithMaxKeySizeAllowed(8+2))
 
-	key1 := flow.NewRegisterID("1", "2")
+	key1 := flow.NewRegisterID("1", "23")
 	key2 := flow.NewRegisterID("123", "234")
 
 	// read
@@ -135,57 +138,77 @@ func TestState_MaxKeySize(t *testing.T) {
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
+
+	key1 := flow.NewRegisterID("1", "2")
+	key1Size := uint64(8 + 1)
+
+	value1 := []byte("A")
+	value1Size := uint64(1)
+
+	key2 := flow.NewRegisterID("123", "23")
+	key2Size := uint64(8 + 2)
+
+	key3 := flow.NewRegisterID("234", "345")
+	key3Size := uint64(8 + 3)
+
+	key4 := flow.NewRegisterID("3", "4567")
+	key4Size := uint64(8 + 4)
+
 	st := state.NewState(
 		view,
 		state.DefaultParameters().
 			WithMeterParameters(
-				meter.DefaultParameters().WithStorageInteractionLimit(12)))
-
-	key1 := flow.NewRegisterID("1", "2")
+				meter.DefaultParameters().WithStorageInteractionLimit(
+					key1Size+key2Size+key3Size-1)))
 
 	// read - interaction 2
 	_, err := st.Get(key1)
-	require.Equal(t, st.InteractionUsed(), uint64(2))
+	require.Equal(t, st.InteractionUsed(), key1Size)
 	require.NoError(t, err)
 
 	// read - interaction 8
-	_, err = st.Get(flow.NewRegisterID("123", "234"))
-	require.Equal(t, st.InteractionUsed(), uint64(8))
+	_, err = st.Get(key2)
 	require.NoError(t, err)
+	require.Equal(t, st.InteractionUsed(), key1Size+key2Size)
 
 	// read - interaction 14
-	_, err = st.Get(flow.NewRegisterID("234", "345"))
-	require.Equal(t, st.InteractionUsed(), uint64(14))
+	_, err = st.Get(key3)
 	require.Error(t, err)
+	require.Equal(t, st.InteractionUsed(), key1Size+key2Size+key3Size)
 
 	st = state.NewState(
 		view,
 		state.DefaultParameters().
 			WithMeterParameters(
-				meter.DefaultParameters().WithStorageInteractionLimit(6)))
+				meter.DefaultParameters().WithStorageInteractionLimit(
+					key1Size+value1Size+key2Size)))
 	stChild := st.NewChild()
 
 	// update - 0
-	err = stChild.Set(key1, []byte{'A'})
+	err = stChild.Set(key1, value1)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
 	err = st.MergeState(stChild)
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(3))
+	require.Equal(t, st.InteractionUsed(), key1Size+value1Size)
 
 	// read - interaction 3 (already in read cache)
 	_, err = st.Get(key1)
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(3))
+	require.Equal(t, st.InteractionUsed(), key1Size+value1Size)
 
 	// read - interaction 5
-	_, err = st.Get(flow.NewRegisterID("2", "3"))
+	_, err = st.Get(key2)
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(5))
+	require.Equal(t, st.InteractionUsed(), key1Size+value1Size+key2Size)
 
 	// read - interaction 7
-	_, err = st.Get(flow.NewRegisterID("3", "4"))
+	_, err = st.Get(key4)
 	require.Error(t, err)
+	require.Equal(
+		t,
+		st.InteractionUsed(),
+		key1Size+value1Size+key2Size+key4Size)
 }
