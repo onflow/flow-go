@@ -264,12 +264,12 @@ func (e *EventHandler) Start(ctx context.Context) error {
 	// notify about commencing recovery procedure
 	e.notifier.OnStart(e.paceMaker.CurView())
 	defer e.notifier.OnEventProcessed()
+	e.paceMaker.Start(ctx)
 
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
-	e.paceMaker.Start(ctx)
 	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)

@@ -39,7 +39,7 @@ consensus-tests:
 .PHONY: epochs-tests
 epochs-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/...
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 30m ./tests/epochs/...
 
 .PHONY: ghost-tests
 ghost-tests:
