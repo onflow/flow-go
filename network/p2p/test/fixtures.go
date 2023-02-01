@@ -75,7 +75,8 @@ func NodeFixture(
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager := connection.NewConnManager(logger, parameters.Metrics)
+	connManager, err := connection.NewConnManager(logger, parameters.Metrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
@@ -120,6 +121,10 @@ func NodeFixture(
 		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
+	if parameters.ConnManager != nil {
+		builder.SetConnectionManager(parameters.ConnManager)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -154,6 +159,7 @@ type NodeFixtureParameters struct {
 	UpdateInterval     time.Duration         // peer manager parameter
 	PeerProvider       p2p.PeersProvider     // peer manager parameter
 	ConnGater          connmgr.ConnectionGater
+	ConnManager        connmgr.ConnManager
 	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 	Metrics            module.LibP2PMetrics
@@ -208,6 +214,12 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.ConnGater = connGater
+	}
+}
+
+func WithConnectionManager(connManager connmgr.ConnManager) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnManager = connManager
 	}
 }
 

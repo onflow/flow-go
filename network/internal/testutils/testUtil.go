@@ -63,51 +63,62 @@ type PeerTag struct {
 	Tag  string
 }
 
+// TagWatchingConnManager implements connection.ConnManager struct, and manages connections with tags. It
+// also maintains a set of observers that it notifies when a tag is added or removed from a peer.
 type TagWatchingConnManager struct {
 	*connection.ConnManager
 	observers map[observable.Observer]struct{}
 	obsLock   sync.RWMutex
 }
 
-func (cwcm *TagWatchingConnManager) Subscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
+// Subscribe allows an observer to subscribe to receive notifications when a tag is added or removed from a peer.
+func (tw *TagWatchingConnManager) Subscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
 	var void struct{}
-	cwcm.observers[observer] = void
+	tw.observers[observer] = void
 }
 
-func (cwcm *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
-	delete(cwcm.observers, observer)
+// Unsubscribe allows an observer to unsubscribe from receiving notifications.
+func (tw *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
+	delete(tw.observers, observer)
 }
 
-func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	cwcm.ConnManager.Protect(id, tag)
-	for obs := range cwcm.observers {
+// Protect adds a tag to a peer. It also notifies all observers that a tag has been added to a peer.
+func (tw *TagWatchingConnManager) Protect(id peer.ID, tag string) {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	tw.ConnManager.Protect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 }
 
-func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	res := cwcm.ConnManager.Unprotect(id, tag)
-	for obs := range cwcm.observers {
+// Unprotect removes a tag from a peer. It also notifies all observers that a tag has been removed from a peer.
+func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	res := tw.ConnManager.Unprotect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics) *TagWatchingConnManager {
-	cm := connection.NewConnManager(log, metrics)
+// NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *connection.ManagerConfig) (*TagWatchingConnManager, error) {
+	cm, err := connection.NewConnManager(log, metrics, config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection manager: %w", err)
+	}
+
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
 		obsLock:     sync.RWMutex{},
-	}
+	}, nil
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
@@ -136,12 +147,10 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		}
 	}
 
-	idProvider := id.NewFixedIdentityProvider(identities)
-
 	// generates keys and address for the node
-	for i, id := range identities {
+	for i, identity := range identities {
 		// generate key
-		key, err := generateNetworkingKey(id.NodeID)
+		key, err := generateNetworkingKey(identity.NodeID)
 		require.NoError(t, err)
 
 		var opts []nodeBuilderOption
@@ -151,7 +160,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -414,13 +423,13 @@ func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOpt
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	key crypto.PrivateKey,
-	idProvider module.IdentityProvider,
 	opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, noopMetrics)
+	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
