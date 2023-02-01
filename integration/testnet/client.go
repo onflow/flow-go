@@ -193,6 +193,7 @@ func (c *Client) Account() *sdk.Account {
 	return c.account
 }
 
+// WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
@@ -214,7 +215,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 		} else {
 			fmt.Print(".")
 		}
-		time.Sleep(time.Second)
+		time.Sleep(250 * time.Millisecond)
 	}
 
 	fmt.Println()
@@ -289,6 +290,19 @@ func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) 
 	}
 
 	return address, found
+}
+
+// CreatedAccounts returns the addresses of all accounts created in the given transaction,
+// in the order they were created.
+func (c *Client) CreatedAccounts(txResp *sdk.TransactionResult) []sdk.Address {
+	var addresses []sdk.Address
+	for _, event := range txResp.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			addresses = append(addresses, accountCreatedEvent.Address())
+		}
+	}
+	return addresses
 }
 
 func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
