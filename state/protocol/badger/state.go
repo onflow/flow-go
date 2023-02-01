@@ -581,10 +581,10 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
-	if errors.Is(err, storage.ErrNotFound) {
-		return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
-	}
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
+		}
 		// critical storage error
 		return invalid.NewSnapshotf("could not look up block by height: %w", err)
 	}

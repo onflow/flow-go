@@ -3,6 +3,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
@@ -29,6 +31,8 @@ type Snapshot struct {
 	state   *State
 	blockID flow.Identifier // reference block for this snapshot
 }
+
+var _ protocol.Snapshot = (*Snapshot)(nil)
 
 func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
@@ -250,21 +254,23 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
-// receipt in the block's payload to make sure we have a corresponding execution result, any execution
-// results missing from blocks are stored in the SealingSegment.ExecutionResults field.
+// receipt in the block's payload to make sure we have a corresponding execution result, any
+// execution results missing from blocks are stored in the `SealingSegment.ExecutionResults` field.
+// See `model/flow/sealing_segment.md` for detailed technical specification of the Sealing Segment
+//
+// Expected errors during normal operations:
+//   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
+//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
-	// Lets denote the highest block in the sealing segment `head` (initialized below). Formally,
-	// the sealing segment needs to contains enough history to satisfy _all_ of the following conditions:
+	// Lets denote the highest block in the sealing segment `head` (initialized below).
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
+	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
-	//       limitHeight := max(header.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
-	//
-	// Condition (i) and (ii) are necessary for the sealing segment for _any node_. In contrast, (iii) is
-	// necessary to bootstrap nodes that _validate_ block payloads (e.g. consensus nodes), to verify that
-	// collection guarantees are not duplicated (collections expire after `flow.DefaultTransactionExpiry` blocks).
-	// However, per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
+	//       limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
 	head, err := s.state.blocks.ByID(s.blockID)
 	if err != nil {
@@ -272,6 +278,18 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 	if head.Header.Height < s.state.rootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
+	}
+
+	// Verify that head of sealing segment is finalized.
+	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Header.Height)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Header.Height, err)
+		}
+		return nil, fmt.Errorf("exception while retrieving finzalized bloc, by height: %w", err)
+	}
+	if finalizedBlockAtHeight != s.blockID { // comparison of fixed-length arrays
+		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Header.Height, finalizedBlockAtHeight)
 	}
 
 	// STEP (i): highest sealed block as of `head` must be included.
