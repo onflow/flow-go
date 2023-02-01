@@ -76,7 +76,6 @@ func NodeFixture(
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
 	noopMetrics := metrics.NewNoopCollector()
-	resourceManager := testutils.NewResourceManager(t)
 
 	connManager, err := connection.NewConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
