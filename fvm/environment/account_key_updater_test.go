@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	require.NoError(t, err)
 
 	err = akh.InternalAddEncodedAccountKey(
-		runtime.Address(address),
+		common.Address(address),
 		encodedPublicKey)
 	require.Error(t, err)
 
