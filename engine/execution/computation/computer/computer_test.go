@@ -35,6 +35,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -49,6 +50,31 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
+	endState := flow.StateCommitment(startState)
+	endState[0] += 1
+	return endState
+}
+
+type fakeCommitter struct {
+	callCount int
+}
+
+func (committer *fakeCommitter) CommitView(
+	view state.View,
+	startState flow.StateCommitment,
+) (
+	flow.StateCommitment,
+	[]byte,
+	*ledger.TrieUpdate,
+	error,
+) {
+	committer.callCount++
+
+	endState := incStateCommitment(startState)
+	return endState, []byte{byte(committer.callCount)}, nil, nil
+}
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
@@ -73,10 +99,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		committer := new(computermock.ViewCommitter)
-		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
-			Times(2 + 1) // 2 txs in collection + system chunk
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionCollectionExecuted",
@@ -95,6 +120,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			false).        // no failure
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
+
+		exemetrics.On(
+			"ExecutionChunkDataPackGenerated",
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := mocktracker.NewMockStorage()
@@ -133,6 +165,58 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
+		assert.Len(t, result.Chunks, 1+1)         // +1 system chunk
+		assert.Len(t, result.ChunkDataPacks, 1+1) // +1 system chunk
+
+		require.Equal(t, 2, committer.callCount)
+
+		// regular collection chunk
+		chunk1 := result.Chunks[0]
+
+		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, uint(0), chunk1.CollectionIndex)
+		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
+		assert.Equal(t, result.EventsHashes[0], chunk1.EventCollection)
+
+		assert.Equal(t, *block.StartState, chunk1.StartState)
+
+		expectedChunk1EndState := incStateCommitment(*block.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk1.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
+		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
+
+		chunkDataPack1 := result.ChunkDataPacks[0]
+
+		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
+		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
+		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
+		assert.NotNil(t, chunkDataPack1.Collection)
+
+		// system chunk is special case, but currently also 1 tx
+		chunk2 := result.Chunks[1]
+		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, uint(1), chunk2.CollectionIndex)
+		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, result.EventsHashes[1], chunk2.EventCollection)
+
+		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
+
+		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
+
+		assert.NotEqual(t, *block.StartState, chunk2.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
+		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
+		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
+
+		chunkDataPack2 := result.ChunkDataPacks[1]
+
+		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
+		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
+		assert.Nil(t, chunkDataPack2.Collection)
+
+		assert.Equal(t, expectedChunk2EndState, result.EndState)
 
 		assertEventHashesMatch(t, 1+1, result)
 
@@ -579,7 +663,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			string(address.Bytes()),
+			flow.AccountStatusKey,
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -677,7 +764,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			string(address.Bytes()),
+			flow.AccountStatusKey,
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -899,10 +989,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	registerTouches := view.Interactions().RegisterTouches()
 
 	// make sure check for account status has been registered
-	id := flow.RegisterID{
-		Owner: string(address.Bytes()),
-		Key:   state.AccountStatusKey,
-	}
+	id := flow.AccountStatusRegisterID(address)
 
 	require.Contains(t, registerTouches, id)
 }
@@ -946,6 +1033,13 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		false).
 		Return(nil).
 		Times(1) // system chunk tx
+
+	metrics.On(
+		"ExecutionChunkDataPackGenerated",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1) // system collection
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()

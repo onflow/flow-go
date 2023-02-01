@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -169,6 +168,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.Float64Var(&fnb.BaseConfig.LibP2PResourceManagerConfig.FileDescriptorsRatio, "libp2p-fd-ratio", defaultConfig.LibP2PResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
 	fnb.flags.Float64Var(&fnb.BaseConfig.LibP2PResourceManagerConfig.MemoryLimitRatio, "libp2p-memory-limit", defaultConfig.LibP2PResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
+	fnb.flags.IntVar(&fnb.BaseConfig.ConnectionManagerConfig.LowWatermark, "libp2p-connmgr-low", defaultConfig.ConnectionManagerConfig.LowWatermark, "low watermarking for libp2p connection manager")
+	fnb.flags.IntVar(&fnb.BaseConfig.ConnectionManagerConfig.HighWatermark, "libp2p-connmgr-high", defaultConfig.ConnectionManagerConfig.HighWatermark, "high watermarking for libp2p connection manager")
+	fnb.flags.DurationVar(&fnb.BaseConfig.ConnectionManagerConfig.GracePeriod, "libp2p-connmgr-grace", defaultConfig.ConnectionManagerConfig.GracePeriod, "grace period for libp2p connection manager")
+	fnb.flags.DurationVar(&fnb.BaseConfig.ConnectionManagerConfig.SilencePeriod, "libp2p-connmgr-silence", defaultConfig.ConnectionManagerConfig.SilencePeriod, "silence period for libp2p connection manager")
+
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
@@ -281,21 +285,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
-	// log and collect metrics for unicast messages that are rate limited
-	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		fnb.Logger.Warn().
-			Str("peer_id", peerID.String()).
-			Str("role", role).
-			Str("message_type", msgType).
-			Str("topic", topic.String()).
-			Str("reason", reason.String()).
-			Bool(logging.KeySuspicious, true).
-			Msg("unicast peer rate limited")
-		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
-	}
+	fnb.UnicastRateLimiterDistributor = ratelimit.NewUnicastRateLimiterDistributor()
+	fnb.UnicastRateLimiterDistributor.AddConsumer(fnb.Metrics.Network)
 
-	// setup default noop unicast rate limiters
-	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
+	// setup default rate limiter options
+	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun),
+		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
+	}
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
@@ -304,7 +301,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastMessageRateLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -315,6 +312,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// don't create outbound connections to rate limited peers
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
+
 	}
 
 	// override noop unicast bandwidth rate limiter
@@ -324,7 +322,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -334,6 +332,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
+
+	// setup unicast rate limiters
+	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -357,6 +358,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
 			fnb.LibP2PResourceManagerConfig,
+			fnb.UnicastRateLimiterDistributor,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()

@@ -1060,7 +1060,10 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, networkMetrics)
+		connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("could not create connection manager: %w", err)
+		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,

@@ -59,8 +59,7 @@ func meterParamOverridesUpdated(env *facadeEnvironment) bool {
 		//
 		// The meter param overrides use storageDomain as input, so any
 		// changes to it must also invalidate the values.
-		if registerId.Key == storageDomain ||
-			state.IsSlabIndex(registerId.Key) {
+		if registerId.Key == storageDomain || registerId.IsSlabIndex() {
 			return true
 		}
 	}
