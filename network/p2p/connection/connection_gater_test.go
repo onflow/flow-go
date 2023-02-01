@@ -131,8 +131,8 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 
 	// Flow-level resource allocation metrics:
 	// We expect both of the following to be called as they are called together in the same function.
-	node2Metrics.On("InboundConnections", mock.Anything)
-	node2Metrics.On("OutboundConnections", mock.Anything)
+	node2Metrics.On("InboundConnections", mock.Anything).Return()
+	node2Metrics.On("OutboundConnections", mock.Anything).Return()
 
 	// we create node2 with a connection gater that allows all connections and the mocked metrics collector.
 	node2, node2Id := p2ptest.NodeFixture(
