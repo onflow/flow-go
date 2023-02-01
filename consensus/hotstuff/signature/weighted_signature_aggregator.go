@@ -149,8 +149,8 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
-// The function performs a final verification and errors if the aggregated signature is not valid. This is
-// required for the function safety since "TrustedAdd" allows adding invalid signatures.
+// The function performs a final verification and errors if the aggregated signature is invalid. This is
+// required for the function safety since `TrustedAdd` allows adding invalid signatures.
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
 //   - model.InvalidAggregatedSignatureError if the signer's staking public keys sum up to the

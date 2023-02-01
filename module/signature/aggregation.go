@@ -158,11 +158,10 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 	return ok, nil
 }
 
-// Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
+// Aggregate aggregates the added BLS signatures and returns the aggregated signature.
 //
-// Aggregate attempts to aggregate the internal signatures and returns the resulting signature.
 // The function errors if any signature fails the deserialization. It also performs a final
-// verification and errors if the aggregated signature is not valid.
+// verification and errors if the aggregated signature is invalid.
 // It also errors if no signatures were added.
 // Post-check of aggregated signature is required for function safety, as `TrustedAdd` allows
 // adding invalid signatures. Aggregation may also output an invalid signature (identity)
@@ -234,7 +233,6 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //   - InvalidSignerIdxError if some signer indices are out of bound
 //   - generic error in case of an unexpected runtime failure
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, crypto.PublicKey, error) {
-
 	keys := make([]crypto.PublicKey, 0, len(signers))
 	for _, signer := range signers {
 		if signer >= s.n || signer < 0 {
@@ -246,7 +244,7 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig cryp
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(keys)
 	if err != nil {
 		// error for:
-		//  * empty `keys` slice
+		//  * empty `keys` slice results in crypto.blsAggregateEmptyListError
 		//  * some keys are not BLS12 381 keys, which should not happen, as we checked
 		//    each key's signing algorithm in the constructor to be `crypto.BLSBLS12381`
 		if crypto.IsBLSAggregateEmptyListError(err) {
@@ -354,13 +352,13 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 		// add the new keys
 		updatedKey, err = crypto.AggregateBLSPublicKeys(append(addedSignerKeys, lastKey))
 		if err != nil {
-			// not expected in notrmal operations as there is at least one key, and all keys are BLS
+			// no error expected as there is at least one key (from the `append`), and all keys are BLS (checked in the constructor)
 			return nil, fmt.Errorf("adding new keys failed: %w", err)
 		}
 		// remove the missing keys
 		updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 		if err != nil {
-			// not expected in normal operations as there is at least one key, and all keys are BLS
+			// no error expected as all keys are BLS (checked in the constructor)
 			return nil, fmt.Errorf("removing missing keys failed: %w", err)
 		}
 	}
