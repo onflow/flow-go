@@ -162,6 +162,8 @@ func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)            
 func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                  {}
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                          {}
+func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                             {}
+func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                              {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}

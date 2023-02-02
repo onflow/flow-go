@@ -30,8 +30,9 @@ type DerivedTransactionData interface {
 // these nested transactions on Set calls in order to capture the states
 // needed for parsing the programs.
 type Programs struct {
-	tracer tracing.TracerSpan
-	meter  Meter
+	tracer  tracing.TracerSpan
+	meter   Meter
+	metrics MetricsReporter
 
 	txnState *state.TransactionState
 	accounts Accounts
@@ -50,6 +51,7 @@ type Programs struct {
 func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
+	metrics MetricsReporter,
 	txnState *state.TransactionState,
 	accounts Accounts,
 	derivedTxnData DerivedTransactionData,
@@ -57,6 +59,7 @@ func NewPrograms(
 	return &Programs{
 		tracer:             tracer,
 		meter:              meter,
+		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
 		derivedTxnData:     derivedTxnData,
@@ -140,6 +143,8 @@ func (programs *Programs) get(
 
 	program, state, has := programs.derivedTxnData.GetProgram(address)
 	if has {
+		programs.cacheHit()
+
 		programs.dependencyStack.addDependencies(program.Dependencies)
 		err := programs.txnState.AttachAndCommit(state)
 		if err != nil {
@@ -150,6 +155,7 @@ func (programs *Programs) get(
 
 		return program.Program, true
 	}
+	programs.cacheMiss()
 
 	// this program is not in cache, so we need to load it into the cache.
 	// tho have proper invalidation, we need to track the dependencies of the program.
@@ -238,6 +244,14 @@ func (programs *Programs) DecodeArgument(
 	}
 
 	return v, err
+}
+
+func (programs *Programs) cacheHit() {
+	programs.metrics.RuntimeTransactionProgramsCacheHit()
+}
+
+func (programs *Programs) cacheMiss() {
+	programs.metrics.RuntimeTransactionProgramsCacheMiss()
 }
 
 // dependencyTracker tracks dependencies for a location
