@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/insecure"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
@@ -79,7 +79,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	// create flow client
 	flowClient, err := client.NewClient(accessAddress,
-		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 	)
 	if err != nil {
