@@ -10,6 +10,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -42,12 +43,18 @@ type ConnGater struct {
 	sync.RWMutex
 	onInterceptPeerDialFilters []p2p.PeerFilter
 	onInterceptSecuredFilters  []p2p.PeerFilter
-	log                        zerolog.Logger
+
+	// identityProvider provides the identity of a node given its peer ID for logging purposes only.
+	// It is not used for allowlisting or filtering. We use the onInterceptPeerDialFilters and onInterceptSecuredFilters
+	// to determine if a node should be allowed to connect.
+	identityProvider module.IdentityProvider
+	log              zerolog.Logger
 }
 
-func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
+func NewConnGater(log zerolog.Logger, identityProvider module.IdentityProvider, opts ...ConnGaterOption) *ConnGater {
 	cg := &ConnGater{
-		log: log.With().Str("component", "connection_gater").Logger(),
+		log:              log.With().Str("component", "connection_gater").Logger(),
+		identityProvider: identityProvider,
 	}
 
 	for _, opt := range opts {
@@ -59,22 +66,36 @@ func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
+	lg := c.log.With().Str("peer_id", p.String()).Logger()
+
 	if len(c.onInterceptPeerDialFilters) == 0 {
-		c.log.Debug().
-			Str("peer_id", p.String()).
+		lg.Debug().
 			Msg("allowing outbound connection intercept peer dial has no peer filters set")
 		return true
 	}
 
+	identity, ok := c.identityProvider.ByPeerID(p)
+	if !ok {
+		lg = lg.With().
+			Str("remote_node_id", "unknown").
+			Str("role", "unknown").
+			Logger()
+	} else {
+		lg = lg.With().
+			Hex("remote_node_id", logging.ID(identity.NodeID)).
+			Str("role", identity.Role.String()).
+			Logger()
+	}
+
 	if err := c.peerIDPassesAllFilters(p, c.onInterceptPeerDialFilters); err != nil {
 		// log the filtered outbound connection attempt
-		c.log.Warn().
+		lg.Warn().
 			Err(err).
-			Str("peer_id", p.String()).
 			Msg("rejected outbound connection attempt")
 		return false
 	}
 
+	lg.Info().Msg("outbound connection established")
 	return true
 }
 
@@ -101,6 +122,19 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 		if len(c.onInterceptSecuredFilters) == 0 {
 			lg.Info().Msg("inbound connection established")
 			return true
+		}
+
+		identity, ok := c.identityProvider.ByPeerID(p)
+		if !ok {
+			lg = lg.With().
+				Str("remote_node_id", "unknown").
+				Str("role", "unknown").
+				Logger()
+		} else {
+			lg = lg.With().
+				Hex("remote_node_id", logging.ID(identity.NodeID)).
+				Str("role", identity.Role.String()).
+				Logger()
 		}
 
 		if err := c.peerIDPassesAllFilters(p, c.onInterceptSecuredFilters); err != nil {
