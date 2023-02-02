@@ -202,7 +202,6 @@ func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
 }
 
-<<<<<<< HEAD
 // BatchRemoveChunkBlockIndexByChunkID mocks base method
 func (m *MockHeaders) BatchRemoveChunkBlockIndexByChunkID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
 	m.ctrl.T.Helper()
@@ -215,7 +214,8 @@ func (m *MockHeaders) BatchRemoveChunkBlockIndexByChunkID(arg0 flow.Identifier, 
 func (mr *MockHeadersMockRecorder) BatchRemoveChunkBlockIndexByChunkID(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveChunkBlockIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchRemoveChunkBlockIndexByChunkID), arg0, arg1)
-=======
+}
+
 // BlockIDByHeight mocks base method
 func (m *MockHeaders) BlockIDByHeight(arg0 uint64) (flow.Identifier, error) {
 	m.ctrl.T.Helper()
@@ -229,7 +229,6 @@ func (m *MockHeaders) BlockIDByHeight(arg0 uint64) (flow.Identifier, error) {
 func (mr *MockHeadersMockRecorder) BlockIDByHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockIDByHeight", reflect.TypeOf((*MockHeaders)(nil).BlockIDByHeight), arg0)
->>>>>>> feature/active-pacemaker
 }
 
 // ByBlockID mocks base method

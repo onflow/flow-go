@@ -28,7 +28,6 @@ func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Id
 	return r0
 }
 
-<<<<<<< HEAD
 // BatchRemoveChunkBlockIndexByChunkID provides a mock function with given fields: chunkID, batch
 func (_m *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
 	ret := _m.Called(chunkID, batch)
@@ -41,7 +40,8 @@ func (_m *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, 
 	}
 
 	return r0
-=======
+}
+
 // BlockIDByHeight provides a mock function with given fields: height
 func (_m *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	ret := _m.Called(height)
@@ -63,7 +63,6 @@ func (_m *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	}
 
 	return r0, r1
->>>>>>> feature/active-pacemaker
 }
 
 // ByBlockID provides a mock function with given fields: blockID
