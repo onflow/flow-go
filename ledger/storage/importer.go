@@ -104,7 +104,7 @@ func EncodePayload(path ledger.Path, payload *ledger.Payload, scratch []byte) ([
 
 	buf := scratch
 	if len(scratch) < encodedNodeSize {
-		buf = make([]byte, encodedNodeSize)
+		buf = make([]byte, encPathSize+encPayloadLengthSize, encodedNodeSize)
 	}
 
 	pos := 0

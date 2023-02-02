@@ -39,6 +39,7 @@ func (s *PayloadStore) Get(hash hash.Hash) ([]byte, error) {
 func (s *PayloadStore) SetMul(keys []hash.Hash, values [][]byte) error {
 	s.Lock()
 	defer s.Unlock()
+
 	for i, key := range keys {
 		value := values[i]
 		s.stored[key] = value

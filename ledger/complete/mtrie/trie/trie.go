@@ -200,6 +200,9 @@ func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
 // }
 
 // ReadSinglePayload reads and returns a payload for a single path from root
+// it returns (ledger.EmptyPayload(), nil) if no payload was found for the given path
+// it returns (payload, nil) if payload was found for the given path
+// it returns (nil, err) for any exception
 func (mt *MTrie) ReadSinglePayload(path ledger.Path, payloads ledger.PayloadStorage) (*ledger.Payload, error) {
 	return readSinglePayload(path, mt.root, payloads)
 }
@@ -208,8 +211,7 @@ func readSinglePayload(path ledger.Path, head *node.Node, payloadStorage ledger.
 	pathBytes := path[:]
 
 	if head == nil {
-		// TODO: use sential error
-		return nil, fmt.Errorf("path not found")
+		return ledger.EmptyPayload(), nil
 	}
 
 	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
@@ -226,7 +228,7 @@ func readSinglePayload(path ledger.Path, head *node.Node, payloadStorage ledger.
 	}
 
 	if head == nil {
-		return nil, fmt.Errorf("path not found")
+		return ledger.EmptyPayload(), nil
 	}
 
 	leafHash := head.ExpandedLeafHash()
@@ -236,7 +238,7 @@ func readSinglePayload(path ledger.Path, head *node.Node, payloadStorage ledger.
 	}
 
 	if leafPath != path {
-		return nil, fmt.Errorf("path not found")
+		return ledger.EmptyPayload(), nil
 	}
 
 	return payload, nil
@@ -497,8 +499,7 @@ func update(
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		// TODO: remove deep copy
-		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
+		n = node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 		if payloads[0].IsEmpty() {
 			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
 			return n, 0, 0, nodeHeight, nil
