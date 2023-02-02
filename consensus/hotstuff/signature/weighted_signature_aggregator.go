@@ -19,9 +19,12 @@ type signerInfo struct {
 }
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator.
-// It is a wrapper around signature.SignatureAggregatorSameMessage, which implements a
+// It is a wrapper around module/signature.SignatureAggregatorSameMessage, which implements a
 // mapping from node IDs (as used by HotStuff) to index-based addressing of authorized
 // signers (as used by SignatureAggregatorSameMessage).
+//
+// Similarly to module/signature.SignatureAggregatorSameMessage, this module assumes proofs of possession (PoP)
+// of all identity public keys are valid.
 type WeightedSignatureAggregator struct {
 	aggregator  *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
 	ids         flow.IdentityList                         // all possible ids (only gets updated by constructor)
@@ -42,6 +45,8 @@ var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, their respective public keys, a message and a domain separation tag. The identities
 // represent the list of all possible signers.
+// This aggregator is only safe if PoPs of all identity keys are valid. This constructor does not
+// verify the PoPs but assumes they have been validated outside this module.
 // The constructor errors if:
 // - the list of identities is empty
 // - if the length of keys does not match the length of identities
@@ -154,11 +159,12 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
 //   - model.InvalidAggregatedSignatureError if the signer's staking public keys sum up to the
-//     BLS identity public key. The aggregated signature would fail the cryptographic verification
+//     BLS identity public key. Any aggregated signature would fail the cryptographic verification
 //     under the identity public key and therefore such signature is considered invalid.
-//     Such scenario can only happen if staking public keys of signers were (maliciously) forged to
-//     add up to the identity public key (there is a negligible probability that randomly sampled
-//     keys yield to an aggregated identity key).
+//     Such scenario can only happen if staking public keys of signers were forged to
+//     add up to the identity public key. Under the assumption that all staking key PoPs are valid,
+//     this error case can only happen if all signers are malicious and colluding. If there is at least
+//     one honest signer, there is a negligible probability that the aggregated key is identity.
 //   - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 //
 // The function is thread-safe.
