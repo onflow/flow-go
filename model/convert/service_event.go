@@ -405,10 +405,15 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 
 		// check that aggregated signature is not identity, because an identity signature
 		// is invalid if verified under an identity public key. This can happen in two cases:
-		//  - If the quorum has at least one honest signer, the aggregated public is uniformly sampled
-		//    and the identity key probability is negligible.
-		//  - If all quorum is malicious and intentionally forge an identity aggregate. This is also
-		//    unlikely since the clusters are proven with high probability not to have a malicious quorum.
+		//  - If the quorum has at least one honest signer, and given all staking key proofs of possession
+		//    are valid, it's extremely unlikely for the aggregated public key (and the corresponding
+		//    aggregated signature) to be identity.
+		//  - If all quorum is malicious and intentionally forge an identity aggregate. As of the previous point,
+		//    this is only possible if there is no honest collector involved in constructing the cluster QC.
+		//    Hence, the cluster would need to contain a supermajority of malicious collectors.
+		//    As we are assuming that the fraction of malicious collectors overall does not exceed 1/3  (measured
+		//    by stake), the probability for randomly assigning 2/3 or more byzantine collectors to a single cluster
+		//    vanishes (provided a sufficiently high collector count in total).
 		//  This check is therefore a sanity check to catch a potential issue early.
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
 			return nil, fmt.Errorf("cluster qc vote aggregation failed because resulting BLS signature is identity")
