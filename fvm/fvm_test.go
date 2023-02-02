@@ -1496,10 +1496,7 @@ func TestStorageUsed(t *testing.T) {
 	simpleView := utils.NewSimpleView()
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
-	err = simpleView.Set(
-		accountStatusId.Owner,
-		accountStatusId.Key,
-		status.ToBytes())
+	err = simpleView.Set(accountStatusId, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)

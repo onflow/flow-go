@@ -68,8 +68,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			view := utils.NewSimpleView()
 
 			err := view.Set(
-				string(address.Bytes()),
-				"public_key_0",
+				flow.NewRegisterID(string(address.Bytes()), "public_key_0"),
 				ledgerValue,
 			)
 			require.NoError(t, err)
@@ -96,8 +95,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()),
-				"public_key_count",
+				flow.NewRegisterID(string(address.Bytes()), "public_key_count"),
 				ledgerValue,
 			)
 			require.NoError(t, err)
@@ -125,8 +123,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()),
-				"public_key_count",
+				flow.NewRegisterID(string(address.Bytes()), "public_key_count"),
 				ledgerValue,
 			)
 			require.NoError(t, err)
