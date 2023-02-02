@@ -72,6 +72,8 @@ type ExecutionCollector struct {
 	scriptMemoryEstimate                   prometheus.Histogram
 	scriptMemoryDifference                 prometheus.Histogram
 	numberOfAccounts                       prometheus.Gauge
+	programsCacheMiss                      prometheus.Counter
+	programsCacheHit                       prometheus.Counter
 	chunkDataPackRequestProcessedTotal     prometheus.Counter
 	chunkDataPackProofSize                 prometheus.Histogram
 	chunkDataPackCollectionSize            prometheus.Histogram
@@ -659,6 +661,20 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of existing accounts on the network",
 		}),
 
+		programsCacheMiss: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_miss",
+			Help:      "the number of times a program was not found in the cache and had to be loaded",
+		}),
+
+		programsCacheHit: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_hit",
+			Help:      "the number of times a program was found in the cache",
+		}),
+
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -903,6 +919,14 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 
 func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
+}
+
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheMiss() {
+	ec.programsCacheMiss.Inc()
+}
+
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
+	ec.programsCacheHit.Inc()
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
