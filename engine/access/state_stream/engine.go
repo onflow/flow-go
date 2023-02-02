@@ -20,7 +20,7 @@ import (
 // Config defines the configurable options for the ingress server.
 type Config struct {
 	ListenAddr              string
-	MaxExecutionDataMsgSize int  // in bytes
+	MaxExecutionDataMsgSize uint // in bytes
 	RpcMetricsEnabled       bool // enable GRPC metrics
 }
 
@@ -53,8 +53,8 @@ func NewEng(
 ) *Engine {
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxExecutionDataMsgSize),
-		grpc.MaxSendMsgSize(config.MaxExecutionDataMsgSize),
+		grpc.MaxRecvMsgSize(int(config.MaxExecutionDataMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxExecutionDataMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors

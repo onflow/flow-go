@@ -13,6 +13,7 @@ import (
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/utils/grpcutils"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -63,6 +64,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	datadir := filepath.Join(homedir, ".flow", "execution")
 
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 	flags.StringVar(&exeConf.triedir, "triedir", datadir, "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
