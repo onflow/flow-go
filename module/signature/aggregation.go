@@ -167,9 +167,8 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // verification and errors if the aggregated signature is invalid.
 // It also errors if no signatures were added.
 // Post-check of aggregated signature is required for function safety, as `TrustedAdd` allows
-// adding invalid signatures. Aggregation may also output an invalid signature (identity)
-// even though all included signatures are valid (extremely unlikely case when all keys are sampled
-// uniformly)
+// adding invalid signatures or signatures that yield the identity aggregate. In both failure
+// cases, the function discards the generated aggregate and errors. 
 // The function is not thread-safe.
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
