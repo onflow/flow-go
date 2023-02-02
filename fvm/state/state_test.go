@@ -188,5 +188,4 @@ func TestState_MaxInteraction(t *testing.T) {
 	// read - interaction 7
 	_, err = st.Get(flow.NewRegisterID("3", "4"))
 	require.Error(t, err)
-
 }

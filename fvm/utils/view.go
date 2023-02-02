@@ -142,10 +142,9 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 			panic(err)
 		}
 
-		id := flow.RegisterID{
-			Owner: string(key.KeyParts[0].Value),
-			Key:   string(key.KeyParts[1].Value),
-		}
+		id := flow.NewRegisterID(
+			string(key.KeyParts[0].Value),
+			string(key.KeyParts[1].Value))
 
 		ledger.Registers[id] = entry.Value()
 	}

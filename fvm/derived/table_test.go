@@ -849,7 +849,7 @@ func (computer *testValueComputer) Compute(
 func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 	blockDerivedData := NewEmptyTable[flow.RegisterID, int]()
 
-	key := flow.RegisterID{Owner: "addr", Key: "key"}
+	key := flow.NewRegisterID("addr", "key")
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
