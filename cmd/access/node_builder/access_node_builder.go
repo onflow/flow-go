@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	consensuspubsub "github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
@@ -204,10 +205,11 @@ type FlowAccessNodeBuilder struct {
 	TransactionMetrics         module.TransactionMetrics
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.Committee
+	Committee                  hotstuff.DynamicCommittee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
+	Validator                  hotstuff.Validator
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
@@ -252,7 +254,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 		builder.SyncCore = syncCore
 
 		return err
@@ -262,14 +264,15 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
-	builder.Module("committee", func(node *cmd.NodeConfig) error {
+	builder.Component("committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize consensus committee's membership state
-		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+		node.ProtocolEvents.AddConsumer(committee)
 		builder.Committee = committee
 
-		return err
+		return committee, err
 	})
 
 	return builder
@@ -295,6 +298,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		packer := signature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
@@ -337,6 +341,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerState,
 			conCache,
 			builder.FollowerCore,
+			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
 			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
@@ -756,6 +761,8 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
+	builder.ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange)
+
 	return nil
 }
 

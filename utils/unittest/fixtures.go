@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/cadence"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -34,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -64,6 +66,11 @@ func RandomAddressFixture() flow.Address {
 		panic(err)
 	}
 	return addr
+}
+
+// Uint64InRange returns a uint64 value drawn from the uniform random distribution [min,max].
+func Uint64InRange(min, max uint64) uint64 {
+	return min + uint64(rand.Intn(int(max)+1-int(min)))
 }
 
 func RandomSDKAddressFixture() sdk.Address {
@@ -328,13 +335,19 @@ func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
 
-func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier, participantCount int) flow.Block {
+func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
 	block := BlockWithParentFixture(parent)
 
+	indices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{proposer}, []flow.Identifier{proposer})
+	require.NoError(t, err)
+
 	block.Header.ProposerID = proposer
-	indices := bitutils.MakeBitVector(10)
-	bitutils.SetBit(indices, 1)
 	block.Header.ParentVoterIndices = indices
+	if block.Header.LastViewTC != nil {
+		block.Header.LastViewTC.SignerIndices = indices
+		block.Header.LastViewTC.NewestQC.SignerIndices = indices
+	}
 
 	return *block
 }
@@ -438,6 +451,19 @@ func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.H
 func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
 	return &flow.Header{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
@@ -445,10 +471,12 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		PayloadHash:        IdentifierFixture(),
 		Timestamp:          time.Now().UTC(),
 		View:               view,
+		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
 	}
 }
 
@@ -486,6 +514,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.ChainID = parent.Header.ChainID
 	header.Timestamp = time.Now()
 	header.ParentID = parent.ID()
+	header.ParentView = parent.Header.View
 	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
@@ -992,7 +1021,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
 		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%x:0", nodeID[0:7]),
+		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
 		Weight:        1000,
 		StakingPubKey: stakingKey.PublicKey(),
@@ -1695,6 +1724,13 @@ func QCWithSignerIndices(signerIndices []byte) func(*flow.QuorumCertificate) {
 	}
 }
 
+func QCWithRootBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.BlockID = blockID
+		qc.View = 0
+	}
+}
+
 func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	vote := &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
@@ -1908,7 +1944,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
 	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
-	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
+	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
 		panic(err)

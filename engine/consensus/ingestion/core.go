@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -185,7 +185,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	// determine whether signers reach minimally required stake threshold
-	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(clusterMembers.TotalWeight()) // compute required stake threshold
+	threshold := committees.WeightThresholdToBuildQC(clusterMembers.TotalWeight()) // compute required stake threshold
 	totalStake := flow.IdentityList(guarantors).TotalWeight()
 	if totalStake < threshold {
 		return engine.NewInvalidInputErrorf("collection guarantee qc signers have insufficient stake of %d (required=%d)", totalStake, threshold)

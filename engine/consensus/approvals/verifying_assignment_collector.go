@@ -340,7 +340,7 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 			if err != nil {
 				// it could happen that other gorotuine will prune request tracker because of sealing progress
 				// in this case we should just stop requesting approvals as block was already sealed
-				if mempool.IsDecreasingPruningHeightError(err) {
+				if mempool.IsBelowPrunedThresholdError(err) {
 					return 0, nil
 				}
 				return 0, err

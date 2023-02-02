@@ -62,13 +62,13 @@ func (s *VoteCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.Vot
 }
 
 // TestGetOrCreatorCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
-// lower than already pruned one. This should result in sentinel error `DecreasingPruningHeightError`
+// lower than already pruned one. This should result in sentinel error `BelowPrunedThresholdError`
 func (s *VoteCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest() {
 	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel - 10)
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.Error(s.T(), err)
-	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+	require.True(s.T(), mempool.IsBelowPrunedThresholdError(err))
 }
 
 // TestGetOrCreateCollector_ValidCollector tests a happy path scenario where we try first to create and then retrieve cached collector.
@@ -148,7 +148,7 @@ func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 	for _, prunedView := range prunedViews {
 		_, _, err := s.collectors.GetOrCreateCollector(prunedView)
 		require.Error(s.T(), err)
-		require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+		require.True(s.T(), mempool.IsBelowPrunedThresholdError(err))
 	}
 
 	for _, collector := range expectedCollectors {

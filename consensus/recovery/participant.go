@@ -23,16 +23,13 @@ func Participant(
 ) error {
 	return Recover(log, finalized, pending, validator, func(proposal *model.Proposal) error {
 		// add it to forks
-		err := forks.AddBlock(proposal.Block)
+		err := forks.AddProposal(proposal)
 		if err != nil {
 			return fmt.Errorf("could not add block to forks: %w", err)
 		}
 
-		// recovery the proposer's vote
-		err = voteAggregator.AddBlock(proposal)
-		if err != nil {
-			return fmt.Errorf("could not process proposal %v: %w", proposal.Block.BlockID, err)
-		}
+		// recover the proposer's vote
+		voteAggregator.AddBlock(proposal)
 
 		return nil
 	})

@@ -3,6 +3,7 @@
 package mock
 
 import (
+	component "github.com/onflow/flow-go/module/component"
 	cluster "github.com/onflow/flow-go/state/cluster"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
@@ -10,8 +11,6 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	module "github.com/onflow/flow-go/module"
-
-	network "github.com/onflow/flow-go/network"
 
 	protocol "github.com/onflow/flow-go/state/protocol"
 )
@@ -22,7 +21,7 @@ type EpochComponentsFactory struct {
 }
 
 // Create provides a mock function with given fields: epoch
-func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, network.Engine, network.Engine, module.HotStuff, hotstuff.VoteAggregator, error) {
+func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
 	ret := _m.Called(epoch)
 
 	var r0 cluster.State
@@ -34,21 +33,21 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, n
 		}
 	}
 
-	var r1 network.Engine
-	if rf, ok := ret.Get(1).(func(protocol.Epoch) network.Engine); ok {
+	var r1 component.Component
+	if rf, ok := ret.Get(1).(func(protocol.Epoch) component.Component); ok {
 		r1 = rf(epoch)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(network.Engine)
+			r1 = ret.Get(1).(component.Component)
 		}
 	}
 
-	var r2 network.Engine
-	if rf, ok := ret.Get(2).(func(protocol.Epoch) network.Engine); ok {
+	var r2 module.ReadyDoneAware
+	if rf, ok := ret.Get(2).(func(protocol.Epoch) module.ReadyDoneAware); ok {
 		r2 = rf(epoch)
 	} else {
 		if ret.Get(2) != nil {
-			r2 = ret.Get(2).(network.Engine)
+			r2 = ret.Get(2).(module.ReadyDoneAware)
 		}
 	}
 
@@ -70,14 +69,32 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, n
 		}
 	}
 
-	var r5 error
-	if rf, ok := ret.Get(5).(func(protocol.Epoch) error); ok {
+	var r5 hotstuff.TimeoutAggregator
+	if rf, ok := ret.Get(5).(func(protocol.Epoch) hotstuff.TimeoutAggregator); ok {
 		r5 = rf(epoch)
 	} else {
-		r5 = ret.Error(5)
+		if ret.Get(5) != nil {
+			r5 = ret.Get(5).(hotstuff.TimeoutAggregator)
+		}
 	}
 
-	return r0, r1, r2, r3, r4, r5
+	var r6 component.Component
+	if rf, ok := ret.Get(6).(func(protocol.Epoch) component.Component); ok {
+		r6 = rf(epoch)
+	} else {
+		if ret.Get(6) != nil {
+			r6 = ret.Get(6).(component.Component)
+		}
+	}
+
+	var r7 error
+	if rf, ok := ret.Get(7).(func(protocol.Epoch) error); ok {
+		r7 = rf(epoch)
+	} else {
+		r7 = ret.Error(7)
+	}
+
+	return r0, r1, r2, r3, r4, r5, r6, r7
 }
 
 type mockConstructorTestingTNewEpochComponentsFactory interface {

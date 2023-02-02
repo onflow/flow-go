@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	statepkg "github.com/onflow/flow-go/state"
@@ -30,6 +31,10 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+	rootHeight uint64
+	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	sporkRootBlockHeight uint64
 }
 
 type BootstrapConfig struct {
@@ -93,7 +98,7 @@ func Bootstrap(
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
 		highest := segment.Highest() // reference block of the snapshot
-		lowest := segment.Lowest()   // last sealed block
+		lowest := segment.Sealed()   // last sealed block
 
 		// 1) bootstrap the sealing segment
 		err = state.bootstrapSealingSegment(segment, highest)(tx)
@@ -118,7 +123,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
+		err = state.bootstrapEpoch(root.Epochs(), segment, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -145,6 +150,12 @@ func Bootstrap(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
+	}
+
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
 	}
 
 	return state, nil
@@ -174,6 +185,19 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
+		for _, block := range segment.ExtraBlocks {
+			blockID := block.ID()
+			height := block.Header.Height
+			err := state.blocks.StoreTx(block)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert root block: %w", err)
+			}
+			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+			}
+		}
+
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
@@ -181,10 +205,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
-			}
-			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
-			if err != nil {
-				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
@@ -235,21 +255,52 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
 		highest := segment.Highest()
-		lowest := segment.Lowest()
+		lowest := segment.Sealed()
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
 			return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)
 		}
 
-		// insert initial views for HotStuff
-		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+		safetyData := &hotstuff.SafetyData{
+			LockedOneChainView:      highest.Header.View,
+			HighestAcknowledgedView: highest.Header.View,
 		}
-		err = operation.InsertVotedView(highest.Header.ChainID, highest.Header.View)(tx)
+
+		// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
+		// exist for the `highest` block in the sealing segment. The QC for `highest` should be
+		// contained in the `root` Snapshot and returned by `root.QuorumCertificate()`. Otherwise,
+		// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
+		// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
+		//  * `rootQC` should not be nil
+		//  * `rootQC` should be for `highest` block, i.e. its view and blockID should match
+		rootQC, err := root.QuorumCertificate()
 		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+			return fmt.Errorf("could not get root QC: %w", err)
+		}
+		if rootQC == nil {
+			return fmt.Errorf("QC for highest (finalized) block in sealing segment cannot be nil")
+		}
+		if rootQC.View != highest.Header.View {
+			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
+		}
+		if rootQC.BlockID != highest.Header.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		}
+
+		livenessData := &hotstuff.LivenessData{
+			CurrentView: highest.Header.View + 1,
+			NewestQC:    rootQC,
+		}
+
+		// insert initial views for HotStuff
+		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert safety data: %w", err)
+		}
+		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
@@ -279,11 +330,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		previous := root.Epochs().Previous()
-		current := root.Epochs().Current()
-		next := root.Epochs().Next()
+		previous := epochs.Previous()
+		current := epochs.Current()
+		next := epochs.Next()
 
 		// build the status as we go
 		status := new(flow.EpochStatus)
@@ -358,7 +409,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 			setups = append(setups, setup)
 			status.NextEpoch.SetupID = setup.ID()
 			commit, err := protocol.ToEpochCommit(next)
-			if err != nil && !errors.Is(err, protocol.ErrEpochNotCommitted) {
+			if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
@@ -394,11 +445,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment in within the same phase within the same epoch.
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
-		for _, block := range segment.Blocks {
+		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()
 			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
 			if err != nil {
@@ -425,6 +472,15 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
+		sporkRootBlockHeight, err := params.SporkRootBlockHeight()
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork root block height: %w", err)
+		}
+
 		version, err := params.ProtocolVersion()
 		if err != nil {
 			return fmt.Errorf("could not get protocol version: %w", err)
@@ -432,6 +488,15 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 		err = operation.InsertProtocolVersion(version)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert protocol version: %w", err)
+		}
+
+		threshold, err := params.EpochCommitSafetyThreshold()
+		if err != nil {
+			return fmt.Errorf("could not get epoch commit safety threshold: %w", err)
+		}
+		err = operation.InsertEpochCommitSafetyThreshold(threshold)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
 
 		return nil
@@ -477,12 +542,17 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	return state, nil
 }
 
 func (state *State) Params() protocol.Params {
-	return &Params{state: state}
+	return Params{state: state}
 }
 
 func (state *State) Sealed() protocol.Snapshot {
@@ -511,10 +581,10 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
-	if errors.Is(err, storage.ErrNotFound) {
-		return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
-	}
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
+		}
 		// critical storage error
 		return invalid.NewSnapshotf("could not look up block by height: %w", err)
 	}
@@ -560,7 +630,7 @@ func newState(
 	}
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state
 func IsBootstrapped(db *badger.DB) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -625,6 +695,23 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	return nil
 }
 
+// populateCache is used after opening or bootstrapping the state to populate the cache.
+func (state *State) populateCache() error {
+	var rootHeight uint64
+	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not read root block to populate cache: %w", err)
+	}
+	state.rootHeight = rootHeight
+
+	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not read spork root block height: %w", err)
+	}
+	state.sporkRootBlockHeight = sporkRootBlockHeight
+	return nil
+}
+
 // updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
 // based on the current epoch phase of the input snapshot. It should be called
 // at startup and during transitions between EpochSetup and EpochCommitted phases.
@@ -664,8 +751,13 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	return nil
 }
 
-func (m *State) isEpochEmergencyFallbackTriggered() (bool, error) {
+// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
+// Returns:
+// * (true, nil) if epoch fallback is triggered
+// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
+// * (false, err) if an unexpected error occurs
+func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
-	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	return triggered, err
 }

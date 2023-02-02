@@ -36,7 +36,12 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 	return mutableState, nil
 }
 
+// Extend validates that the given cluster block passes compliance rules, then inserts
+// it to the cluster state.
 // TODO (Ramtin) pass context here
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
 	blockID := block.ID()
@@ -83,6 +88,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
+		// extending block must have correct parent view
+		if header.ParentView != parent.View {
+			return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+				header.ParentView, parent.View)
+		}
+
 		// the extending block must increase height by 1 from parent
 		if header.Height != parent.Height+1 {
 			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
@@ -124,10 +135,10 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// NOTE: it is valid for a collection to be expired at this point,
 		// otherwise we would compromise liveness of the cluster.
 		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
-		}
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
+			}
 			return fmt.Errorf("could not check reference block: %w", err)
 		}
 
