@@ -8,6 +8,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/utils/grpcutils"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
@@ -104,6 +105,8 @@ func main() {
 			"maximum number of transactions in the memory pool")
 		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
+		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize,
+			"the maximum message size in bytes for messages sent or received over grpc")
 		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,

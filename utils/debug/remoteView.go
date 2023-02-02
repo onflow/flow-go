@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
@@ -54,7 +55,7 @@ func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 }
 
 func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
+	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
