@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -68,30 +67,10 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	// verify the aggregated staking signature
-	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys())
+	err := verifyAggregatedSignature(signers.PublicStakingKeys(), sigData, v.stakingHasher, msg)
 	if err != nil {
-		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-		//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
-		//      This scenario _is expected_ during normal operations, because a byzantine
-		//      proposer might construct an (invalid) QC with an empty list of signers.
-		// (ii) In case some provided public keys type is not BLS.
-		//      This scenario is _not expected_ during normal operations, because all keys are
-		//      guaranteed by the protocol to be BLS keys.
-		//
-		if crypto.IsBLSAggregateEmptyListError(err) {
-			return model.NewInsufficientSignaturesErrorf("empty list of signers: %w", err)
-		}
-		return fmt.Errorf("could not compute aggregated key: %w", err)
+		return fmt.Errorf("verifying aggregated staking signature failed for block %v: %w", block.BlockID, err)
 	}
 
-	stakingValid, err := aggregatedKey.Verify(sigData, msg, v.stakingHasher)
-	if err != nil {
-		return fmt.Errorf("internal error while verifying staking signature: %w", err)
-	}
-	if !stakingValid {
-		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
-	}
 	return nil
 }

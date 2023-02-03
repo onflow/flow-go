@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -215,7 +214,6 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	require.NoError(t, err)
 
 	err = verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	fmt.Println(err.Error())
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block)

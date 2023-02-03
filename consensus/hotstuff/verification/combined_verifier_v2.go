@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
@@ -141,32 +140,9 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		return fmt.Errorf("invalid reconstructed random beacon sig for block (%x): %w", block.BlockID, model.ErrInvalidSignature)
 	}
 
-	// aggregate public staking keys of all signers (more costly)
-	// TODO: update to use module/signature.PublicKeyAggregator
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys())
+	err = verifyAggregatedSignature(signers.PublicStakingKeys(), blockSigData.AggregatedStakingSig, c.stakingHasher, msg)
 	if err != nil {
-		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-		//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
-		//      This scenario _is expected_ during normal operations, because a byzantine
-		//      proposer might construct an (invalid) QC with an empty list of signers.
-		// (ii) In case some provided public keys type is not BLS.
-		//      This scenario is _not expected_ during normal operations, because all keys are
-		//      guaranteed by the protocol to be BLS keys.
-		// check case (i)
-		if crypto.IsBLSAggregateEmptyListError(err) {
-			return model.NewInsufficientSignaturesErrorf("aggregating public keys failed: %w", err)
-		}
-		// case (ii) or any other error are not expected during normal operations
-		return fmt.Errorf("could not compute aggregated key for block %x: %w", block.BlockID, err)
-	}
-
-	// verify aggregated signature with aggregated keys from last step
-	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
-	if err != nil {
-		return fmt.Errorf("internal error while verifying staking signature for block %x: %w", block.BlockID, err)
-	}
-	if !stakingValid {
-		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+		return fmt.Errorf("verifying aggregated staking signature failed for block %v: %w", block.BlockID, err)
 	}
 
 	return nil
