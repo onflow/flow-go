@@ -51,7 +51,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Ensure the values are written to the correctly nested state
 
-	key := flow.RegisterID{Owner: "address", Key: "key"}
+	key := flow.NewRegisterID("address", "key")
 	val := createByteArray(2)
 
 	err = txn.Set(key, val)
@@ -174,7 +174,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Sanity check
 
-	key := flow.RegisterID{Owner: "address", Key: "key"}
+	key := flow.NewRegisterID("address", "key")
 
 	v, err := restrictedNestedState2.Get(key)
 	require.NoError(t, err)
@@ -281,7 +281,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	id, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	key := flow.RegisterID{Owner: "address", Key: "key"}
+	key := flow.NewRegisterID("address", "key")
 	val := createByteArray(2)
 
 	for i := 0; i < 10; i++ {
@@ -333,7 +333,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 	id, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	key := flow.RegisterID{Owner: "address", Key: "key"}
+	key := flow.NewRegisterID("address", "key")
 	val := createByteArray(2)
 
 	err = txn.Set(key, val)
@@ -483,8 +483,8 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 func TestPauseAndResume(t *testing.T) {
 	txn := newTestTransactionState()
 
-	key1 := flow.RegisterID{Owner: "addr", Key: "key"}
-	key2 := flow.RegisterID{Owner: "addr2", Key: "key2"}
+	key1 := flow.NewRegisterID("addr", "key")
+	key2 := flow.NewRegisterID("addr2", "key2")
 
 	val, err := txn.Get(key1)
 	require.NoError(t, err)
@@ -530,7 +530,7 @@ func TestInvalidCommittedStateModification(t *testing.T) {
 	id1, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	key := flow.RegisterID{Owner: "addr", Key: "key"}
+	key := flow.NewRegisterID("addr", "key")
 	err = txn.Set(key, createByteArray(2))
 	require.NoError(t, err)
 

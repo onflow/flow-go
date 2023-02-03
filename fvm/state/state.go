@@ -169,7 +169,7 @@ func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 		}
 	}
 
-	if value, err = s.view.Get(id.Owner, id.Key); err != nil {
+	if value, err = s.view.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -192,7 +192,7 @@ func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
 		}
 	}
 
-	if err := s.view.Set(id.Owner, id.Key, value); err != nil {
+	if err := s.view.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info

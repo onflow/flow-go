@@ -1106,9 +1106,10 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(key))
+	id := flow.NewRegisterID(string(owner), string(key))
+	data, err := blockView.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
 	}
 
 	return data, nil

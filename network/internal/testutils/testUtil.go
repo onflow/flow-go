@@ -128,18 +128,18 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
+	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
+	idProvider := NewUpdatableIDProvider(identities)
 	o := &optsConfig{
 		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
 		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
-		connectionGater: NewConnectionGater(func(p peer.ID) error {
+		connectionGater: NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil
 		}),
 	}
 	for _, opt := range opts {
 		opt(o)
 	}
-
-	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
 
 	for _, identity := range identities {
 		for _, idOpt := range o.idOpts {
@@ -520,11 +520,13 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 }
 
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
-func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
+func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(),
+		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
+
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

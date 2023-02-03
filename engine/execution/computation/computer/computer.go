@@ -194,8 +194,6 @@ func (e *blockComputer) ExecuteBlock(
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
-	// TODO: compute block fees & reward payments
-
 	return results, nil
 }
 
@@ -355,6 +353,8 @@ func (e *blockComputer) executeBlock(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
 		Msg("all views committed")
+
+	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())
 
 	executionDataID, err := e.executionDataProvider.Provide(
 		ctx,

@@ -332,7 +332,7 @@ func WithoutGuarantee(payload *flow.Payload) {
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
-	return &delta.NewView(nil).Interactions().Snapshot
+	return &delta.NewDeltaView(nil).Interactions().Snapshot
 }
 
 func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
