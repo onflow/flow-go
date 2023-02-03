@@ -10,7 +10,7 @@ var (
 	EmptyTargetList = errors.New("target list empty")
 )
 
-// ErrUnexpectedConnectionStatus indicates that no message auth configured for the message type v
+// ErrUnexpectedConnectionStatus indicates connection status to node is NotConnected but connections to node > 0
 type ErrUnexpectedConnectionStatus struct {
 	pid        peer.ID
 	numOfConns int
