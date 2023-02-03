@@ -188,7 +188,6 @@ func TestConnGater(t *testing.T) {
 		})))
 	idProvider.On("ByPeerID", node2.Host().ID()).Return(&identity2,
 
-
 		true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
