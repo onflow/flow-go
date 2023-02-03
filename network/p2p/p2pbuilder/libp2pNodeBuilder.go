@@ -483,6 +483,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
 	connGater := connection.NewConnGater(log,
+		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)))
 
