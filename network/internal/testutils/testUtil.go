@@ -128,8 +128,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
-	idProvider := mock.NewIdentityProvider(t)
-
+	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
+	idProvider := NewUpdatableIDProvider(identities)
 	o := &optsConfig{
 		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
 		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
@@ -140,8 +140,6 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	for _, opt := range opts {
 		opt(o)
 	}
-
-	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
 
 	for _, identity := range identities {
 		for _, idOpt := range o.idOpts {
@@ -167,7 +165,6 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
 
-		idProvider.On("ByPeerID", libP2PNodes[i].Host().ID()).Return(identities[i], true).Maybe()
 		identities[i].Address = unittest.IPPort(port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
