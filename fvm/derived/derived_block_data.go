@@ -151,6 +151,13 @@ func (block *DerivedBlockData) GetProgramForTestingOnly(
 	return block.programs.GetForTestingOnly(addressLocation)
 }
 
+// CachedPrograms returns the number of programs cached.
+// Note: this should only be called after calling commit, otherwise
+// the count will contain invalidated entries.
+func (block *DerivedBlockData) CachedPrograms() int {
+	return len(block.programs.items)
+}
+
 func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (

@@ -134,6 +134,7 @@ func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.Execut
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
+func (ec *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
@@ -161,6 +162,8 @@ func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)            
 func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                  {}
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                          {}
+func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                             {}
+func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                              {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
