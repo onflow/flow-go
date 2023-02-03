@@ -29,7 +29,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/scoring"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
@@ -87,7 +87,7 @@ func NodeFixture(
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
-				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
 				noopMetrics,
 				parameters.DhtOptions...,
@@ -138,7 +138,7 @@ type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc        network.StreamHandler
-	Unicasts           []unicast.ProtocolName
+	Unicasts           []protocols.ProtocolName
 	Key                crypto.PrivateKey
 	Address            string
 	DhtOptions         []dht.Option
@@ -176,7 +176,7 @@ func WithPeerManagerEnabled(connectionPruning bool, updateInterval time.Duration
 	}
 }
 
-func WithPreferredUnicasts(unicasts []unicast.ProtocolName) NodeFixtureParameterOption {
+func WithPreferredUnicasts(unicasts []protocols.ProtocolName) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Unicasts = unicasts
 	}

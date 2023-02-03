@@ -17,39 +17,47 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
 const MaxConnectAttemptSleepDuration = 5
 
+var (
+	_ p2p.UnicastManager = (*Manager)(nil)
+)
+
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
 	logger         zerolog.Logger
 	streamFactory  StreamFactory
-	unicasts       []Protocol
+	unicasts       []protocols.Protocol
 	defaultHandler libp2pnet.StreamHandler
 	sporkId        flow.Identifier
+	connStatus     p2p.PeerConnections
 }
 
-func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
+func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier, connStatus p2p.PeerConnections) *Manager {
 	return &Manager{
 		logger:        logger.With().Str("module", "unicast-manager").Logger(),
 		streamFactory: streamFactory,
 		sporkId:       sporkId,
+		connStatus:    connStatus,
 	}
 }
 
 // WithDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
 // as the core handler for other unicast protocols, e.g., compressions.
 func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
-	defaultProtocolID := FlowProtocolID(m.sporkId)
+	defaultProtocolID := protocols.FlowProtocolID(m.sporkId)
 	m.defaultHandler = defaultHandler
 
 	if len(m.unicasts) > 0 {
 		panic("default handler must be set only once before any unicast registration")
 	}
 
-	m.unicasts = []Protocol{
+	m.unicasts = []protocols.Protocol{
 		&PlainStream{
 			protocolId: defaultProtocolID,
 			handler:    defaultHandler,
@@ -61,9 +69,9 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 }
 
 // Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
-// over previously registered ones.
-func (m *Manager) Register(unicast ProtocolName) error {
-	factory, err := ToProtocolFactory(unicast)
+// over previously registered ones.ddda
+func (m *Manager) Register(unicast protocols.ProtocolName) error {
+	factory, err := protocols.ToProtocolFactory(unicast)
 	if err != nil {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
@@ -84,6 +92,7 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	var errs error
 
 	for i := len(m.unicasts) - 1; i >= 0; i-- {
+		// handle the dial in progress error and add retry with backoff
 		s, addrs, err := m.rawStreamWithProtocol(ctx, m.unicasts[i].ProtocolId(), peerID, maxAttempts)
 		if err != nil {
 			errs = multierror.Append(errs, err)
@@ -134,6 +143,9 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
 		// immediately without backing off and fail-fast.
 		// Hence, explicitly cancel the dial back off (if any) and try connecting again
+
+		// return typed error if dialing in progress, caller should check for this error and retry the func
+		// collect dial in progress metric
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		dialAddr = m.streamFactory.DialAddress(peerID)

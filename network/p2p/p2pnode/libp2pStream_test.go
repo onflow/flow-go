@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -128,7 +129,7 @@ func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	testCreateStream(t,
 		sporkId,
 		nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
-		unicast.FlowProtocolID(sporkId))
+		protocols.FlowProtocolID(sporkId))
 }
 
 // TestCreateStream_WithPreferredGzipUnicast evaluates correctness of creating gzip-compressed tcp unicast streams between two libp2p nodes.
@@ -136,14 +137,14 @@ func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	testCreateStream(t,
 		sporkId,
-		[]unicast.ProtocolName{unicast.GzipCompressionUnicast},
-		unicast.FlowGzipProtocolId(sporkId))
+		[]protocols.ProtocolName{protocols.GzipCompressionUnicast},
+		protocols.FlowGzipProtocolId(sporkId))
 }
 
 // testCreateStreams checks if a new streams of "preferred" type is created each time when CreateStream is called and an existing stream is not
 // reused. The "preferred" stream type is the one with the largest index in `unicasts` list.
 // To check that the streams are of "preferred" type, it evaluates the protocol id of established stream against the input `protocolID`.
-func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
+func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocols.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -210,7 +211,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	thisNode, _ := p2ptest.NodeFixture(t,
 		sporkId,
 		"test_create_stream_fallback",
-		p2ptest.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
 	otherNode, otherId := p2ptest.NodeFixture(t, sporkId, "test_create_stream_fallback")
 
 	nodes := []p2p.LibP2PNode{thisNode, otherNode}
@@ -218,8 +219,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
-	defaultProtocolId := unicast.FlowProtocolID(sporkId)
-	preferredProtocolId := unicast.FlowGzipProtocolId(sporkId)
+	defaultProtocolId := protocols.FlowProtocolID(sporkId)
+	preferredProtocolId := protocols.FlowGzipProtocolId(sporkId)
 	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
 	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 
@@ -381,7 +382,7 @@ func TestUnicastOverStream_WithPlainStream(t *testing.T) {
 // TestUnicastOverStream_WithGzipStreamCompression checks two nodes can send and receive unicast messages on gzip compressed streams
 // when both nodes have gzip stream compression enabled.
 func TestUnicastOverStream_WithGzipStreamCompression(t *testing.T) {
-	testUnicastOverStream(t, p2ptest.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+	testUnicastOverStream(t, p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
 }
 
 // testUnicastOverStream sends a message from node 1 to node 2 and then from node 2 to node 1 over a unicast stream.
@@ -446,7 +447,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 		sporkId,
 		t.Name(),
 		p2ptest.WithDefaultStreamHandler(streamHandler2),
-		p2ptest.WithPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}),
+		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}),
 	)
 
 	nodes := []p2p.LibP2PNode{node1, node2}
