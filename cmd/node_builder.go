@@ -199,6 +199,7 @@ type NetworkConfig struct {
 	UnicastMessageTimeout       time.Duration
 	DNSCacheTTL                 time.Duration
 	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	ConnectionManagerConfig     *connection.ManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -251,6 +252,8 @@ type NodeConfig struct {
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeBlockListDistributor notifies consumers of updates to the node block list
 	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }
@@ -279,6 +282,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastRateLimitDryRun:          true,
 			DNSCacheTTL:                     dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

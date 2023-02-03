@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
@@ -845,34 +847,37 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 		events = nil
 	}
 
-	paths := make([][]byte, len(data.TrieUpdate.Paths))
-	for i, path := range data.TrieUpdate.Paths {
-		paths[i] = path[:]
-	}
-
-	payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
-	for i, payload := range data.TrieUpdate.Payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
+	var trieUpdate *entities.TrieUpdate
+	if data.TrieUpdate != nil {
+		paths := make([][]byte, len(data.TrieUpdate.Paths))
+		for i, path := range data.TrieUpdate.Paths {
+			paths[i] = path[:]
 		}
-		keyParts := make([]*entities.KeyPart, len(key.KeyParts))
-		for j, keyPart := range key.KeyParts {
-			keyParts[j] = &entities.KeyPart{
-				Type:  uint32(keyPart.Type),
-				Value: keyPart.Value,
+
+		payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
+		for i, payload := range data.TrieUpdate.Payloads {
+			key, err := payload.Key()
+			if err != nil {
+				return nil, err
+			}
+			keyParts := make([]*entities.KeyPart, len(key.KeyParts))
+			for j, keyPart := range key.KeyParts {
+				keyParts[j] = &entities.KeyPart{
+					Type:  uint32(keyPart.Type),
+					Value: keyPart.Value,
+				}
+			}
+			payloads[i] = &entities.Payload{
+				KeyPart: keyParts,
+				Value:   payload.Value(),
 			}
 		}
-		payloads[i] = &entities.Payload{
-			KeyPart: keyParts,
-			Value:   payload.Value(),
-		}
-	}
 
-	trieUpdate := &entities.TrieUpdate{
-		RootHash: data.TrieUpdate.RootHash[:],
-		Paths:    paths,
-		Payloads: payloads,
+		trieUpdate = &entities.TrieUpdate{
+			RootHash: data.TrieUpdate.RootHash[:],
+			Paths:    paths,
+			Payloads: payloads,
+		}
 	}
 
 	return &entities.ChunkExecutionData{
@@ -902,14 +907,17 @@ func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chai
 }
 
 func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (*execution_data.ChunkExecutionData, error) {
-	collection, err := messageToExecutionDataCollection(m.GetCollection(), chain)
+	collection, err := messageToTrustedCollection(m.GetCollection(), chain)
 	if err != nil {
 		return nil, err
 	}
 
-	trieUpdate, err := messageToTrieUpdate(m.GetTrieUpdate())
-	if err != nil {
-		return nil, err
+	var trieUpdate *ledger.TrieUpdate
+	if m.GetTrieUpdate() != nil {
+		trieUpdate, err = messageToTrieUpdate(m.GetTrieUpdate())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	events := MessagesToEvents(m.GetEvents())
@@ -924,13 +932,13 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 	}, nil
 }
 
-func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain flow.Chain) (*flow.Collection, error) {
+func messageToTrustedCollection(m *entities.ExecutionDataCollection, chain flow.Chain) (*flow.Collection, error) {
 	messages := m.GetTransactions()
 	transactions := make([]*flow.TransactionBody, len(messages))
 	for i, message := range messages {
-		transaction, err := MessageToTransaction(message, chain)
+		transaction, err := messageToTrustedTransaction(message, chain)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not convert transaction %d: %w", i, err)
 		}
 		transactions[i] = &transaction
 	}
@@ -942,17 +950,77 @@ func messageToExecutionDataCollection(m *entities.ExecutionDataCollection, chain
 	return &flow.Collection{Transactions: transactions}, nil
 }
 
+// messageToTrustedTransaction converts a transaction message to a transaction body.
+// This is useful when converting transactions from trusted state like BlockExecutionData which
+// contain service transactions that do not conform to external transaction format.
+func messageToTrustedTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+	if m == nil {
+		return flow.TransactionBody{}, ErrEmptyMessage
+	}
+
+	t := flow.NewTransactionBody()
+
+	proposalKey := m.GetProposalKey()
+	if proposalKey != nil {
+		proposalAddress, err := insecureAddress(proposalKey.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert proposer address: %w", err)
+		}
+		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+	}
+
+	payer := m.GetPayer()
+	if payer != nil {
+		payerAddress, err := insecureAddress(payer, chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert payer address: %w", err)
+		}
+		t.SetPayer(payerAddress)
+	}
+
+	for _, authorizer := range m.GetAuthorizers() {
+		authorizerAddress, err := Address(authorizer, chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert authorizer address: %w", err)
+		}
+		t.AddAuthorizer(authorizerAddress)
+	}
+
+	for _, sig := range m.GetPayloadSignatures() {
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert payload signature address: %w", err)
+		}
+		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	for _, sig := range m.GetEnvelopeSignatures() {
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert envelope signature address: %w", err)
+		}
+		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	t.SetScript(m.GetScript())
+	t.SetArguments(m.GetArguments())
+	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
+	t.SetGasLimit(m.GetGasLimit())
+
+	return *t, nil
+}
+
 func messageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 	rootHash, err := ledger.ToRootHash(m.GetRootHash())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert root hash: %w", err)
 	}
 
 	paths := make([]ledger.Path, len(m.GetPaths()))
 	for i, path := range m.GetPaths() {
 		convertedPath, err := ledger.ToPath(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not convert path %d: %w", i, err)
 		}
 		paths[i] = convertedPath
 	}
@@ -971,4 +1039,15 @@ func messageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 		Paths:    paths,
 		Payloads: payloads,
 	}, nil
+}
+
+// insecureAddress converts a raw address to a flow.Address, skipping validation
+// This is useful when converting transactions from trusted state like BlockExecutionData.
+// This should only be used for trusted inputs
+func insecureAddress(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
+	if len(rawAddress) == 0 {
+		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
+	}
+
+	return flow.BytesToAddress(rawAddress), nil
 }

@@ -134,6 +134,7 @@ func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.Execut
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
+func (ec *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
@@ -209,29 +210,30 @@ func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, 
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
-func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)       {}
-func (nc *NoopCollector) OnIWantReceived(int)                                                   {}
-func (nc *NoopCollector) OnIHaveReceived(int)                                                   {}
-func (nc *NoopCollector) OnGraftReceived(int)                                                   {}
-func (nc *NoopCollector) OnPruneReceived(int)                                                   {}
-func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                           {}
-func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                          {}
-func (nc *NoopCollector) OnIncomingRpcRejected()                                                {}
-func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                           {}
-func (nc *NoopCollector) AllowConn(dir network.Direction, usefd bool)                           {}
-func (nc *NoopCollector) BlockConn(dir network.Direction, usefd bool)                           {}
-func (nc *NoopCollector) AllowStream(p peer.ID, dir network.Direction)                          {}
-func (nc *NoopCollector) BlockStream(p peer.ID, dir network.Direction)                          {}
-func (nc *NoopCollector) AllowPeer(p peer.ID)                                                   {}
-func (nc *NoopCollector) BlockPeer(p peer.ID)                                                   {}
-func (nc *NoopCollector) AllowProtocol(proto protocol.ID)                                       {}
-func (nc *NoopCollector) BlockProtocol(proto protocol.ID)                                       {}
-func (nc *NoopCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID)                        {}
-func (nc *NoopCollector) AllowService(svc string)                                               {}
-func (nc *NoopCollector) BlockService(svc string)                                               {}
-func (nc *NoopCollector) BlockServicePeer(svc string, p peer.ID)                                {}
-func (nc *NoopCollector) AllowMemory(size int)                                                  {}
-func (nc *NoopCollector) BlockMemory(size int)                                                  {}
+func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+}
+func (nc *NoopCollector) OnIWantReceived(int)                            {}
+func (nc *NoopCollector) OnIHaveReceived(int)                            {}
+func (nc *NoopCollector) OnGraftReceived(int)                            {}
+func (nc *NoopCollector) OnPruneReceived(int)                            {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                    {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()   {}
+func (nc *NoopCollector) OnIncomingRpcRejected()                         {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)    {}
+func (nc *NoopCollector) AllowConn(dir network.Direction, usefd bool)    {}
+func (nc *NoopCollector) BlockConn(dir network.Direction, usefd bool)    {}
+func (nc *NoopCollector) AllowStream(p peer.ID, dir network.Direction)   {}
+func (nc *NoopCollector) BlockStream(p peer.ID, dir network.Direction)   {}
+func (nc *NoopCollector) AllowPeer(p peer.ID)                            {}
+func (nc *NoopCollector) BlockPeer(p peer.ID)                            {}
+func (nc *NoopCollector) AllowProtocol(proto protocol.ID)                {}
+func (nc *NoopCollector) BlockProtocol(proto protocol.ID)                {}
+func (nc *NoopCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID) {}
+func (nc *NoopCollector) AllowService(svc string)                        {}
+func (nc *NoopCollector) BlockService(svc string)                        {}
+func (nc *NoopCollector) BlockServicePeer(svc string, p peer.ID)         {}
+func (nc *NoopCollector) AllowMemory(size int)                           {}
+func (nc *NoopCollector) BlockMemory(size int)                           {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

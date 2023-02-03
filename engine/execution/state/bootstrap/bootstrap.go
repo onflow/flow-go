@@ -36,7 +36,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	view := delta.NewDeltaView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
 
 	vm := fvm.NewVirtualMachine()
 

@@ -226,7 +226,8 @@ func WithExtensiveTracing() Option {
 	}
 }
 
-// TODO(patrick): remove after emulator has been updated.
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/306
+// is merged and integrated.
 //
 // WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
