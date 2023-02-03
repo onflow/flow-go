@@ -69,8 +69,8 @@ func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	lg := c.log.With().Str("peer_id", p.String()).Logger()
 
 	if len(c.onInterceptPeerDialFilters) == 0 {
-		lg.Debug().
-			Msg("allowing outbound connection intercept peer dial has no peer filters set")
+		lg.Warn().
+			Msg("outbound connection established with no intercept peer dial filters")
 		return true
 	}
 
@@ -120,7 +120,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 			Logger()
 
 		if len(c.onInterceptSecuredFilters) == 0 {
-			lg.Info().Msg("inbound connection established")
+			lg.Warn().Msg("inbound connection established with no intercept secured filters")
 			return true
 		}
 
