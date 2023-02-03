@@ -233,24 +233,25 @@ func IsInvalidSignatureIncludedError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// InvalidAggregatedSignatureError indicates that the aggregated signature is invalid.
-type InvalidAggregatedSignatureError struct {
+// InvalidAggregatedKeyError indicates that the aggregated key is invalid
+// which makes any aggregated signature invalid.
+type InvalidAggregatedKeyError struct {
 	error
 }
 
-func NewInvalidAggregatedSignatureError(err error) error {
-	return InvalidAggregatedSignatureError{err}
+func NewInvalidAggregatedKeyError(err error) error {
+	return InvalidAggregatedKeyError{err}
 }
 
-func NewInvalidAggregatedSignatureErrorf(msg string, args ...interface{}) error {
-	return InvalidAggregatedSignatureError{fmt.Errorf(msg, args...)}
+func NewInvalidAggregatedKeyErrorf(msg string, args ...interface{}) error {
+	return InvalidAggregatedKeyError{fmt.Errorf(msg, args...)}
 }
 
-func (e InvalidAggregatedSignatureError) Unwrap() error { return e.error }
+func (e InvalidAggregatedKeyError) Unwrap() error { return e.error }
 
-// IsInvalidAggregatedSignatureError returns whether err is an InvalidAggregatedSignatureError
-func IsInvalidAggregatedSignatureError(err error) bool {
-	var e InvalidAggregatedSignatureError
+// IsInvalidAggregatedKeyError returns whether err is an InvalidAggregatedKeyError
+func IsInvalidAggregatedKeyError(err error) bool {
+	var e InvalidAggregatedKeyError
 	return errors.As(err, &e)
 }
 

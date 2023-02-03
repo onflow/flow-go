@@ -358,11 +358,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[0])
 			require.NoError(t, err)
 
-			// Aggregation should error with sentinel ErrIdentityPublicKey
+			// Aggregation should error with sentinel InvalidAggregatedKeyError
 			// aggregated public key is identity
 			signers, agg, err := aggregator.Aggregate()
 			assert.Error(t, err)
-			assert.True(t, model.IsInvalidAggregatedSignatureError(err))
+			assert.True(t, model.IsInvalidAggregatedKeyError(err))
 			assert.Nil(t, agg)
 			assert.Nil(t, signers)
 		})
@@ -401,11 +401,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		_, err = aggregator.TrustedAdd(ids[1].NodeID, sigs[1])
 		require.NoError(t, err)
 
-		// Aggregation should error with sentinel model.InvalidAggregatedSignatureError
+		// Aggregation should error with sentinel model.InvalidAggregatedKeyError
 		// because aggregated key is identity, although all signatures are valid
 		signers, agg, err := aggregator.Aggregate()
 		assert.Error(t, err)
-		assert.True(t, model.IsInvalidAggregatedSignatureError(err))
+		assert.True(t, model.IsInvalidAggregatedKeyError(err))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})

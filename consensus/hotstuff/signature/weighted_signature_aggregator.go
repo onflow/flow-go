@@ -158,8 +158,8 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // required for the function safety since `TrustedAdd` allows adding invalid signatures.
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
-//   - model.InvalidAggregatedSignatureError if the signer's staking public keys sum up to the
-//     BLS identity public key. Any aggregated signature would fail the cryptographic verification
+//   - model.InvalidAggregatedKeyError if the signer's staking public keys sum up to an invalid key
+//     (BLS identity public key). Any aggregated signature would fail the cryptographic verification
 //     under the identity public key and therefore such signature is considered invalid.
 //     Such scenario can only happen if staking public keys of signers were forged to
 //     add up to the identity public key. Under the assumption that all staking key PoPs are valid,
@@ -179,7 +179,7 @@ func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, 
 			return nil, nil, model.NewInsufficientSignaturesError(err)
 		}
 		if errors.Is(err, signature.ErrIdentityPublicKey) {
-			return nil, nil, model.NewInvalidAggregatedSignatureError(err)
+			return nil, nil, model.NewInvalidAggregatedKeyError(err)
 		}
 		if signature.IsInvalidSignatureIncludedError(err) {
 			return nil, nil, model.NewInvalidSignatureIncludedError(err)
