@@ -1,10 +1,7 @@
 package state
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
 
@@ -16,17 +13,6 @@ import (
 const (
 	DefaultMaxKeySize   = 16_000      // ~16KB
 	DefaultMaxValueSize = 256_000_000 // ~256MB
-
-	// Service level keys (owner is empty):
-	UUIDKey         = "uuid"
-	AddressStateKey = "account_address_state"
-
-	// Account level keys
-	AccountKeyPrefix   = "a."
-	AccountStatusKey   = AccountKeyPrefix + "s"
-	CodeKeyPrefix      = "code."
-	ContractNamesKey   = "contract_names"
-	PublicKeyKeyPrefix = "public_key_"
 )
 
 // TODO(patrick): make State implement the View interface.
@@ -183,15 +169,11 @@ func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 		}
 	}
 
-	if value, err = s.view.Get(id.Owner, id.Key); err != nil {
+	if value, err = s.view.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf(
-			"failed to read key %s on account %s: %w",
-			PrintableKey(id.Key),
-			hex.EncodeToString([]byte(id.Owner)),
-			getError)
+		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
 	}
 
 	err = s.meter.MeterStorageRead(id, value, s.enforceLimits)
@@ -210,15 +192,11 @@ func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
 		}
 	}
 
-	if err := s.view.Set(id.Owner, id.Key, value); err != nil {
+	if err := s.view.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf(
-			"failed to update key %s on account %s: %w",
-			PrintableKey(id.Key),
-			hex.EncodeToString([]byte(id.Owner)),
-			setError)
+		return fmt.Errorf("failed to update %s: %w", id, setError)
 	}
 
 	return s.meter.MeterStorageWrite(id, value, s.enforceLimits)
@@ -330,48 +308,4 @@ func (s *State) checkSize(
 			s.maxValueSizeAllowed)
 	}
 	return nil
-}
-
-// IsFVMStateKey returns true if the key is controlled by the fvm env and
-// return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner string, key string) bool {
-	// check if is a service level key (owner is empty)
-	// cases:
-	// 		- "", "uuid"
-	// 		- "", "account_address_state"
-	if len(owner) == 0 && (key == UUIDKey || key == AddressStateKey) {
-		return true
-	}
-
-	// check account level keys
-	// cases:
-	// 		- address, "contract_names"
-	// 		- address, "code.%s" (contract name)
-	// 		- address, "public_key_%d" (index)
-	// 		- address, "a.s" (account status)
-	return strings.HasPrefix(key, PublicKeyKeyPrefix) ||
-		key == ContractNamesKey ||
-		strings.HasPrefix(key, CodeKeyPrefix) ||
-		key == AccountStatusKey
-}
-
-// This returns true if the key is a slab index for an account's ordered fields
-// map.
-//
-// In general, each account's regular fields are stored in ordered map known
-// only to cadence.  Cadence encodes this map into bytes and split the bytes
-// into slab chunks before storing the slabs into the ledger.
-func IsSlabIndex(key string) bool {
-	return len(key) == 9 && key[0] == '$'
-}
-
-// TODO(patrick): refactor this to RegisterID.String
-// PrintableKey formats slabs properly and avoids invalid utf8s
-func PrintableKey(key string) string {
-	// slab
-	if IsSlabIndex(key) {
-		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
-		return fmt.Sprintf("$%d", i)
-	}
-	return fmt.Sprintf("#%x", []byte(key))
 }

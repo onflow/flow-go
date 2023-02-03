@@ -2,6 +2,7 @@ package corruptlibp2p
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -44,7 +45,7 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		builder := p2pbuilder.DefaultNodeBuilder(
+		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
 			flowKey,
@@ -60,6 +61,10 @@ func NewCorruptLibP2PNodeFactory(
 			updateInterval,
 			p2pbuilder.DefaultResourceManagerConfig(),
 			ratelimit.NewUnicastRateLimiterDistributor())
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
+		}
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}

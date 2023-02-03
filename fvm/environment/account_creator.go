@@ -3,7 +3,6 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -18,11 +17,6 @@ const (
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
 )
-
-var addressStateKey = flow.RegisterID{
-	Owner: "",
-	Key:   state.AddressStateKey,
-}
 
 type AddressGenerator interface {
 	Bytes() []byte
@@ -58,9 +52,9 @@ func NewParseRestrictedAccountCreator(
 }
 
 func (creator ParseRestrictedAccountCreator) CreateAccount(
-	payer runtime.Address,
+	payer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
 	return parseRestrict1Arg1Ret(
@@ -71,19 +65,19 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 }
 
 type AccountCreator interface {
-	CreateAccount(payer runtime.Address) (runtime.Address, error)
+	CreateAccount(payer common.Address) (common.Address, error)
 }
 
 type NoAccountCreator struct {
 }
 
 func (NoAccountCreator) CreateAccount(
-	payer runtime.Address,
+	payer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
-	return runtime.Address{}, errors.NewOperationNotSupportedError(
+	return common.Address{}, errors.NewOperationNotSupportedError(
 		"CreateAccount")
 }
 
@@ -152,7 +146,7 @@ func NewAccountCreator(
 }
 
 func (creator *accountCreator) bytes() ([]byte, error) {
-	stateBytes, err := creator.txnState.Get(addressStateKey)
+	stateBytes, err := creator.txnState.Get(flow.AddressStateRegisterID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -196,7 +190,8 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 	}
 
 	// update the ledger state
-	err = creator.txnState.Set(addressStateKey,
+	err = creator.txnState.Set(
+		flow.AddressStateRegisterID,
 		addressGenerator.Bytes())
 	if err != nil {
 		return address, fmt.Errorf(
@@ -257,9 +252,9 @@ func (creator *accountCreator) CreateBootstrapAccount(
 }
 
 func (creator *accountCreator) CreateAccount(
-	payer runtime.Address,
+	payer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
 	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
@@ -270,7 +265,7 @@ func (creator *accountCreator) CreateAccount(
 	}
 
 	// don't enforce limit during account creation
-	var addr runtime.Address
+	var addr common.Address
 	creator.txnState.RunWithAllLimitsDisabled(func() {
 		addr, err = creator.createAccount(payer)
 	})
@@ -279,9 +274,9 @@ func (creator *accountCreator) CreateAccount(
 }
 
 func (creator *accountCreator) createAccount(
-	payer runtime.Address,
+	payer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
 	flowAddress, err := creator.createBasicAccount(nil)
@@ -299,5 +294,5 @@ func (creator *accountCreator) createAccount(
 	}
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
-	return runtime.Address(flowAddress), nil
+	return common.Address(flowAddress), nil
 }

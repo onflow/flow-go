@@ -24,17 +24,11 @@ func TestTransactionStorageLimiter(t *testing.T) {
 	owner := flow.HexToAddress("1")
 
 	err := txnState.Set(
-		flow.RegisterID{
-			Owner: string(owner[:]),
-			Key:   "a",
-		},
+		flow.NewRegisterID(string(owner[:]), "a"),
 		flow.RegisterValue("foo"))
 	require.NoError(t, err)
 	err = txnState.Set(
-		flow.RegisterID{
-			Owner: string(owner[:]),
-			Key:   "b",
-		},
+		flow.NewRegisterID(string(owner[:]), "b"),
 		flow.RegisterValue("bar"))
 	require.NoError(t, err)
 

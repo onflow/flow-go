@@ -1490,10 +1490,13 @@ func TestStorageUsed(t *testing.T) {
 	address, err := hex.DecodeString("2a3c4c2581cef731")
 	require.NoError(t, err)
 
+	accountStatusId := flow.AccountStatusRegisterID(
+		flow.BytesToAddress(address))
+
 	simpleView := utils.NewSimpleView()
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
-	err = simpleView.Set(string(address), state.AccountStatusKey, status.ToBytes())
+	err = simpleView.Set(accountStatusId, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)

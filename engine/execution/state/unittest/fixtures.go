@@ -10,7 +10,7 @@ import (
 )
 
 func StateInteractionsFixture() *delta.SpockSnapshot {
-	return delta.NewView(nil).Interactions()
+	return delta.NewDeltaView(nil).Interactions()
 }
 
 func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {

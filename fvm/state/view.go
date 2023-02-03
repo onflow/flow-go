@@ -28,7 +28,6 @@ type View interface {
 //
 // TODO Rename this to Storage
 type Ledger interface {
-	// TODO(patrick): replace owner/key tuple with RegisterID
-	Set(owner, key string, value flow.RegisterValue) error
-	Get(owner, key string) (flow.RegisterValue, error)
+	Set(id flow.RegisterID, value flow.RegisterValue) error
+	Get(id flow.RegisterID) (flow.RegisterValue, error)
 }
