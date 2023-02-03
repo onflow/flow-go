@@ -1502,8 +1502,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger)
-		require.Error(t, err)
+		txProc := fvm.Transaction(tx, 0)
+		err = vm.Run(blockCtx, txProc, ledger)
+		require.NoError(t, err)
+		require.Error(t, txProc.Err)
 	})
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
@@ -1515,8 +1517,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-		err := vm.Run(blockCtx, fvm.Script(script), ledger)
-		require.Error(t, err)
+		scriptProc := fvm.Script(script)
+		err := vm.Run(blockCtx, scriptProc, ledger)
+		require.NoError(t, err)
+		require.Error(t, scriptProc.Err)
 	})
 }
 

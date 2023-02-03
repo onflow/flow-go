@@ -99,7 +99,6 @@ var (
 
 		// Cadence Types
 
-		common.MemoryKindCadenceSimpleType:             1,
 		common.MemoryKindCadenceOptionalType:           17,
 		common.MemoryKindCadenceVariableSizedArrayType: 17,
 		common.MemoryKindCadenceConstantSizedArrayType: 25,

@@ -493,7 +493,8 @@ func TestBLSMultiSignature(t *testing.T) {
 						)
 
 						err = vm.Run(ctx, script, view)
-						assert.Error(t, err)
+						assert.NoError(t, err)
+						assert.Error(t, script.Err)
 					})
 				}
 			},
@@ -721,7 +722,8 @@ func TestBLSMultiSignature(t *testing.T) {
 						)
 
 						err := vm.Run(ctx, script, view)
-						assert.Error(t, err)
+						assert.NoError(t, err)
+						assert.Error(t, script.Err)
 					})
 				}
 
