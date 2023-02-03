@@ -203,6 +203,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.NetworkConfig.UnicastBandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", defaultConfig.NetworkConfig.UnicastRateLimitLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", defaultConfig.NetworkConfig.UnicastRateLimitDryRun, "disable peer disconnects and connections gating when rate limiting peers")
+
+	// unicast manager options
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "backoff delay to use when create stream retry is in progress when peer dialing is in progress")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -356,6 +359,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// run peer manager with the specified interval and let it also prune connections
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
+			fnb.UnicastCreateStreamRetryDelay,
 			fnb.LibP2PResourceManagerConfig,
 		)
 

@@ -69,7 +69,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	role string,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
-	updateInterval time.Duration,
+	updateInterval,
+	createStreamRetryInterval time.Duration,
 	rCfg *ResourceManagerConfig) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder := DefaultNodeBuilder(log,
@@ -85,6 +86,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerScoringEnabled,
 			connectionPruning,
 			updateInterval,
+			createStreamRetryInterval,
 			rCfg)
 		return builder.Build()
 	}
@@ -101,6 +103,7 @@ type NodeBuilder interface {
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+	SetUnicastManagerOptions(createStreamRetryInterval time.Duration) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -140,6 +143,7 @@ type LibP2PNodeBuilder struct {
 	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
+	createStreamRetryInterval   time.Duration
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -236,6 +240,11 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, c
 	return builder
 }
 
+func (builder *LibP2PNodeBuilder) SetUnicastManagerOptions(createStreamRetryInterval time.Duration) NodeBuilder {
+	builder.createStreamRetryInterval = createStreamRetryInterval
+	return builder
+}
+
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	if builder.routingFactory == nil {
@@ -311,7 +320,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	node := builder.createNode(builder.logger, h, pCache, peerManager)
 
-	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID, node)
+	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID, builder.createStreamRetryInterval, node)
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
@@ -450,7 +459,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	peerScoringEnabled bool,
 	connectionPruning bool,
-	updateInterval time.Duration,
+	updateInterval,
+	createStreamRetryInterval time.Duration,
 	rCfg *ResourceManagerConfig) NodeBuilder {
 	connManager := connection.NewConnManager(log, metrics)
 

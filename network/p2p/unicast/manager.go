@@ -15,14 +15,22 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/rs/zerolog"
 )
 
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-const MaxConnectAttemptSleepDuration = 5
+const (
+	MaxConnectAttemptSleepDuration = 5
+
+	// DefaultRetryDelay is the default initial delay used in the exponential backoff create stream retries while
+	// waiting for dialing to peer to be complete
+	DefaultRetryDelay = 1 * time.Second
+)
 
 var (
 	_ p2p.UnicastManager = (*Manager)(nil)
@@ -30,24 +38,26 @@ var (
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
-	lock           sync.RWMutex
-	logger         zerolog.Logger
-	streamFactory  StreamFactory
-	unicasts       []protocols.Protocol
-	defaultHandler libp2pnet.StreamHandler
-	sporkId        flow.Identifier
-	connStatus     p2p.PeerConnections
-	peerDialing    map[peer.ID]struct{}
+	lock                   sync.RWMutex
+	logger                 zerolog.Logger
+	streamFactory          StreamFactory
+	unicasts               []protocols.Protocol
+	defaultHandler         libp2pnet.StreamHandler
+	sporkId                flow.Identifier
+	connStatus             p2p.PeerConnections
+	peerDialing            map[peer.ID]struct{}
+	createStreamRetryDelay time.Duration
 }
 
-func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier, connStatus p2p.PeerConnections) *Manager {
+func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier, createStreamRetryDelay time.Duration, connStatus p2p.PeerConnections) *Manager {
 	return &Manager{
-		lock:          sync.RWMutex{},
-		logger:        logger.With().Str("module", "unicast-manager").Logger(),
-		streamFactory: streamFactory,
-		sporkId:       sporkId,
-		connStatus:    connStatus,
-		peerDialing:   make(map[peer.ID]struct{}),
+		lock:                   sync.RWMutex{},
+		logger:                 logger.With().Str("module", "unicast-manager").Logger(),
+		streamFactory:          streamFactory,
+		sporkId:                sporkId,
+		connStatus:             connStatus,
+		peerDialing:            make(map[peer.ID]struct{}),
+		createStreamRetryDelay: createStreamRetryDelay,
 	}
 }
 
@@ -94,18 +104,11 @@ func (m *Manager) Register(unicast protocols.ProtocolName) error {
 // back to the less preferred one.
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
-
 	for i := len(m.unicasts) - 1; i >= 0; i-- {
 		// handle the dial in progress error and add retry with backoff collect back off / retry metrics
-		s, addrs, err := m.rawStreamWithProtocol(ctx, m.unicasts[i].ProtocolId(), peerID, maxAttempts)
+		s, addrs, err := m.tryCreateStream(ctx, peerID, maxAttempts, m.unicasts[i])
 		if err != nil {
 			errs = multierror.Append(errs, err)
-			continue
-		}
-
-		s, err = m.unicasts[i].UpgradeRawStream(s)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not upgrade stream: %w", err))
 			continue
 		}
 
@@ -114,6 +117,53 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	}
 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
+}
+
+// createStream creates a stream to the peerID with the provided unicastProtocol.
+func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	s, addrs, err := m.rawStreamWithProtocol(ctx, unicastProtocol.ProtocolId(), peerID, maxAttempts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	s, err = unicastProtocol.UpgradeRawStream(s)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s, addrs, nil
+
+}
+
+// tryCreateStream will retry createStream with the configured exponential backoff delay and maxAttempts. If no stream can be created after max attempts the error is returned.
+func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	var s libp2pnet.Stream
+	var addrs []multiaddr.Multiaddr // address on which we dial peerID
+
+	// configure back off retry delay values
+	backoff := retry.NewExponential(m.createStreamRetryDelay)
+	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
+
+	f := func(context.Context) error {
+		var err error
+		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
+		if err != nil {
+			if IsErrDialInProgress(err) {
+				// capture dial in progress metric and log
+				return retry.RetryableError(err)
+			}
+			return err
+		}
+
+		return nil
+	}
+
+	err := retry.Do(ctx, backoff, f)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s, addrs, nil
 }
 
 // rawStreamWithProtocol creates a stream raw libp2p stream on specified protocol.

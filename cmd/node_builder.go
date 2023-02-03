@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -194,11 +195,12 @@ type NetworkConfig struct {
 	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
 	UnicastBandwidthRateLimit int
 	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit  int
-	PeerUpdateInterval          time.Duration
-	UnicastMessageTimeout       time.Duration
-	DNSCacheTTL                 time.Duration
-	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	UnicastBandwidthBurstLimit    int
+	PeerUpdateInterval            time.Duration
+	UnicastMessageTimeout         time.Duration
+	UnicastCreateStreamRetryDelay time.Duration
+	DNSCacheTTL                   time.Duration
+	LibP2PResourceManagerConfig   *p2pbuilder.ResourceManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -265,6 +267,7 @@ func DefaultBaseConfig() *BaseConfig {
 
 	return &BaseConfig{
 		NetworkConfig: NetworkConfig{
+			UnicastCreateStreamRetryDelay:   unicast.DefaultRetryDelay,
 			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
 			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
