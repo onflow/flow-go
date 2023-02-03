@@ -134,6 +134,7 @@ func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.Execut
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
+func (ec *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}

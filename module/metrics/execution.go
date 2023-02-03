@@ -39,6 +39,7 @@ type ExecutionCollector struct {
 	readDurationPerValue                   prometheus.Histogram
 	blockComputationUsed                   prometheus.Histogram
 	blockComputationVector                 *prometheus.GaugeVec
+	blockCachedPrograms                    prometheus.Gauge
 	blockMemoryUsed                        prometheus.Histogram
 	blockEventCounts                       prometheus.Histogram
 	blockEventSize                         prometheus.Histogram
@@ -253,6 +254,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "block_execution_effort_vector",
 		Help:      "execution effort vector of the last executed block by computation kind",
 	}, []string{LabelComputationKind})
+
+	blockCachedPrograms := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_cached_programs",
+		Help:      "Number of cached programs at the end of block execution",
+	})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
@@ -543,6 +551,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		blockExecutionTime:                     blockExecutionTime,
 		blockComputationUsed:                   blockComputationUsed,
 		blockComputationVector:                 blockComputationVector,
+		blockCachedPrograms:                    blockCachedPrograms,
 		blockMemoryUsed:                        blockMemoryUsed,
 		blockEventCounts:                       blockEventCounts,
 		blockEventSize:                         blockEventSize,
@@ -704,6 +713,10 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 
 func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
 	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
+}
+
+func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
+	ec.blockCachedPrograms.Set(float64(programs))
 }
 
 // TransactionExecuted reports stats for executing a transaction
