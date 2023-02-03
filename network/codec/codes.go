@@ -158,75 +158,75 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	switch code {
 	// consensus
 	case CodeBlockProposal:
-		return &messages.BlockProposal{}, what(messages.BlockProposal{}), nil
+		return &messages.BlockProposal{}, what(&messages.BlockProposal{}), nil
 	case CodeBlockVote:
-		return &messages.BlockVote{}, what(messages.BlockVote{}), nil
+		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		return &messages.ClusterBlockProposal{}, what(messages.ClusterBlockProposal{}), nil
+		return &messages.ClusterBlockProposal{}, what(&messages.ClusterBlockProposal{}), nil
 	case CodeClusterBlockVote:
-		return &messages.ClusterBlockVote{}, what(messages.ClusterBlockVote{}), nil
+		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
-		return &messages.ClusterBlockResponse{}, what(messages.ClusterBlockResponse{}), nil
+		return &messages.ClusterBlockResponse{}, what(&messages.ClusterBlockResponse{}), nil
 
 	// protocol state sync
 	case CodeSyncRequest:
-		return &messages.SyncRequest{}, what(messages.SyncRequest{}), nil
+		return &messages.SyncRequest{}, what(&messages.SyncRequest{}), nil
 	case CodeSyncResponse:
-		return &messages.SyncResponse{}, what(messages.SyncResponse{}), nil
+		return &messages.SyncResponse{}, what(&messages.SyncResponse{}), nil
 	case CodeRangeRequest:
-		return &messages.RangeRequest{}, what(messages.RangeRequest{}), nil
+		return &messages.RangeRequest{}, what(&messages.RangeRequest{}), nil
 	case CodeBatchRequest:
-		return &messages.BatchRequest{}, what(messages.BatchRequest{}), nil
+		return &messages.BatchRequest{}, what(&messages.BatchRequest{}), nil
 	case CodeBlockResponse:
-		return &messages.BlockResponse{}, what(messages.BlockResponse{}), nil
+		return &messages.BlockResponse{}, what(&messages.BlockResponse{}), nil
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		return &flow.CollectionGuarantee{}, what(flow.CollectionGuarantee{}), nil
+		return &flow.CollectionGuarantee{}, what(&flow.CollectionGuarantee{}), nil
 	case CodeTransactionBody:
-		return &flow.TransactionBody{}, what(flow.TransactionBody{}), nil
+		return &flow.TransactionBody{}, what(&flow.TransactionBody{}), nil
 	case CodeTransaction:
-		return &flow.Transaction{}, what(flow.Transaction{}), nil
+		return &flow.Transaction{}, what(&flow.Transaction{}), nil
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		return &flow.ExecutionReceipt{}, what(flow.ExecutionReceipt{}), nil
+		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
 	case CodeResultApproval:
-		return &flow.ResultApproval{}, what(flow.ResultApproval{}), nil
+		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
 
 	// execution state synchronization
 	case CodeExecutionStateSyncRequest:
-		return &messages.ExecutionStateSyncRequest{}, what(messages.ExecutionStateSyncRequest{}), nil
+		return &messages.ExecutionStateSyncRequest{}, what(&messages.ExecutionStateSyncRequest{}), nil
 	case CodeExecutionStateDelta:
-		return &messages.ExecutionStateDelta{}, what(messages.ExecutionStateDelta{}), nil
+		return &messages.ExecutionStateDelta{}, what(&messages.ExecutionStateDelta{}), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
-		return &messages.ChunkDataRequest{}, what(messages.ChunkDataRequest{}), nil
+		return &messages.ChunkDataRequest{}, what(&messages.ChunkDataRequest{}), nil
 	case CodeChunkDataResponse:
-		return &messages.ChunkDataResponse{}, what(messages.ChunkDataResponse{}), nil
+		return &messages.ChunkDataResponse{}, what(&messages.ChunkDataResponse{}), nil
 
 	// result approvals
 	case CodeApprovalRequest:
-		return &messages.ApprovalRequest{}, what(messages.ApprovalRequest{}), nil
+		return &messages.ApprovalRequest{}, what(&messages.ApprovalRequest{}), nil
 	case CodeApprovalResponse:
-		return &messages.ApprovalResponse{}, what(messages.ApprovalResponse{}), nil
+		return &messages.ApprovalResponse{}, what(&messages.ApprovalResponse{}), nil
 
 	// generic entity exchange engines
 	case CodeEntityRequest:
-		return &messages.EntityRequest{}, what(messages.EntityRequest{}), nil
+		return &messages.EntityRequest{}, what(&messages.EntityRequest{}), nil
 	case CodeEntityResponse:
-		return &messages.EntityResponse{}, what(messages.EntityResponse{}), nil
+		return &messages.EntityResponse{}, what(&messages.EntityResponse{}), nil
 
 	// dkg
 	case CodeDKGMessage:
-		return &messages.DKGMessage{}, what(messages.DKGMessage{}), nil
+		return &messages.DKGMessage{}, what(&messages.DKGMessage{}), nil
 
 	// test messages
 	case CodeEcho:
-		return &message.TestMessage{}, what(message.TestMessage{}), nil
+		return &message.TestMessage{}, what(&message.TestMessage{}), nil
 
 	default:
 		return nil, "", NewUnknownMsgCodeErr(code)
