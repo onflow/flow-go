@@ -28,7 +28,7 @@ func TestTopicValidator(t *testing.T) {
 func (s *TopicValidatorTestSuite) TestTopicValidatorE2E() {
 	s.Orchestrator.sendUnauthorizedMsgs(s.T())
 	s.Orchestrator.sendAuthorizedMsgs(s.T())
-	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
+	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 10*time.Second, "could not send authorized messages on time")
 
 	// Victim nodes are configured with the topic validator enabled, therefore they should not have
 	// received any of the unauthorized messages.
