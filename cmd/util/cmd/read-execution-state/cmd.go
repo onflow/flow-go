@@ -10,6 +10,7 @@ import (
 	list_accounts "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
 	list_tries "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-tries"
 	list_wals "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-wals"
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -66,7 +67,8 @@ func loadExecutionState() *mtrie.Forest {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}
 
-	err = w.ReplayOnForest(forest)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	err = w.ReplayOnForest(forest, payloadStorage)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while replaying execution state")
 	}

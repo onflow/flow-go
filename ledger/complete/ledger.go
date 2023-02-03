@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -49,7 +50,8 @@ func NewLedger(
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	pathFinderVer uint8) (*Ledger, error) {
+	pathFinderVer uint8,
+) (*Ledger, error) {
 
 	logger := log.With().Str("ledger_mod", "complete").Logger()
 
@@ -58,6 +60,8 @@ func NewLedger(
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
 
+	payloadStorage := newPayloadStorage()
+
 	storage := &Ledger{
 		forest:            forest,
 		wal:               wal,
@@ -65,13 +69,14 @@ func NewLedger(
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
 		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
+		payloadStorage:    payloadStorage,
 	}
 
 	// pause records to prevent double logging trie removals
 	wal.PauseRecord()
 	defer wal.UnpauseRecord()
 
-	err = wal.ReplayOnForest(forest)
+	err = wal.ReplayOnForest(forest, payloadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
@@ -82,6 +87,12 @@ func NewLedger(
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
+}
+
+// TODO: BE REPLACED BY REAL IMPLEMENTATION
+func newPayloadStorage() ledger.PayloadStorage {
+	store := storage.NewInMemStorage()
+	return storage.NewPayloadStorage(store)
 }
 
 // TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.

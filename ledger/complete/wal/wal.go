@@ -86,7 +86,7 @@ func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 	return nil
 }
 
-func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
+func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest, payloadStorage ledger.PayloadStorage) error {
 	return w.Replay(
 		func(tries []*trie.MTrie) error {
 			err := forest.AddTries(tries)
@@ -96,9 +96,8 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
-			panic("Not implemented")
-			// _, err := forest.Update(update)
-			// return err
+			_, err := forest.Update(update, payloadStorage)
+			return err
 		},
 		func(rootHash ledger.RootHash) error {
 			return nil
@@ -340,7 +339,7 @@ type LedgerWAL interface {
 	UnpauseRecord()
 	RecordUpdate(update *ledger.TrieUpdate) (int, bool, error)
 	RecordDelete(rootHash ledger.RootHash) error
-	ReplayOnForest(forest *mtrie.Forest) error
+	ReplayOnForest(forest *mtrie.Forest, payloadStorage ledger.PayloadStorage) error
 	Segments() (first, last int, err error)
 	Replay(
 		checkpointFn func(tries []*trie.MTrie) error,
