@@ -9,7 +9,7 @@ const (
 
 // ProtocolType defines the type of the protocol a message is sent over. Currently, we have two types of protocols:
 // - unicast: a message is sent to a single node through a direct connection.
-// - pubsub: a message is sent to a set of nodes through a pubsub channel.
+// - pubsub: a message is sent to one or more nodes through a pubsub channel.
 type ProtocolType string
 
 func (m ProtocolType) String() string {
