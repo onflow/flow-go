@@ -212,7 +212,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	if !ok {
-		// check for identity signature (invalid aggregated signature)
+		// check for identity aggregated key (invalid aggregated signature)
 		if aggregatedKey.Equals(crypto.IdentityBLSPublicKey()) {
 			return nil, nil, fmt.Errorf("invalid aggregated signature: %w", ErrIdentityPublicKey)
 		}

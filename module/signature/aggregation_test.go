@@ -17,10 +17,20 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature, []crypto.PublicKey) {
+// utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 serialization
+// that is currently supported by the flow crypto module
+func negatePoint(pointbytes []byte) {
+	pointbytes[0] ^= 0x20
+}
+
+func createAggregationData(t *testing.T, signersNumber int) (
+	[]byte, string, []crypto.Signature, []crypto.PublicKey,
+) {
 	// create message and tag
 	msgLen := 100
 	msg := make([]byte, msgLen)
+	rand.Read(msg)
 	tag := "random_tag"
 	hasher := NewBLSHasher(tag)
 
@@ -38,9 +48,7 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 	}
-	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
-	require.NoError(t, err)
-	return aggregator, sigs, keys
+	return msg, tag, sigs, keys
 }
 
 func TestAggregatorSameMessage(t *testing.T) {
@@ -67,8 +75,12 @@ func TestAggregatorSameMessage(t *testing.T) {
 	})
 
 	// Happy paths
+	// all signatures are valid
 	t.Run("happy path", func(t *testing.T) {
-		aggregator, sigs, pks := createAggregationData(t, signersNum)
+		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+		require.NoError(t, err)
+
 		// only add half of the signatures
 		subSet := signersNum / 2
 		for i, sig := range sigs[subSet:] {
@@ -136,9 +148,12 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
-		aggregator, sigs, _ := createAggregationData(t, signersNum)
-		// loop through invalid inputs
+		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+		require.NoError(t, err)
+		// invalid indices for different methods
 		for _, index := range []int{-1, signersNum} {
+			// loop through invalid index inputs
 			ok, err := aggregator.Verify(index, sigs[0])
 			assert.False(t, ok)
 			assert.True(t, IsInvalidSignerIdxError(err))
@@ -159,25 +174,31 @@ func TestAggregatorSameMessage(t *testing.T) {
 			assert.Nil(t, aggKey)
 			assert.True(t, IsInvalidSignerIdxError(err))
 		}
-		// empty list
+		// empty list on VerifyAggregate
 		ok, aggKey, err := aggregator.VerifyAggregate([]int{}, sigs[0])
 		assert.False(t, ok)
 		assert.Nil(t, aggKey)
 		assert.True(t, IsInsufficientSignaturesError(err))
 	})
 
-	t.Run("duplicate signature", func(t *testing.T) {
-		aggregator, sigs, _ := createAggregationData(t, signersNum)
+	t.Run("duplicate signers", func(t *testing.T) {
+		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+		require.NoError(t, err)
+
+		// first add non-duplicate signatures
 		for i, sig := range sigs {
 			err := aggregator.TrustedAdd(i, sig)
 			require.NoError(t, err)
 		}
-		// TrustedAdd
+		// add duplicate signers which expects errors
 		for i := range sigs {
+			// `TrustedAdd`
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
 			assert.True(t, IsDuplicatedSignerIdxError(err))
 			err = aggregator.TrustedAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
 			assert.True(t, IsDuplicatedSignerIdxError(err))
+			// `VerifyAndAdd``
 			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // same signature for same index
 			assert.False(t, ok)
 			assert.True(t, IsDuplicatedSignerIdxError(err))
@@ -187,29 +208,118 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 	})
 
-	// Generally, `Aggregate()` can fail in three places, when invalid signatures were added via `TrustedAdd`:
-	//  1. The signature itself has an invalid structure, i.e. it can't be deserialized successfully. In this
-	//     case, already the aggregation step fails.
-	//  2. The signatures were deserialized successfully, but the aggregated signature is identity signature (invalid)
-	//  3. The signatures were deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key
-	//     (although it is not identity)
-	t.Run("invalid signature", func(t *testing.T) {
-		_, s, _ := createAggregationData(t, 1)
-		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
-		mismatchingSig := s[0]
+	// The following tests are related to the `Aggregate()` method.
+	// Generally, `Aggregate()` can fail in four cases:
+	//  1. No signature has been added.
+	//  2. A signature added via `TrustedAdd` has an invalid structure (fails to deserialize)
+	//      2.a. aggregated public key is not identity
+	//      2.b. aggregated public key is identity
+	//  3. Signatures serialization is valid but some signatures are invalid w.r.t their respective public keys.
+	//      3.a. aggregated public key is not identity
+	//      3.b. aggregated public key is identity
+	//  4. All signatures are valid but aggregated key is identity
 
-		for _, invalidSig := range []crypto.Signature{invalidStructureSig, mismatchingSig} {
-			aggregator, sigs, _ := createAggregationData(t, signersNum)
-			ok, err := aggregator.VerifyAndAdd(0, sigs[0]) // first, add a valid signature
+	// 1: No signature has been added.
+	t.Run("aggregate with no signatures", func(t *testing.T) {
+		msg, tag, _, pks := createAggregationData(t, 1)
+		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+		require.NoError(t, err)
+		// Aggregation should error with sentinel InsufficientSignaturesError
+		signers, agg, err := aggregator.Aggregate()
+		assert.Error(t, err)
+		assert.True(t, IsInsufficientSignaturesError(err))
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+
+	})
+
+	//  2. A signature added via `TrustedAdd` has an invalid structure (fails to deserialize)
+	//      2.a. aggregated public key is not identity
+	//      2.b. aggregated public key is identity
+	t.Run("invalid signature serialization", func(t *testing.T) {
+		msg, tag, sigs, pks := createAggregationData(t, 2)
+		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
+
+		t.Run("with non-identity aggregated public key", func(t *testing.T) {
+			aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+			require.NoError(t, err)
+
+			// add invalid signature for signer with index 0
+			// sanity check : methods that check validity should reject it
+			ok, err := aggregator.Verify(0, invalidStructureSig) // stand-alone verification
+			require.NoError(t, err)
+			assert.False(t, ok)
+			ok, err = aggregator.VerifyAndAdd(0, invalidStructureSig) // verification plus addition
+			require.NoError(t, err)
+			assert.False(t, ok)
+			// check signature is still not added
+			ok, err = aggregator.HasSignature(0)
+			require.NoError(t, err)
+			assert.False(t, ok)
+
+			// TrustedAdd should accept the invalid signature
+			err = aggregator.TrustedAdd(0, invalidStructureSig)
+			require.NoError(t, err)
+
+			// Aggregation should error with sentinel InvalidSignatureIncludedError
+			// aggregated public key is not identity (equal to pk[0])
+			signers, agg, err := aggregator.Aggregate()
+			assert.Error(t, err)
+			assert.True(t, IsInvalidSignatureIncludedError(err))
+			assert.Nil(t, agg)
+			assert.Nil(t, signers)
+		})
+
+		t.Run("with identity aggregated public key", func(t *testing.T) {
+			// assign  pk1 to -pk0 so that the aggregated public key is identity
+			pkBytes := pks[0].Encode()
+			negatePoint(pkBytes)
+			var err error
+			pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
+			require.NoError(t, err)
+
+			aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+			require.NoError(t, err)
+
+			// add the invalid signature on index 0
+			err = aggregator.TrustedAdd(0, invalidStructureSig)
+			require.NoError(t, err)
+
+			// add a second signature for index 1
+			err = aggregator.TrustedAdd(1, sigs[1])
+			require.NoError(t, err)
+
+			// Aggregation should error with sentinel InvalidSignatureIncludedError
+			// aggregated public key is identity
+			signers, agg, err := aggregator.Aggregate()
+			assert.Error(t, err)
+			assert.True(t, IsInvalidSignatureIncludedError(err))
+			assert.Nil(t, agg)
+			assert.Nil(t, signers)
+		})
+	})
+
+	//  3. Signatures serialization is valid but some signatures are invalid w.r.t their respective public keys.
+	//      3.a. aggregated public key is not identity
+	//      3.b. aggregated public key is identity
+	t.Run("correct serialization and invalid signature", func(t *testing.T) {
+		msg, tag, sigs, pks := createAggregationData(t, 2)
+
+		t.Run("with non-identity aggregated public key", func(t *testing.T) {
+			aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+			require.NoError(t, err)
+
+			// first, add a valid signature
+			ok, err := aggregator.VerifyAndAdd(0, sigs[0])
 			require.NoError(t, err)
 			assert.True(t, ok)
 
-			// add invalid signature for signer with index 1:
-			// method that check validity should reject it:
-			ok, err = aggregator.Verify(1, invalidSig) // stand-alone verification
+			// add invalid signature for signer with index 1
+			// sanity check: methods that check validity should reject it
+			ok, err = aggregator.Verify(1, sigs[0]) // stand-alone verification
 			require.NoError(t, err)
 			assert.False(t, ok)
-			ok, err = aggregator.VerifyAndAdd(1, invalidSig) // verification plus addition
+			ok, err = aggregator.VerifyAndAdd(1, sigs[0]) // verification plus addition
 			require.NoError(t, err)
 			assert.False(t, ok)
 			// check signature is still not added
@@ -218,46 +328,86 @@ func TestAggregatorSameMessage(t *testing.T) {
 			assert.False(t, ok)
 
 			// TrustedAdd should accept invalid signature
-			err = aggregator.TrustedAdd(1, invalidSig)
+			err = aggregator.TrustedAdd(1, sigs[0])
 			require.NoError(t, err)
 
-			// Aggregation should validate its own aggregation result and error with sentinel InvalidSignatureIncludedError
+			// Aggregation should error with sentinel InvalidSignatureIncludedError
+			// aggregated public key is not identity (equal to pk[0] + pk[1])
 			signers, agg, err := aggregator.Aggregate()
 			assert.Error(t, err)
 			assert.True(t, IsInvalidSignatureIncludedError(err))
 			assert.Nil(t, agg)
 			assert.Nil(t, signers)
-		}
+		})
+
+		t.Run("with identity aggregated public key", func(t *testing.T) {
+			// assign  pk1 to -pk0 so that the aggregated public key is identity
+			// this is a shortcut since PoPs are not checked in this test
+			pkBytes := pks[0].Encode()
+			negatePoint(pkBytes)
+			var err error
+			pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
+			require.NoError(t, err)
+
+			aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+			require.NoError(t, err)
+
+			// add a valid signature
+			err = aggregator.TrustedAdd(0, sigs[0])
+			require.NoError(t, err)
+
+			// add an invalid signature via `TrustedAdd`
+			err = aggregator.TrustedAdd(1, sigs[0])
+			require.NoError(t, err)
+
+			// Aggregation should error with sentinel ErrIdentityPublicKey
+			// aggregated public key is identity
+			signers, agg, err := aggregator.Aggregate()
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, ErrIdentityPublicKey))
+			assert.Nil(t, agg)
+			assert.Nil(t, signers)
+		})
 	})
 
-	t.Run("identity aggregated signature", func(t *testing.T) {
-		aggregator, sigs, pks := createAggregationData(t, 2)
+	// 4. All signatures are valid but aggregated key is identity
+	t.Run("all valid signatures and identity aggregated key", func(t *testing.T) {
+		msg, tag, sigs, pks := createAggregationData(t, 2)
 
-		// public key at index 1 is opposite of public key at index 0
-		oppositePk := pks[0].Encode()
-		oppositePk[0] ^= 0x20 // flip the sign bit to flip the point sign
+		// public key at index 1 is opposite of public key at index 0 (pks[1] = -pks[0])
+		// so that aggregation of pks[0] and pks[1] is identity
+		// this is a shortcut given no PoPs are notchecked in this test
+		pkBytes := pks[0].Encode()
+		negatePoint(pkBytes)
 		var err error
-		pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, oppositePk)
+		pks[1], err = crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
 		require.NoError(t, err)
 
-		// first, add a valid signature
+		// given how pks[1] was constructed,
+		// sig[1]= -sigs[0] is a valid signature for signer with index 1
+		copy(sigs[1], sigs[0])
+		negatePoint(sigs[1])
+
+		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
+		require.NoError(t, err)
+
+		// add a valid signature for index 0
 		ok, err := aggregator.VerifyAndAdd(0, sigs[0])
 		require.NoError(t, err)
 		assert.True(t, ok)
 
-		// add invalid signature for signer with index 1
-		// (invalid because the corresponding key was altered)
-		err = aggregator.TrustedAdd(1, sigs[1])
+		// add a valid signature for index 1
+		ok, err = aggregator.VerifyAndAdd(1, sigs[1])
 		require.NoError(t, err)
+		assert.True(t, ok)
 
-		// Aggregation should validate its own aggregation result and error with sentinel ErrIdentityPublicKey
+		// Aggregation should error with sentinel ErrIdentityPublicKey
 		signers, agg, err := aggregator.Aggregate()
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, ErrIdentityPublicKey))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 	})
-
 }
 
 func TestKeyAggregator(t *testing.T) {
