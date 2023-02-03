@@ -354,7 +354,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 				Text: "hello",
 			},
 			unittest.NetworkCodec().Encode,
-			network.ProtocolTypeUnicast)
+			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
 		err = m.mws[0].SendDirect(msg)
 		if err != nil {
@@ -513,7 +513,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 				Text: "",
 			},
 			unittest.NetworkCodec().Encode,
-			network.ProtocolTypeUnicast)
+			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
 		err = m.mws[0].SendDirect(msg)
 		if err != nil {
