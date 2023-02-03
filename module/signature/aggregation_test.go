@@ -30,7 +30,8 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	// create message and tag
 	msgLen := 100
 	msg := make([]byte, msgLen)
-	rand.Read(msg)
+	_, err := rand.Read(msg)
+	require.NoError(t, err)
 	tag := "random_tag"
 	hasher := NewBLSHasher(tag)
 
