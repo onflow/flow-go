@@ -708,11 +708,13 @@ func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocate
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // Paths in the input query don't have to be deduplicated, though deduplication would
 // result in allocating less dynamic memory to store the proofs.
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.TrieBatchProof {
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, payloadStorage ledger.PayloadStorage) (*ledger.TrieBatchProof, error) {
 	batchProofs := ledger.NewTrieBatchProofWithEmptyProofs(len(paths))
-	// TODO:
-	// prove(mt.root, paths, batchProofs.Proofs)
-	return batchProofs
+	err := prove(mt.root, paths, batchProofs.Proofs, payloadStorage)
+	if err != nil {
+		return nil, fmt.Errorf("could not get proof: %w", err)
+	}
+	return batchProofs, nil
 }
 
 // prove traverses the subtree and stores proofs for the given register paths in
@@ -721,68 +723,88 @@ func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.TrieBatchProof {
 // UNSAFE: method requires the following conditions to be satisfied:
 //   - paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
-// func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
-// 	// check for empty paths
-// 	if len(paths) == 0 {
-// 		return
-// 	}
-//
-// 	// we've reached the end of a trie
-// 	// and path is not found (noninclusion proof)
-// 	if head == nil {
-// 		// by default, proofs are non-inclusion proofs
-// 		return
-// 	}
-//
-// 	// we've reached a leaf
-// 	if head.IsLeaf() {
-// 		for i, path := range paths {
-// 			// value matches (inclusion proof)
-// 			if *head.Path() == path {
-// 				proofs[i].Path = *head.Path()
-// 				proofs[i].Payload = head.Payload()
-// 				proofs[i].Inclusion = true
-// 			}
-// 		}
-// 		// by default, proofs are non-inclusion proofs
-// 		return
-// 	}
-//
-// 	// increment steps for all the proofs
-// 	for _, p := range proofs {
-// 		p.Steps++
-// 	}
-//
-// 	// partition step to quick sort the paths:
-// 	// lpaths contains all paths that have `0` at the partitionIndex
-// 	// rpaths contains all paths that have `1` at the partitionIndex
-// 	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
-// 	partitionIndex := splitTrieProofsByPath(paths, proofs, depth)
-// 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-// 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
-//
-// 	parallelRecursionThreshold := 64 // threshold to avoid the parallelization going too deep in the recursion
-// 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-// 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
-// 		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
-// 		prove(head.LeftChild(), lpaths, lproofs)
-//
-// 		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
-// 		prove(head.RightChild(), rpaths, rproofs)
-// 	} else {
-// 		wg := sync.WaitGroup{}
-// 		wg.Add(1)
-// 		go func() {
-// 			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
-// 			prove(head.LeftChild(), lpaths, lproofs)
-// 			wg.Done()
-// 		}()
-//
-// 		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
-// 		prove(head.RightChild(), rpaths, rproofs)
-// 		wg.Wait()
-// 	}
-// }
+func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof, payloadStorage ledger.PayloadStorage) error {
+	// check for empty paths
+	if len(paths) == 0 {
+		return nil
+	}
+
+	// we've reached the end of a trie
+	// and path is not found (noninclusion proof)
+	if head == nil {
+		// by default, proofs are non-inclusion proofs
+		return nil
+	}
+
+	// we've reached a leaf
+	if head.IsLeaf() {
+		leafPath, leafPayload, err := payloadStorage.Get(head.ExpandedLeafHash())
+		if err != nil {
+			return fmt.Errorf("could not get payload by hash %v: %w", head.ExpandedLeafHash(), err)
+		}
+		for i, path := range paths {
+			// value matches (inclusion proof)
+			if leafPath == path {
+				proofs[i].Path = leafPath
+				proofs[i].Payload = leafPayload
+				proofs[i].Inclusion = true
+			}
+		}
+		// by default, proofs are non-inclusion proofs
+		return nil
+	}
+
+	// increment steps for all the proofs
+	for _, p := range proofs {
+		p.Steps++
+	}
+
+	// partition step to quick sort the paths:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+	partitionIndex := splitTrieProofsByPath(paths, proofs, depth)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
+
+	parallelRecursionThreshold := 64 // threshold to avoid the parallelization going too deep in the recursion
+	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
+		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
+		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
+		err := prove(head.LeftChild(), lpaths, lproofs, payloadStorage)
+		if err != nil {
+			return err
+		}
+
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
+		err = prove(head.RightChild(), rpaths, rproofs, payloadStorage)
+		if err != nil {
+			return err
+		}
+	} else {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		var goerr error
+		go func() {
+			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
+			goerr = prove(head.LeftChild(), lpaths, lproofs, payloadStorage)
+			wg.Done()
+		}()
+
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
+		err := prove(head.RightChild(), rpaths, rproofs, payloadStorage)
+		wg.Wait()
+		if err != nil {
+			return err
+		}
+
+		if goerr != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 // addSiblingTrieHashToProofs inspects the sibling Trie and adds its root hash
 // to the proofs, if the trie contains non-empty registers (i.e. the

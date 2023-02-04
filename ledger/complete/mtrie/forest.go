@@ -310,7 +310,10 @@ func (f *Forest) Proofs(r *ledger.TrieRead, payloadStorage ledger.PayloadStorage
 		stateTrie = newTrie
 	}
 
-	bp := stateTrie.UnsafeProofs(r.Paths)
+	bp, err := stateTrie.UnsafeProofs(r.Paths, payloadStorage)
+	if err != nil {
+		return nil, fmt.Errorf("could not get proof from state trie: %w", err)
+	}
 	return bp, nil
 }
 

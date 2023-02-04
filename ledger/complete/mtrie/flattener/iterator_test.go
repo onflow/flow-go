@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/storage"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEmptyTrie(t *testing.T) {
@@ -38,8 +38,8 @@ func TestTrieWithOneNode(t *testing.T) {
 	paths := []ledger.Path{p1}
 	payloads := []ledger.Payload{*v1}
 
-	store := createMockStore()
-	testTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, storage.NewPayloadStorage(store))
+	store := unittest.CreateMockPayloadStore()
+	testTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, store)
 	require.NoError(t, err)
 
 	itr := flattener.NewNodeIterator(testTrie.RootNode())
@@ -131,8 +131,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		store := createMockStore()
-		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, storage.NewPayloadStorage(store))
+		store := unittest.CreateMockPayloadStore()
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		//              n4
@@ -194,8 +194,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		store := createMockStore()
-		trie1, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, storage.NewPayloadStorage(store))
+		store := unittest.CreateMockPayloadStore()
+		trie1, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie1
@@ -223,8 +223,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p3, p4}
 		payloads = []ledger.Payload{*v3, *v4}
 
-		store2 := createMockStore()
-		trie2, _, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true, storage.NewPayloadStorage(store2))
+		trie2, _, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie2
@@ -247,8 +246,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p1}
 		payloads = []ledger.Payload{*v5}
 
-		store3 := createMockStore()
-		trie3, _, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true, storage.NewPayloadStorage(store3))
+		trie3, _, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie3
@@ -311,8 +309,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		store := createMockStore()
-		trie1, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, storage.NewPayloadStorage(store))
+		store := unittest.CreateMockPayloadStore()
+		trie1, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie1
@@ -338,8 +336,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p3, p4}
 		payloads = []ledger.Payload{*v3, *v4}
 
-		store2 := createMockStore()
-		trie2, _, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true, storage.NewPayloadStorage(store2))
+		trie2, _, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie2
@@ -360,8 +357,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p1}
 		payloads = []ledger.Payload{*v5}
 
-		store3 := createMockStore()
-		trie3, _, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true, storage.NewPayloadStorage(store3))
+		trie3, _, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true, store)
 		require.NoError(t, err)
 
 		// trie3
