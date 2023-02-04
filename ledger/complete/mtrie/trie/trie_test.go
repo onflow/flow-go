@@ -34,6 +34,7 @@ func Test_EmptyTrie(t *testing.T) {
 
 	// check String() method does not panic:
 	_ = emptyTrie.String()
+	require.True(t, emptyTrie.IsAValidTrie())
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
@@ -58,6 +59,8 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, leftPopulatedTrie.RootHash(), updatedTrie.RootHash())
 	require.Equal(t, maxDepthTouched, maxDepthTouched2)
+
+	require.True(t, updatedTrie.IsAValidTrie())
 }
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
@@ -86,6 +89,8 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, rightPopulatedTrie.RootHash(), updatedTrie.RootHash())
 	require.Equal(t, maxDepthTouched, maxDepthTouched2)
+
+	require.True(t, updatedTrie.IsAValidTrie())
 }
 
 // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
@@ -104,6 +109,8 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
 	require.Equal(t, expectedRootHashHex, hashToString(leftPopulatedTrie.RootHash()))
+
+	require.True(t, leftPopulatedTrie.IsAValidTrie())
 }
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
@@ -126,6 +133,8 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
 	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+
+	require.True(t, updatedTrie.IsAValidTrie())
 }
 
 // Test_FullTrie tests whether the root hash of a trie,
@@ -161,6 +170,8 @@ func Test_FullTrie(t *testing.T) {
 	updatedTrie2, _, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads, true, store)
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.RootHash(), updatedTrie2.RootHash())
+
+	require.True(t, updatedTrie2.IsAValidTrie())
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
@@ -242,6 +253,8 @@ func Test_UpdateTrie(t *testing.T) {
 	require.Equal(t, expectedRootHashes[19], hashToString(updatedTrie.RootHash()))
 	// check the root node pointers are equal
 	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
+
+	require.True(t, newTrie.IsAValidTrie())
 }
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
@@ -294,6 +307,8 @@ func Test_UnallocateRegisters(t *testing.T) {
 	require.Equal(t, totalPayloadSize2, comparisonTrie.AllocatedRegSize())
 	require.Equal(t, expectedRootHashHex, hashToString(comparisonTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+
+	require.True(t, comparisonTrie.IsAValidTrie())
 }
 
 // simple Linear congruential RNG
@@ -1199,6 +1214,7 @@ func TestReadSinglePayload(t *testing.T) {
 		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, false, store)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
+		require.True(t, newTrie.IsAValidTrie())
 
 		savedRootHash := newTrie.RootHash()
 
