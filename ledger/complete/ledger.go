@@ -445,7 +445,11 @@ func (l *Ledger) ExportCheckpointAt(
 		// preCheckpointReporters, which doesn't use the payloads.
 	} else {
 		// get all payloads
-		payloads = t.AllPayloads(l.payloadStorage)
+		payloads, err = t.AllPayloads(l.payloadStorage)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("could not get all payloads: %w", err)
+		}
+
 		payloadSize := len(payloads)
 
 		// migrate payloads
@@ -537,7 +541,10 @@ func (l *Ledger) ExportCheckpointAt(
 	if noMigration {
 		// when there is no mgiration, we generate the payloads now before
 		// running the postCheckpointReporters
-		payloads = newTrie.AllPayloads(l.payloadStorage)
+		payloads, err = newTrie.AllPayloads(l.payloadStorage)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("could not get all payloads: %w", err)
+		}
 	}
 
 	// running post checkpoint reporters

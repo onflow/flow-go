@@ -33,7 +33,10 @@ func (s *PayloadStore) Get(hash hash.Hash) ([]byte, error) {
 		return nil, fmt.Errorf("key not found: %v", hash)
 	}
 
-	return node, nil
+	// return the copied data
+	buf := make([]byte, len(node))
+	copy(buf[:], node)
+	return buf, nil
 }
 
 func (s *PayloadStore) SetMul(keys []hash.Hash, values [][]byte) error {

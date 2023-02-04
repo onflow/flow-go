@@ -894,17 +894,21 @@ func EmptyTrieRootHash() ledger.RootHash {
 }
 
 // AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads(payloadStorage ledger.PayloadStorage) []ledger.Payload {
+func (mt *MTrie) AllPayloads(payloadStorage ledger.PayloadStorage) ([]ledger.Payload, error) {
 	leafs := mt.AllLeafNodes()
 	payloads := make([]ledger.Payload, 0, len(leafs))
+	// TODO: batch request
 	for _, leaf := range leafs {
 		leafHash := leaf.ExpandedLeafHash()
 		// TODO handle err
-		_, leafPayload, _ := payloadStorage.Get(leafHash)
+		_, leafPayload, err := payloadStorage.Get(leafHash)
+		if err != nil {
+			return nil, fmt.Errorf("could not get payload by hash %v: %w", leafHash, err)
+		}
 		payloads = append(payloads, *leafPayload)
 	}
 
-	return payloads
+	return payloads, nil
 }
 
 // AllLeafNodes returns all leaf nodes
