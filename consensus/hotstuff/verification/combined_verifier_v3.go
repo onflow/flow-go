@@ -179,7 +179,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// Step 2b: verify aggregated beacon signature.
-	// Our previous threshold check also guarantees that `beaconPubKeys` is not empty.
 	err = verifyAggregatedSignature(beaconPubKeys, blockSigData.AggregatedRandomBeaconSig, c.beaconHasher, msg)
 	if err != nil {
 		return fmt.Errorf("verifying aggregated random beacon signature failed for block %v: %w", block.BlockID, err)

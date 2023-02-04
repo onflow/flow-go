@@ -16,9 +16,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// utility function that flips a point sign bit to negate the point
-// this is shortcut which works only for zcash BLS12-381 serialization
+// Utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 compressed serialization
 // that is currently supported by the flow crypto module
+// Applicable to both signatures and public keys
 func negatePoint(pointbytes []byte) {
 	pointbytes[0] ^= 0x20
 }
@@ -34,6 +35,8 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	// create message and tag
 	msgLen := 100
 	msg := make([]byte, msgLen)
+	_, err := rand.Read(msg)
+	require.NoError(t, err)
 	tag := "random_tag"
 	hasher := msig.NewBLSHasher(tag)
 

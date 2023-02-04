@@ -17,9 +17,10 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// utility function that flips a point sign bit to negate the point
-// this is shortcut which works only for zcash BLS12-381 serialization
+// Utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 compressed serialization
 // that is currently supported by the flow crypto module
+// Applicable to both signatures and public keys
 func negatePoint(pointbytes []byte) {
 	pointbytes[0] ^= 0x20
 }
@@ -377,7 +378,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 		// public key at index 1 is opposite of public key at index 0 (pks[1] = -pks[0])
 		// so that aggregation of pks[0] and pks[1] is identity
-		// this is a shortcut given no PoPs are notchecked in this test
+		// this is a shortcut given PoPs are not checked in this test
 		pkBytes := pks[0].Encode()
 		negatePoint(pkBytes)
 		var err error

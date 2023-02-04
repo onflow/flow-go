@@ -158,14 +158,18 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // required for the function safety since `TrustedAdd` allows adding invalid signatures.
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
-//   - model.InvalidAggregatedKeyError if the signer's staking public keys sum up to an invalid key
-//     (BLS identity public key). Any aggregated signature would fail the cryptographic verification
-//     under the identity public key and therefore such signature is considered invalid.
-//     Such scenario can only happen if staking public keys of signers were forged to
-//     add up to the identity public key. Under the assumption that all staking key PoPs are valid,
-//     this error case can only happen if all signers are malicious and colluding. If there is at least
-//     one honest signer, there is a negligible probability that the aggregated key is identity.
-//   - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+//   - model.InvalidSignatureIncludedError if:
+//   - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
+//   - Or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
+//     invalid (while aggregated public key is valid)
+//   - model.InvalidAggregatedKeyError if if all signatures deserialize correctly but the signer's
+//     staking public keys sum up to an invalid key (BLS identity public key).
+//     Any aggregated signature would fail the cryptographic verification under the identity public
+//     key and therefore such signature is considered invalid. Such scenario can only happen if
+//     staking public keys of signers were forged to add up to the identity public key.
+//     Under the assumption that all staking key PoPs are valid, this error case can only
+//     happen if all signers are malicious and colluding. If there is at least one honest signer,
+//     there is a negligible probability that the aggregated key is identity.
 //
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {

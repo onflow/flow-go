@@ -414,6 +414,10 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 		//    As we are assuming that the fraction of malicious collectors overall does not exceed 1/3  (measured
 		//    by stake), the probability for randomly assigning 2/3 or more byzantine collectors to a single cluster
 		//    vanishes (provided a sufficiently high collector count in total).
+		//
+		//  Note that at this level, all individual signatures are guaranteed to be valid
+		//  w.r.t their corresponding staking public key. It is therefore enough to check
+		//  the aggregated signature to conclude whether the aggregated public key is identity.
 		//  This check is therefore a sanity check to catch a potential issue early.
 		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
 			return nil, fmt.Errorf("cluster qc vote aggregation failed because resulting BLS signature is identity")
