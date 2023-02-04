@@ -167,7 +167,8 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	noopCollector := &metrics.NoopCollector{}
 
-	ledger, err := complete.NewLedger(&fixtures.NoopWAL{}, 10, noopCollector, zerolog.Nop(), complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	ledger, err := complete.NewLedger(&fixtures.NoopWAL{}, 10, noopCollector, zerolog.Nop(), complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(t, err)
 
 	compactor := fixtures.NewNoopCompactor(ledger)
@@ -571,7 +572,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	script := []byte(`
 	pub fun main(): Int {
 		var i = 0
-		var j = 0 
+		var j = 0
 		while i < 10000000 {
 			i = i + 1
 			j = i + j

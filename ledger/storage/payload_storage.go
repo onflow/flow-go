@@ -60,3 +60,8 @@ func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
 
 	return nil
 }
+
+// TODO: replace the storage with other key-value store
+func CreatePayloadStorage() *PayloadStorage {
+	return NewPayloadStorage(NewInMemStorage())
+}

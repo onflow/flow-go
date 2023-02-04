@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/storage"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -159,7 +160,8 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string, full
 		}
 
 	} else {
-		led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, noopMetrics, log.Logger, 0)
+		payloadStorage := storage.CreatePayloadStorage()
+		led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, noopMetrics, log.Logger, 0, payloadStorage)
 		if err != nil {
 			return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 		}

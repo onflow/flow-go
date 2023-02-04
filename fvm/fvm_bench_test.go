@@ -168,7 +168,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	wal := &fixtures.NoopWAL{}
 
-	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(tb, err)
 
 	compactor := fixtures.NewNoopCompactor(ledger)
@@ -697,7 +698,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	setUpReceiverTemplate := `
 	import NonFungibleToken from 0x%s
 	import BatchNFT from 0x%s
-	
+
 	transaction {
 		prepare(signer: AuthAccount) {
 			signer.save(

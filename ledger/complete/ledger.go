@@ -51,6 +51,7 @@ func NewLedger(
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
 	pathFinderVer uint8,
+	payloadStorage ledger.PayloadStorage,
 ) (*Ledger, error) {
 
 	logger := log.With().Str("ledger_mod", "complete").Logger()
@@ -59,8 +60,6 @@ func NewLedger(
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
-
-	payloadStorage := newPayloadStorage()
 
 	storage := &Ledger{
 		forest:            forest,
@@ -140,7 +139,7 @@ func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	valueSizes, err = l.forest.ValueSizes(trieRead)
+	valueSizes, err = l.forest.ValueSizes(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}

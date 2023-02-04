@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/debug"
 )
@@ -89,7 +90,8 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create WAL")
 	}
-	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
+	payloadStorage := storage.CreatePayloadStorage()
+	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0, payloadStorage)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create ledger from write-a-head logs and checkpoints")
 	}

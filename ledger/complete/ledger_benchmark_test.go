@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // GENERAL COMMENT:
@@ -47,7 +48,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
 
-	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(b, err)
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
@@ -162,7 +164,8 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
 
-	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(b, err)
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
@@ -216,7 +219,8 @@ func BenchmarkTrieRead(b *testing.B) {
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
 
-	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(b, err)
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
@@ -279,7 +283,8 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
 
-	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(b, err)
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
@@ -359,7 +364,8 @@ func BenchmarkTrieProve(b *testing.B) {
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
 
-	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(b, err)
 
 	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))

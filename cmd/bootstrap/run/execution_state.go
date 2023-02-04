@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -52,7 +53,8 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	ledgerStorage, err := ledger.NewLedger(diskWal, capacity, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+	payloadStorage := storage.CreatePayloadStorage()
+	ledgerStorage, err := ledger.NewLedger(diskWal, capacity, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion, payloadStorage)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

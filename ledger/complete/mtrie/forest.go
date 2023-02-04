@@ -54,7 +54,7 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 
 // ValueSizes returns value sizes for a slice of paths and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
-func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
+func (f *Forest) ValueSizes(r *ledger.TrieRead, payloadStorage ledger.PayloadStorage) ([]int, error) {
 
 	if len(r.Paths) == 0 {
 		return []int{}, nil
@@ -82,7 +82,10 @@ func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 		pathOrgIndex[path] = append(indices, i)
 	}
 
-	sizes := trie.UnsafeValueSizes(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	sizes, err := trie.UnsafeValueSizes(deduplicatedPaths, payloadStorage) // this sorts deduplicatedPaths IN-PLACE
+	if err != nil {
+		return nil, fmt.Errorf("could not read unsafe value size: %w", err)
+	}
 
 	// reconstruct value sizes in the same key order that called the method
 	orderedValueSizes := make([]int, len(r.Paths))
@@ -268,7 +271,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead, payloadStorage ledger.PayloadStorage
 	}
 
 	// look up for non existing paths
-	retValueSizes, err := f.ValueSizes(r)
+	retValueSizes, err := f.ValueSizes(r, payloadStorage)
 	if err != nil {
 		return nil, err
 	}

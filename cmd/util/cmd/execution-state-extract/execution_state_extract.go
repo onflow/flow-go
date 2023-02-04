@@ -50,12 +50,15 @@ func extractExecutionState(
 
 	log.Info().Msg("init ledger")
 
+	payloadStorage := storage.CreatePayloadStorage()
 	led, err := complete.NewLedger(
 		diskWal,
 		complete.DefaultCacheSize,
 		&metrics.NoopCollector{},
 		log,
-		complete.DefaultPathFinderVersion)
+		complete.DefaultPathFinderVersion,
+		payloadStorage,
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
