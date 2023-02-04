@@ -200,9 +200,9 @@ void bn_randZr(bn_t x) {
     bn_mod(x, x, &core_get()->ep_r);
 }
 
-// reads a scalar from an array and maps it to Zr
-// the resulting scalar is in the range 0 <= a < r
-// len must be less than BITS_TO_BYTES(RLC_BN_BITS).
+// Reads a scalar from an array and maps it to Zr.
+// The resulting scalar `a` satisfies 0 <= a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS).
 // It returns VALID if scalar is zero and INVALID otherwise
 int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
     bn_t tmp;
@@ -218,9 +218,9 @@ int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
     return INVALID;
 }
 
-// reads a scalar from an array and maps it to Zr*
-// the resulting scalar is in the range 0 < a < r
-// len must be less than BITS_TO_BYTES(RLC_BN_BITS)
+// Reads a scalar from an array and maps it to Zr*.
+// The resulting scalar `a` satisfies 0 < a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS)
 void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_t tmp;
     bn_new(tmp);

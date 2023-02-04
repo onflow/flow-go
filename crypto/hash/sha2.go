@@ -6,7 +6,7 @@ import (
 	"hash"
 )
 
-// sha2_256Algo, embeds commonHasher
+// sha2_256Algo
 type sha2_256Algo struct {
 	hash.Hash
 }
@@ -37,7 +37,7 @@ func (s *sha2_256Algo) SumHash() Hash {
 	return s.Sum(nil)
 }
 
-// sha2_384Algo, embeds commonHasher
+// sha2_384Algo
 type sha2_384Algo struct {
 	hash.Hash
 }
@@ -70,9 +70,8 @@ func (s *sha2_384Algo) SumHash() Hash {
 // ComputeSHA2_256 computes the SHA2-256 (commonly known as SHA256)
 // digest of data and copies the result to the result buffer.
 //
-// The function is not part of the Hasher API. It is a light API
-// that allows a simple computation of a hash and minimizes
-// heap allocations.
+// The function is not part of the Hasher API. It is a pure function
+// for simple computation of a hash with minimal heap allocations.
 func ComputeSHA2_256(result *[HashLenSHA2_256]byte, data []byte) {
 	hash := sha256.Sum256(data)
 	copy(result[:], hash[:])

@@ -212,7 +212,7 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	okmLength := Nlen + (securityBits / 8)
 
-	// instanciate HKDF and extract okm
+	// instantiate HKDF and extract okm
 	reader := hkdf.New(hashFunction, seed, salt, info)
 	okm := make([]byte, okmLength)
 	n, err := reader.Read(okm)

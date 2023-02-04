@@ -105,6 +105,8 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+// tests the key generation constraints with regards to the input seed, mainly
+// the seed length constraints and the result determinicity.
 func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
 	t.Run("seed length check", func(t *testing.T) {
 		// valid seed lengths

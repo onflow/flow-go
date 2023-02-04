@@ -109,10 +109,9 @@ func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
 //
 // The function returns:
 //   - (false, invalidInputsErrors) if the signing algorithm is not supported or
-//
-// if the seed length is not valid (less than 32 bytes or larger than 256 bytes)
+//     if the seed length is not valid (less than 32 bytes or larger than 256 bytes)
 //   - (false, error) if an unexpected error occurs
-//   - (sk, nil) otherwise
+//   - (sk, nil) if key generation was successful
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {

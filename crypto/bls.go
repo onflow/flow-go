@@ -289,7 +289,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	sk := newPrKeyBLSBLS12381(nil)
 	for {
-		// instanciate HKDF and extract L bytes
+		// instantiate HKDF and extract L bytes
 		reader := hkdf.New(hashFunction, secret, salt, info)
 		okm := make([]byte, okmLength)
 		n, err := reader.Read(okm)

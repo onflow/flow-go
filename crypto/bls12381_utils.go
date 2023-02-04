@@ -122,8 +122,8 @@ func randZrStar(x *scalar) {
 	C.bn_randZr_star((*C.bn_st)(x))
 }
 
-// mapToZr reads a scalar from a slice of bytes and maps it to Zr
-// the resulting scalar is in the range 0 <= k < r.
+// mapToZr reads a scalar from a slice of bytes and maps it to Zr.
+// The resulting scalar `k` satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
 func mapToZr(x *scalar, src []byte) bool {
 	isZero := C.bn_map_to_Zr((*C.bn_st)(x),
