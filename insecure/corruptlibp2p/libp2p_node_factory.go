@@ -34,7 +34,8 @@ func NewCorruptLibP2PNodeFactory(
 	onInterceptPeerDialFilters,
 	onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
-	updateInterval time.Duration,
+	updateInterval,
+	createStreamRetryDelay time.Duration,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -58,6 +59,7 @@ func NewCorruptLibP2PNodeFactory(
 			peerScoringEnabled,
 			connectionPruning,
 			updateInterval,
+			createStreamRetryDelay,
 			p2pbuilder.DefaultResourceManagerConfig())
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)

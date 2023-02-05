@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
@@ -377,7 +378,8 @@ func generateLibP2PNode(t *testing.T,
 		sporkID,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
-		SetResourceManager(NewResourceManager(t))
+		SetResourceManager(NewResourceManager(t)).
+		SetUnicastManagerOptions(unicast.DefaultRetryDelay)
 
 	for _, opt := range opts {
 		opt(builder)

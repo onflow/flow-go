@@ -480,6 +480,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(connectionPruning, updateInterval).
+		SetUnicastManagerOptions(createStreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc)
 
 	if peerScoringEnabled {

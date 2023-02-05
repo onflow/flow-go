@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
@@ -119,24 +119,9 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
 }
 
-// createStream creates a stream to the peerID with the provided unicastProtocol.
-func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	s, addrs, err := m.rawStreamWithProtocol(ctx, unicastProtocol.ProtocolId(), peerID, maxAttempts)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	s, err = unicastProtocol.UpgradeRawStream(s)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return s, addrs, nil
-
-}
-
 // tryCreateStream will retry createStream with the configured exponential backoff delay and maxAttempts. If no stream can be created after max attempts the error is returned.
 func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	var err error
 	var s libp2pnet.Stream
 	var addrs []multiaddr.Multiaddr // address on which we dial peerID
 
@@ -144,8 +129,9 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	backoff := retry.NewExponential(m.createStreamRetryDelay)
 	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
 
+	attempts := atomic.NewInt64(0)
 	f := func(context.Context) error {
-		var err error
+		attempts.Inc()
 		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
 		if err != nil {
 			if IsErrDialInProgress(err) {
@@ -158,7 +144,22 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 		return nil
 	}
 
-	err := retry.Do(ctx, backoff, f)
+	err = retry.Do(ctx, backoff, f)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s, addrs, nil
+}
+
+// createStream creates a stream to the peerID with the provided unicastProtocol.
+func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	s, addrs, err := m.rawStreamWithProtocol(ctx, unicastProtocol.ProtocolId(), peerID, maxAttempts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	s, err = unicastProtocol.UpgradeRawStream(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,14 +188,24 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	peerID peer.ID,
 	maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 
+	// aggregated retryable errors that occur during retries, these errs will be returned if retry context times out before a successful retry occurs
 	var errs error
 	var s libp2pnet.Stream
-	var retries = 0
 	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
-	for ; retries < maxAttempts; retries++ {
+
+	// create backoff
+	backoff := retry.NewConstant(1000 * time.Millisecond)
+	// add a MaxConnectAttemptSleepDuration*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
+	backoff = retry.WithJitter(MaxConnectAttemptSleepDuration*time.Millisecond, backoff)
+	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
+
+	// retryable func that will attempt to dial the peer and establish the initial connection
+	dialRetries := atomic.NewInt64(0)
+	dialPeer := func(context.Context) error {
+		dialRetries.Inc()
 		select {
 		case <-ctx.Done():
-			return nil, nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", dialRetries.String(), errs)
 		default:
 		}
 
@@ -204,52 +215,38 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		// immediately without backing off and fail-fast.
 		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 
-		isConnected, err := m.connStatus.IsConnected(peerID)
+		// cancel the dial back off (if any), since we want to connect immediately
+		dialAddr = m.streamFactory.DialAddress(peerID)
+		m.streamFactory.ClearBackoff(peerID)
+		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
-			return nil, nil, err
+			// if the connection was rejected due to invalid node id, skip the re-attempt
+			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
+				return fmt.Errorf("invalid node id: %w", err)
+			}
+
+			// if the connection was rejected due to allowlisting, skip the re-attempt
+			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
+				return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+			}
+
+			errs = multierror.Append(errs, err)
+			return retry.RetryableError(err)
+		}
+		return nil
+	}
+
+	// retryable func that will attempt to create the stream using the stream factory if connection exists
+	connectRetries := atomic.NewInt64(0)
+	connectPeer := func(context.Context) error {
+		connectRetries.Inc()
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", connectRetries.String(), errs)
+		default:
 		}
 
-		// dial peer and establish connection if one does not exist
-		if !isConnected {
-			// we prevent nodes from dialingComplete peers multiple times which leads to multiple connections being
-			// created under the hood which can lead to resource exhaustion
-			if m.isDialing(peerID) {
-				return nil, nil, NewDialInProgressErr(peerID)
-			}
-
-			m.dialingInProgress(peerID)
-			// cancel the dial back off (if any), since we want to connect immediately
-			dialAddr = m.streamFactory.DialAddress(peerID)
-			m.streamFactory.ClearBackoff(peerID)
-
-			// if this is a retry attempt, wait for some time before retrying
-			if retries > 0 {
-				// choose a random interval between 0 to 5
-				// (to ensure that this node and the target node don't attempt to reconnect at the same time)
-				r := rand.Intn(MaxConnectAttemptSleepDuration)
-				time.Sleep(time.Duration(r) * time.Millisecond)
-			}
-
-			err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
-			if err != nil {
-				// if the connection was rejected due to invalid node id, skip the re-attempt
-				if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-					m.dialingComplete(peerID)
-					return s, dialAddr, fmt.Errorf("invalid node id: %w", err)
-				}
-
-				// if the connection was rejected due to allowlisting, skip the re-attempt
-				if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-					m.dialingComplete(peerID)
-					return s, dialAddr, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
-				}
-
-				errs = multierror.Append(errs, err)
-				continue
-			}
-			m.dialingComplete(peerID)
-		}
-
+		var err error
 		// add libp2p context value NoDial to prevent the underlying host from dialingComplete the peer while creating the stream
 		// we've already ensured that a connection already exists.
 		ctx = libp2pnet.WithNoDial(ctx, "application ensured connection to peer exists")
@@ -258,17 +255,38 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {
-				return nil, dialAddr, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, protocolID)
+				return fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, protocolID)
 			}
 			errs = multierror.Append(errs, err)
-			continue
+			return retry.RetryableError(err)
 		}
 
-		break
+		return nil
 	}
 
-	if retries == maxAttempts {
-		return s, dialAddr, errs
+	isConnected, err := m.connStatus.IsConnected(peerID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// check connection status and attempt to dial the peer if dialing is not in progress
+	if !isConnected {
+		if m.isDialing(peerID) {
+			return nil, nil, NewDialInProgressErr(peerID)
+		}
+
+		m.dialingInProgress(peerID)
+		defer m.dialingComplete(peerID)
+		err = retry.Do(ctx, backoff, dialPeer)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// at this point dialing should have completed or we are already connected we can attempt to create the stream
+	err = retry.Do(ctx, backoff, connectPeer)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return s, dialAddr, nil

@@ -1085,6 +1085,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			}).
 			// disable connection pruning for the access node which supports the observer
 			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
+			SetUnicastManagerOptions(builder.UnicastCreateStreamRetryDelay).
 			Build()
 
 		if err != nil {

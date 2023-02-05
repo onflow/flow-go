@@ -29,6 +29,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -94,7 +95,8 @@ func NodeFixture(
 			)
 		}).
 		SetResourceManager(resourceManager).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
+		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
+		SetUnicastManagerOptions(unicast.DefaultRetryDelay)
 
 	if parameters.ConnGater != nil {
 		builder.SetConnectionGater(parameters.ConnGater)

@@ -87,6 +87,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			// run peer manager with the specified interval and let it also prune connections
 			cnb.NetworkConnectionPruning,
 			cnb.PeerUpdateInterval,
+			cnb.UnicastCreateStreamRetryDelay,
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,

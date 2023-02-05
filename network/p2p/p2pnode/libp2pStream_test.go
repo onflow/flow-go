@@ -82,8 +82,8 @@ func TestStreamClosing(t *testing.T) {
 	}
 
 	// wait for stream to be closed
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 1*time.Second, "could not send messages on time")
-	unittest.RequireReturnsBefore(t, streamCloseWG.Wait, 1*time.Second, "could not close stream at receiver side")
+	unittest.RequireReturnsBefore(t, senderWG.Wait, 3*time.Second, "could not send messages on time")
+	unittest.RequireReturnsBefore(t, streamCloseWG.Wait, 3*time.Second, "could not close stream at receiver side")
 }
 
 // mockStreamHandlerForMessages creates a stream handler that expects receiving `msgCount` unique messages that match the input regexp.

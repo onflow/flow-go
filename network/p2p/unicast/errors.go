@@ -13,7 +13,7 @@ type ErrDialInProgress struct {
 }
 
 func (e ErrDialInProgress) Error() string {
-	return fmt.Sprintf("dialingComplete to peer %s already in progress", e.pid.String())
+	return fmt.Sprintf("dialing to peer %s already in progress", e.pid.String())
 }
 
 // NewDialInProgressErr returns a new ErrDialInProgress.
