@@ -55,12 +55,13 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
-		HandlerFunc: func(network.Stream) {},
-		Unicasts:    nil,
-		Key:         NetworkingKeyFixtures(t),
-		Address:     unittest.DefaultAddress,
-		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
-		Role:        flow.RoleCollection,
+		HandlerFunc:            func(network.Stream) {},
+		Unicasts:               nil,
+		Key:                    NetworkingKeyFixtures(t),
+		Address:                unittest.DefaultAddress,
+		Logger:                 unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:                   flow.RoleCollection,
+		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
 	}
 
 	for _, opt := range opts {
@@ -96,7 +97,7 @@ func NodeFixture(
 		}).
 		SetResourceManager(resourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
-		SetUnicastManagerOptions(unicast.DefaultRetryDelay)
+		SetUnicastManagerOptions(parameters.CreateStreamRetryDelay)
 
 	if parameters.ConnGater != nil {
 		builder.SetConnectionGater(parameters.ConnGater)
@@ -139,22 +140,29 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc        network.StreamHandler
-	Unicasts           []protocols.ProtocolName
-	Key                crypto.PrivateKey
-	Address            string
-	DhtOptions         []dht.Option
-	Role               flow.Role
-	Logger             zerolog.Logger
-	PeerScoringEnabled bool
-	IdProvider         module.IdentityProvider
-	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
-	ConnectionPruning  bool                  // peer manager parameter
-	UpdateInterval     time.Duration         // peer manager parameter
-	PeerProvider       p2p.PeersProvider     // peer manager parameter
-	ConnGater          connmgr.ConnectionGater
-	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
-	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
+	HandlerFunc            network.StreamHandler
+	Unicasts               []protocols.ProtocolName
+	Key                    crypto.PrivateKey
+	Address                string
+	DhtOptions             []dht.Option
+	Role                   flow.Role
+	Logger                 zerolog.Logger
+	PeerScoringEnabled     bool
+	IdProvider             module.IdentityProvider
+	AppSpecificScore       func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning      bool                  // peer manager parameter
+	UpdateInterval         time.Duration         // peer manager parameter
+	PeerProvider           p2p.PeersProvider     // peer manager parameter
+	ConnGater              connmgr.ConnectionGater
+	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
+	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
+	CreateStreamRetryDelay time.Duration
+}
+
+func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.CreateStreamRetryDelay = delay
+	}
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {

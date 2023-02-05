@@ -127,7 +127,10 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 	// configure back off retry delay values
 	backoff := retry.NewExponential(m.createStreamRetryDelay)
-	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
+	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
+	// when retries == maxAttempts causing 1 more func invocation than expected.
+	maxRetries := maxAttempts - 1
+	backoff = retry.WithMaxRetries(uint64(maxRetries), backoff)
 
 	attempts := atomic.NewInt64(0)
 	// retryable func will attempt to create the stream and only retry if dialing the peer is in progress
@@ -136,7 +139,12 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
 		if err != nil {
 			if IsErrDialInProgress(err) {
-				// capture dial in progress metric and log
+				m.logger.Warn().
+					Err(err).
+					Str("peer_id", peerID.String()).
+					Int64("attempt", attempts.Load()).
+					Int("max_attempts", maxAttempts).
+					Msg("retrying create stream, dial to peer in progress")
 				return retry.RetryableError(err)
 			}
 			return err
@@ -199,15 +207,18 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	backoff := retry.NewConstant(1000 * time.Millisecond)
 	// add a MaxConnectAttemptSleepDuration*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxConnectAttemptSleepDuration*time.Millisecond, backoff)
-	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
+	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
+	// when retries == maxAttempts causing 1 more func invocation than expected.
+	maxRetries := maxAttempts - 1
+	backoff = retry.WithMaxRetries(uint64(maxRetries), backoff)
 
 	// retryable func that will attempt to dial the peer and establish the initial connection
-	dialRetries := atomic.NewInt64(0)
+	dialAttempts := atomic.NewInt64(0)
 	dialPeer := func(context.Context) error {
-		dialRetries.Inc()
+		dialAttempts.Inc()
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", dialRetries.String(), errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", dialAttempts.String(), errs)
 		default:
 		}
 
@@ -231,7 +242,12 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
 				return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
-
+			m.logger.Warn().
+				Err(err).
+				Str("peer_id", peerID.String()).
+				Int64("attempt", dialAttempts.Load()).
+				Int("max_attempts", maxAttempts).
+				Msg("retrying peer dialing")
 			errs = multierror.Append(errs, err)
 			return retry.RetryableError(errs)
 		}
@@ -239,12 +255,12 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	// retryable func that will attempt to create the stream using the stream factory if connection exists
-	connectRetries := atomic.NewInt64(0)
+	connectAttempts := atomic.NewInt64(0)
 	connectPeer := func(context.Context) error {
-		connectRetries.Inc()
+		connectAttempts.Inc()
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", connectRetries.String(), errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", connectAttempts.String(), errs)
 		default:
 		}
 
@@ -283,7 +299,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		}
 	}
 
-	// at this point dialing should have completed or we are already connected we can attempt to create the stream
+	// at this point dialing should have completed we are already connected we can attempt to create the stream
 	err = retry.Do(ctx, backoff, connectPeer)
 	if err != nil {
 		return nil, nil, err
