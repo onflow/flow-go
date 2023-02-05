@@ -38,25 +38,23 @@ var (
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
-	lock                   sync.RWMutex
 	logger                 zerolog.Logger
 	streamFactory          StreamFactory
 	unicasts               []protocols.Protocol
 	defaultHandler         libp2pnet.StreamHandler
 	sporkId                flow.Identifier
 	connStatus             p2p.PeerConnections
-	peerDialing            map[peer.ID]struct{}
+	peerDialing            sync.Map
 	createStreamRetryDelay time.Duration
 }
 
 func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier, createStreamRetryDelay time.Duration, connStatus p2p.PeerConnections) *Manager {
 	return &Manager{
-		lock:                   sync.RWMutex{},
 		logger:                 logger.With().Str("module", "unicast-manager").Logger(),
 		streamFactory:          streamFactory,
 		sporkId:                sporkId,
 		connStatus:             connStatus,
-		peerDialing:            make(map[peer.ID]struct{}),
+		peerDialing:            sync.Map{},
 		createStreamRetryDelay: createStreamRetryDelay,
 	}
 }
@@ -100,12 +98,11 @@ func (m *Manager) Register(unicast protocols.ProtocolName) error {
 }
 
 // CreateStream tries establishing a libp2p stream to the remote peer id. It tries creating streams in the descending order of preference until
-// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempt` one, and then falls
+// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempts`, and then falls
 // back to the less preferred one.
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
 	for i := len(m.unicasts) - 1; i >= 0; i-- {
-		// handle the dial in progress error and add retry with backoff collect back off / retry metrics
 		s, addrs, err := m.tryCreateStream(ctx, peerID, maxAttempts, m.unicasts[i])
 		if err != nil {
 			errs = multierror.Append(errs, err)
@@ -119,7 +116,10 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
 }
 
-// tryCreateStream will retry createStream with the configured exponential backoff delay and maxAttempts. If no stream can be created after max attempts the error is returned.
+// tryCreateStream will retry createStream with the configured exponential backoff delay and maxAttempts.
+// If no stream can be created after max attempts the error is returned. During stream creation IsErrDialInProgress indicates
+// that no connection to the peer exists yet, in this case we will retry creating the stream with a backoff until a connection
+// is established.
 func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var err error
 	var s libp2pnet.Stream
@@ -130,6 +130,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	backoff = retry.WithMaxRetries(uint64(maxAttempts), backoff)
 
 	attempts := atomic.NewInt64(0)
+	// retryable func will attempt to create the stream and only retry if dialing the peer is in progress
 	f := func(context.Context) error {
 		attempts.Inc()
 		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
@@ -188,7 +189,8 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	peerID peer.ID,
 	maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 
-	// aggregated retryable errors that occur during retries, these errs will be returned if retry context times out before a successful retry occurs
+	// aggregated retryable errors that occur during retries, errs will be returned
+	// if retry context times out or maxAttempts have been made before a successful retry occurs
 	var errs error
 	var s libp2pnet.Stream
 	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
@@ -231,7 +233,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			}
 
 			errs = multierror.Append(errs, err)
-			return retry.RetryableError(err)
+			return retry.RetryableError(errs)
 		}
 		return nil
 	}
@@ -258,9 +260,8 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 				return fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, protocolID)
 			}
 			errs = multierror.Append(errs, err)
-			return retry.RetryableError(err)
+			return retry.RetryableError(errs)
 		}
-
 		return nil
 	}
 
@@ -271,11 +272,10 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 	// check connection status and attempt to dial the peer if dialing is not in progress
 	if !isConnected {
-		if m.isDialing(peerID) {
+		// if we can't start dialing another routine has we can return an error
+		if m.dialingInProgress(peerID) {
 			return nil, nil, NewDialInProgressErr(peerID)
 		}
-
-		m.dialingInProgress(peerID)
 		defer m.dialingComplete(peerID)
 		err = retry.Do(ctx, backoff, dialPeer)
 		if err != nil {
@@ -292,24 +292,13 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	return s, dialAddr, nil
 }
 
-// isDialing returns true if dialing to peer in progress.
-func (m *Manager) isDialing(peerID peer.ID) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	_, ok := m.peerDialing[peerID]
-	return ok
-}
-
-// dialingInProgress sets peerDialing value for peerID indicating dialing in progress.
-func (m *Manager) dialingInProgress(peerID peer.ID) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.peerDialing[peerID] = struct{}{}
+// dialingInProgress sets the value for peerID key in our map if it does not already exist.
+func (m *Manager) dialingInProgress(peerID peer.ID) bool {
+	_, loaded := m.peerDialing.LoadOrStore(peerID, struct{}{})
+	return loaded
 }
 
 // dialingComplete removes peerDialing value for peerID indicating dialing to peerID no longer in progress.
 func (m *Manager) dialingComplete(peerID peer.ID) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	delete(m.peerDialing, peerID)
+	m.peerDialing.Delete(peerID)
 }

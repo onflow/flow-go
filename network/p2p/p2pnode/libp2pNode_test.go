@@ -3,6 +3,7 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -236,4 +238,84 @@ func TestNode_HasSubscription(t *testing.T) {
 	// create topic with no subscription
 	topic = channels.TopicFromChannel(channels.ConsensusCommittee, unittest.IdentifierFixture())
 	require.False(t, node.HasSubscription(topic))
+}
+
+func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	nodeCount := 3
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	nodes, ids := p2ptest.NodesFixture(t,
+		sporkId,
+		"test_create_stream",
+		nodeCount,
+		p2ptest.WithPreferredUnicasts(nil))
+
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	numOfStreamsPerNode := 3
+	expectedTotalNumOfStreams := 18
+
+	// create a number of streams concurrently between each node
+	streams := make(chan network.Stream, expectedTotalNumOfStreams)
+
+	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streams, done)
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streams on time")
+	require.Len(t, streams, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streams created got %d", expectedTotalNumOfStreams, len(streams)))
+
+	// ensure only a single connection exists between all nodes
+	ensureSinglePairwiseConnection(t, nodes)
+	close(streams)
+	for s := range streams {
+		require.NoError(t, s.Close())
+	}
+}
+
+// createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
+func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList, n int, streams chan network.Stream, done chan struct{}) {
+	defer close(done)
+	var wg sync.WaitGroup
+	for _, this := range nodes {
+		for i, other := range nodes {
+			if this == other {
+				continue
+			}
+
+			pInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			this.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+
+			for j := 0; j < n; j++ {
+				wg.Add(1)
+				go func(sender p2p.LibP2PNode) {
+					defer wg.Done()
+					s, err := sender.CreateStream(ctx, pInfo.ID)
+					require.NoError(t, err)
+					streams <- s
+				}(this)
+			}
+		}
+		// brief sleep to prevent sender and receiver dialing each other at the same time if separate goroutines resulting
+		// in 2 connections 1 created by each node, this happens because we are calling CreateStream concurrently.
+		time.Sleep(500 * time.Millisecond)
+	}
+	wg.Wait()
+}
+
+// ensureSinglePairwiseConnection ensure each node in the list has exactly one connection to every other node in the list.
+func ensureSinglePairwiseConnection(t *testing.T, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			require.Len(t, this.Host().Network().ConnsToPeer(other.Host().ID()), 1)
+		}
+	}
 }
