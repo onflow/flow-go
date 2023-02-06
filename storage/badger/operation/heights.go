@@ -38,6 +38,18 @@ func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSealedHeight), height)
 }
 
+// InsertEpochFirstHeight inserts the height of the first block in the given epoch.
+// Returns storage.ErrAlreadyExists if the height has already been indexed.
+func InsertEpochFirstHeight(epoch, height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochFirstHeight, epoch), height)
+}
+
+// RetrieveEpochFirstHeight retrieves the height of the first block in the given epoch.
+// Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
+func RetrieveEpochFirstHeight(epoch uint64, height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeEpochFirstHeight, epoch), height)
+}
+
 // InsertLastCompleteBlockHeightIfNotExists inserts the last full block height if it is not already set.
 // Calling this function multiple times is a no-op and returns no expected errors.
 func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(*badger.Txn) error {

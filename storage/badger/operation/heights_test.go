@@ -3,12 +3,14 @@
 package operation
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,6 +59,35 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, retrieved, height)
+	})
+}
+
+func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		height := rand.Uint64()
+		epoch := rand.Uint64()
+
+		// retrieve when empty errors
+		var retrieved uint64
+		err := db.View(RetrieveEpochFirstHeight(epoch, &retrieved))
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// can insert
+		err = db.Update(InsertEpochFirstHeight(epoch, height))
+		require.NoError(t, err)
+
+		// can retrieve
+		err = db.View(RetrieveEpochFirstHeight(epoch, &retrieved))
+		require.NoError(t, err)
+		assert.Equal(t, retrieved, height)
+
+		// retrieve non-existent key errors
+		err = db.View(RetrieveEpochFirstHeight(epoch+1, &retrieved))
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// insert existent key errors
+		err = db.Update(InsertEpochFirstHeight(epoch, height))
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
 
