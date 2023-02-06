@@ -12,6 +12,7 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -23,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -213,12 +213,19 @@ func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flo
 
 // EnsureNotConnected ensures that no connection exists from "from" nodes to "to" nodes.
 func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode) {
-	for _, node := range from {
+	for _, this := range from {
 		for _, other := range to {
-			if node == other {
+			if this == other {
 				require.Fail(t, "overlapping nodes in from and to lists")
 			}
-			require.Error(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			thisId := this.Host().ID()
+			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
+			// does not cause the nodes to complain about the connection being rejected at the dialer side.
+			// Hence, we instead check for any trace of the connection being established in the receiver side.
+			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
+			// ensures that other node has never received a connection from this node.
+			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 		}
 	}
 }
@@ -335,10 +342,16 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 				// should not happen, unless the test is misconfigured.
 				require.Fail(t, "node is in both from and to lists")
 			}
-			// stream creation should fail
-			_, err := this.CreateStream(ctx, other.Host().ID())
-			require.Error(t, err)
-			require.True(t, flownet.IsPeerUnreachableError(err))
+			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
+			// does not cause the nodes to complain about the connection being rejected at the dialer side.
+			// Hence, we instead check for any trace of the connection being established in the receiver side.
+			otherId := other.Host().ID()
+			thisId := this.Host().ID()
+			_, err := this.CreateStream(ctx, otherId)
+			// ensures that other node has never received a connection from this node.
+			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
+			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
 			// runs the error checkers if any.
 			for _, check := range errorCheckers {

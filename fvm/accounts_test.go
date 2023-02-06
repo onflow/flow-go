@@ -1310,15 +1310,20 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					if key == state.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
+					if id.Key == flow.AccountStatusKey {
+						return nil, fmt.Errorf("error getting register %s", id)
 					}
 					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, view)
-				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.AccountStatusKey))
+				require.ErrorContains(
+					t,
+					err,
+					fmt.Sprintf(
+						"error getting register %s",
+						flow.AccountStatusRegisterID(address)))
 			}),
 	)
 
@@ -1518,15 +1523,20 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				newview := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					if key == state.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				newview := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
+					if id.Key == flow.AccountStatusKey {
+						return nil, fmt.Errorf("error getting register %s", id)
 					}
 					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, newview)
-				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.AccountStatusKey))
+				require.ErrorContains(
+					t,
+					err,
+					fmt.Sprintf(
+						"error getting register %s",
+						flow.AccountStatusRegisterID(address)))
 			}),
 	)
 }

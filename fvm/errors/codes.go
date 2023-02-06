@@ -79,7 +79,7 @@ const (
 	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
 	ErrCodeEventEncodingError                        ErrorCode = 1115
-	ErrCodeInvalidFVMStateAccessError                ErrorCode = 1116
+	ErrCodeInvalidInternalStateAccessError           ErrorCode = 1116
 	// 1117 was never deployed and is free to use
 	ErrCodeInsufficientPayerBalance ErrorCode = 1118
 

@@ -162,18 +162,20 @@ func TestConnGater(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
+	idProvider := mock.NewIdentityProvider(t)
 
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node1Peers.Has(pid) {
 				return fmt.Errorf("peer id not found: %s", pid.String())
 			}
 			return nil
 		})))
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&identity1, true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel, 100*time.Millisecond)
@@ -185,12 +187,16 @@ func TestConnGater(t *testing.T) {
 	node2, identity2 := p2ptest.NodeFixture(
 		t,
 		sporkID, t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node2Peers.Has(pid) {
 				return fmt.Errorf("id not found: %s", pid.String())
 			}
 			return nil
 		})))
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&identity2,
+
+		true).Maybe()
+
 	p2ptest.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node2, cancel, 100*time.Millisecond)
 

@@ -1,10 +1,7 @@
 package state
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
 
@@ -16,17 +13,6 @@ import (
 const (
 	DefaultMaxKeySize   = 16_000      // ~16KB
 	DefaultMaxValueSize = 256_000_000 // ~256MB
-
-	// Service level keys (owner is empty):
-	UUIDKey         = "uuid"
-	AddressStateKey = "account_address_state"
-
-	// Account level keys
-	AccountKeyPrefix   = "a."
-	AccountStatusKey   = AccountKeyPrefix + "s"
-	CodeKeyPrefix      = "code."
-	ContractNamesKey   = "contract_names"
-	PublicKeyKeyPrefix = "public_key_"
 )
 
 // TODO(patrick): make State implement the View interface.
@@ -82,19 +68,6 @@ func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameter
 func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
 	newParams := params
 	newParams.maxValueSizeAllowed = limit
-	return newParams
-}
-
-// TODO(patrick): rm once https://github.com/onflow/flow-emulator/pull/245
-// is integrated.
-//
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func (params StateParameters) WithMaxInteractionSizeAllowed(
-	limit uint64,
-) StateParameters {
-	newParams := params
-	newParams.MeterParameters = newParams.MeterParameters.
-		WithStorageInteractionLimit(limit)
 	return newParams
 }
 
@@ -182,7 +155,7 @@ func (s *State) UpdatedRegisters() flow.RegisterEntries {
 }
 
 // Get returns a register value given owner and key
-func (s *State) Get(owner, key string) (flow.RegisterValue, error) {
+func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	if s.committed {
 		return nil, fmt.Errorf("cannot Get on a committed state")
 	}
@@ -191,55 +164,42 @@ func (s *State) Get(owner, key string) (flow.RegisterValue, error) {
 	var err error
 
 	if s.enforceLimits {
-		if err = s.checkSize(owner, key, []byte{}); err != nil {
+		if err = s.checkSize(id, []byte{}); err != nil {
 			return nil, err
 		}
 	}
 
-	if value, err = s.view.Get(owner, key); err != nil {
+	if value, err = s.view.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
+		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
 	}
 
-	err = s.meter.MeterStorageRead(
-		flow.RegisterID{Owner: owner, Key: key},
-		value,
-		s.enforceLimits)
-
+	err = s.meter.MeterStorageRead(id, value, s.enforceLimits)
 	return value, err
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, key string, value flow.RegisterValue) error {
+func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
 	if s.committed {
 		return fmt.Errorf("cannot Set on a committed state")
 	}
 
 	if s.enforceLimits {
-		if err := s.checkSize(owner, key, value); err != nil {
+		if err := s.checkSize(id, value); err != nil {
 			return err
 		}
 	}
 
-	if err := s.view.Set(owner, key, value); err != nil {
+	if err := s.view.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
+		return fmt.Errorf("failed to update %s: %w", id, setError)
 	}
 
-	err := s.meter.MeterStorageWrite(
-		flow.RegisterID{Owner: owner, Key: key},
-		value,
-		s.enforceLimits,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.meter.MeterStorageWrite(id, value, s.enforceLimits)
 }
 
 // MeterComputation meters computation usage
@@ -329,57 +289,23 @@ func (s *State) MergeState(other *State) error {
 	return nil
 }
 
-func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(key))
+func (s *State) checkSize(
+	id flow.RegisterID,
+	value flow.RegisterValue,
+) error {
+	keySize := uint64(len(id.Owner) + len(id.Key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return errors.NewStateKeySizeLimitError(owner, key, keySize, s.maxKeySizeAllowed)
+		return errors.NewStateKeySizeLimitError(
+			id,
+			keySize,
+			s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
-		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
+		return errors.NewStateValueSizeLimitError(
+			value,
+			valueSize,
+			s.maxValueSizeAllowed)
 	}
 	return nil
-}
-
-// IsFVMStateKey returns true if the key is controlled by the fvm env and
-// return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner string, key string) bool {
-	// check if is a service level key (owner is empty)
-	// cases:
-	// 		- "", "uuid"
-	// 		- "", "account_address_state"
-	if len(owner) == 0 && (key == UUIDKey || key == AddressStateKey) {
-		return true
-	}
-
-	// check account level keys
-	// cases:
-	// 		- address, "contract_names"
-	// 		- address, "code.%s" (contract name)
-	// 		- address, "public_key_%d" (index)
-	// 		- address, "a.s" (account status)
-	return strings.HasPrefix(key, PublicKeyKeyPrefix) ||
-		key == ContractNamesKey ||
-		strings.HasPrefix(key, CodeKeyPrefix) ||
-		key == AccountStatusKey
-}
-
-// This returns true if the key is a slab index for an account's ordered fields
-// map.
-//
-// In general, each account's regular fields are stored in ordered map known
-// only to cadence.  Cadence encodes this map into bytes and split the bytes
-// into slab chunks before storing the slabs into the ledger.
-func IsSlabIndex(key string) bool {
-	return len(key) == 9 && key[0] == '$'
-}
-
-// PrintableKey formats slabs properly and avoids invalid utf8s
-func PrintableKey(key string) string {
-	// slab
-	if IsSlabIndex(key) {
-		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
-		return fmt.Sprintf("$%d", i)
-	}
-	return fmt.Sprintf("#%x", []byte(key))
 }

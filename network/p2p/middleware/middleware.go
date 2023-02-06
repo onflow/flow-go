@@ -202,7 +202,6 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
-
 	return mw
 }
 
@@ -320,7 +319,9 @@ func (m *Middleware) start(ctx context.Context) error {
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
 // which this node should be directly connected to as peers. The peer ID list
-// returned will be filtered through any configured m.peerManagerFilters.
+// returned will be filtered through any configured m.peerManagerFilters. If the
+// underlying libp2p node has a peer manager configured this func will be used as the
+// peers provider.
 func (m *Middleware) topologyPeers() peer.IDSlice {
 	peerIDs := make([]peer.ID, 0)
 	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
@@ -705,7 +706,6 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			return
 		}
 	}
-
 	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
 }
 

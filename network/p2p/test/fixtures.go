@@ -62,6 +62,8 @@ func NodeFixture(
 		Logger:                 unittest.Logger().Level(zerolog.ErrorLevel),
 		Role:                   flow.RoleCollection,
 		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
+		Metrics:                metrics.NewNoopCollector(),
+		ResourceManager:        testutils.NewResourceManager(t),
 	}
 
 	for _, opt := range opts {
@@ -75,13 +77,12 @@ func NodeFixture(
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(logger, noopMetrics)
-	resourceManager := testutils.NewResourceManager(t)
+	connManager, err := connection.NewConnManager(logger, parameters.Metrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		parameters.Metrics,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
@@ -91,13 +92,17 @@ func NodeFixture(
 			return p2pdht.NewDHT(c, h,
 				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
-				noopMetrics,
+				parameters.Metrics,
 				parameters.DhtOptions...,
 			)
 		}).
-		SetResourceManager(resourceManager).
+		SetResourceManager(parameters.ResourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetUnicastManagerOptions(parameters.CreateStreamRetryDelay)
+
+	if parameters.ResourceManager != nil {
+		builder.SetResourceManager(parameters.ResourceManager)
+	}
 
 	if parameters.ConnGater != nil {
 		builder.SetConnectionGater(parameters.ConnGater)
@@ -118,6 +123,10 @@ func NodeFixture(
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
 		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
+	}
+
+	if parameters.ConnManager != nil {
+		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
 	n, err := builder.Build()
@@ -154,8 +163,11 @@ type NodeFixtureParameters struct {
 	UpdateInterval         time.Duration         // peer manager parameter
 	PeerProvider           p2p.PeersProvider     // peer manager parameter
 	ConnGater              connmgr.ConnectionGater
+	ConnManager            connmgr.ConnManager
 	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
+	Metrics                module.LibP2PMetrics
+	ResourceManager        network.ResourceManager
 	CreateStreamRetryDelay time.Duration
 }
 
@@ -216,6 +228,12 @@ func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameter
 	}
 }
 
+func WithConnectionManager(connManager connmgr.ConnManager) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnManager = connManager
+	}
+}
+
 func WithRole(role flow.Role) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Role = role
@@ -231,6 +249,20 @@ func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOptio
 func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Logger = logger
+	}
+}
+
+func WithMetricsCollector(metrics module.LibP2PMetrics) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.Metrics = metrics
+	}
+}
+
+// WithDefaultResourceManager sets the resource manager to nil, which will cause the node to use the default resource manager.
+// Otherwise, it uses the resource manager provided by the test (the infinite resource manager).
+func WithDefaultResourceManager() NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ResourceManager = nil
 	}
 }
 

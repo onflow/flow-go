@@ -2,13 +2,12 @@ package corruptlibp2p
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
-
-	"github.com/onflow/flow-go/network/p2p"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
@@ -16,7 +15,9 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -45,7 +46,7 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		builder := p2pbuilder.DefaultNodeBuilder(
+		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
 			flowKey,
@@ -60,7 +61,12 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval,
 			createStreamRetryDelay,
-			p2pbuilder.DefaultResourceManagerConfig())
+			p2pbuilder.DefaultResourceManagerConfig(),
+			ratelimit.NewUnicastRateLimiterDistributor())
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
+		}
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}

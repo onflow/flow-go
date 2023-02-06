@@ -5,6 +5,8 @@ import (
 
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,8 +38,8 @@ type NetworkSecurityMetrics interface {
 	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
-	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
@@ -419,17 +421,25 @@ type ExecutionDataRequesterMetrics interface {
 }
 
 type RuntimeMetrics interface {
-	// TransactionParsed reports the time spent parsing a single transaction
+	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
 
-	// TransactionChecked reports the time spent checking a single transaction
+	// RuntimeTransactionChecked reports the time spent checking a single transaction
 	RuntimeTransactionChecked(dur time.Duration)
 
-	// TransactionInterpreted reports the time spent interpreting a single transaction
+	// RuntimeTransactionInterpreted reports the time spent interpreting a single transaction
 	RuntimeTransactionInterpreted(dur time.Duration)
 
 	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
 	RuntimeSetNumberOfAccounts(count uint64)
+
+	// RuntimeTransactionProgramsCacheMiss reports a programs cache miss
+	// during transaction execution
+	RuntimeTransactionProgramsCacheMiss()
+
+	// RuntimeTransactionProgramsCacheHit reports a programs cache hit
+	// during transaction execution
+	RuntimeTransactionProgramsCacheHit()
 }
 
 type ProviderMetrics interface {
@@ -527,6 +537,9 @@ type ExecutionMetrics interface {
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+
+	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
+	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
