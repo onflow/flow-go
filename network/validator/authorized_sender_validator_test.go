@@ -200,7 +200,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	// ensure ClusterBlockProposal not allowed to be sent on channel via unicast
 	msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeClusterBlockProposal.Uint8()}, channels.ConsensusCluster(clusterID), message.ProtocolTypeUnicast)
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
-	require.Equal(s.T(), message.ClusterBlockProposal, msgType)
+	require.Equal(s.T(), "*messages.ClusterBlockProposal", msgType)
 
 	// ensure ClusterBlockProposal is allowed to be sent via pubsub by authorized sender
 	payload, err := s.codec.Encode(&messages.ClusterBlockProposal{})
@@ -216,7 +216,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	// validate collection sync cluster SyncRequest is not allowed to be sent on channel via unicast
 	msgType, err = authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCluster(clusterID), message.ProtocolTypeUnicast)
 	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
-	require.Equal(s.T(), message.SyncRequest, msgType)
+	require.Equal(s.T(), "*messages.SyncRequest", msgType)
 
 	// ensure SyncRequest is allowed to be sent via pubsub by authorized sender
 	payload, err = s.codec.Encode(&messages.SyncRequest{})
@@ -318,9 +318,8 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnauthorizedP
 			require.NoError(s.T(), err)
 
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.GetIdentity)
-
 			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypePubSub)
-			if c.MessageStr == message.TestMessage {
+			if c.MessageStr == "*message.TestMessage" {
 				require.NoError(s.T(), err)
 			} else {
 				require.ErrorIs(s.T(), err, message.ErrUnauthorizedPublishOnChannel)
@@ -336,7 +335,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 		for channel, channelAuthConfig := range c.Config {
 			for _, role := range flow.Roles() {
 				identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
-				code, _, err := codec.MessageCodeFromInterface(c.Type())
+				code, what, err := codec.MessageCodeFromInterface(c.Type())
 				require.NoError(s.T(), err)
 				tc := TestCase{
 					Identity:    identity,
@@ -344,7 +343,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 					Channel:     channel,
 					Message:     c.Type(),
 					MessageCode: code,
-					MessageStr:  c.Name,
+					MessageStr:  what,
 					Protocols:   channelAuthConfig.AllowedProtocols,
 				}
 				if channelAuthConfig.AuthorizedRoles.Contains(role) {
@@ -371,7 +370,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 			for _, config := range s.allMsgConfigs {
 				// include test if message type is not authorized on channel
 				_, ok := config.Config[channel]
-				code, _, err := codec.MessageCodeFromInterface(config.Type())
+				code, what, err := codec.MessageCodeFromInterface(config.Type())
 				require.NoError(s.T(), err)
 				if config.Name != c.Name && !ok {
 					tc := TestCase{
@@ -380,7 +379,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTe
 						Channel:     channel,
 						Message:     config.Type(),
 						MessageCode: code,
-						MessageStr:  config.Name,
+						MessageStr:  what,
 						Protocols:   channelAuthConfig.AllowedProtocols,
 					}
 					s.unauthorizedMessageOnChannelTestCases = append(s.unauthorizedMessageOnChannelTestCases, tc)
@@ -395,7 +394,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeUnicastOnChannelTestCases
 	for _, c := range s.allMsgConfigs {
 		for channel, channelAuthConfig := range c.Config {
 			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(channelAuthConfig.AuthorizedRoles[0]))
-			code, _, err := codec.MessageCodeFromInterface(c.Type())
+			code, what, err := codec.MessageCodeFromInterface(c.Type())
 			require.NoError(s.T(), err)
 			tc := TestCase{
 				Identity:    identity,
@@ -403,7 +402,7 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeUnicastOnChannelTestCases
 				Channel:     channel,
 				Message:     c.Type(),
 				MessageCode: code,
-				MessageStr:  c.Name,
+				MessageStr:  what,
 				Protocols:   channelAuthConfig.AllowedProtocols,
 			}
 			if channelAuthConfig.AllowedProtocols.Contains(message.ProtocolTypeUnicast) {
