@@ -186,6 +186,16 @@ func (_m *ExecutionMetrics) RuntimeTransactionParsed(dur time.Duration) {
 	_m.Called(dur)
 }
 
+// RuntimeTransactionProgramsCacheHit provides a mock function with given fields:
+func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheHit() {
+	_m.Called()
+}
+
+// RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
+func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheMiss() {
+	_m.Called()
+}
+
 // StartBlockReceivedToExecuted provides a mock function with given fields: blockID
 func (_m *ExecutionMetrics) StartBlockReceivedToExecuted(blockID flow.Identifier) {
 	_m.Called(blockID)
