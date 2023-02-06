@@ -1,13 +1,13 @@
 package verification
 
 import (
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 // TestVerificationStreamNegotiation enables gzip stream compression only between execution and verification nodes, while the
