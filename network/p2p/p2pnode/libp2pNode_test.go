@@ -317,7 +317,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		})),
 		// add very small delay so that when the sender attempts to create multiple streams
 		// the func fails fast before the first routine can finish the peer dialing retries
-		// this prevents us from calling
+		// this prevents us from making another call to dial peer
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
 		p2ptest.WithLogger(logger))
 

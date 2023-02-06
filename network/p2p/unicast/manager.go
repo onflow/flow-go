@@ -81,7 +81,7 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 }
 
 // Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
-// over previously registered ones.ddda
+// over previously registered ones.
 func (m *Manager) Register(unicast protocols.ProtocolName) error {
 	factory, err := protocols.ToProtocolFactory(unicast)
 	if err != nil {
@@ -288,7 +288,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 	// check connection status and attempt to dial the peer if dialing is not in progress
 	if !isConnected {
-		// if we can't start dialing another routine has we can return an error
+		// return error if we can't start dialing
 		if m.dialingInProgress(peerID) {
 			return nil, nil, NewDialInProgressErr(peerID)
 		}
