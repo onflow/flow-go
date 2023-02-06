@@ -137,6 +137,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		connectionGater: NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil
 		}),
+		createStreamRetryInterval: unicast.DefaultRetryDelay,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -160,6 +161,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
+		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
 
@@ -282,6 +284,13 @@ type optsConfig struct {
 	peerManagerFilters            []p2p.PeerFilter
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	connectionGater               connmgr.ConnectionGater
+	createStreamRetryInterval     time.Duration
+}
+
+func WithCreateStreamRetryInterval(delay time.Duration) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.createStreamRetryInterval = delay
+	}
 }
 
 func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
@@ -417,6 +426,12 @@ func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) n
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
+	}
+}
+
+func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetUnicastManagerOptions(delay)
 	}
 }
 

@@ -306,18 +306,18 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		}
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
-
+	idProvider := mock.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
 
-	sender, _ := p2ptest.NodeFixture(
+	sender, id1 := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// avoid connection gating outbound messages on sender
 			return nil
 		})),
@@ -327,21 +327,24 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
 		p2ptest.WithLogger(logger))
 
-	receiver, id := p2ptest.NodeFixture(
+	receiver, id2 := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// connection gate all incoming connections forcing the senders unicast manager to perform retries
 			return fmt.Errorf("gate keep")
 		})),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
 		p2ptest.WithLogger(logger))
 
+	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
+	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
+
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
 
-	pInfo, err := utils.PeerAddressInfo(id)
+	pInfo, err := utils.PeerAddressInfo(id1)
 	require.NoError(t, err)
 	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
