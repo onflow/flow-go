@@ -24,6 +24,7 @@ func notEjectedPeerFilter(idProvider module.IdentityProvider) p2p.PeerFilter {
 	}
 }
 
+// appendBaseLimitLogger appends the base limit to the logger with the given prefix.
 func appendBaseLimitLogger(prefix string, baseLimit rcmgr.BaseLimit, logger zerolog.Logger) zerolog.Logger {
 	return logger.With().
 		Int(fmt.Sprintf("%s_streams", prefix), baseLimit.Streams).
