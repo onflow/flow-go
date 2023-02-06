@@ -247,7 +247,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  message.TestMessage,
+		MsgType:  "*message.TestMessage",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedMessageOnChannel,
@@ -379,7 +379,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "DKGMessage",
+		MsgType:  "*messages.DKGMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedMessageOnChannel,
@@ -504,7 +504,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "BlockProposal",
+		MsgType:  "*messages.BlockProposal",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedUnicastOnChannel,
@@ -567,7 +567,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	expectedViolation := &slashing.Violation{
 		Identity: nil,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "message.TestMessage",
+		MsgType:  "*message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      middleware.ErrUnicastMsgWithoutSub,
