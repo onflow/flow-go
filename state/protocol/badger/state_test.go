@@ -21,7 +21,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	storutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -70,6 +72,13 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		t.Run("epoch first block height index should be initialized", func(t *testing.T) {
+			var epochFirstHeight uint64
+			err = db.View(operation.RetrieveEpochFirstHeight(counter, &epochFirstHeight))
+			require.NoError(t, err)
+			require.Equal(t, rootSnapshot.Encodable().Head.Height, epochFirstHeight)
+		})
 	})
 }
 
@@ -174,9 +183,26 @@ func TestBootstrapNonRoot(t *testing.T) {
 			return state.AtBlockID(block2.ID())
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
+		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
+	t.Run("should not index epoch first block for non-spork-root snapshot", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			buildFinalizedBlock(t, state, block1)
+			child := unittest.BlockWithParentFixture(block1.Header)
+			buildBlock(t, state, child)
+
+			return state.AtBlockID(block1.ID())
+		})
+
+		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
+			var firstEpochHeight uint64
+			err = db.View(operation.RetrieveEpochFirstHeight(rootSnapshot.Encodable().Epochs.Current.Counter, &firstEpochHeight))
+			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 
@@ -194,7 +220,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
+		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -214,7 +240,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
+		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -241,7 +267,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
+		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -255,7 +281,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeIDIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, err error) {
+		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -264,7 +290,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
 		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, err error) {
+		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -280,7 +306,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 			t.Run(fmt.Sprintf("no %s nodes", role), func(t *testing.T) {
 				participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
 				root := unittest.RootSnapshotFixture(participants)
-				bootstrap(t, root, func(state *bprotocol.State, err error) {
+				bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
 					assert.Error(t, err)
 				})
 			})
@@ -293,7 +319,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeAddressIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(state *bprotocol.State, err error) {
+		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -306,7 +332,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		encodable := root.Encodable()
 		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
 		root = inmem.SnapshotFromEncodable(encodable)
-		bootstrap(t, root, func(state *bprotocol.State, err error) {
+		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -321,7 +347,7 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -334,7 +360,7 @@ func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
 	encodable.SealingSegment.FirstSeal = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -347,7 +373,7 @@ func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
 	encodable.SealingSegment.ExecutionResults = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -359,7 +385,7 @@ func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
 	encodable.QuorumCertificate.BlockID = unittest.IdentifierFixture()
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -371,7 +397,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -382,7 +408,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -393,7 +419,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -401,7 +427,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 
 // bootstraps protocol state with the given snapshot and invokes the callback
 // with the result of the constructor
-func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.State, error)) {
+func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*badger.DB, *bprotocol.State, error)) {
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
@@ -409,7 +435,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer db.Close()
 	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
 	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
-	f(state, err)
+	f(db, state, err)
 }
 
 // snapshotAfter bootstraps the protocol state from the root snapshot, applies
@@ -443,7 +469,7 @@ func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.
 // assertSealingSegmentBlocksQueryable bootstraps the state with the given
 // snapshot, then verifies that all sealing segment blocks are queryable.
 func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
-	bootstrap(t, snapshot, func(state *bprotocol.State, err error) {
+	bootstrap(t, snapshot, func(db *badger.DB, state *bprotocol.State, err error) {
 		require.NoError(t, err)
 
 		segment, err := state.Final().SealingSegment()

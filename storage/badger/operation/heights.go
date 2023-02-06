@@ -39,6 +39,13 @@ func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
 }
 
 // InsertEpochFirstHeight inserts the height of the first block in the given epoch.
+// The first block of an epoch E is the finalized block with view >= E.FirstView.
+// All epochs for which this node has processed the first block will have this index set.
+// The current epoch w.r.t. to the root snapshot represents an edge case:
+//   - if the root snapshot is a spork root snapshot (single self-sealing block), then the
+//     root block is the first block of the epoch and the index is set accordingly
+//   - if the root snapshot is any other snapshot, then the index is not set for the initial epoch
+//
 // Returns storage.ErrAlreadyExists if the height has already been indexed.
 func InsertEpochFirstHeight(epoch, height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeEpochFirstHeight, epoch), height)
