@@ -3,6 +3,7 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"testing"
 	"time"
 
@@ -154,7 +155,7 @@ func TestConnGater(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(
