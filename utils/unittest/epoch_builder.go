@@ -377,9 +377,6 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 		err := state.Extend(context.Background(), block)
 		require.NoError(builder.t, err)
 
-		err = state.MarkValid(blockID)
-		require.NoError(builder.t, err)
-
 		err = state.Finalize(context.Background(), blockID)
 		require.NoError(builder.t, err)
 	}

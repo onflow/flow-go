@@ -180,11 +180,11 @@ func (r *PendingReceipts) Size() uint {
 // Monotonicity Requirement:
 // The pruned height cannot decrease, as we cannot recover already pruned elements.
 // If `height` is smaller than the previous value, the previous value is kept
-// and the sentinel mempool.DecreasingPruningHeightError is returned.
+// and the sentinel mempool.BelowPrunedThresholdError is returned.
 func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 	return r.Backend.Run(func(backData mempool.BackData) error {
 		if height < r.lowestHeight {
-			return mempool.NewDecreasingPruningHeightErrorf(
+			return mempool.NewBelowPrunedThresholdErrorf(
 				"pruning height: %d, existing height: %d", height, r.lowestHeight)
 		}
 
