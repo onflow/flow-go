@@ -7,9 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +29,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 		nil,
 		nil)
 
-	address := cadence.BytesToAddress([]byte{1, 2, 3, 4})
+	address := flow.BytesToAddress([]byte{1, 2, 3, 4})
 
 	// emulate encoded public key (which comes as a user input)
 	// containing bytes which are invalid UTF8
@@ -44,9 +42,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
 
-	err = akh.InternalAddEncodedAccountKey(
-		common.Address(address),
-		encodedPublicKey)
+	err = akh.InternalAddEncodedAccountKey(address, encodedPublicKey)
 	require.Error(t, err)
 
 	require.True(t, errors.IsValueError(err))

@@ -218,7 +218,7 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entry.Value.Dependencies, 1)
-		require.NotNil(t, entry.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
+		require.NotNil(t, entry.Value.Dependencies[addressA])
 
 		// type assertion for further inspections
 		require.IsType(t, entry.State.View(), &delta.View{})
@@ -319,8 +319,8 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entryB.Value.Dependencies, 2)
-		require.NotNil(t, entryB.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
-		require.NotNil(t, entryB.Value.Dependencies[common.MustBytesToAddress(addressB.Bytes())])
+		require.NotNil(t, entryB.Value.Dependencies[addressA])
+		require.NotNil(t, entryB.Value.Dependencies[addressB])
 
 		// program B should contain all the registers used by program A, as it depends on it
 		require.IsType(t, entryB.State.View(), &delta.View{})
@@ -470,9 +470,9 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entryC.Value.Dependencies, 3)
-		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressA.Bytes())])
-		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressB.Bytes())])
-		require.NotNil(t, entryC.Value.Dependencies[common.MustBytesToAddress(addressC.Bytes())])
+		require.NotNil(t, entryC.Value.Dependencies[addressA])
+		require.NotNil(t, entryC.Value.Dependencies[addressB])
+		require.NotNil(t, entryC.Value.Dependencies[addressC])
 
 		cached := derivedBlockData.CachedPrograms()
 		require.Equal(t, 3, cached)
