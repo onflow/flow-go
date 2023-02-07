@@ -232,48 +232,6 @@ type BlockProducer struct {
 	proposerID flow.Identifier
 }
 
-// //////// master
-// DenylistValidator is Validator mock that consider all proposals are valid unless the proposal's BlockID exists
-// in the invalidProposals key or unverifiable key
-type DenylistValidator struct {
-	mocks.Validator
-	invalidProposals map[flow.Identifier]struct{}
-	unverifiable     map[flow.Identifier]struct{}
-	t                require.TestingT
-}
-
-func NewDenylistValidator(t require.TestingT) *DenylistValidator {
-	return &DenylistValidator{
-		invalidProposals: make(map[flow.Identifier]struct{}),
-		unverifiable:     make(map[flow.Identifier]struct{}),
-		t:                t,
-	}
-}
-
-func (v *DenylistValidator) ValidateProposal(proposal *model.Proposal) error {
-	// check if is invalid
-	_, ok := v.invalidProposals[proposal.Block.BlockID]
-	if ok {
-		log.Info().Msgf("invalid proposal: %v\n", proposal.Block.View)
-		return model.InvalidBlockError{
-			BlockID: proposal.Block.BlockID,
-			View:    proposal.Block.View,
-			Err:     fmt.Errorf("some error"),
-		}
-	}
-
-	// check if is unverifiable
-	_, ok = v.unverifiable[proposal.Block.BlockID]
-	if ok {
-		log.Info().Msgf("unverifiable proposal: %v\n", proposal.Block.View)
-		return model.ErrUnverifiableBlock
-	}
-
-	return nil
-}
-
-////////// master
-
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
 	return model.ProposalToFlow(&model.Proposal{
 		Block: helper.MakeBlock(
@@ -295,7 +253,6 @@ type EventHandlerSuite struct {
 
 	eventhandler *EventHandler
 
-	validator     *DenylistValidator // from master, merge - do we need?????
 	paceMaker     hotstuff.PaceMaker
 	forks         *Forks
 	persist       *mocks.Persister
@@ -335,7 +292,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
 	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
 	es.safetyRules = NewSafetyRules(es.T())
-	es.validator = NewDenylistValidator(es.T())
 	es.notifier = mocks.NewConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
