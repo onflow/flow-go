@@ -36,7 +36,7 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByBlock", mock.Anything).Return(s.allConsensus, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.allConsensus, nil).Maybe()
 
 	// prepare valid test block:
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
@@ -78,12 +78,12 @@ func (s *blockSignerDecoderSuite) Test_UnknownBlock() {
 }
 
 // Test_UnexpectedCommitteeException verifies that `BlockSignerDecoder`
-// does _not_ erroneously interpret an unexpecgted exception from the committee as
-// a sign of an unknown block, i.e. the decouder should _not_ return an `state.UnknownBlockError`
+// does _not_ erroneously interpret an unexpected exception from the committee as
+// a sign of an unknown block, i.e. the decoder should _not_ return an `state.UnknownBlockError`
 func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 	exception := errors.New("unexpected exception")
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, exception)
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, exception)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)
@@ -99,4 +99,27 @@ func (s *blockSignerDecoderSuite) Test_InvalidIndices() {
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)
 	require.True(s.T(), signature.IsInvalidSignerIndicesError(err))
+}
+
+// Test_EpochTransition verifies that `BlockSignerDecoder` correctly handles blocks
+// near a boundary where the committee changes - an epoch transition.
+func (s *blockSignerDecoderSuite) Test_EpochTransition() {
+	// The block under test B is the first block of a new epoch, where the committee changed.
+	// B contains a QC formed during the view of B's parent -- hence B's signatures must
+	// be validated w.r.t. the committee as of this view.
+	//
+	//   Epoch 1     Epoch 2
+	//   PARENT <- | -- B
+	blockView := s.block.Header.View
+	parentView := s.block.Header.ParentView
+	epoch1Committee := s.allConsensus
+	epoch2Committee := s.allConsensus.SamplePct(.8)
+
+	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByEpoch", parentView).Return(epoch1Committee, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee, nil).Maybe()
+
+	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), epoch1Committee.NodeIDs(), ids)
 }
