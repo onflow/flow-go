@@ -86,7 +86,7 @@ func NewRequestTracker(headers storage.Headers, blackoutPeriodMin, blackoutPerio
 // TryUpdate tries to update tracker item if it's not in blackout period. Returns the tracker item for a specific chunk
 // (creates it if it doesn't exists) and whenever request item was successfully updated or not.
 // Since RequestTracker prunes items by height it can't accept items for height lower than cached lowest height.
-// If height of executed block pointed by execution result is smaller than the lowest height, sentinel mempool.DecreasingPruningHeightError is returned.
+// If height of executed block pointed by execution result is smaller than the lowest height, sentinel mempool.BelowPrunedThresholdError is returned.
 // In case execution result points to unknown executed block exception will be returned.
 func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBlockID flow.Identifier, chunkIndex uint64) (RequestTrackerItem, bool, error) {
 	resultID := result.ID()
@@ -119,7 +119,7 @@ func (rt *RequestTracker) set(resultID, executedBlockID, incorporatedBlockID flo
 	}
 
 	if executedBlock.Height < rt.lowestHeight {
-		return mempool.NewDecreasingPruningHeightErrorf(
+		return mempool.NewBelowPrunedThresholdErrorf(
 			"adding height: %d, existing height: %d", executedBlock.Height, rt.lowestHeight)
 	}
 
@@ -171,12 +171,12 @@ func (rt *RequestTracker) Remove(resultIDs ...flow.Identifier) {
 // Monotonicity Requirement:
 // The pruned height cannot decrease, as we cannot recover already pruned elements.
 // If `height` is smaller than the previous value, the previous value is kept
-// and the sentinel mempool.DecreasingPruningHeightError is returned.
+// and the sentinel mempool.BelowPrunedThresholdError is returned.
 func (rt *RequestTracker) PruneUpToHeight(height uint64) error {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	if height < rt.lowestHeight {
-		return mempool.NewDecreasingPruningHeightErrorf(
+		return mempool.NewBelowPrunedThresholdErrorf(
 			"pruning height: %d, existing height: %d", height, rt.lowestHeight)
 	}
 

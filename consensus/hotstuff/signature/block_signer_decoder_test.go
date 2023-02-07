@@ -24,7 +24,7 @@ func TestBlockSignerDecoder(t *testing.T) {
 type blockSignerDecoderSuite struct {
 	suite.Suite
 	allConsensus flow.IdentityList
-	committee    *hotstuff.Committee
+	committee    *hotstuff.DynamicCommittee
 
 	decoder *BlockSignerDecoder
 	block   flow.Block
@@ -34,15 +34,15 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 	// the default header fixture creates signerIDs for a committee of 10 nodes, so we prepare a committee same as that
 	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 
+	// mock consensus committee
+	s.committee = hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByBlock", mock.Anything).Return(s.allConsensus, nil).Maybe()
+
 	// prepare valid test block:
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
 	require.NoError(s.T(), err)
 	s.block = unittest.BlockFixture()
 	s.block.Header.ParentVoterIndices = voterIndices
-
-	// mock consensus committee
-	s.committee = new(hotstuff.Committee)
-	s.committee.On("Identities", s.block.Header.ParentID).Return(s.allConsensus, nil)
 
 	s.decoder = NewBlockSignerDecoder(s.committee)
 }
@@ -69,8 +69,8 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 // At the moment, hotstuff.Committee returns an storage.ErrNotFound for an unknown block,
 // which we expect the `BlockSignerDecoder` to wrap into a `state.UnknownBlockError`
 func (s *blockSignerDecoderSuite) Test_UnknownBlock() {
-	*s.committee = hotstuff.Committee{}
-	s.committee.On("Identities", mock.Anything).Return(nil, storage.ErrNotFound)
+	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, storage.ErrNotFound)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)
@@ -82,8 +82,8 @@ func (s *blockSignerDecoderSuite) Test_UnknownBlock() {
 // a sign of an unknown block, i.e. the decouder should _not_ return an `state.UnknownBlockError`
 func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 	exception := errors.New("unexpected exception")
-	*s.committee = hotstuff.Committee{}
-	s.committee.On("Identities", mock.Anything).Return(nil, exception)
+	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, exception)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)

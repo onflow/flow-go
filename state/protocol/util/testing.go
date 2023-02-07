@@ -152,6 +152,21 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	})
 }
 
+func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.MutableState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+		receiptValidator := MockReceiptValidator()
+		sealValidator := MockSealValidator(seals)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+		f(db, fullState)
+	})
+}
+
 func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState, storage.Headers, storage.Index)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()

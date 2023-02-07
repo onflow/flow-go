@@ -32,7 +32,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -57,7 +57,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -68,7 +68,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -85,7 +85,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
@@ -99,7 +99,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
@@ -124,7 +124,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	// even if the node failed DKG, and has no random beacon private key,
 	// but other nodes, who completed and succeeded DKG, have a public key
 	// for this failed node, which can be used to verify signature from
@@ -138,7 +138,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -155,7 +155,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid
 func Test_VerifyQCV3(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
@@ -163,7 +163,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
@@ -191,7 +191,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -208,7 +208,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -223,7 +223,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -236,7 +236,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -252,7 +252,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -263,18 +263,18 @@ func Test_VerifyQCV3(t *testing.T) {
 // any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
 // sentinel errors to distinguish between internal problems and external byzantine inputs.
 func Test_VerifyQC_EmptySignersV3(t *testing.T) {
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	sigData := unittest.QCSigDataFixture()
 
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
-	err = verifier.VerifyQC(nil, sigData, block)
+	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 }
 

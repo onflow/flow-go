@@ -75,6 +75,7 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
+	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
 	// metrics
@@ -150,6 +151,7 @@ func New(
 		transactions:               transactions,
 		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
+		maxReceiptHeight:           0,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -184,40 +186,31 @@ func New(
 }
 
 func (e *Engine) Start(parent irrecoverable.SignalerContext) {
-	rootBlock, err := e.state.Params().Root()
+	err := e.initLastFullBlockHeightIndex()
 	if err != nil {
-		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
-	}
-
-	// if spork root snapshot
-	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
-
-	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
-	if err != nil {
-		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
-	}
-
-	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
-	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
-	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
-	// in blocks above that height.
-	if isSporkRootSnapshot {
-		// for snapshot with a single block in the sealing segment the first full block is the root block.
-		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
-		if err != nil {
-			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
-		}
-	} else {
-		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
-		// requesting resources for blocks below the expiry.
-		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
-		if err != nil {
-			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
-		}
+		parent.Throw(fmt.Errorf("unexpected error initializing full block index: %w", err))
 	}
 
 	e.ComponentManager.Start(parent)
+}
+
+// initializeLastFullBlockHeightIndex initializes the index of full blocks
+// (blocks for which we have ingested all collections) to the root block height.
+// This means that the Access Node will ingest all collections for all blocks
+// ingested after state bootstrapping is complete (all blocks received from the network).
+// If the index has already been initialized, this is a no-op.
+// No errors are expected during normal operation.
+func (e *Engine) initLastFullBlockHeightIndex() error {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		return fmt.Errorf("failed to get root block: %w", err)
+	}
+	err = e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+	if err != nil {
+		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
+	}
+
+	return nil
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

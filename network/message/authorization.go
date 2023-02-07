@@ -86,6 +86,18 @@ func initializeMessageAuthConfigsMap() {
 			},
 		},
 	}
+	authorizationConfigs[TimeoutObject] = MsgAuthConfig{
+		Name: TimeoutObject,
+		Type: func() interface{} {
+			return new(messages.TimeoutObject)
+		},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusCommittee: {
+				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
+				AllowedProtocols: Protocols{ProtocolPublish},
+			},
+		},
+	}
 
 	// protocol state sync
 	authorizationConfigs[SyncRequest] = MsgAuthConfig{
@@ -187,6 +199,18 @@ func initializeMessageAuthConfigsMap() {
 			channels.ConsensusClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
 				AllowedProtocols: Protocols{ProtocolUnicast},
+			},
+		},
+	}
+	authorizationConfigs[ClusterTimeoutObject] = MsgAuthConfig{
+		Name: ClusterTimeoutObject,
+		Type: func() interface{} {
+			return new(messages.ClusterTimeoutObject)
+		},
+		Config: map[channels.Channel]ChannelAuthConfig{
+			channels.ConsensusClusterPrefix: {
+				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
+				AllowedProtocols: Protocols{ProtocolPublish},
 			},
 		},
 	}
@@ -385,6 +409,8 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil
+	case *messages.TimeoutObject:
+		return authorizationConfigs[TimeoutObject], nil
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -403,6 +429,8 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ClusterBlockProposal], nil
 	case *messages.ClusterBlockVote:
 		return authorizationConfigs[ClusterBlockVote], nil
+	case *messages.ClusterTimeoutObject:
+		return authorizationConfigs[ClusterTimeoutObject], nil
 	case *messages.ClusterBlockResponse:
 		return authorizationConfigs[ClusterBlockResponse], nil
 

@@ -16,26 +16,26 @@ import (
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers storage.Headers, updater module.Finalizer,
+func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, headers storage.Headers, updater module.Finalizer,
 	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
 
-	finalizer, err := newFinalizer(finalized, headers, updater, notifier, rootHeader, rootQC)
+	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
 	// initialize the Validator
-	validator := validator.New(committee, finalizer, verifier)
+	validator := validator.New(committee, verifier)
 
 	// recover the hotstuff state as a follower
-	err = recovery.Follower(log, finalizer, validator, finalized, pending)
+	err = recovery.Follower(log, forks, validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff follower state: %w", err)
 	}
 
 	// initialize the follower logic
-	logic, err := follower.New(log, validator, finalizer)
+	logic, err := follower.New(log, validator, forks)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower logic: %w", err)
 	}
