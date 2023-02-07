@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -65,18 +65,6 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 	require.Empty(s.T(), ids)
 }
 
-// Test_UnknownBlock tests handling of an unknwon block.
-// At the moment, hotstuff.Committee returns an storage.ErrNotFound for an unknown block,
-// which we expect the `BlockSignerDecoder` to wrap into a `state.UnknownBlockError`
-func (s *blockSignerDecoderSuite) Test_UnknownBlock() {
-	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, storage.ErrNotFound)
-
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
-	require.Empty(s.T(), ids)
-	require.True(s.T(), state.IsUnknownBlockError(err))
-}
-
 // Test_UnexpectedCommitteeException verifies that `BlockSignerDecoder`
 // does _not_ erroneously interpret an unexpected exception from the committee as
 // a sign of an unknown block, i.e. the decoder should _not_ return an `state.UnknownBlockError`
@@ -89,6 +77,17 @@ func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 	require.Empty(s.T(), ids)
 	require.False(s.T(), state.IsUnknownBlockError(err))
 	require.True(s.T(), errors.Is(err, exception))
+}
+
+// Test_UnknownEpoch tests handling of a block from an unknown epoch.
+// It should propagate the sentinel error model.ErrViewForUnknownEpoch from Committee.
+func (s *blockSignerDecoderSuite) Test_UnknownEpoch() {
+	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+
+	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	require.Empty(s.T(), ids)
+	require.ErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 }
 
 // Test_InvalidIndices verifies that `BlockSignerDecoder` returns
