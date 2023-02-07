@@ -499,11 +499,13 @@ func NewTrieBatchProof() *TrieBatchProof {
 
 // NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
 // filled with n newly created proofs (empty)
-func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
+func NewTrieBatchProofWithEmptyProofs(paths []Path) *TrieBatchProof {
 	bp := new(TrieBatchProof)
-	bp.Proofs = make([]*TrieProof, numberOfProofs)
-	for i := 0; i < numberOfProofs; i++ {
-		bp.Proofs[i] = NewTrieProof()
+	bp.Proofs = make([]*TrieProof, len(paths))
+	for i := 0; i < len(paths); i++ {
+		proof := NewTrieProof()
+		proof.Path = paths[i]
+		bp.Proofs[i] = proof
 	}
 	return bp
 }

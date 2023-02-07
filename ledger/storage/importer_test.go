@@ -51,6 +51,7 @@ func TestEncodeDecodeEmptyPayload(t *testing.T) {
 	// decoded should be the same as original
 	require.Equal(t, path, decodedPath)
 	require.True(t, payload.Equals(decodedPayload))
+	require.True(t, decodedPayload.IsEmpty())
 }
 
 // func TestImportAndRead(t *testing.T) {

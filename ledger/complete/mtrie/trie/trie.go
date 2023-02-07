@@ -421,6 +421,7 @@ func NewTrieWithUpdatedRegisters(
 
 	// before returning the trie, add all payloads to storage
 	// TODO: avoid re-computing hash
+	// integrate into "update"
 	leafNodeUpdates := toLeafNodeUpdates(updatedPaths, updatedPayloads)
 
 	err = payloadStorage.Add(leafNodeUpdates)
@@ -453,7 +454,11 @@ func toLeafNodeUpdates(paths []ledger.Path, payloads []ledger.Payload) []ledger.
 
 	for i, path := range deduplicatedPaths {
 		payload := deduplicatedPayloads[i]
-		// TODO: skip if payload.Value is empty
+		// trie doesn't store nodes with empty payload, so we skip them, and never
+		// add them to storage
+		if payload.IsEmpty() {
+			continue
+		}
 		hash := ledger.ComputeFullyExpandedLeafValue(path, &payload)
 		leafs = append(leafs, ledger.LeafNode{
 			Hash:    hash,
@@ -709,7 +714,9 @@ func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocate
 // Paths in the input query don't have to be deduplicated, though deduplication would
 // result in allocating less dynamic memory to store the proofs.
 func (mt *MTrie) UnsafeProofs(paths []ledger.Path, payloadStorage ledger.PayloadStorage) (*ledger.TrieBatchProof, error) {
-	batchProofs := ledger.NewTrieBatchProofWithEmptyProofs(len(paths))
+	// create non-inclusion proof by default, so that
+	// if we can prove its inclusive then it's noninclusive
+	batchProofs := ledger.NewTrieBatchProofWithEmptyProofs(paths)
 	err := prove(mt.root, paths, batchProofs.Proofs, payloadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proof: %w", err)
@@ -738,7 +745,14 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof, pay
 
 	// we've reached a leaf
 	if head.IsLeaf() {
-		leafPath, leafPayload, err := payloadStorage.Get(head.ExpandedLeafHash())
+		if head.IsDefaultNode() {
+			// if a leaf is a default node, means nothing is stored on this path,
+			// we return non-inclusion proof
+			return nil
+		}
+
+		leafHash := head.ExpandedLeafHash()
+		leafPath, leafPayload, err := payloadStorage.Get(leafHash)
 		if err != nil {
 			return fmt.Errorf("could not get payload by hash %v: %w", head.ExpandedLeafHash(), err)
 		}

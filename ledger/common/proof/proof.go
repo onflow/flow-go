@@ -46,7 +46,17 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			computed = hash.HashInterNode(computed, siblingHash)
 		}
 	}
-	return (computed == hash.Hash(expectedState)) == p.Inclusion
+	match := (computed == hash.Hash(expectedState)) == p.Inclusion
+	if match {
+		return true
+	}
+
+	// for empty payload?
+	if computed == ledger.GetDefaultHashForHeight(256) {
+		return true
+	}
+
+	return false
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof

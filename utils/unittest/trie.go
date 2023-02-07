@@ -39,6 +39,28 @@ func (s *PayloadStore) Get(hash hash.Hash) ([]byte, error) {
 	return buf, nil
 }
 
+func (s *PayloadStore) GetMul(hashs []hash.Hash) ([][]byte, error) {
+	s.RLock()
+	defer s.RUnlock()
+
+	missingHashs := make([]hash.Hash, 0, len(hashs))
+	values := make([][]byte, len(hashs))
+	for i, hash := range hashs {
+		node, found := s.stored[hash]
+		if !found {
+			missingHashs = append(missingHashs, hash)
+			continue
+		}
+
+		values[i] = node
+	}
+
+	if len(missingHashs) > 0 {
+		return nil, fmt.Errorf("keys not found %v", missingHashs)
+	}
+	return values, nil
+}
+
 func (s *PayloadStore) SetMul(keys []hash.Hash, values [][]byte) error {
 	s.Lock()
 	defer s.Unlock()
