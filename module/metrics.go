@@ -3,9 +3,8 @@ package module
 import (
 	"time"
 
-	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
-
 	"github.com/libp2p/go-libp2p/core/peer"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
