@@ -88,7 +88,9 @@ type Snapshot interface {
 	// an execution receipt in its payload that references an execution result
 	// missing from the payload. These missing execution results are stored on the
 	// flow.SealingSegment.ExecutionResults field.
-	// TODO document error returns
+	// Expected errors during normal operations:
+	//   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
+	//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block.
