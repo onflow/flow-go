@@ -559,6 +559,7 @@ func (h *handler) GetBlockHeaderByID(
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
+		// the block was retrieved from local storage - so no errors are expected
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}
 
