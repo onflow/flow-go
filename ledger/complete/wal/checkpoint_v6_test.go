@@ -79,7 +79,8 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}
 
-	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	payloadStorage := trie.CreateMockPayloadStore()
+	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true, payloadStorage)
 	require.NoError(t, err)
 	tries := []*trie.MTrie{emptyTrie, updatedTrie}
 	return tries

@@ -1,4 +1,4 @@
-package unittest
+package trie
 
 import (
 	"fmt"
@@ -8,15 +8,15 @@ import (
 	"github.com/onflow/flow-go/ledger/storage"
 )
 
+func CreateMockPayloadStore() *storage.PayloadStorage {
+	store := CreateMockStore()
+	return storage.NewPayloadStorage(store)
+}
+
 func CreateMockStore() *PayloadStore {
 	return &PayloadStore{
 		stored: make(map[hash.Hash][]byte),
 	}
-}
-
-func CreateMockPayloadStore() *storage.PayloadStorage {
-	store := CreateMockStore()
-	return storage.NewPayloadStorage(store)
 }
 
 // a mock key-value storage

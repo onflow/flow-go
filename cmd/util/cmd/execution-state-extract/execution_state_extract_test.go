@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/trie"
 )
 
 type keyPair struct {
@@ -90,7 +91,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), execdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 			require.NoError(t, err)
-			payloadStorage := unittest.CreateMockPayloadStore()
+			payloadStorage := trie.CreateMockPayloadStore()
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion, payloadStorage)
 			require.NoError(t, err)
 			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
@@ -162,7 +163,7 @@ func TestExtractExecutionState(t *testing.T) {
 					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 					require.NoError(t, err)
 
-					payloadStorage := unittest.CreateMockPayloadStore()
+					payloadStorage := trie.CreateMockPayloadStore()
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion, payloadStorage)
 					require.NoError(t, err)
 

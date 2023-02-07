@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	ledgerstorage "github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -50,7 +51,7 @@ func extractExecutionState(
 
 	log.Info().Msg("init ledger")
 
-	payloadStorage := storage.CreatePayloadStorage()
+	payloadStorage := ledgerstorage.CreatePayloadStorage()
 	led, err := complete.NewLedger(
 		diskWal,
 		complete.DefaultCacheSize,
