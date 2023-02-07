@@ -78,6 +78,13 @@ func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	}
 }
 
+func NewRegisterID(owner, key string) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(BytesToAddress([]byte(owner))),
+		Key:   key,
+	}
+}
+
 // IsInternalState returns true if the register id is controlled by flow-go and
 // return false otherwise (key controlled by the cadence env).
 func (id RegisterID) IsInternalState() bool {
@@ -130,13 +137,6 @@ func (id RegisterID) String() string {
 // The encoding uses the injective fingerprint module.
 func (r *RegisterID) Bytes() []byte {
 	return fingerprint.Fingerprint(r)
-}
-
-func NewRegisterID(owner, key string) RegisterID {
-	return RegisterID{
-		Owner: owner,
-		Key:   key,
-	}
 }
 
 // RegisterValue (value part of Register)
