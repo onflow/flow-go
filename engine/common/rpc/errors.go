@@ -3,13 +3,15 @@ package rpc
 import (
 	"errors"
 
+	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-go/storage"
 )
 
+// ConvertStorageError converts a generic error into a grpc status error, converting storage errors
+// into codes.NotFound
 func ConvertStorageError(err error) error {
 	if err == nil {
 		return nil
@@ -27,8 +29,7 @@ func ConvertStorageError(err error) error {
 }
 
 // ConvertMultiError converts a multierror to a grpc status error.
-// If all of the errors in the multierror have the same code, that code is used, otherwise
-// defaultCode is used.
+// If the errors have related status codes, the common code is returned, otherwise defaultCode is used.
 func ConvertMultiError(err *multierror.Error, msg string, defaultCode codes.Code) error {
 	allErrors := err.WrappedErrors()
 	if len(allErrors) == 0 {
