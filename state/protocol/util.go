@@ -94,7 +94,7 @@ func PreviousEpochExists(snap Snapshot) (bool, error) {
 // Expected Error returns during normal operations:
 //   - signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of collection guarantors
 //   - storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
-//   - protocol.ErrEpochNotCommitted if epoch has not been committed yet
+//   - protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
 //   - protocol.ErrClusterNotFound if cluster is not found by the given chainID
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)

@@ -247,7 +247,7 @@ func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
 	convertible := &committedEpoch{
