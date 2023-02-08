@@ -104,16 +104,17 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	vm := fvm.NewVirtualMachine()
 
-	chain := flow.Emulator.Chain()
+	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chain),
+		fvm.WithChain(chainID.Chain()),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{})),
+				runtime.Config{},
+				chainID)),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,
