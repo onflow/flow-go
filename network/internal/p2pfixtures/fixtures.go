@@ -342,13 +342,14 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 				// should not happen, unless the test is misconfigured.
 				require.Fail(t, "node is in both from and to lists")
 			}
-			
+
 			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
 			// does not cause the nodes to complain about the connection being rejected at the dialer side.
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
 			otherId := other.Host().ID()
 			thisId := this.Host().ID()
 
+			// closes all connections from other node to this node in order to isolate the connection attempt.
 			for _, conn := range other.Host().Network().ConnsToPeer(thisId) {
 				require.NoError(t, conn.Close())
 			}
