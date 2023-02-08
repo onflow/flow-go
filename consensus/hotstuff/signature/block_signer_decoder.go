@@ -23,8 +23,11 @@ func NewBlockSignerDecoder(committee hotstuff.DynamicCommittee) *BlockSignerDeco
 var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 
 // DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+// // Note: A block header contains a quorum certificate for its parent, which proves that a 
+// the block extends a valid fork. Consequently, the returned IdentifierList contains the
+// consensus participants that signed the parent block.   
 // Expected Error returns during normal operations:
-//   - model.ErrViewForUnknownEpoch if the given block is within an unknown epoch
+//   - model.ErrViewForUnknownEpoch if the given block's parent is within an unknown epoch
 //   - signature.InvalidSignerIndicesError if signer indices included in the header do
 //     not encode a valid subset of the consensus committee
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
@@ -36,7 +39,7 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 	members, err := b.IdentitiesByEpoch(header.ParentView)
 	if err != nil {
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d: %w", header.ID(), header.ParentView, err)
+			return nil, fmt.Errorf("could not retrieve consensus participants for view %d: %w", header.ParentView, err)
 		}
 		return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
 	}
