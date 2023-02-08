@@ -1184,8 +1184,6 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState := result.EndState
-	chdps := result.ChunkDataPacks
 	executionResult := flow.NewExecutionResult(
 		previousErID,
 		block.ID(),
@@ -1211,14 +1209,10 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.SaveExecutionResults(childCtx,
-		block.Header,
-		endState,
-		chdps,
-		executionReceipt,
-		result.Events,
-		result.ServiceEvents,
-		result.TransactionResults)
+	err = e.execState.SaveExecutionResults(
+		childCtx,
+		result,
+		executionReceipt)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1226,7 +1220,7 @@ func (e *Engine) saveExecutionResults(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).
-		Hex("final_state", endState[:]).
+		Hex("final_state", result.EndState[:]).
 		Msg("saved computation results")
 
 	return executionReceipt, nil
