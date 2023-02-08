@@ -105,11 +105,12 @@ type EnvironmentParams struct {
 }
 
 func DefaultEnvironmentParams() EnvironmentParams {
+	const chainID = flow.Mainnet
 	return EnvironmentParams{
-		Chain:                 flow.Mainnet.Chain(),
+		Chain:                 chainID.Chain(),
 		ServiceAccountEnabled: true,
 
-		RuntimeParams:         DefaultRuntimeParams(),
+		RuntimeParams:         DefaultRuntimeParams(chainID),
 		ProgramLoggerParams:   DefaultProgramLoggerParams(),
 		EventEmitterParams:    DefaultEventEmitterParams(),
 		BlockInfoParams:       DefaultBlockInfoParams(),

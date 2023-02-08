@@ -122,13 +122,21 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
+	chainID, err := protoState.Params().ChainID()
+	if err != nil {
+		return nil, err
+	}
+
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled: params.CadenceTracing,
-				})),
+				},
+				chainID,
+			),
+		),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
