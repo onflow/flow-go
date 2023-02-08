@@ -10,22 +10,6 @@ import (
 	"gotest.tools/assert"
 )
 
-func TestConvertError(t *testing.T) {
-	// tests := map[error]codes.Code{
-	// 	context.Canceled:                          codes.Canceled,
-	// 	context.DeadlineExceeded:                  codes.DeadlineExceeded,
-	// 	storage.ErrNotFound:                       codes.NotFound,
-	// 	status.Error(codes.NotFound, "not found"): codes.NotFound,
-	// 	status.Error(codes.Internal, "internal"):  codes.Internal,
-	// 	status.Error(codes.Unknown, "unknown"):    codes.Unknown,
-	// }
-
-	// for err, expected := range tests {
-	// 	err := status.Err
-
-	// }
-}
-
 func TestConvertMultiError(t *testing.T) {
 	defaultCode := codes.Internal
 	t.Run("same code", func(t *testing.T) {
