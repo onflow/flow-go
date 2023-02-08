@@ -6,8 +6,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func MigrateAccountUsage(payloads []ledger.Payload, nWorker int) ([]ledger.Payload, error) {
@@ -24,7 +24,7 @@ func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
 }
 
 func isAccountKey(key ledger.Key) bool {
-	return string(key.KeyParts[1].Value) == state.AccountStatusKey
+	return string(key.KeyParts[1].Value) == flow.AccountStatusKey
 }
 
 type AccountUsageMigrator struct{}

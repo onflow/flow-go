@@ -5,10 +5,7 @@ package flow
 func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
-	payload := Payload{
-		Guarantees: nil,
-		Seals:      nil,
-	}
+	payload := Payload{}
 
 	// create the header
 	header := Header{

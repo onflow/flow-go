@@ -23,8 +23,6 @@ type nestedTransactionStackFrame struct {
 // TransactionState provides active transaction states and facilitates common
 // state management operations.
 type TransactionState struct {
-	enforceLimits bool
-
 	// NOTE: The first frame is always the main transaction, and is not
 	// poppable during the course of the transaction.
 	nestedTransactions []nestedTransactionStackFrame
@@ -47,7 +45,6 @@ func NewTransactionState(
 ) *TransactionState {
 	startState := NewState(startView, params)
 	return &TransactionState{
-		enforceLimits: true,
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
 				state:            startState,
@@ -331,27 +328,19 @@ func (s *TransactionState) RestartNestedTransaction(
 }
 
 func (s *TransactionState) Get(
-	owner string,
-	key string,
-	enforceLimit bool,
+	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
 	error,
 ) {
-	return s.currentState().Get(owner, key, enforceLimit)
+	return s.currentState().Get(id)
 }
 
 func (s *TransactionState) Set(
-	owner string,
-	key string,
+	id flow.RegisterID,
 	value flow.RegisterValue,
-	enforceLimit bool,
 ) error {
-	return s.currentState().Set(owner, key, value, enforceLimit)
-}
-
-func (s *TransactionState) UpdatedAddresses() []flow.Address {
-	return s.currentState().UpdatedAddresses()
+	return s.currentState().Set(id, value)
 }
 
 func (s *TransactionState) MeterComputation(
@@ -412,34 +401,7 @@ func (s *TransactionState) UpdatedRegisters() flow.RegisterEntries {
 	return s.currentState().UpdatedRegisters()
 }
 
-// EnableAllLimitEnforcements enables all the limits
-func (s *TransactionState) EnableAllLimitEnforcements() {
-	s.enforceLimits = true
-}
-
-// DisableAllLimitEnforcements disables all the limits
-func (s *TransactionState) DisableAllLimitEnforcements() {
-	s.enforceLimits = false
-}
-
 // RunWithAllLimitsDisabled runs f with limits disabled
 func (s *TransactionState) RunWithAllLimitsDisabled(f func()) {
-	if f == nil {
-		return
-	}
-	current := s.enforceLimits
-	s.enforceLimits = false
-	f()
-	s.enforceLimits = current
-}
-
-// EnforceComputationLimits returns if the computation limits should be enforced
-// or not.
-func (s *TransactionState) EnforceComputationLimits() bool {
-	return s.enforceLimits
-}
-
-// EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *TransactionState) EnforceLimits() bool {
-	return s.enforceLimits
+	s.currentState().RunWithAllLimitsDisabled(f)
 }

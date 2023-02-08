@@ -263,7 +263,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.ValidDescendants()
+	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -428,7 +428,8 @@ func (e *Engine) reloadBlock(
 
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: BlockProcessable might be called multiple times for the same block.
+// NOTE: BlockProcessable might be called multiple times for the same block.
+// NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
 	// skip if stopControl tells to skip
@@ -627,7 +628,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		}
 	}
 
-	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
+	finalState, receipt, err := e.handleComputationResult(ctx, computationResult)
 	if errors.Is(err, storage.ErrDataMismatch) {
 		lg.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
 	}
@@ -1105,9 +1106,10 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(key))
+	id := flow.NewRegisterID(string(owner), string(key))
+	data, err := blockView.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
 	}
 
 	return data, nil
@@ -1138,9 +1140,11 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 func (e *Engine) handleComputationResult(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	startState flow.StateCommitment,
-) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
-
+) (
+	flow.StateCommitment,
+	*flow.ExecutionReceipt,
+	error,
+) {
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
 	defer span.End()
 
@@ -1148,18 +1152,14 @@ func (e *Engine) handleComputationResult(
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(
-		ctx,
-		result,
-		startState,
-	)
+	receipt, err := e.saveExecutionResults(ctx, result)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
 	if errors.Is(err, flow.ErrNoChunks) {
-		finalState = startState
+		finalState = *result.ExecutableBlock.StartState
 	} else if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
 	}
@@ -1170,13 +1170,12 @@ func (e *Engine) handleComputationResult(
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	startState flow.StateCommitment,
-) (*flow.ExecutionReceipt, error) {
-
+) (
+	*flow.ExecutionReceipt,
+	error,
+) {
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.End()
-
-	originalState := startState
 
 	block := result.ExecutableBlock.Block
 	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
@@ -1185,10 +1184,15 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(e.metrics, previousErID, startState, result)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
-	}
+	endState := result.EndState
+	chdps := result.ChunkDataPacks
+	executionResult := flow.NewExecutionResult(
+		previousErID,
+		block.ID(),
+		result.Chunks,
+		result.ConvertedServiceEvents,
+		result.ExecutionDataID)
+
 	for _, event := range executionResult.ServiceEvents {
 		e.log.Info().
 			Uint64("block_height", result.ExecutableBlock.Height()).
@@ -1221,7 +1225,7 @@ func (e *Engine) saveExecutionResults(
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
-		Hex("start_state", originalState[:]).
+		Hex("start_state", result.ExecutableBlock.StartState[:]).
 		Hex("final_state", endState[:]).
 		Msg("saved computation results")
 

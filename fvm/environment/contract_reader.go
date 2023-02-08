@@ -34,7 +34,7 @@ func NewContractReader(
 }
 
 func (reader *ContractReader) GetAccountContractNames(
-	address runtime.Address,
+	address common.Address,
 ) (
 	[]string,
 	error,
@@ -176,7 +176,7 @@ func (reader *ContractReader) GetCode(
 }
 
 func (reader *ContractReader) GetAccountContractCode(
-	address runtime.Address,
+	address common.Address,
 	name string,
 ) (
 	code []byte,

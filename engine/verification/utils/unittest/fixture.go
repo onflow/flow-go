@@ -261,7 +261,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 
 		// create state.View
-		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		view := delta.NewDeltaView(state.LedgerGetRegister(led, startStateCommitment))
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 

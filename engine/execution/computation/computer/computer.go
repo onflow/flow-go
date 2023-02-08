@@ -31,6 +31,7 @@ const (
 )
 
 type collectionItem struct {
+	blockId    flow.Identifier
 	blockIdStr string
 
 	collectionIndex int
@@ -193,8 +194,6 @@ func (e *blockComputer) ExecuteBlock(
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
-	// TODO: compute block fees & reward payments
-
 	return results, nil
 }
 
@@ -222,6 +221,7 @@ func (e *blockComputer) getRootSpanAndCollections(
 		collections = append(
 			collections,
 			collectionItem{
+				blockId:            blockId,
 				blockIdStr:         blockIdStr,
 				collectionIndex:    idx,
 				CompleteCollection: collection,
@@ -255,6 +255,7 @@ func (e *blockComputer) getRootSpanAndCollections(
 	collections = append(
 		collections,
 		collectionItem{
+			blockId:         blockId,
 			blockIdStr:      blockIdStr,
 			collectionIndex: len(collections),
 			CompleteCollection: &entity.CompleteCollection{
@@ -353,6 +354,8 @@ func (e *blockComputer) executeBlock(
 		Hex("block_id", logging.Entity(block)).
 		Msg("all views committed")
 
+	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())
+
 	executionDataID, err := e.executionDataProvider.Provide(
 		ctx,
 		block.Height(),
@@ -430,11 +433,11 @@ func (e *blockComputer) executeCollection(
 		Int64("time_spent_in_ms", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
-	stats := collector.CommitCollection(
+	collector.CommitCollection(
 		collection,
+		startedAt,
 		collectionView)
 
-	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), stats)
 	return startTxIndex + uint32(len(txns)), nil
 }
 

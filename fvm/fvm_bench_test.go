@@ -226,7 +226,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		prov)
 	require.NoError(tb, err)
 
-	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
+	view := delta.NewDeltaView(exeState.LedgerGetRegister(ledger, initialCommit))
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)
@@ -262,9 +262,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
-	require.NoError(tb, err)
-	b.activeStateCommitment = endState
+	b.activeStateCommitment = computationResult.EndState
 
 	return computationResult
 }

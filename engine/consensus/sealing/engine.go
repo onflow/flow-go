@@ -432,7 +432,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// (1) Informs sealing.Core about finalization of respective block.
+// It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
@@ -441,7 +441,7 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 }
 
 // OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
-// (1) Processes all execution results that were incorporated in parent block payload.
+// It processes all execution results that were incorporated in parent block payload.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
