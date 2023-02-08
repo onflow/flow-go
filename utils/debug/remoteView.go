@@ -190,21 +190,16 @@ func (v *RemoteView) Get(owner, key string) (flow.RegisterValue, error) {
 	return resp.Value, nil
 }
 
-// returns all the registers that has been touched
-func (v *RemoteView) AllRegisters() []flow.RegisterID {
+// returns all the register ids that has been updated
+func (v *RemoteView) UpdatedRegisterIDs() []flow.RegisterID {
+	panic("Not implemented yet")
+}
+
+// returns all the register ids that has been touched
+func (v *RemoteView) AllRegisterIDs() []flow.RegisterID {
 	panic("Not implemented yet")
 }
 
 func (v *RemoteView) UpdatedRegisters() flow.RegisterEntries {
 	panic("Not implemented yet")
-}
-
-func (v *RemoteView) Touch(owner, key string) error {
-	// no-op for now
-	return nil
-}
-
-func (v *RemoteView) Delete(owner, key string) error {
-	v.Delta[owner+"~"+key] = nil
-	return nil
 }

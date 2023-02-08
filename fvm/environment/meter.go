@@ -73,10 +73,7 @@ func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterComputation(kind, intensity)
-	}
-	return nil
+	return meter.txnState.MeterComputation(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
@@ -88,10 +85,7 @@ func (meter *meterImpl) ComputationUsed() uint64 {
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
-	}
-	return nil
+	return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
 }
 
 func (meter *meterImpl) MemoryEstimate() uint64 {
@@ -99,10 +93,7 @@ func (meter *meterImpl) MemoryEstimate() uint64 {
 }
 
 func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterEmittedEvent(byteSize)
-	}
-	return nil
+	return meter.txnState.MeterEmittedEvent(byteSize)
 }
 
 func (meter *meterImpl) TotalEmittedEventBytes() uint64 {

@@ -838,7 +838,7 @@ func (computer *testValueComputer) Compute(
 	error,
 ) {
 	computer.called = true
-	_, err := txnState.Get("addr", key, true)
+	_, err := txnState.Get("addr", key)
 	if err != nil {
 		return 0, err
 	}

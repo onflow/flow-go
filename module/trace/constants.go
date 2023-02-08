@@ -103,7 +103,6 @@ const (
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
-	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//

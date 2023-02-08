@@ -93,8 +93,9 @@ func (v *View) Interactions() *SpockSnapshot {
 	}
 }
 
-// AllRegisters returns all the register IDs either in read or delta
-func (r *Snapshot) AllRegisters() []flow.RegisterID {
+// AllRegisterIDs returns all the register IDs either in read or delta.
+// The returned ids are unsorted.
+func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 	set := make(map[flow.RegisterID]struct{}, len(r.Reads)+len(r.Delta.Data))
 	for reg := range r.Reads {
 		set[reg] = struct{}{}
@@ -118,11 +119,16 @@ func (v *View) DropDelta() {
 	v.delta = NewDelta()
 }
 
-func (v *View) AllRegisters() []flow.RegisterID {
-	return v.Interactions().AllRegisters()
+func (v *View) AllRegisterIDs() []flow.RegisterID {
+	return v.Interactions().AllRegisterIDs()
 }
 
-// RegisterUpdates returns a list of register updates
+// UpdatedRegisterIDs returns a list of updated registers' ids.
+func (v *View) UpdatedRegisterIDs() []flow.RegisterID {
+	return v.Delta().UpdatedRegisterIDs()
+}
+
+// UpdatedRegisters returns a list of updated registers.
 func (v *View) UpdatedRegisters() flow.RegisterEntries {
 	return v.Delta().UpdatedRegisters()
 }
@@ -186,24 +192,6 @@ func (v *View) Set(owner, key string, value flow.RegisterValue) error {
 	// add key value to delta
 	v.delta.Set(owner, key, value)
 	return nil
-}
-
-// Touch explicitly adds a register to the touched registers set.
-func (v *View) Touch(owner, key string) error {
-
-	k := flow.NewRegisterID(owner, key)
-
-	// capture register touch
-	v.regTouchSet[k] = struct{}{}
-	// increase reads
-	v.readsCount++
-
-	return nil
-}
-
-// Delete removes a register in this view.
-func (v *View) Delete(owner, key string) error {
-	return v.Set(owner, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.
