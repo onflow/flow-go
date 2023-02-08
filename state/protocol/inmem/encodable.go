@@ -39,6 +39,7 @@ type EncodableEpoch struct {
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster
 	DKG                *EncodableDKG
+	FinalHeight        *uint64
 }
 
 // EncodableDKG is the encoding format for protocol.DKG

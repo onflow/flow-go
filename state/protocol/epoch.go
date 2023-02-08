@@ -151,7 +151,7 @@ type Epoch interface {
 	// The last block of the epoch is defined...
 	//   ... <- L <-|- F <- ...
 	// TODO docs
-	FinalHeight() (uint64, error)
+	//FinalHeight() (uint64, error)
 }
 
 // EpochSchedule is the pre-determined start and end-points of the epoch and the

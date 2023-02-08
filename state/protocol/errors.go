@@ -22,6 +22,10 @@ var (
 	// in the EpochCommitted phase.
 	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 
+	// ErrEpochNotEnded is a sentinel error returned when a query for the final block
+	// of an epoch is made about an epoch that has not yet ended.
+	ErrEpochNotEnded = fmt.Errorf("epoch not ended")
+
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block (local history cutoff).
 	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot construct sealing segment beyond locally known history")
