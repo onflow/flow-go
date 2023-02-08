@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,28 +17,26 @@ type MetricsConsumer struct {
 	metrics module.HotstuffMetrics
 }
 
+var _ hotstuff.Consumer = (*MetricsConsumer)(nil)
+
 func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	return &MetricsConsumer{
 		metrics: metrics,
 	}
 }
 
-func (c *MetricsConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
-	c.metrics.SetCurView(view)
-}
-
-func (c *MetricsConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
+func (c *MetricsConsumer) OnQcTriggeredViewChange(_ uint64, newView uint64, qc *flow.QuorumCertificate) {
+	c.metrics.SetCurView(newView)
 	c.metrics.SetQCView(qc.View)
-}
-
-func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	c.metrics.CountSkipped()
 }
 
-func (c *MetricsConsumer) OnReachedTimeout(info *model.TimerInfo) {
+func (c *MetricsConsumer) OnTcTriggeredViewChange(_ uint64, newView uint64, tc *flow.TimeoutCertificate) {
+	c.metrics.SetCurView(newView)
+	c.metrics.SetTCView(tc.View)
 	c.metrics.CountTimeout()
 }
 
-func (c *MetricsConsumer) OnStartingTimeout(info *model.TimerInfo) {
+func (c *MetricsConsumer) OnStartingTimeout(info model.TimerInfo) {
 	c.metrics.SetTimeout(info.Duration)
 }

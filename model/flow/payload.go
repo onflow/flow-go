@@ -6,11 +6,16 @@ import (
 
 // Payload is the actual content of each block.
 type Payload struct {
-	// Guarantees are ordered in execution order.
+	// Guarantees are ordered in execution order. May be empty, in which case
+	// only the system chunk is executed for this block.
 	Guarantees []*CollectionGuarantee
-	Seals      []*Seal
-	Receipts   ExecutionReceiptMetaList
-	Results    ExecutionResultList
+	// Seals holds block seals for ancestor blocks.
+	// The oldest seal must connect to the latest seal in the fork extended by this block.
+	// Seals must be internally connected, containing no seals with duplicate block IDs or heights.
+	// Seals may be empty. It presents a set, i.e. there is no protocol-defined ordering.
+	Seals    []*Seal
+	Receipts ExecutionReceiptMetaList
+	Results  ExecutionResultList
 }
 
 // EmptyPayload returns an empty block payload.

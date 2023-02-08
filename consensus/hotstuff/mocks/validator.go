@@ -29,13 +29,13 @@ func (_m *Validator) ValidateProposal(proposal *model.Proposal) error {
 	return r0
 }
 
-// ValidateQC provides a mock function with given fields: qc, block
-func (_m *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
-	ret := _m.Called(qc, block)
+// ValidateQC provides a mock function with given fields: qc
+func (_m *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
+	ret := _m.Called(qc)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate, *model.Block) error); ok {
-		r0 = rf(qc, block)
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
+		r0 = rf(qc)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -43,13 +43,27 @@ func (_m *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) 
 	return r0
 }
 
-// ValidateVote provides a mock function with given fields: vote, block
-func (_m *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {
-	ret := _m.Called(vote, block)
+// ValidateTC provides a mock function with given fields: tc
+func (_m *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
+	ret := _m.Called(tc)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.TimeoutCertificate) error); ok {
+		r0 = rf(tc)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ValidateVote provides a mock function with given fields: vote
+func (_m *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+	ret := _m.Called(vote)
 
 	var r0 *flow.Identity
-	if rf, ok := ret.Get(0).(func(*model.Vote, *model.Block) *flow.Identity); ok {
-		r0 = rf(vote, block)
+	if rf, ok := ret.Get(0).(func(*model.Vote) *flow.Identity); ok {
+		r0 = rf(vote)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Identity)
@@ -57,8 +71,8 @@ func (_m *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.I
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*model.Vote, *model.Block) error); ok {
-		r1 = rf(vote, block)
+	if rf, ok := ret.Get(1).(func(*model.Vote) error); ok {
+		r1 = rf(vote)
 	} else {
 		r1 = ret.Error(1)
 	}

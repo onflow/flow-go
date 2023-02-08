@@ -132,6 +132,13 @@ type ReadyFunc func()
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
+// NoopWorker is a worker routine which is immediately ready, does nothing, and
+// exits when the context is done.
+func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
+	ready()
+	<-ctx.Done()
+}
+
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager

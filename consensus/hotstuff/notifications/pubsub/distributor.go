@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"sync"
+	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -30,18 +31,18 @@ func NewDistributor() *Distributor {
 	return &Distributor{}
 }
 
-// AddConsumer adds an a event consumer to the Distributor
+// AddConsumer adds an event consumer to the Distributor
 func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.subscribers = append(p.subscribers, consumer)
 }
 
-func (p *Distributor) OnReceiveVote(currentView uint64, vote *model.Vote) {
+func (p *Distributor) OnStart(currentView uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnReceiveVote(currentView, vote)
+		subscriber.OnStart(currentView)
 	}
 }
 
@@ -53,47 +54,63 @@ func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Prop
 	}
 }
 
-func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
+func (p *Distributor) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnEnteringView(view, leader)
+		subscriber.OnReceiveQc(currentView, qc)
 	}
 }
 
-func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+func (p *Distributor) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnQcTriggeredViewChange(qc, newView)
+		subscriber.OnReceiveTc(currentView, tc)
 	}
 }
 
-func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
+func (p *Distributor) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnProposingBlock(proposal)
+		subscriber.OnPartialTc(currentView, partialTc)
 	}
 }
 
-func (p *Distributor) OnVoting(vote *model.Vote) {
+func (p *Distributor) OnLocalTimeout(currentView uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnVoting(vote)
+		subscriber.OnLocalTimeout(currentView)
 	}
 }
 
-func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+func (p *Distributor) OnViewChange(oldView, newView uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnQcConstructedFromVotes(curView, qc)
+		subscriber.OnViewChange(oldView, newView)
 	}
 }
 
-func (p *Distributor) OnStartingTimeout(timerInfo *model.TimerInfo) {
+func (p *Distributor) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcTriggeredViewChange(oldView, newView, qc)
+	}
+}
+
+func (p *Distributor) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnTcTriggeredViewChange(oldView, newView, tc)
+	}
+}
+
+func (p *Distributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
@@ -101,27 +118,27 @@ func (p *Distributor) OnStartingTimeout(timerInfo *model.TimerInfo) {
 	}
 }
 
-func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
+func (p *Distributor) OnVoteProcessed(vote *model.Vote) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnReachedTimeout(timeout)
+		subscriber.OnVoteProcessed(vote)
 	}
 }
 
-func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
+func (p *Distributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnQcIncorporated(qc)
+		subscriber.OnTimeoutProcessed(timeout)
 	}
 }
 
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
+func (p *Distributor) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnForkChoiceGenerated(curView, selectedQC)
+		subscriber.OnCurrentViewDetails(currentView, finalizedView, currentLeader)
 	}
 }
 
@@ -157,11 +174,11 @@ func (p *Distributor) OnDoubleVotingDetected(vote1, vote2 *model.Vote) {
 	}
 }
 
-func (p *Distributor) OnInvalidVoteDetected(vote *model.Vote) {
+func (p *Distributor) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnInvalidVoteDetected(vote)
+		subscriber.OnInvalidVoteDetected(err)
 	}
 }
 
@@ -170,5 +187,45 @@ func (p *Distributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidPro
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnVoteForInvalidBlockDetected(vote, invalidProposal)
+	}
+}
+
+func (p *Distributor) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnDoubleTimeoutDetected(timeout, altTimeout)
+	}
+}
+
+func (p *Distributor) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnInvalidTimeoutDetected(err)
+	}
+}
+
+func (p *Distributor) OnOwnVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnVote(blockID, view, sigData, recipientID)
+	}
+}
+
+func (p *Distributor) OnOwnTimeout(timeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnTimeout(timeout)
+	}
+}
+
+func (p *Distributor) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, s := range p.subscribers {
+		s.OnOwnProposal(proposal, targetPublicationTime)
 	}
 }

@@ -780,7 +780,6 @@ func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error)
 func (m *mockSnapshot) Commit() (flow.StateCommitment, error)         { return flow.DummyStateCommitment, nil }
 func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error) { return nil, nil }
 func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)       { return nil, nil }
-func (m *mockSnapshot) ValidDescendants() ([]flow.Identifier, error)  { return nil, nil }
 func (m *mockSnapshot) RandomSource() ([]byte, error)                 { return nil, nil }
 func (m *mockSnapshot) Phase() (flow.EpochPhase, error)               { return flow.EpochPhaseUndefined, nil }
 func (m *mockSnapshot) Epochs() protocol.EpochQuery                   { return nil }

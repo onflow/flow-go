@@ -131,6 +131,10 @@ type NodeBuilder interface {
 	// ValidateFlags sets any custom validation rules for the command line flags,
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
+
+	// ValidateRootSnapshot sets any custom validation rules for the root snapshot.
+	// This check is executed after other checks but before applying any data from root snapshot.
+	ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params
@@ -223,6 +227,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option

@@ -21,7 +21,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
 
-		err := isValidEpochSetup(setup)
+		err := verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -31,7 +31,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		// randomly shuffle the identities so they are not canonically ordered
 		setup.Participants = setup.Participants.DeterministicShuffle(time.Now().UnixNano())
 
-		err := isValidEpochSetup(setup)
+		err := verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -42,7 +42,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
-		err := isValidEpochSetup(setup)
+		err := verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -51,7 +51,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
 
-		err := isValidEpochSetup(setup)
+		err := verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 }
@@ -99,5 +99,49 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 
 		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
+	})
+}
+
+// TestEntityExpirySnapshotValidation tests that we perform correct sanity checks when
+// bootstrapping consensus nodes and access nodes we expect that we only bootstrap snapshots
+// with sufficient history.
+func TestEntityExpirySnapshotValidation(t *testing.T) {
+	t.Run("spork-root-snapshot", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
+		require.NoError(t, err)
+	})
+	t.Run("not-enough-history", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootSnapshot.Encodable().Head.Height += 10 // advance height to be not spork root snapshot
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
+		require.Error(t, err)
+	})
+	t.Run("enough-history-spork-just-started", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		// advance height to be not spork root snapshot, but still lower than transaction expiry
+		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry / 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry / 2))
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
+		require.NoError(t, err)
+	})
+	t.Run("enough-history-long-spork", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		// advance height to be not spork root snapshot
+		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry) - 1)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
+		require.NoError(t, err)
+	})
+	t.Run("more-history-than-needed", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		// advance height to be not spork root snapshot
+		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
+		// add blocks to sealing segment
+		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
+		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
+		require.NoError(t, err)
 	})
 }

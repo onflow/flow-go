@@ -8,12 +8,17 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -24,23 +29,34 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
+const defaultBlockQueueCapacity = 10_000
+
+// Engine follows and maintains the local copy of the protocol state. It is a
+// passive (read-only) version of the compliance engine. The compliance engine
+// is employed by consensus nodes (active consensus participants) where the
+// Follower engine is employed by all other node roles.
+// Implements consensus.Compliance interface.
 type Engine struct {
-	unit           *engine.Unit
-	log            zerolog.Logger
-	config         compliance.Config
-	me             module.Local
-	engMetrics     module.EngineMetrics
-	mempoolMetrics module.MempoolMetrics
-	cleaner        storage.Cleaner
-	headers        storage.Headers
-	payloads       storage.Payloads
-	state          protocol.MutableState
-	pending        module.PendingBlockBuffer
-	follower       module.HotStuffFollower
-	con            network.Conduit
-	sync           module.BlockRequester
-	tracer         module.Tracer
-	channel        channels.Channel
+	*component.ComponentManager
+	log                   zerolog.Logger
+	config                compliance.Config
+	me                    module.Local
+	engMetrics            module.EngineMetrics
+	mempoolMetrics        module.MempoolMetrics
+	cleaner               storage.Cleaner
+	headers               storage.Headers
+	payloads              storage.Payloads
+	state                 protocol.MutableState
+	pending               module.PendingBlockBuffer
+	follower              module.HotStuffFollower
+	validator             hotstuff.Validator
+	con                   network.Conduit
+	sync                  module.BlockRequester
+	tracer                module.Tracer
+	channel               channels.Channel
+	pendingBlocks         *fifoqueue.FifoQueue // queues for processing inbound blocks
+	pendingBlocksNotifier engine.Notifier
 }
 
 type Option func(*Engine)
@@ -61,6 +77,9 @@ func WithChannel(channel channels.Channel) Option {
 	}
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
+var _ consensus.Compliance = (*Engine)(nil)
+
 func New(
 	log zerolog.Logger,
 	net network.Network,
@@ -73,26 +92,35 @@ func New(
 	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 	opts ...Option,
 ) (*Engine, error) {
+	// FIFO queue for block proposals
+	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
+	}
+
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "follower").Logger(),
-		config:         compliance.DefaultConfig(),
-		me:             me,
-		engMetrics:     engMetrics,
-		mempoolMetrics: mempoolMetrics,
-		cleaner:        cleaner,
-		headers:        headers,
-		payloads:       payloads,
-		state:          state,
-		pending:        pending,
-		follower:       follower,
-		sync:           sync,
-		tracer:         tracer,
-		channel:        channels.ReceiveBlocks,
+		log:                   log.With().Str("engine", "follower").Logger(),
+		config:                compliance.DefaultConfig(),
+		me:                    me,
+		engMetrics:            engMetrics,
+		mempoolMetrics:        mempoolMetrics,
+		cleaner:               cleaner,
+		headers:               headers,
+		payloads:              payloads,
+		state:                 state,
+		pending:               pending,
+		follower:              follower,
+		validator:             validator,
+		sync:                  sync,
+		tracer:                tracer,
+		channel:               channels.ReceiveBlocks,
+		pendingBlocks:         pendingBlocks,
+		pendingBlocksNotifier: engine.NewNotifier(),
 	}
 
 	for _, apply := range opts {
@@ -105,124 +133,110 @@ func New(
 	}
 	e.con = con
 
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.processBlocksLoop).
+		Build()
+
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready(func() {
-		<-e.follower.Ready()
-	})
+// OnBlockProposal errors when called since follower engine doesn't support direct ingestion via internal method.
+func (e *Engine) OnBlockProposal(_ flow.Slashable[messages.BlockProposal]) {
+	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		<-e.follower.Done()
-	})
-}
+// OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) OnSyncedBlock(synced flow.Slashable[messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+	// a block that is synced has to come locally, from the synchronization engine
+	// the block itself will contain the proposer to indicate who created it
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	// queue proposal
+	if e.pendingBlocks.Push(synced) {
+		e.pendingBlocksNotifier.Notify()
+	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-func (e *Engine) process(originID flow.Identifier, input interface{}) error {
-	switch v := input.(type) {
-	case *messages.BlockResponse:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onBlockResponse(originID, v)
-	case *events.SyncedBlock:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onSyncedBlock(originID, v)
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+	switch msg := message.(type) {
 	case *messages.BlockProposal:
-		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
-		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
-		e.unit.Lock()
-		defer e.unit.Unlock()
-		return e.onBlockProposal(originID, v, false)
+		e.onBlockProposal(flow.Slashable[messages.BlockProposal]{
+			OriginID: originID,
+			Message:  msg,
+		})
 	default:
-		return fmt.Errorf("invalid event type (%T)", input)
+		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
-}
-
-func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
-
-	// a block that is synced has to come locally, from the synchronization engine
-	// the block itself will contain the proposer to indicate who created it
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("synced block with non-local origin (local: %x, origin: %x)", e.me.NodeID(), originID)
-	}
-
-	// process as proposal
-	proposal := &messages.BlockProposal{
-		Block: synced.Block,
-	}
-	return e.onBlockProposal(originID, proposal, false)
-}
-
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
-	for i, block := range res.Blocks {
-		proposal := &messages.BlockProposal{
-			Block: block,
-		}
-
-		// process block proposal with a wait
-		if err := e.onBlockProposal(originID, proposal, true); err != nil {
-			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
-		}
-	}
-
 	return nil
 }
 
-// onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
+// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
+func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	newMessageSignal := e.pendingBlocksNotifier.Channel()
+	for {
+		select {
+		case <-doneSignal:
+			return
+		case <-newMessageSignal:
+			err := e.processQueuedBlocks(doneSignal) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
+	}
+}
+
+// processQueuedBlocks processes any available messages until the message queue is empty.
+// Only returns when all inbound queues are empty (or the engine is terminated).
+// No errors are expected during normal operation. All returned exceptions are potential
+// symptoms of internal state corruption and should be fatal.
+func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
+	for {
+		select {
+		case <-doneSignal:
+			return nil
+		default:
+		}
+
+		msg, ok := e.pendingBlocks.Pop()
+		if ok {
+			in := msg.(flow.Slashable[messages.BlockProposal])
+			err := e.processBlockProposal(in.OriginID, in.Message)
+			if err != nil {
+				return fmt.Errorf("could not handle block proposal: %w", err)
+			}
+			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+			continue
+		}
+
+		// when there are no more messages in the queue, back to the processBlocksLoop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
+}
+
+// onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) onBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+	// queue proposal
+	if e.pendingBlocks.Push(proposal) {
+		e.pendingBlocksNotifier.Notify()
+	}
+}
+
+// processBlockProposal handles incoming block proposals.
+// No errors are expected during normal operations.
+func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 	block := proposal.Block.ToInternal()
 	header := block.Header
+	blockID := header.ID()
 
-	span, ctx := e.tracer.StartBlockSpan(context.Background(), header.ID(), trace.FollowerOnBlockProposal)
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), blockID, trace.FollowerOnBlockProposal)
 	defer span.End()
 
 	log := e.log.With().
@@ -230,7 +244,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -247,14 +261,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
-	_, cached := e.pending.ByID(header.ID())
+	_, cached := e.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := e.headers.ByBlockID(header.ID())
+	_, err := e.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -274,6 +288,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		log.Debug().
 			Uint64("final_height", final.Height).
 			Msg("dropping block too far ahead of locally finalized height")
+		return nil
+	}
+	if header.Height <= final.Height {
+		log.Debug().
+			Uint64("final_height", final.Height).
+			Msg("dropping block below finalized threshold")
 		return nil
 	}
 
@@ -319,9 +339,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockAndDescendants(ctx, block, inRangeBlockResponse)
+	err = e.processBlockAndDescendants(ctx, block)
 	if err != nil {
-		return fmt.Errorf("could not process block proposal: %w", err)
+		return fmt.Errorf("could not process block proposal (id=%x, height=%d, view=%d): %w", blockID, header.Height, header.View, err)
 	}
 
 	// most of the heavy database checks are done at this point, so this is a
@@ -337,9 +357,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
-func (e *Engine) processBlockAndDescendants(ctx context.Context, block *flow.Block, inRangeBlockResponse bool) error {
-	header := block.Header
-
+func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *flow.Block) error {
+	header := proposal.Header
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.End()
 
@@ -356,10 +375,36 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, block *flow.Blo
 
 	log.Info().Msg("processing block proposal")
 
+	hotstuffProposal := model.ProposalFromFlow(header)
+	err := e.validator.ValidateProposal(hotstuffProposal)
+	if err != nil {
+		if model.IsInvalidBlockError(err) {
+			// TODO potential slashing
+			log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+			return nil
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We have received a proposal, but we don't know the epoch its view is within.
+			// We know:
+			//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+			//  - if we then see this for the child, one of two things must have happened:
+			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+			//      -> in this case we can disregard the block
+			//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+			//      -> in this case, the network has encountered a critical failure
+			//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+			log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+			return nil
+		}
+		return fmt.Errorf("unexpected error validating proposal: %w", err)
+	}
+
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Extend(ctx, block)
+	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
+	err = e.state.Extend(ctx, proposal)
 	if err != nil {
 		// block is outdated by the time we started processing it
 		// => some other node generating the proposal is probably behind is catching up.
@@ -379,24 +424,13 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, block *flow.Blo
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
-	// retrieve the parent
-	parent, err := e.headers.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	if inRangeBlockResponse {
-		<-e.follower.SubmitProposal(header, parent.View)
-	} else {
-		// ignore returned channel to avoid waiting
-		e.follower.SubmitProposal(header, parent.View)
-	}
+	e.follower.SubmitProposal(hotstuffProposal)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(ctx, header, inRangeBlockResponse)
+	err = e.processPendingChildren(ctx, header)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -407,7 +441,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, block *flow.Blo
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
+func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
 	defer span.End()
@@ -423,13 +457,13 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 	// then try to process children only this once
 	var result *multierror.Error
 	for _, child := range children {
-		err := e.processBlockAndDescendants(ctx, child.Message, inRangeBlockResponse)
+		err := e.processBlockAndDescendants(ctx, child.Message)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	// drop all of the children that should have been processed now
+	// drop all the children that should have been processed now
 	e.pending.DropForParent(blockID)
 
 	return result.ErrorOrNil()
