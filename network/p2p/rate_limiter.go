@@ -4,14 +4,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/onflow/flow-go/network/message"
 )
 
 // RateLimiter unicast rate limiter interface
 type RateLimiter interface {
-	// Allow returns true if a message should be allowed to be processed.
-	Allow(peerID peer.ID, msg *message.Message) bool
+	// Allow returns true if a message with the give size should be allowed to be processed.
+	Allow(peerID peer.ID, msgSize int) bool
 
 	// IsRateLimited returns true if a peer is rate limited.
 	IsRateLimited(peerID peer.ID) bool
@@ -37,4 +35,18 @@ func WithGetTimeNowFunc(now GetTimeNow) RateLimiterOpt {
 	return func(limiter RateLimiter) {
 		limiter.SetTimeNowFunc(now)
 	}
+}
+
+// UnicastRateLimiterDistributor consumes then distributes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
+type UnicastRateLimiterDistributor interface {
+	RateLimiterConsumer
+	AddConsumer(consumer RateLimiterConsumer)
+}
+
+// RateLimiterConsumer consumes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+type RateLimiterConsumer interface {
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
 }

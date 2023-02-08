@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -38,13 +39,14 @@ type NodeBlocklistWrapper struct {
 
 	identityProvider module.IdentityProvider
 	blocklist        IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
+	notifier         p2p.NodeBlockListConsumer
 }
 
 var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 
 // NewNodeBlocklistWrapper wraps the given `IdentityProvider`. The blocklist is
 // loaded from the database (or assumed to be empty if no database entry is present).
-func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB) (*NodeBlocklistWrapper, error) {
+func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB, notifier p2p.NodeBlockListConsumer) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)
@@ -54,6 +56,7 @@ func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badge
 		db:               db,
 		identityProvider: identityProvider,
 		blocklist:        blocklist,
+		notifier:         notifier,
 	}, nil
 }
 
@@ -73,6 +76,8 @@ func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
 	w.blocklist = b
+	w.notifier.OnNodeBlockListUpdate(blocklist)
+
 	return nil
 }
 
@@ -111,9 +116,11 @@ func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 	w.m.RLock()
 	for _, identity := range identities {
 		if w.blocklist.Contains(identity.NodeID) {
-			var i flow.Identity = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
+			var i = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 			i.Ejected = true
-			idtx = append(idtx, &i)
+			if filter(&i) { // we need to check the filter here again, because the filter might drop ejected nodes and we are modifying the ejected status here
+				idtx = append(idtx, &i)
+			}
 		} else {
 			idtx = append(idtx, identity)
 		}
@@ -152,7 +159,7 @@ func (w *NodeBlocklistWrapper) setEjectedIfBlocked(identity *flow.Identity) *flo
 	// For blocked nodes, we want to return their `Identity` with the `Ejected` flag
 	// set to true. Caution: we need to copy the `Identity` before we override `Ejected`, as we
 	// would otherwise potentially change the wrapped IdentityProvider.
-	var i flow.Identity = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
+	var i = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
 	i.Ejected = true
 	return &i
 }

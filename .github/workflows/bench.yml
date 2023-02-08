@@ -57,7 +57,7 @@ jobs:
       - name: Use benchstat for comparison
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          go install golang.org/x/perf/cmd/benchstat@latest
+          go install golang.org/x/perf/cmd/benchstat@91a04616dc65ba76dbe9e5cf746b923b1402d303
           echo "BENCHSTAT<<EOF" >> $GITHUB_ENV
           echo "$(benchstat -html -sort delta old.txt new.txt | sed  '/<title/,/<\/style>/d' | sed 's/<!doctype html>//g')" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV

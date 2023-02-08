@@ -37,6 +37,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -330,7 +332,7 @@ func WithoutGuarantee(payload *flow.Payload) {
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
-	return &delta.NewView(nil).Interactions().Snapshot
+	return &delta.NewDeltaView(nil).Interactions().Snapshot
 }
 
 func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
@@ -2183,4 +2185,13 @@ func EngineMessageFixtures(count int) []*engine.Message {
 		messages = append(messages, EngineMessageFixture())
 	}
 	return messages
+}
+
+// GetFlowProtocolEventID returns the event ID for the event provided.
+func GetFlowProtocolEventID(t *testing.T, channel channels.Channel, event interface{}) flow.Identifier {
+	payload, err := NetworkCodec().Encode(event)
+	require.NoError(t, err)
+	eventIDHash, err := network.EventId(channel, payload)
+	require.NoError(t, err)
+	return flow.HashToID(eventIDHash)
 }

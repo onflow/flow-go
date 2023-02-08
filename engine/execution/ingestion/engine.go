@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/utils"
@@ -67,7 +67,7 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
-	uploaders              []uploader.Uploader
+	uploader               *uploader.Manager
 	stopControl            *StopControl
 }
 
@@ -94,7 +94,7 @@ func New(
 	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
-	uploaders []uploader.Uploader,
+	uploader *uploader.Manager,
 	stopControl *StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
@@ -127,7 +127,7 @@ func New(
 		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		executionDataPruner:    pruner,
-		uploaders:              uploaders,
+		uploader:               uploader,
 		stopControl:            stopControl,
 	}
 
@@ -146,8 +146,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.stopControl.IsPaused() {
-		if computation.GetUploaderEnabled() {
-			if err := e.retryUpload(); err != nil {
+		if e.uploader.Enabled() {
+			if err := e.uploader.RetryUploads(); err != nil {
 				e.log.Warn().Msg("failed to re-upload all ComputationResults")
 			}
 		}
@@ -468,7 +468,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
+	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
@@ -598,11 +598,12 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
-
-	e.log.Info().
+	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
-		Msg("executing block")
+		Logger()
+
+	lg.Info().Msg("executing block")
 
 	startedAt := time.Now()
 
@@ -615,28 +616,32 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
 	if err != nil {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
-			Msg("error while computing block")
+		lg.Err(err).Msg("error while computing block")
 		return
 	}
 
-	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
+	if e.uploader.Enabled() {
+		err := e.uploader.Upload(ctx, computationResult)
+		if err != nil {
+			lg.Err(err).Msg("error while uploading block")
+			// continue processing. uploads should not block execution
+		}
+	}
+
+	finalState, receipt, err := e.handleComputationResult(ctx, computationResult)
 	if errors.Is(err, storage.ErrDataMismatch) {
-		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
+		lg.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
 	}
 
 	if err != nil {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
-			Msg("error while handing computation results")
+		lg.Err(err).Msg("error while handing computation results")
 		return
 	}
 
 	// if the receipt is for a sealed block, then no need to broadcast it.
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
+		lg.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
 	}
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
@@ -645,22 +650,20 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if !isExecutedBlockSealed {
 		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("could not check staking status")
+			lg.Fatal().Err(err).Msg("could not check staking status")
 		}
 		if authorizedAtBlock {
 			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 			if err != nil {
-				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+				lg.Err(err).Msg("critical: failed to broadcast the receipt")
 			} else {
 				broadcasted = true
 			}
 		}
 	}
 
-	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock)).
+	lg.Info().
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
-		Uint64("block_height", executableBlock.Block.Header.Height).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
 		Hex("start_state", executableBlock.StartState[:]).
 		Hex("final_state", finalState[:]).
@@ -682,7 +685,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
-		e.log.Err(err).Msg("failed in process block's children")
+		lg.Err(err).Msg("failed in process block's children")
 	}
 
 	if e.executionDataPruner != nil {
@@ -873,7 +876,7 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 	collID := collection.ID()
 
-	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
+	span, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
 	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
@@ -1103,9 +1106,10 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(key))
+	id := flow.NewRegisterID(string(owner), string(key))
+	data, err := blockView.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
 	}
 
 	return data, nil
@@ -1136,9 +1140,11 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 func (e *Engine) handleComputationResult(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	startState flow.StateCommitment,
-) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
-
+) (
+	flow.StateCommitment,
+	*flow.ExecutionReceipt,
+	error,
+) {
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
 	defer span.End()
 
@@ -1146,18 +1152,14 @@ func (e *Engine) handleComputationResult(
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(
-		ctx,
-		result,
-		startState,
-	)
+	receipt, err := e.saveExecutionResults(ctx, result)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
 	if errors.Is(err, flow.ErrNoChunks) {
-		finalState = startState
+		finalState = *result.ExecutableBlock.StartState
 	} else if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
 	}
@@ -1168,13 +1170,12 @@ func (e *Engine) handleComputationResult(
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	startState flow.StateCommitment,
-) (*flow.ExecutionReceipt, error) {
-
+) (
+	*flow.ExecutionReceipt,
+	error,
+) {
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.End()
-
-	originalState := startState
 
 	block := result.ExecutableBlock.Block
 	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
@@ -1183,10 +1184,15 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(e.metrics, previousErID, startState, result)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
-	}
+	endState := result.EndState
+	chdps := result.ChunkDataPacks
+	executionResult := flow.NewExecutionResult(
+		previousErID,
+		block.ID(),
+		result.Chunks,
+		result.ConvertedServiceEvents,
+		result.ExecutionDataID)
+
 	for _, event := range executionResult.ServiceEvents {
 		e.log.Info().
 			Uint64("block_height", result.ExecutableBlock.Height()).
@@ -1219,7 +1225,7 @@ func (e *Engine) saveExecutionResults(
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
-		Hex("start_state", originalState[:]).
+		Hex("start_state", result.ExecutableBlock.StartState[:]).
 		Hex("final_state", endState[:]).
 		Msg("saved computation results")
 
@@ -1254,16 +1260,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Msg("extensive log: executed tx content")
 		}
 	}
-}
-
-func (e *Engine) retryUpload() (err error) {
-	for _, u := range e.uploaders {
-		switch retryableUploaderWraper := u.(type) {
-		case uploader.RetryableUploaderWrapper:
-			err = retryableUploaderWraper.RetryUpload()
-		}
-	}
-	return err
 }
 
 func GenerateExecutionReceipt(

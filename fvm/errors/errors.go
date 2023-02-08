@@ -4,15 +4,19 @@ import (
 	stdErrors "errors"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
 )
 
+type Unwrappable interface {
+	Unwrap() error
+}
+
 type CodedError interface {
 	Code() ErrorCode
 
-	Unwrap() error
-
+	Unwrappable
 	error
 }
 
@@ -134,21 +138,36 @@ func HasErrorCode(err error, code ErrorCode) bool {
 
 // This recursively unwraps the error and returns first CodedError that matches
 // the specified error code.
-func Find(err error, code ErrorCode) CodedError {
-	if err == nil {
+func Find(originalErr error, code ErrorCode) CodedError {
+	if originalErr == nil {
 		return nil
 	}
 
-	var coded CodedError
-	if !As(err, &coded) {
+	var unwrappable Unwrappable
+	if !As(originalErr, &unwrappable) {
 		return nil
 	}
 
-	if coded.Code() == code {
+	coded, ok := unwrappable.(CodedError)
+	if ok && coded.Code() == code {
 		return coded
 	}
 
-	return Find(coded.Unwrap(), code)
+	// NOTE: we need to special case multierror.Error since As() will only
+	// inspect the first error within multierror.Error.
+	errors, ok := unwrappable.(*multierror.Error)
+	if !ok {
+		return Find(unwrappable.Unwrap(), code)
+	}
+
+	for _, innerErr := range errors.Errors {
+		coded = Find(innerErr, code)
+		if coded != nil {
+			return coded
+		}
+	}
+
+	return nil
 }
 
 type codedError struct {

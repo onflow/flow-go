@@ -15,7 +15,7 @@ import (
     "github.com/onflow/flow-go/model/flow"
 )
 
-vm := fvm.New(runtime.NewInterpreterRuntime())
+vm := fvm.NewVirtualMachine()
 
 tx := flow.NewTransactionBody().
     SetScript([]byte(`transaction { execute { log("Hello, World!") } }`))

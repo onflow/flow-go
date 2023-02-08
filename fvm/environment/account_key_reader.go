@@ -4,10 +4,12 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -20,13 +22,13 @@ type AccountKeyReader interface {
 	// the given index. An error is returned if the specified account does not
 	// exist, the provided index is not valid, or if the key retrieval fails.
 	GetAccountKey(
-		address runtime.Address,
+		address common.Address,
 		keyIndex int,
 	) (
 		*runtime.AccountKey,
 		error,
 	)
-	AccountKeysCount(address runtime.Address) (uint64, error)
+	AccountKeysCount(address common.Address) (uint64, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
@@ -45,7 +47,7 @@ func NewParseRestrictedAccountKeyReader(
 }
 
 func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -59,7 +61,7 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		keyIndex)
 }
 
-func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
 	return parseRestrict1Arg1Ret(
 		reader.txnState,
 		"AccountKeysCount",
@@ -69,14 +71,14 @@ func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address runtime.A
 }
 
 type accountKeyReader struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
 }
 
 func NewAccountKeyReader(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 ) AccountKeyReader {
@@ -88,13 +90,13 @@ func NewAccountKeyReader(
 }
 
 func (reader *accountKeyReader) GetAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
 	error,
 ) {
-	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
+	defer reader.tracer.StartChildSpan(trace.FVMEnvGetAccountKey).End()
 
 	formatErr := func(err error) (*runtime.AccountKey, error) {
 		return nil, fmt.Errorf("getting account key failed: %w", err)
@@ -137,8 +139,8 @@ func (reader *accountKeyReader) GetAccountKey(
 	return runtimeAccountKey, nil
 }
 
-func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
-	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvAccountKeysCount).End()
+func (reader *accountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
+	defer reader.tracer.StartChildSpan(trace.FVMEnvAccountKeysCount).End()
 
 	formatErr := func(err error) (uint64, error) {
 		return 0, fmt.Errorf("fetching account key count failed: %w", err)

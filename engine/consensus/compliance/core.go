@@ -126,17 +126,13 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
-	var traceID string
-
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("view", int64(header.View)),
-			attribute.String("origin_id", originID.String()),
-			attribute.String("proposer", header.ProposerID.String()),
-		)
-		traceID = span.SpanContext().TraceID().String()
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
+	span.SetAttributes(
+		attribute.Int64("view", int64(header.View)),
+		attribute.String("origin_id", originID.String()),
+		attribute.String("proposer", header.ProposerID.String()),
+	)
+	traceID := span.SpanContext().TraceID().String()
 	defer span.End()
 
 	log := c.log.With().
@@ -324,12 +320,10 @@ func (c *Core) processBlockProposal(proposal *flow.Block, parent *flow.Header) e
 	header := proposal.Header
 	blockID := header.ID()
 
-	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("proposer", header.ProposerID.String()),
-		)
-	}
+	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
+	span.SetAttributes(
+		attribute.String("proposer", header.ProposerID.String()),
+	)
 	defer span.End()
 
 	hotstuffProposal := model.ProposalFromFlow(header)

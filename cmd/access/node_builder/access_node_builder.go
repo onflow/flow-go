@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
@@ -153,6 +154,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 			MaxExecutionDataMsgSize:   grpcutils.DefaultMaxMsgSize,
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
@@ -597,8 +599,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
-		flags.IntVar(&builder.rpcConf.MaxExecutionDataMsgSize, "max-block-msg-size", defaultConfig.rpcConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.UintVar(&builder.rpcConf.MaxExecutionDataMsgSize, "max-block-msg-size", defaultConfig.rpcConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
@@ -652,7 +655,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
 func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkCoreMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
@@ -702,7 +705,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
@@ -793,8 +797,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
@@ -812,8 +816,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
-					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-					grpc.WithInsecure()) //nolint:staticcheck
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+					grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return err
 				}
@@ -1061,9 +1065,12 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.NetworkMetrics) p2pbuilder.LibP2PFactoryFunc {
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, networkMetrics)
+		connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("could not create connection manager: %w", err)
+		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
@@ -1104,28 +1111,25 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkSecurityMetrics,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
-
+	validators ...network.MessageValidator,
+) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
-
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
-
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		logger,
 		libp2pNode,
 		nodeID,
-		networkMetrics,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
 		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
+		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }

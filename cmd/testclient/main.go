@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
@@ -26,7 +27,7 @@ func main() {
 
 	pflag.Parse()
 
-	c, err := client.New(targetAddr, grpc.WithInsecure()) //nolint:staticcheck
+	c, err := client.New(targetAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}

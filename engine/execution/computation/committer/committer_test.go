@@ -36,8 +36,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		view := fvmUtils.NewSimpleView()
 
 		err := view.Set(
-			"owner",
-			"key",
+			flow.NewRegisterID("owner", "key"),
 			[]byte{1},
 		)
 		require.NoError(t, err)

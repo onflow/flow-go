@@ -168,10 +168,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	// TODO: change this to block level as well
 	if chunkDataPack.Collection != nil {
-		span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
-		if isSampled {
-			span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
-		}
+		span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+		span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
 		defer span.End()
 	}
 	e.handleChunkDataPack(originID, chunkDataPack)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 
 	fgcrypto "github.com/onflow/flow-go/crypto"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -84,7 +86,7 @@ type AccountKeyUpdater interface {
 	// if the key insertion fails.
 	//
 	// Note that the script variant will return OperationNotSupportedError.
-	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
+	AddEncodedAccountKey(address common.Address, publicKey []byte) error
 
 	// RevokeEncodedAccountKey revokes a public key by index from an existing
 	// account.
@@ -94,7 +96,7 @@ type AccountKeyUpdater interface {
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	RevokeEncodedAccountKey(
-		address runtime.Address,
+		address common.Address,
 		index int,
 	) (
 		[]byte,
@@ -108,7 +110,7 @@ type AccountKeyUpdater interface {
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	AddAccountKey(
-		address runtime.Address,
+		address common.Address,
 		publicKey *runtime.PublicKey,
 		hashAlgo runtime.HashAlgorithm,
 		weight int,
@@ -127,7 +129,7 @@ type AccountKeyUpdater interface {
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	RevokeAccountKey(
-		address runtime.Address,
+		address common.Address,
 		keyIndex int,
 	) (
 		*runtime.AccountKey,
@@ -151,7 +153,7 @@ func NewParseRestrictedAccountKeyUpdater(
 }
 
 func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey []byte,
 ) error {
 	return parseRestrict2Arg(
@@ -163,7 +165,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
 }
 
 func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	index int,
 ) (
 	[]byte,
@@ -178,7 +180,7 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
 }
 
 func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey *runtime.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
@@ -197,7 +199,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
 }
 
 func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -214,14 +216,14 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
 type NoAccountKeyUpdater struct{}
 
 func (NoAccountKeyUpdater) AddEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey []byte,
 ) error {
 	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
 }
 
 func (NoAccountKeyUpdater) RevokeEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	index int,
 ) (
 	[]byte,
@@ -231,7 +233,7 @@ func (NoAccountKeyUpdater) RevokeEncodedAccountKey(
 }
 
 func (NoAccountKeyUpdater) AddAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey *runtime.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
@@ -243,7 +245,7 @@ func (NoAccountKeyUpdater) AddAccountKey(
 }
 
 func (NoAccountKeyUpdater) RevokeAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -253,7 +255,7 @@ func (NoAccountKeyUpdater) RevokeAccountKey(
 }
 
 type accountKeyUpdater struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
@@ -262,7 +264,7 @@ type accountKeyUpdater struct {
 }
 
 func NewAccountKeyUpdater(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 	txnState *state.TransactionState,
@@ -282,7 +284,7 @@ func NewAccountKeyUpdater(
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (updater *accountKeyUpdater) addAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey *runtime.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
@@ -340,7 +342,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 // TODO (ramtin) do we have to return runtime.AccountKey for this method or
 // can be separated into another method
 func (updater *accountKeyUpdater) revokeAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -428,7 +430,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 // * NewAccountNotFoundError - if the specified account does not exist
 // * ValueError - if the provided encodedPublicKey is not valid public key
 func (updater *accountKeyUpdater) InternalAddEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	encodedPublicKey []byte,
 ) error {
 	accountAddress := flow.Address(address)
@@ -468,7 +470,7 @@ func (updater *accountKeyUpdater) InternalAddEncodedAccountKey(
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key revoking fails.
 func (updater *accountKeyUpdater) removeAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	[]byte,
@@ -516,10 +518,10 @@ func (updater *accountKeyUpdater) removeAccountKey(
 }
 
 func (updater *accountKeyUpdater) AddEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey []byte,
 ) error {
-	defer updater.tracer.StartSpanFromRoot(
+	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvAddEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
@@ -548,13 +550,13 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 }
 
 func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
-	address runtime.Address,
+	address common.Address,
 	index int,
 ) (
 	[]byte,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeEncodedAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeEncodedAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeEncodedAccountKey,
@@ -577,7 +579,7 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 }
 
 func (updater *accountKeyUpdater) AddAccountKey(
-	address runtime.Address,
+	address common.Address,
 	publicKey *runtime.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
@@ -585,7 +587,7 @@ func (updater *accountKeyUpdater) AddAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvAddAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindAddAccountKey,
@@ -607,13 +609,13 @@ func (updater *accountKeyUpdater) AddAccountKey(
 }
 
 func (updater *accountKeyUpdater) RevokeAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
 	error,
 ) {
-	defer updater.tracer.StartSpanFromRoot(trace.FVMEnvRevokeAccountKey).End()
+	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeAccountKey).End()
 
 	err := updater.meter.MeterComputation(
 		ComputationKindRevokeAccountKey,

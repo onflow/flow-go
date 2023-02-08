@@ -303,7 +303,7 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 
-	span, _, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
+	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
 	defer span.End()
 
 	err := c.processIncorporatedResult(result)
@@ -352,13 +352,11 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 		Str("verifier_id", approval.Body.ApproverID.String()).
 		Msg("processing result approval")
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("approverId", approval.Body.ApproverID.String()),
-			attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
-		)
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	span.SetAttributes(
+		attribute.String("approverId", approval.Body.ApproverID.String()),
+		attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
+	)
 	defer span.End()
 
 	startTime := time.Now()
@@ -505,7 +503,7 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
-	processFinalizedBlockSpan, _, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+	processFinalizedBlockSpan, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
 	defer processFinalizedBlockSpan.End()
 
 	// STEP 0: Collect auxiliary information

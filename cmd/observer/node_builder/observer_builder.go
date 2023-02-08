@@ -76,6 +76,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -133,6 +134,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -581,6 +583,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
@@ -623,7 +626,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
 func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkCoreMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
@@ -732,7 +735,8 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
@@ -944,7 +948,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 
 			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
-			builder.initMiddleware(node.NodeID, node.Metrics.Network, libp2pNode, msgValidators...)
+			builder.initMiddleware(node.NodeID, libp2pNode, msgValidators...)
 
 			// topology is nil since it is automatically managed by libp2p
 			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
@@ -1004,7 +1008,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, builder.rpcConf.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
@@ -1036,25 +1040,23 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
+	validators ...network.MessageValidator,
+) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		builder.Logger,
-		libp2pNode,
-		nodeID,
-		networkMetrics,
+		libp2pNode, nodeID,
 		builder.Metrics.Bitswap,
 		builder.SporkID,
 		middleware.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
+		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }
 

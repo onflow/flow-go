@@ -423,7 +423,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 	}
 }
 
-// OnOwnProposal directly forwards proposal to HotStuff core logic(skipping compliance engine as we assume our
+// OnOwnProposal directly forwards proposal to HotStuff core logic (skipping compliance engine as we assume our
 // own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
 func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
