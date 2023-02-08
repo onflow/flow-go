@@ -545,7 +545,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+		chainID := execCtx.Chain.ChainID()
+		serviceEvents, err := systemcontracts.ServiceEventsForChain(chainID)
 		require.NoError(t, err)
 
 		payload, err := json.Decode(nil, []byte(fixtures.EpochSetupFixtureJSON))
@@ -599,6 +600,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					chainID,
 					func(_ runtime.Config) runtime.Runtime {
 						return emittingRuntime
 					})))
@@ -637,7 +639,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// make sure event index sequence are valid
 		for _, eventsList := range result.Events {
-			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, eventsList, chainID)
 		}
 
 		// all events should have been collected
@@ -685,6 +687,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain.ChainID(),
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
@@ -786,6 +789,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain.ChainID(),
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
