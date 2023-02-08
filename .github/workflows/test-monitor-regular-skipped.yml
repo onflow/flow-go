@@ -15,7 +15,7 @@ env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results
-  GO_VERSION: 1.19
+  GO_VERSION: "1.20"
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
