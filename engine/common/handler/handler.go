@@ -1,4 +1,4 @@
-package distributer
+package handler
 
 import (
 	"fmt"
