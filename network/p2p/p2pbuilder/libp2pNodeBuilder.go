@@ -24,6 +24,7 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/distributer"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -358,6 +359,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
 			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+			// TODO: replace with proper parameters
+			gossipSubRPCInspectorConsumer := distributer.NewGossipSubInspectorNotificationDistributor(builder.logger, 100, 10)
+			fmt.Println("gossipSubRPCInspectorConsumer", gossipSubRPCInspectorConsumer) // to supress unused error
 			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
 				gossipSubMetrics.ObserveRPC(from, rpc)
 				return nil
