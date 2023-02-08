@@ -67,7 +67,7 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 
 // Test_UnexpectedCommitteeException verifies that `BlockSignerDecoder`
 // does _not_ erroneously interpret an unexpected exception from the committee as
-// a sign of an unknown block, i.e. the decoder should _not_ return an `state.UnknownBlockError`
+// a sign of an unknown block, i.e. the decoder should _not_ return an `model.ErrViewForUnknownEpoch` or `signature.InvalidSignerIndicesError`
 func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 	exception := errors.New("unexpected exception")
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
@@ -75,7 +75,8 @@ func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)
-	require.False(s.T(), state.IsUnknownBlockError(err))
+	require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
 	require.True(s.T(), errors.Is(err, exception))
 }
 
@@ -105,7 +106,7 @@ func (s *blockSignerDecoderSuite) Test_InvalidIndices() {
 func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	// The block under test B is the first block of a new epoch, where the committee changed.
 	// B contains a QC formed during the view of B's parent -- hence B's signatures must
-	// be validated w.r.t. the committee as of this view.
+	// be decoded w.r.t. the committee as of the parent's view.
 	//
 	//   Epoch 1     Epoch 2
 	//   PARENT <- | -- B
