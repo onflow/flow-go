@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type EventHandlerFunc func(flow.Identifier, interface{})
@@ -22,20 +21,19 @@ type AsyncEventHandler struct {
 	component.Component
 	cm *component.ComponentManager
 
-	log             zerolog.Logger
-	handler         *engine.MessageHandler
-	queue           engine.MessageStore
-	msgChannel      chan *engine.Message
-	externalHandler EventHandlerFunc
+	log        zerolog.Logger
+	handler    *engine.MessageHandler
+	queue      engine.MessageStore
+	msgChannel chan *engine.Message
+	processor  EventHandlerFunc
 }
 
 func NewAsyncEventHandler(
 	log zerolog.Logger,
-	handler EventHandlerFunc,
 	queueSize uint32,
 	workerCount uint) *AsyncEventHandler {
 
-	q := queue.NewHeroStore(queueSize, unittest.Logger(), metrics.NewNoopCollector())
+	q := queue.NewHeroStore(queueSize, log, metrics.NewNoopCollector())
 
 	n := &AsyncEventHandler{
 		log:   log.With().Str("component", "async_event_handler").Logger(),
@@ -43,7 +41,6 @@ func NewAsyncEventHandler(
 		handler: engine.NewMessageHandler(log, engine.NewNotifier(), engine.Pattern{
 			Store: q,
 		}),
-		externalHandler: handler,
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -56,6 +53,10 @@ func NewAsyncEventHandler(
 	n.Component = n.cm
 
 	return n
+}
+
+func (n *AsyncEventHandler) RegisterProcessor(processor EventHandlerFunc) {
+	n.processor = processor
 }
 
 // processEventShovlerWorker is constantly listening on the MessageHandler for new events,
@@ -110,7 +111,7 @@ func (n *AsyncEventHandler) processEventWorker(_ irrecoverable.SignalerContext, 
 			n.log.Trace().Msg("processing event worker terminated")
 			return
 		}
-		n.externalHandler(msg.OriginID, msg.Payload)
+		n.processor(msg.OriginID, msg.Payload)
 	}
 }
 
