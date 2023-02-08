@@ -104,7 +104,7 @@ func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
 	return paths, payloads
 }
 
-func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
+func createMultipleRandomTries(t *testing.T, payloadStorage ledger.PayloadStorage) []*trie.MTrie {
 	tries := make([]*trie.MTrie, 0)
 	activeTrie := trie.NewEmptyMTrie()
 
@@ -112,19 +112,19 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	// add tries with no shared paths
 	for i := 0; i < 100; i++ {
 		paths, payloads := randNPathPayloads(100)
-		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
+		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false, payloadStorage)
 		require.NoError(t, err, "update registers")
 		tries = append(tries, activeTrie)
 	}
 
 	// add trie with some shared path
 	sharedPaths, payloads1 := randNPathPayloads(100)
-	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false, payloadStorage)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
 	_, payloads2 := randNPathPayloads(100)
-	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false, payloadStorage)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
@@ -134,7 +134,7 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
-	tries := createMultipleRandomTries(t)
+	tries := createMultipleRandomTries(t, storage)
 	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
 
