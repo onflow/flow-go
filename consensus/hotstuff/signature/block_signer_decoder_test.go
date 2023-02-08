@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
