@@ -91,7 +91,7 @@ func (s *blockSignerDecoderSuite) Test_UnknownEpoch() {
 }
 
 // Test_InvalidIndices verifies that `BlockSignerDecoder` returns
-// signature.InvalidSignerIndicesError is the signer indices in the provided header
+// signature.InvalidSignerIndicesError if the signer indices in the provided header
 // are not a valid encoding.
 func (s *blockSignerDecoderSuite) Test_InvalidIndices() {
 	s.block.Header.ParentVoterIndices = unittest.RandomBytes(1)
