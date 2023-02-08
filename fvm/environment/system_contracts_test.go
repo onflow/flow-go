@@ -58,11 +58,13 @@ func TestSystemContractsInvoke(t *testing.T) {
 				environment.RuntimeParams{
 					reusableRuntime.NewCustomReusableCadenceRuntimePool(
 						0,
+						flow.Emulator,
 						func() runtime.Runtime {
 							return &testutil.TestInterpreterRuntime{
 								InvokeContractFunc: tc.contractFunction,
 							}
-						}),
+						},
+					),
 				})
 			invoker := environment.NewSystemContracts(
 				flow.Mainnet.Chain(),
