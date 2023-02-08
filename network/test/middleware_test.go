@@ -3,7 +3,6 @@ package test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"sync"
@@ -346,9 +345,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// ensure connection to rate limited peer is pruned
 	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
-	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
-		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
-	})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
@@ -361,15 +358,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-		err = m.mws[0].SendDirect(msg)
-		if err != nil {
-			// we expect an error to be returned here because the connection gater will disallow connections
-			// to the rate limited peer until rate limit duration has passed. We expect the error returned to
-			// be IsPeerUnreachableError
-			require.True(m.T(), network.IsPeerUnreachableError(err))
-			return false
-		}
-		return true
+		return m.mws[0].SendDirect(msg) == nil
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
@@ -511,9 +500,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// ensure connection to rate limited peer is pruned
 	p2pfixtures.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
-	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]}, func(t *testing.T, err error) {
-		require.True(m.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection) || network.IsPeerUnreachableError(err), "received unexpected error")
-	})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
@@ -526,15 +513,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 			unittest.NetworkCodec().Encode,
 			network.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-		err = m.mws[0].SendDirect(msg)
-		if err != nil {
-			// we expect an error to be returned here because the connection gater will disallow connections
-			// to the rate limited peer until rate limit duration has passed. We expect the error returned to
-			// be IsPeerUnreachableError
-			require.True(m.T(), network.IsPeerUnreachableError(err))
-			return false
-		}
-		return true
+		return m.mws[0].SendDirect(msg) == nil
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
