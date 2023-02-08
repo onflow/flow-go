@@ -223,7 +223,7 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 
 	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
 	if err != nil {
-		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 	}
 
 	transactions = append(transactions, systemTx)
@@ -323,10 +323,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
-		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		return nil, err
 	}
 
 	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
@@ -385,7 +382,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 		systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
 		if err != nil {
-			return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+			return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 		}
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
@@ -436,10 +433,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 
 	resp, err := b.getTransactionResultByIndexFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
-		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		return nil, err
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
@@ -585,8 +579,12 @@ func (b *backendTransactions) getHistoricalTransaction(
 		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
 			tx, err := convert.MessageToTransaction(txResp.Transaction, b.chainID.Chain())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "could not convert transaction: %v", err)
+			}
+
 			// Found on a historical node. Report
-			return &tx, err
+			return &tx, nil
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {
@@ -605,15 +603,18 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
 			// Found on a historical node. Report
-			if result.GetStatus() == entities.TransactionStatus_PENDING {
-				// This is on a historical node. No transactions from it will ever be
-				// executed, therefore we should consider this expired
-				result.Status = entities.TransactionStatus_EXPIRED
-			} else if result.GetStatus() == entities.TransactionStatus_UNKNOWN {
+			if result.GetStatus() == entities.TransactionStatus_UNKNOWN {
 				// We've moved to returning Status UNKNOWN instead of an error with the NotFound status,
 				// Therefore we should continue and look at the next access node for answers.
 				continue
 			}
+
+			if result.GetStatus() == entities.TransactionStatus_PENDING {
+				// This is on a historical node. No transactions from it will ever be
+				// executed, therefore we should consider this expired
+				result.Status = entities.TransactionStatus_EXPIRED
+			}
+
 			return access.MessageToTransactionResult(result), nil
 		}
 		// Otherwise, if not found, just continue
@@ -657,10 +658,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 
 	resp, err := b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, 0, "", err
-		}
-		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		return nil, 0, "", err
 	}
 
 	events := convert.MessagesToEvents(resp.GetEvents())
@@ -696,12 +694,9 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
 		errs = multierror.Append(errs, err)
 	}
-	return nil, errs.ErrorOrNil()
+	return nil, rpc.ConvertMultiError(errs, "failed to retrieve result from execution node", codes.Internal)
 }
 
 func (b *backendTransactions) tryGetTransactionResult(
@@ -733,6 +728,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	var errs *multierror.Error
 
 	defer func() {
+		// log the errors
 		if err := errs.ErrorOrNil(); err != nil {
 			b.log.Err(errs).Msg("failed to get transaction results from execution nodes")
 		}
@@ -752,14 +748,10 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
 		errs = multierror.Append(errs, err)
 	}
 
-	// log the errors
-	return nil, errs.ErrorOrNil()
+	return nil, rpc.ConvertMultiError(errs, "failed to retrieve result from execution node", codes.Internal)
 }
 
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
@@ -812,13 +804,10 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
 		errs = multierror.Append(errs, err)
 	}
 
-	return nil, errs.ErrorOrNil()
+	return nil, rpc.ConvertMultiError(errs, "failed to retrieve result from execution node", codes.Internal)
 }
 
 func (b *backendTransactions) tryGetTransactionResultByIndex(
