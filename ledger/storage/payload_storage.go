@@ -14,7 +14,9 @@ type PayloadStorage struct {
 }
 
 func NewPayloadStorage(store ledger.Storage) *PayloadStorage {
-	return &PayloadStorage{store}
+	return &PayloadStorage{
+		storage: store,
+	}
 }
 
 func (s *PayloadStorage) Get(hash hash.Hash) (ledger.Path, *ledger.Payload, error) {

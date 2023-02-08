@@ -62,6 +62,10 @@ func GetDefaultHashForHeight(height int) hash.Hash {
 	return defaultHashes[height]
 }
 
+func IsEmptyPayloadLeafHash(hash hash.Hash) bool {
+	return hash == defaultHashes[256]
+}
+
 // ComputeFullyExpandedLeafValue computes the value for the fully expanded leaf node
 func ComputeFullyExpandedLeafValue(path Path, payload *Payload) hash.Hash {
 	return ComputeCompactValue(hash.Hash(path), payload.Value(), 0)

@@ -245,7 +245,7 @@ func readSinglePayload(path ledger.Path, head *node.Node, payloadStorage ledger.
 		depth++
 	}
 
-	if head == nil {
+	if head.IsDefaultNode() {
 		return ledger.EmptyPayload(), nil
 	}
 
@@ -531,9 +531,15 @@ func update(
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
+		// if parentNode is a unpruned node, then
+		if parentNode.IsDefaultNode() && len(paths) == 1 {
+			return parentNode, 0, 0, nodeHeight, nil
+		}
+
 		// check if the parent node path is among the updated paths
 		found := false
 		parentLeafHash := parentNode.ExpandedLeafHash()
+
 		parentPath, parentPayload, err := payloadStorage.Get(parentLeafHash)
 		if err != nil {
 			return nil, 0, 0, 0, fmt.Errorf("could not get payload for parent leaf hash %v: %w", parentLeafHash, err)
@@ -914,7 +920,6 @@ func (mt *MTrie) AllPayloads(payloadStorage ledger.PayloadStorage) ([]ledger.Pay
 	// TODO: batch request
 	for _, leaf := range leafs {
 		leafHash := leaf.ExpandedLeafHash()
-		// TODO handle err
 		_, leafPayload, err := payloadStorage.Get(leafHash)
 		if err != nil {
 			return nil, fmt.Errorf("could not get payload by hash %v: %w", leafHash, err)

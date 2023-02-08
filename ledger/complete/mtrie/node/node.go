@@ -97,6 +97,7 @@ func NewLeafWithHash(path ledger.Path, payload *ledger.Payload, height int, hash
 	}
 }
 
+// TODO: check if payload is empty payload, and use default hash
 func computeLeafNodeHash(path ledger.Path, payload *ledger.Payload, height int) hash.Hash {
 	return ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), height)
 }
