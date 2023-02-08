@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/slok/go-http-metrics/metrics"
 	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
@@ -62,7 +61,7 @@ func NewRecorder(cfg metricsProm.Config) CustomRecorder {
 	}
 
 	r := &recorder{
-		httpRequestDurHistogram: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: cfg.Prefix,
 			Subsystem: "http",
 			Name:      "request_duration_seconds",
@@ -70,7 +69,7 @@ func NewRecorder(cfg metricsProm.Config) CustomRecorder {
 			Buckets:   cfg.DurationBuckets,
 		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
 
-		httpResponseSizeHistogram: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		httpResponseSizeHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: cfg.Prefix,
 			Subsystem: "http",
 			Name:      "response_size_bytes",
@@ -78,14 +77,14 @@ func NewRecorder(cfg metricsProm.Config) CustomRecorder {
 			Buckets:   cfg.SizeBuckets,
 		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
 
-		httpRequestsInflight: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		httpRequestsInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: cfg.Prefix,
 			Subsystem: "http",
 			Name:      "requests_inflight",
 			Help:      "The number of inflight requests being handled at the same time.",
 		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
 
-		httpRequestsTotal: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		httpRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: cfg.Prefix,
 			Subsystem: "http",
 			Name:      "requests_total",
