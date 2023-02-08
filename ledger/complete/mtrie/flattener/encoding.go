@@ -81,7 +81,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	// Encode hash (32 bytes hashValue)
 	leafHash := n.ExpandedLeafHash()
 	copy(buf[pos:], leafHash[:])
-	pos += encHashSize
+	// pos += encHashSize
 
 	return buf
 }
@@ -139,7 +139,7 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 
 	// Encode right child index (8 bytes Big Endian)
 	binary.BigEndian.PutUint64(buf[pos:], rchildIndex)
-	pos += encNodeIndexSize
+	// pos += encNodeIndexSize
 
 	return buf
 }
@@ -199,7 +199,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
 	}
-	pos += encHashSize
+	// pos += encHashSize
 
 	if nType == byte(leafNodeType) {
 

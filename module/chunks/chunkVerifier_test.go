@@ -255,7 +255,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion, payloadStorage)
 
 	compactor := fixtures.NewNoopCompactor(f)
 	<-compactor.Ready()

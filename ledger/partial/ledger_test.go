@@ -16,13 +16,15 @@ import (
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 
 	w := &fixtures.NoopWAL{}
 
-	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(t, err)
 
 	compactor := fixtures.NewNoopCompactor(l)
@@ -113,7 +115,8 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 
 func TestProofsForEmptyRegisters(t *testing.T) {
 
-	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	payloadStorage := unittest.CreateMockPayloadStore()
+	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion, payloadStorage)
 	require.NoError(t, err)
 
 	// create empty update

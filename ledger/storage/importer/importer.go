@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/rs/zerolog"
 )
 
 // ImportLeafNodesFromCheckpoint takes a checkpoint file specified by the dir and fileName,

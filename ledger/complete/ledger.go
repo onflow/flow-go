@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -86,12 +85,6 @@ func NewLedger(
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
-}
-
-// TODO: BE REPLACED BY REAL IMPLEMENTATION
-func newPayloadStorage() ledger.PayloadStorage {
-	store := storage.NewInMemStorage()
-	return storage.NewPayloadStorage(store)
 }
 
 // TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
@@ -308,42 +301,6 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	trieCh <- newTrie
 
 	return ledger.State(newTrie.RootHash()), nil
-}
-
-// toLeafNodeUpdates converts the trie updates into the leaf nodes updates to be stored in storage
-func toLeafNodeUpdates(trieUpdate *ledger.TrieUpdate) []ledger.LeafNode {
-	paths := trieUpdate.Paths
-	payloads := trieUpdate.Payloads
-
-	deduplicatedPaths := make([]ledger.Path, 0, len(paths))
-	deduplicatedPayloads := make([]ledger.Payload, 0, len(paths))
-	payloadMap := make(map[ledger.Path]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
-	for i, path := range paths {
-		payload := payloads[i]
-		// check if we already have encountered an update for the respective register
-		if idx, ok := payloadMap[path]; ok {
-			deduplicatedPayloads[idx] = *payload
-		} else {
-			payloadMap[path] = len(deduplicatedPaths)
-			deduplicatedPaths = append(deduplicatedPaths, path)
-			deduplicatedPayloads = append(deduplicatedPayloads, *payload)
-		}
-	}
-
-	leafs := make([]ledger.LeafNode, 0, len(deduplicatedPayloads))
-
-	for i, path := range deduplicatedPaths {
-		payload := deduplicatedPayloads[i]
-		// TODO: skip if payload.Value is empty
-		hash := ledger.ComputeFullyExpandedLeafValue(path, &payload)
-		leafs = append(leafs, ledger.LeafNode{
-			Hash:    hash,
-			Path:    path,
-			Payload: payload,
-		})
-	}
-
-	return leafs
 }
 
 // Prove provides proofs for a ledger query and errors (if any).

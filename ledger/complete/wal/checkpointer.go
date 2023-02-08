@@ -684,12 +684,6 @@ func readCheckpoint(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	}
 }
 
-type nodeWithRegMetrics struct {
-	n        *node.Node
-	regCount uint64
-	regSize  uint64
-}
-
 // readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
 // Checkpoint file header (magic and version) are verified by the caller.
 func readCheckpointV5(f *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {

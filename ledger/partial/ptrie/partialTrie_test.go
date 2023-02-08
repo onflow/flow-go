@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func withForest(
@@ -29,6 +30,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		// add path1 to the empty trie
 		// 00000000...0 (0)
@@ -40,7 +42,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		rootHash := f.GetEmptyRootHash()
 		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-		bp, err := f.Proofs(r)
+		bp, err := f.Proofs(r, payloadStorage)
 		require.NoError(t, err, "error getting proofs values")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -48,7 +50,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		ensureRootHash(t, rootHash, psmt)
 
 		u := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
-		rootHash, err = f.Update(u)
+		rootHash, err = f.Update(u, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
@@ -59,7 +61,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		payloads = []*ledger.Payload{updatedPayload1}
 
 		u = &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
-		rootHash, err = f.Update(u)
+		rootHash, err = f.Update(u, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
@@ -73,6 +75,7 @@ func TestPartialTrieGet(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -84,11 +87,11 @@ func TestPartialTrieGet(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2}
 
 		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
-		rootHash, err := f.Update(u)
+		rootHash, err := f.Update(u, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-		bp, err := f.Proofs(r)
+		bp, err := f.Proofs(r, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -139,6 +142,7 @@ func TestPartialTrieGetSinglePayload(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -150,11 +154,11 @@ func TestPartialTrieGetSinglePayload(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2}
 
 		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
-		rootHash, err := f.Update(u)
+		rootHash, err := f.Update(u, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-		bp, err := f.Proofs(r)
+		bp, err := f.Proofs(r, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -186,6 +190,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -202,11 +207,11 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2}
 
 		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
-		rootHash, err := f.Update(u)
+		rootHash, err := f.Update(u, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-		bp, err := f.Proofs(r)
+		bp, err := f.Proofs(r, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -214,7 +219,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		ensureRootHash(t, rootHash, psmt)
 
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
@@ -235,6 +240,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -252,7 +258,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2, payload3}
 
 		rootHash := f.GetEmptyRootHash()
-		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths}, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -260,7 +266,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		ensureRootHash(t, f.GetEmptyRootHash(), psmt)
 
 		// first update
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
@@ -269,7 +275,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2, updatedPayload3}
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
@@ -283,6 +289,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -296,7 +303,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2}
 
 		rootHash := f.GetEmptyRootHash()
-		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths}, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -304,7 +311,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		ensureRootHash(t, rootHash, psmt)
 
 		// first update
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, err := psmt.Update(paths, payloads)
@@ -313,7 +320,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, err = psmt.Update(paths, payloads)
@@ -326,6 +333,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 func TestMixProof(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+		payloadStorage := unittest.CreateMockPayloadStore()
 
 		path1 := testutils.PathByUint16(0)
 		payload1 := testutils.LightPayload('A', 'a')
@@ -340,12 +348,12 @@ func TestMixProof(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload3}
 
 		rootHash := f.GetEmptyRootHash()
-		rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		paths = []ledger.Path{path1, path2, path3}
 
-		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths}, payloadStorage)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(rootHash, bp)
@@ -355,7 +363,7 @@ func TestMixProof(t *testing.T) {
 		paths = []ledger.Path{path2, path3}
 		payloads = []*ledger.Payload{updatedPayload2, updatedPayload2}
 
-		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}, payloadStorage)
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, err := psmt.Update(paths, payloads)
@@ -373,6 +381,7 @@ func TestRandomProofs(t *testing.T) {
 	experimentRep := 20
 	for e := 0; e < experimentRep; e++ {
 		withForest(t, pathByteSize, experimentRep+1, func(t *testing.T, f *mtrie.Forest) {
+			payloadStorage := unittest.CreateMockPayloadStore()
 
 			// generate some random paths and payloads
 			seed := time.Now().UnixNano()
@@ -386,7 +395,7 @@ func TestRandomProofs(t *testing.T) {
 			insertPaths := paths[:split]
 			insertPayloads := payloads[:split]
 
-			rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: insertPaths, Payloads: insertPayloads})
+			rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: insertPaths, Payloads: insertPayloads}, payloadStorage)
 			require.NoError(t, err, "error updating trie")
 
 			// shuffle paths for read
@@ -395,7 +404,7 @@ func TestRandomProofs(t *testing.T) {
 				payloads[i], payloads[j] = payloads[j], payloads[i]
 			})
 
-			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths}, payloadStorage)
 			require.NoError(t, err, "error getting batch proof")
 
 			psmt, err := NewPSMT(rootHash, bp)
@@ -411,7 +420,7 @@ func TestRandomProofs(t *testing.T) {
 				updatePayloads[i], updatePayloads[j] = updatePayloads[j], updatePayloads[i]
 			})
 
-			rootHash2, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: updatePaths, Payloads: updatePayloads})
+			rootHash2, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: updatePaths, Payloads: updatePayloads}, payloadStorage)
 			require.NoError(t, err, "error updating trie")
 
 			pRootHash2, err := psmt.Update(updatePaths, updatePayloads)

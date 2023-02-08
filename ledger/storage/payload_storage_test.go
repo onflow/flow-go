@@ -3,11 +3,12 @@ package storage_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPayloadStorage(t *testing.T) {
