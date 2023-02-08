@@ -41,7 +41,7 @@ func (v *SimpleView) MergeView(o state.View) error {
 	}
 
 	for key, value := range other.Ledger.Registers {
-		err := v.Ledger.Set(key.Owner, key.Key, value)
+		err := v.Ledger.Set(key, value)
 		if err != nil {
 			return fmt.Errorf("can not merge: %w", err)
 		}
@@ -57,12 +57,12 @@ func (v *SimpleView) DropDelta() {
 	v.Ledger.Registers = make(map[flow.RegisterID]flow.RegisterValue)
 }
 
-func (v *SimpleView) Set(owner, key string, value flow.RegisterValue) error {
-	return v.Ledger.Set(owner, key, value)
+func (v *SimpleView) Set(id flow.RegisterID, value flow.RegisterValue) error {
+	return v.Ledger.Set(id, value)
 }
 
-func (v *SimpleView) Get(owner, key string) (flow.RegisterValue, error) {
-	value, err := v.Ledger.Get(owner, key)
+func (v *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	value, err := v.Ledger.Get(id)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (v *SimpleView) Get(owner, key string) (flow.RegisterValue, error) {
 	}
 
 	if v.Parent != nil {
-		return v.Parent.Get(owner, key)
+		return v.Parent.Get(id)
 	}
 
 	return nil, nil
@@ -142,10 +142,9 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 			panic(err)
 		}
 
-		id := flow.RegisterID{
-			Owner: string(key.KeyParts[0].Value),
-			Key:   string(key.KeyParts[1].Value),
-		}
+		id := flow.NewRegisterID(
+			string(key.KeyParts[0].Value),
+			string(key.KeyParts[1].Value))
 
 		ledger.Registers[id] = entry.Value()
 	}
@@ -153,24 +152,22 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 	return ledger
 }
 
-func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
+func (m *MapLedger) Set(id flow.RegisterID, value flow.RegisterValue) error {
 	m.Lock()
 	defer m.Unlock()
 
-	k := flow.RegisterID{Owner: owner, Key: key}
-	m.RegisterTouches[k] = struct{}{}
-	m.RegisterUpdated[k] = struct{}{}
-	m.Registers[k] = value
+	m.RegisterTouches[id] = struct{}{}
+	m.RegisterUpdated[id] = struct{}{}
+	m.Registers[id] = value
 	return nil
 }
 
-func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
+func (m *MapLedger) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	k := flow.RegisterID{Owner: owner, Key: key}
-	m.RegisterTouches[k] = struct{}{}
-	return m.Registers[k], nil
+	m.RegisterTouches[id] = struct{}{}
+	return m.Registers[id], nil
 }
 
 func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {

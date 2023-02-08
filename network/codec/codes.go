@@ -16,6 +16,7 @@ const (
 	// consensus
 	CodeBlockProposal
 	CodeBlockVote
+	CodeTimeoutObject
 
 	// protocol state sync
 	CodeSyncRequest
@@ -28,6 +29,7 @@ const (
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
 	CodeClusterBlockResponse
+	CodeClusterTimeoutObject
 
 	// collections, guarantees & transactions
 	CodeCollectionGuarantee
@@ -71,6 +73,8 @@ func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
 		return CodeBlockProposal, "CodeBlockProposal", nil
 	case *messages.BlockVote:
 		return CodeBlockVote, "CodeBlockVote", nil
+	case *messages.TimeoutObject:
+		return CodeTimeoutObject, "CodeTimeoutObject", nil
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
@@ -79,6 +83,8 @@ func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
 		return CodeClusterBlockVote, "CodeClusterBlockVote", nil
 	case *messages.ClusterBlockResponse:
 		return CodeClusterBlockResponse, "CodeClusterBlockResponse", nil
+	case *messages.ClusterTimeoutObject:
+		return CodeClusterTimeoutObject, "CodeClusterTimeoutObject", nil
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -154,6 +160,8 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.BlockProposal{}, "BlockProposal", nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, "BlockVote", nil
+	case CodeTimeoutObject:
+		return &messages.TimeoutObject{}, "TimeoutObject", nil
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
@@ -162,6 +170,8 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.ClusterBlockVote{}, "ClusterBlockVote", nil
 	case CodeClusterBlockResponse:
 		return &messages.ClusterBlockResponse{}, "ClusterBlockResponse", nil
+	case CodeClusterTimeoutObject:
+		return &messages.ClusterTimeoutObject{}, "ClusterTimeoutObject", nil
 
 	// protocol state sync
 	case CodeSyncRequest:

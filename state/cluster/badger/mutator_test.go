@@ -65,7 +65,7 @@ func (suite *MutatorSuite) SetupTest() {
 	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis)
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
@@ -76,7 +76,7 @@ func (suite *MutatorSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(genesis.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
 	seal.ResultID = result.ID()
@@ -168,21 +168,21 @@ func TestMutator(t *testing.T) {
 func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
 	suite.genesis.Header.Height = 1
 
-	_, err := NewStateRoot(suite.genesis)
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis)
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
 	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis)
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.Assert().Error(err)
 }
 
@@ -190,7 +190,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
 	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
 
-	_, err := NewStateRoot(suite.genesis)
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.Assert().Error(err)
 }
 
@@ -258,6 +258,18 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
+// TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func (suite *MutatorSuite) TestExtend_InvalidParentView() {
+	block := suite.Block()
+	// change the block parent view
+	block.Header.ParentView--
+
+	err := suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
+
 func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
 	block := suite.Block()
 	// add the same transaction to a payload twice
@@ -319,15 +331,25 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 
 // an unknown reference block is unverifiable
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
-	block := suite.Block()
-	tx := suite.Tx()
-	payload := suite.Payload(&tx)
-	// set a random reference block ID
-	payload.ReferenceBlockID = unittest.IdentifierFixture()
-	block.SetPayload(payload)
-	err := suite.state.Extend(&block)
-	suite.Assert().Error(err)
-	suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	suite.Run("empty collection", func() {
+		block := suite.Block()
+		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
+		block.SetPayload(*block.Payload)
+		err := suite.state.Extend(&block)
+		suite.Assert().Error(err)
+		suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	})
+	suite.Run("non-empty collection", func() {
+		block := suite.Block()
+		tx := suite.Tx()
+		payload := suite.Payload(&tx)
+		// set a random reference block ID
+		payload.ReferenceBlockID = unittest.IdentifierFixture()
+		block.SetPayload(payload)
+		err := suite.state.Extend(&block)
+		suite.Assert().Error(err)
+		suite.Assert().True(state.IsUnverifiableExtensionError(err))
+	})
 }
 
 // a collection with an expired reference block is a VALID extension of chain state

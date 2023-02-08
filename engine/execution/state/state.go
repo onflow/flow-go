@@ -138,9 +138,9 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
+func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, key)),
+		RegisterIDToKey(id),
 	)
 }
 
@@ -173,17 +173,12 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
-	return func(owner, key string) (flow.RegisterValue, error) {
-		regID := flow.RegisterID{
-			Owner: owner,
-			Key:   key,
-		}
-
+	return func(regID flow.RegisterID) (flow.RegisterValue, error) {
 		if value, ok := readCache[regID]; ok {
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, key)
+		query, err := makeSingleValueQuery(commitment, regID)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
@@ -192,7 +187,7 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", regID, commitment, err)
 		}
 
 		// Prevent caching of value with len zero
@@ -208,7 +203,7 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 }
 
 func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewView(LedgerGetRegister(s.ls, commitment))
+	return delta.NewDeltaView(LedgerGetRegister(s.ls, commitment))
 }
 
 type RegisterUpdatesHolder interface {

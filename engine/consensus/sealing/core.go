@@ -197,7 +197,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known results for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedSnapshot.Descendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
@@ -585,12 +585,12 @@ func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Head
 	}
 
 	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not request tracker at block up to height %d: %w", lastSealed.Height, err)
 	}
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not prune seals mempool at block up to height %d: %w", lastSealed.Height, err)
 	}
 

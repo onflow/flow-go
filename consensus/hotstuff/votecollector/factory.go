@@ -63,7 +63,7 @@ func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Propos
 // NewStakingVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
 // members of a collector cluster. For their cluster-local hotstuff, collectors
 // only sign with their staking key.
-func NewStakingVoteProcessorFactory(committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewStakingVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &stakingVoteProcessorFactoryBase{
 		committee:   committee,
 		onQCCreated: onQCCreated,
@@ -74,7 +74,7 @@ func NewStakingVoteProcessorFactory(committee hotstuff.Committee, onQCCreated ho
 }
 
 // NewCombinedVoteProcessorFactory implements hotstuff.VoteProcessorFactory fo
-// participants of the Main Consensus Committee.
+// participants of the Main Consensus committee.
 //
 // With their vote, members of the main consensus committee can contribute to hotstuff and
 // the random beacon. When a consensus participant signs with its random beacon key, it
@@ -82,7 +82,7 @@ func NewStakingVoteProcessorFactory(committee hotstuff.Committee, onQCCreated ho
 // participant can sign with its staking key; thereby it contributes only to consensus but
 // not the random beacon. There should be an economic incentive for the nodes to preferably
 // sign with their random beacon key.
-func NewCombinedVoteProcessorFactory(committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
 		onQCCreated: onQCCreated,
@@ -99,7 +99,7 @@ func NewCombinedVoteProcessorFactory(committee hotstuff.Committee, onQCCreated h
 // suitable for the collector's local cluster consensus.
 // Intended use: only for bootstrapping.
 // UNSAFE: the proposer vote for `block` is _not_ validated or included
-func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Committee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
 		onQCCreated: onQCCreated,
@@ -112,7 +112,7 @@ func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Co
 // suitable for the collector's local cluster consensus.
 // Intended use: only for bootstrapping.
 // UNSAFE: the proposer vote for `block` is _not_ validated or included
-func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.Committee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &stakingVoteProcessorFactoryBase{
 		committee:   committee,
 		onQCCreated: onQCCreated,

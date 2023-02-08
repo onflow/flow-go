@@ -128,6 +128,7 @@ func newFacadeEnvironment(
 		Programs: NewPrograms(
 			tracer,
 			meter,
+			params.MetricsReporter,
 			txnState,
 			accounts,
 			derivedTxnData),

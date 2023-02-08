@@ -263,7 +263,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.ValidDescendants()
+	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -428,7 +428,8 @@ func (e *Engine) reloadBlock(
 
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: BlockProcessable might be called multiple times for the same block.
+// NOTE: BlockProcessable might be called multiple times for the same block.
+// NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
 	// skip if stopControl tells to skip
@@ -1105,9 +1106,10 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(key))
+	id := flow.NewRegisterID(string(owner), string(key))
+	data, err := blockView.Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
 	}
 
 	return data, nil

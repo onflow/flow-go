@@ -264,11 +264,11 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 	ctx.TxBody = &flow.TransactionBody{}
 
-	checkForUpdates := func(owner string, key string, expected bool) {
+	checkForUpdates := func(id flow.RegisterID, expected bool) {
 		view := utils.NewSimpleView()
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
-		err := txnState.Set(owner, key, flow.RegisterValue("blah"))
+		err := txnState.Set(id, flow.RegisterValue("blah"))
 		require.NoError(t, err)
 
 		env := environment.NewTransactionEnvironment(
@@ -282,24 +282,18 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	}
 
 	for registerId := range view.Ledger.RegisterTouches {
-		checkForUpdates(registerId.Owner, registerId.Key, true)
-		checkForUpdates("other owner", registerId.Key, false)
+		checkForUpdates(registerId, true)
+		checkForUpdates(
+			flow.NewRegisterID("other owner", registerId.Key),
+			false)
 	}
 
-	stabIndex := "$12345678"
-	require.True(t, state.IsSlabIndex(stabIndex))
+	owner := string(ctx.Chain.ServiceAddress().Bytes())
+	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
+	require.True(t, stabIndexKey.IsSlabIndex())
 
-	checkForUpdates(
-		string(ctx.Chain.ServiceAddress().Bytes()),
-		stabIndex,
-		true)
-
-	checkForUpdates(
-		string(ctx.Chain.ServiceAddress().Bytes()),
-		"other keys",
-		false)
-
-	checkForUpdates("other owner", stabIndex, false)
-
-	checkForUpdates("other owner", "other key", false)
+	checkForUpdates(stabIndexKey, true)
+	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
+	checkForUpdates(flow.NewRegisterID("other owner", stabIndexKey.Key), false)
+	checkForUpdates(flow.NewRegisterID("other owner", "other key"), false)
 }

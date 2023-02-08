@@ -1,16 +1,27 @@
 package fvm
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
+
+func addressFromRegisterId(id flow.RegisterID) (flow.Address, bool) {
+	if len(id.Owner) != flow.AddressLength {
+		return flow.EmptyAddress, false
+	}
+
+	return flow.BytesToAddress([]byte(id.Owner)), true
+}
 
 type TransactionStorageLimiter struct{}
 
@@ -21,9 +32,9 @@ type TransactionStorageLimiter struct{}
 //
 // The payers balance is considered to be maxTxFees lower that its actual balance, due to the fact that
 // the fee deduction step happens after the storage limit check.
-func (d TransactionStorageLimiter) CheckStorageLimits(
+func (limiter TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
-	addresses []flow.Address,
+	txnState *state.TransactionState,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
@@ -33,34 +44,69 @@ func (d TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := d.checkStorageLimits(env, addresses, payer, maxTxFees)
+	err := limiter.checkStorageLimits(env, txnState, payer, maxTxFees)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
 	return nil
 }
 
-func (d TransactionStorageLimiter) checkStorageLimits(
+// getStorageCheckAddresses returns a list of addresses to be checked whether
+// storage limit is exceeded.  The returned list include addresses of updated
+// registers (and the payer's address).
+func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
+	txnState *state.TransactionState,
+	payer flow.Address,
+	maxTxFees uint64,
+) []flow.Address {
+	updatedIds := txnState.UpdatedRegisterIDs()
+
+	// Multiple updated registers might be from the same address.  We want to
+	// duplicated the addresses to reduce check overhead.
+	dedup := make(map[flow.Address]struct{}, len(updatedIds)+1)
+	addresses := make([]flow.Address, 0, len(updatedIds)+1)
+
+	// In case the payer is not updated, include it here.  If the maxTxFees is
+	// zero, it doesn't matter if the payer is included or not.
+	if maxTxFees > 0 {
+		dedup[payer] = struct{}{}
+		addresses = append(addresses, payer)
+	}
+
+	for _, id := range updatedIds {
+		address, ok := addressFromRegisterId(id)
+		if !ok {
+			continue
+		}
+
+		_, ok = dedup[address]
+		if ok {
+			continue
+		}
+
+		dedup[address] = struct{}{}
+		addresses = append(addresses, address)
+	}
+
+	slices.SortFunc(
+		addresses,
+		func(a flow.Address, b flow.Address) bool {
+			// reverse order to maintain compatibility with previous
+			// implementation.
+			return bytes.Compare(a[:], b[:]) >= 0
+		})
+	return addresses
+}
+
+// checkStorageLimits checks if the transaction changed the storage of any
+// address and exceeded the storage limit.
+func (limiter TransactionStorageLimiter) checkStorageLimits(
 	env environment.Environment,
-	addresses []flow.Address,
+	txnState *state.TransactionState,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
-	// in case the payer is not already part of the check, include it here.
-	// If the maxTxFees is zero, it doesn't matter if the payer is included or not.
-	if maxTxFees > 0 {
-		commonAddressesContainPayer := false
-		for _, address := range addresses {
-			if address == payer {
-				commonAddressesContainPayer = true
-				break
-			}
-		}
-
-		if !commonAddressesContainPayer {
-			addresses = append(addresses, payer)
-		}
-	}
+	addresses := limiter.getStorageCheckAddresses(txnState, payer, maxTxFees)
 
 	commonAddresses := make([]common.Address, len(addresses))
 	usages := make([]uint64, len(commonAddresses))
@@ -82,23 +128,32 @@ func (d TransactionStorageLimiter) checkStorageLimits(
 		maxTxFees,
 	)
 
-	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
-	// already handles cases where the default vault is missing.
+	// This error only occurs in case of implementation errors.
+	// InvokeAccountsStorageCapacity already handles cases where the default
+	// vault is missing.
 	if invokeErr != nil {
 		return invokeErr
 	}
 
-	// the resultArray elements are in the same order as the addresses and the addresses are deterministically sorted
+	// The resultArray elements are in the same order as the addresses and the
+	// addresses are deterministically sorted.
 	resultArray, ok := result.(cadence.Array)
 	if !ok {
 		return fmt.Errorf("AccountsStorageCapacity did not return an array")
 	}
 
-	for i, value := range resultArray.Values {
-		capacity := environment.StorageMBUFixToBytesUInt(value)
+	if len(addresses) != len(resultArray.Values) {
+		return fmt.Errorf("number of addresses does not match number of result")
+	}
+
+	for i, address := range addresses {
+		capacity := environment.StorageMBUFixToBytesUInt(resultArray.Values[i])
 
 		if usages[i] > capacity {
-			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usages[i], capacity)
+			return errors.NewStorageCapacityExceededError(
+				address,
+				usages[i],
+				capacity)
 		}
 	}
 

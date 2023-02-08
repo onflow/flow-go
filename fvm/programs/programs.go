@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
+// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/306
 // is merged and integrated.
 type Programs struct {
 	lock sync.RWMutex

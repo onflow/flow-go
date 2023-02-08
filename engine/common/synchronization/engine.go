@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -39,7 +40,7 @@ type Engine struct {
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
-	comp    network.Engine // compliance layer engine
+	comp    consensus.Compliance
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
@@ -61,7 +62,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
-	comp network.Engine,
+	comp consensus.Compliance,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider module.IdentifierProvider,
@@ -300,13 +301,19 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(&block.Header) {
-			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
+		header := block.Header
+		if !e.core.HandleBlock(&header) {
+			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
+		// forward the block to the compliance engine for validation and processing
+		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
+			OriginID: originID,
+			Message: &messages.BlockProposal{
+				Block: block,
+			},
+		})
 	}
-
-	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
