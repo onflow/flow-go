@@ -126,8 +126,8 @@ type DynamicCommittee interface {
 // particular block header to the identifiers of the nodes which signed the block.
 type BlockSignerDecoder interface {
 	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
-	// Note: A block header contains a quorum certificate for its parent, which proves that
-	// the block extends a valid fork. Consequently, the returned IdentifierList contains the
+	// Note: A block header contains a quorum certificate for its parent, which proves that consensus committee 
+	// has reached agreement on validity of parent block. Consequently, the returned IdentifierList contains the
 	// consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
 	//   - model.ErrViewForUnknownEpoch if the given block's parent is within an unknown epoch

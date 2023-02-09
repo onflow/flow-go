@@ -23,8 +23,8 @@ func NewBlockSignerDecoder(committee hotstuff.DynamicCommittee) *BlockSignerDeco
 var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 
 // DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
-// Note: A block header contains a quorum certificate for its parent, which proves that
-// the block extends a valid fork. Consequently, the returned IdentifierList contains the
+// Note: A block header contains a quorum certificate for its parent, which proves that consensus committee 
+// has reached agreement on validity of parent block. Consequently, the returned IdentifierList contains the
 // consensus participants that signed the parent block.
 // Expected Error returns during normal operations:
 //   - model.ErrViewForUnknownEpoch if the given block is within an unknown epoch
