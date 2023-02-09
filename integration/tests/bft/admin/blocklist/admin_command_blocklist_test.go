@@ -23,7 +23,7 @@ func TestAdminCommandBlockList(t *testing.T) {
 // the libp2p connection to that node should be pruned immediately and the connection gater should start to block incoming connection requests. This test
 // sets up 2 corrupt nodes a sender and receiver, the sender will send messages before and after being blocked by the receiver node via
 // the blocklist admin command. The receiver node is expected to receive messages like normal before blocking the sender, after blocking the sender
-// it should not receive any messages.
+// it should not receive any messages. The reason this test is conducted via two corrupt nodes is to empower the test logic to command one (corrupt) node to send a message and to examine the other (corrupt) node to check whether it has received the message.
 func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	// send some authorized messages indicating the network is working as expected
 	a.Orchestrator.sendAuthorizedMsgs(a.T())
