@@ -20,7 +20,7 @@ func TestAdminCommandBlockList(t *testing.T) {
 }
 
 // TestAdminCommandBlockList ensures that the blocklist admin command works as expected. When a node is blocked via the admin blocklist command
-// the libp2p connection to that node should be pruned immediately and the connection should start to block incoming connection request. This test
+// the libp2p connection to that node should be pruned immediately and the connection gater should start to block incoming connection requests. This test
 // sets up 2 corrupt nodes a sender and receiver, the sender will send messages before and after being blocked by the receiver node via
 // the blocklist admin command. The receiver node is expected to receive messages like normal before blocking the sender, after blocking the sender
 // it should not receive any messages.
