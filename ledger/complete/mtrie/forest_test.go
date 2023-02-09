@@ -760,6 +760,29 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	}
 }
 
+// should create valid proof for non existing path
+func TestNonExistingProof(t *testing.T) {
+	forest, err := mtrie.NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+	paths := testutils.RandomPaths(1)
+
+	activeRoot := forest.GetEmptyRootHash()
+
+	payloadStorage := unittest.CreateMockPayloadStore()
+	read := &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
+	retValues, err := forest.Read(read, payloadStorage)
+
+	require.NoError(t, err, "error reading - non existing paths")
+	for _, p := range retValues {
+		require.Equal(t, 0, len(p))
+	}
+
+	read = &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
+	batchProof, err := forest.Proofs(read, payloadStorage)
+	require.NoError(t, err, "error generating proofs")
+	assert.True(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
+}
+
 // TestRandomUpdateReadProofValueSizes repeats a sequence of actions update, read, get value sizes, and proof random paths
 // this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProofValueSizes(t *testing.T) {
