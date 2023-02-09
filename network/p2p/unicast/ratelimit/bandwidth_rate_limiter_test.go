@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
@@ -43,7 +44,7 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 			Text: string(b),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(t, err)
 
 	allowed := bandwidthRateLimiter.Allow(peerID, msg.Size())
@@ -96,7 +97,7 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 			Text: string(b),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(t, err)
 
 	allowed := bandwidthRateLimiter.Allow(peerID, msg.Size())
