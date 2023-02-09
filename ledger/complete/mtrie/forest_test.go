@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	prf "github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -780,7 +781,34 @@ func TestNonExistingProof(t *testing.T) {
 	read = &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
 	batchProof, err := forest.Proofs(read, payloadStorage)
 	require.NoError(t, err, "error generating proofs")
-	assert.True(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
+
+	// proof for non-existing path should have inclusion as true
+	require.True(t, batchProof.Proofs[0].Inclusion)
+	require.True(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
+}
+
+func TestNonExistingInvalidProof(t *testing.T) {
+	forest, err := mtrie.NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+	paths := testutils.RandomPaths(1)
+
+	activeRoot := forest.GetEmptyRootHash()
+
+	payloadStorage := unittest.CreateMockPayloadStore()
+	read := &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
+	retValues, err := forest.Read(read, payloadStorage)
+
+	require.NoError(t, err, "error reading - non existing paths")
+	for _, p := range retValues {
+		require.Equal(t, 0, len(p))
+	}
+
+	read = &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
+	batchProof, err := forest.Proofs(read, payloadStorage)
+	require.NoError(t, err, "error generating proofs")
+	batchProof.Proofs[0].Inclusion = false
+	batchProof.Proofs[0].Interims[0] = hash.DummyHash
+	require.False(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
 }
 
 // TestRandomUpdateReadProofValueSizes repeats a sequence of actions update, read, get value sizes, and proof random paths

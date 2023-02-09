@@ -50,17 +50,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 
 	// for both inclusion and non-inclusion proof the computed hash
 	// must match the expected root hash
-	match := computed == hash.Hash(expectedState)
-	if !match {
-		return false
-	}
-
-	// for non-inclusion proof the leaf hash must equal to the default hash at that height
-	if p.Inclusion == false {
-		return leafHash == ledger.GetDefaultHashForHeight(leafHeight)
-	}
-
-	return false
+	return computed == hash.Hash(expectedState)
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof
