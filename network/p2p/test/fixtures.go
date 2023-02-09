@@ -385,14 +385,11 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	_, topic := messageFactory()
 
 	subs := make([]p2p.Subscription, len(nodes))
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 	for i, node := range nodes {
 		ps, err := node.Subscribe(
 			topic,
 			validator.TopicValidator(
 				unittest.Logger(),
-				unittest.NetworkCodec(),
-				slashingViolationsConsumer,
 				unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 		subs[i] = ps

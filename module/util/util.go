@@ -3,9 +3,9 @@ package util
 import (
 	"context"
 	"reflect"
-	"sync"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // AllReady calls Ready on all input components and returns a channel that is
@@ -40,18 +40,10 @@ func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 		return done
 	}
 
-	var wg sync.WaitGroup
-
-	for _, ch := range channels {
-		wg.Add(1)
-		go func(ch <-chan struct{}) {
-			<-ch
-			wg.Done()
-		}(ch)
-	}
-
 	go func() {
-		wg.Wait()
+		for _, ch := range channels {
+			<-ch
+		}
 		close(done)
 	}()
 
@@ -149,6 +141,37 @@ func WaitError(errChan <-chan error, done <-chan struct{}) error {
 		}
 		return nil
 	}
+}
+
+// readyDoneAwareMerger is a utility structure which implements module.ReadyDoneAware and module.Startable interfaces
+// and is used to merge []T into one T.
+type readyDoneAwareMerger struct {
+	components []module.ReadyDoneAware
+}
+
+func (m readyDoneAwareMerger) Start(signalerContext irrecoverable.SignalerContext) {
+	for _, component := range m.components {
+		startable, ok := component.(module.Startable)
+		if ok {
+			startable.Start(signalerContext)
+		}
+	}
+}
+
+func (m readyDoneAwareMerger) Ready() <-chan struct{} {
+	return AllReady(m.components...)
+}
+
+func (m readyDoneAwareMerger) Done() <-chan struct{} {
+	return AllDone(m.components...)
+}
+
+var _ module.ReadyDoneAware = (*readyDoneAwareMerger)(nil)
+var _ module.Startable = (*readyDoneAwareMerger)(nil)
+
+// MergeReadyDone merges []module.ReadyDoneAware into one module.ReadyDoneAware.
+func MergeReadyDone(components ...module.ReadyDoneAware) module.ReadyDoneAware {
+	return readyDoneAwareMerger{components: components}
 }
 
 // DetypeSlice converts a typed slice containing any kind of elements into an

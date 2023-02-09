@@ -122,11 +122,14 @@ type FlowNodeBuilder struct {
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
+	extraRootSnapshotCheck   func(protocol.Snapshot) error
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
 }
+
+var _ NodeBuilder = (*FlowNodeBuilder)(nil)
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
 	defaultConfig := DefaultBaseConfig()
@@ -239,12 +242,12 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			persist := persister.New(node.DB, node.RootChainID)
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				curView, err := persist.GetStarted()
+				livenessData, err := persist.GetLivenessData()
 				if err != nil {
 					return 0, err
 				}
 
-				return curView, nil
+				return livenessData.CurrentView, nil
 			}
 		}
 
@@ -555,6 +558,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	log.Msg("flags loaded")
 
 	return fnb.extraFlagsValidation()
+}
+
+func (fnb *FlowNodeBuilder) ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder {
+	fnb.extraRootSnapshotCheck = f
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
@@ -1104,6 +1112,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
 
+	// perform extra checks requested by specific node types
+	if fnb.extraRootSnapshotCheck != nil {
+		err = fnb.extraRootSnapshotCheck(rootSnapshot)
+		if err != nil {
+			return fmt.Errorf("failed to perform extra checks on root snapshot: %w", err)
+		}
+	}
+
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
 	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
@@ -1486,25 +1502,6 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 	return fnb.Component(name, f)
 }
 
-// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
-// already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
-	for i := 0; i < len(fnb.modules); i++ {
-		if fnb.modules[i].name == name {
-			// found module with the name, override it.
-			fnb.modules[i] = namedModuleFunc{
-				fn:   f,
-				name: name,
-			}
-
-			return fnb
-		}
-	}
-
-	// no module found with the same name, hence just adding it.
-	return fnb.Module(name, f)
-}
-
 // RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
 // Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -1525,6 +1522,25 @@ func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory
 		errorHandler: errorHandler,
 	})
 	return fnb
+}
+
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no module found with the same name, hence just adding it.
+	return fnb.Module(name, f)
 }
 
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {

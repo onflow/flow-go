@@ -1,29 +1,25 @@
 package message
 
-type Protocol string
-
 const (
-	ProtocolPublish = Protocol("publish")
-	ProtocolUnicast = Protocol("unicast")
+	// ProtocolTypeUnicast is protocol type for unicast messages.
+	ProtocolTypeUnicast ProtocolType = "unicast"
+	// ProtocolTypePubSub is the protocol type for pubsub messages.
+	ProtocolTypePubSub ProtocolType = "pubsub"
 )
 
-func (p Protocol) String() string {
-	return string(p)
+// ProtocolType defines the type of the protocol a message is sent over. Currently, we have two types of protocols:
+// - unicast: a message is sent to a single node through a direct connection.
+// - pubsub: a message is sent to one or more nodes through a pubsub channel.
+type ProtocolType string
+
+func (m ProtocolType) String() string {
+	return string(m)
 }
 
-// NewUnauthorizedProtocolError returns ErrUnauthorizedUnicastOnChannel or ErrUnauthorizedPublishOnChannel depending on the protocol provided.
-func NewUnauthorizedProtocolError(p Protocol) error {
-	if p == ProtocolUnicast {
-		return ErrUnauthorizedUnicastOnChannel
-	}
-
-	return ErrUnauthorizedPublishOnChannel
-}
-
-type Protocols []Protocol
+type Protocols []ProtocolType
 
 // Contains returns true if the protocol is in the list of Protocols.
-func (pr Protocols) Contains(protocol Protocol) bool {
+func (pr Protocols) Contains(protocol ProtocolType) bool {
 	for _, p := range pr {
 		if p == protocol {
 			return true

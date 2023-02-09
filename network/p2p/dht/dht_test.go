@@ -13,7 +13,6 @@ import (
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -158,7 +157,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	logger := unittest.Logger()
 
-	topicValidator := flowpubsub.TopicValidator(logger, codec, unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
 		s, err := n.Subscribe(topic, topicValidator)
 		require.NoError(t, err)

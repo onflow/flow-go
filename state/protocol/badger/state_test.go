@@ -161,12 +161,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, block1)
+			buildFinalizedBlock(t, state, block1)
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			buildBlock(t, state, block2)
+			buildFinalizedBlock(t, state, block2)
 
 			child := unittest.BlockWithParentFixture(block2.Header)
 			buildBlock(t, state, child)
@@ -429,12 +429,15 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 	return after
 }
 
-// buildBlock builds and marks valid the given block
+// buildBlock extends the protocol state by the given block
 func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	err := state.Extend(context.Background(), block)
-	require.NoError(t, err)
-	err = state.MarkValid(block.ID())
-	require.NoError(t, err)
+	require.NoError(t, state.Extend(context.Background(), block))
+}
+
+// buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
+func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
+	require.NoError(t, state.Extend(context.Background(), block))
+	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }
 
 // assertSealingSegmentBlocksQueryable bootstraps the state with the given
@@ -444,7 +447,13 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		require.NoError(t, err)
 
 		segment, err := state.Final().SealingSegment()
-		assert.NoError(t, err)
+		require.NoError(t, err)
+
+		rootBlock, err := state.Params().Root()
+		require.NoError(t, err)
+
+		// root block should be the highest block from the sealing segment
+		assert.Equal(t, segment.Highest().Header, rootBlock)
 
 		// for each block in the sealing segment we should be able to query:
 		// * Head

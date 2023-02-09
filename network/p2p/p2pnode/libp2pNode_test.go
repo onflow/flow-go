@@ -19,7 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
@@ -162,7 +162,7 @@ func TestConnGater(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(
@@ -233,9 +233,8 @@ func TestNode_HasSubscription(t *testing.T) {
 	defer p2ptest.StopNode(t, node, cancel, 100*time.Millisecond)
 
 	logger := unittest.Logger()
-	met := mock.NewNetworkMetrics(t)
 
-	topicValidator := validator.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, met), func(id peer.ID) error {
+	topicValidator := validator.TopicValidator(logger, func(id peer.ID) error {
 		return nil
 	})
 
