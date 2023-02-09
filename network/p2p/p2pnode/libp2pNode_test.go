@@ -306,7 +306,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		}
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := mockmodule.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
