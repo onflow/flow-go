@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -146,10 +147,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.stopControl.IsPaused() {
-		if e.uploader.Enabled() {
-			if err := e.uploader.RetryUploads(); err != nil {
-				e.log.Warn().Msg("failed to re-upload all ComputationResults")
-			}
+		if err := e.uploader.RetryUploads(); err != nil {
+			e.log.Warn().Msg("failed to re-upload all ComputationResults")
 		}
 
 		err := e.reloadUnexecutedBlocks()
@@ -620,13 +619,18 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	if e.uploader.Enabled() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	defer wg.Wait()
+
+	go func() {
+		defer wg.Done()
 		err := e.uploader.Upload(ctx, computationResult)
 		if err != nil {
 			lg.Err(err).Msg("error while uploading block")
 			// continue processing. uploads should not block execution
 		}
-	}
+	}()
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult)
 	if errors.Is(err, storage.ErrDataMismatch) {
