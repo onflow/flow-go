@@ -117,10 +117,7 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
-	chainID, err := protoState.Params().ChainID()
-	if err != nil {
-		return nil, err
-	}
+	chainID := vmCtx.Chain.ChainID()
 
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
