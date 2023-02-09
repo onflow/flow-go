@@ -14,6 +14,9 @@ import (
 //go:embed templates/create-and-setup-node.cdc
 var createAndSetupNodeTxScript string
 
+//go:embed templates/remove-node.cdc
+var removeNodeTxScript string
+
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
 		IDTableAddress:           "f8d6e0586b0a20c7",
@@ -143,7 +146,8 @@ func MakeCreateAndSetupNodeTx(
 	return tx, nil
 }
 
-// MakeAdminRemoveNodeTx makes the admin remove node transaction.  This is equivalent to the node un-staking and will result in removal at the next epoch boundary
+// MakeAdminRemoveNodeTx makes an admin transaction to remove the node. This transaction both
+// manually unstakes and removes the node, and removes it from the allow-list.
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
@@ -153,7 +157,7 @@ func MakeAdminRemoveNodeTx(
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateRemoveNodeScript(env)).
+		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).

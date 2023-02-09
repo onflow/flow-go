@@ -177,8 +177,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
 	github.com/onflow/cadence v0.31.3 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go-sdk v0.31.3 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 // indirect
