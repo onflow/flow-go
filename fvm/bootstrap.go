@@ -349,9 +349,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
 
-	// set the list of nodes which are allowed to stake in this network
-	b.setStakingAllowlist(service, b.identities.NodeIDs())
-
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
 	// deploy staking proxy contract to the service account
@@ -364,6 +361,9 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployStakingCollection(service, fungibleToken, flowToken)
 
 	b.registerNodes(service, fungibleToken, flowToken)
+
+	// set the list of nodes which are allowed to stake in this network
+	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	return nil
 }
@@ -907,7 +907,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	}
 
 	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
-	txErr, fatalErr := errors.SplitErrorTypes(err)
 
-	return txErr, fatalErr
+	return tx.Err, err
 }
