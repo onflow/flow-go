@@ -117,13 +117,18 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
+	chainID := vmCtx.Chain.ChainID()
+
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled: params.CadenceTracing,
-				})),
+				},
+				chainID,
+			),
+		),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
