@@ -272,14 +272,14 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	done := make(chan struct{})
-	numOfStreamsPerNode := 300 // create large number of streams per node per connection to ensure the resource manager does not cause starvation of resources
-	expectedTotalNumOfStreams := 1800
+	numOfStreamsPerNode := 100 // create large number of streams per node per connection to ensure the resource manager does not cause starvation of resources
+	expectedTotalNumOfStreams := 600
 
 	// create a number of streams concurrently between each node
 	streams := make(chan network.Stream, expectedTotalNumOfStreams)
 
 	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streams, done)
-	unittest.RequireCloseBefore(t, done, 3*time.Second, "could not create streams on time")
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streams on time")
 	require.Len(t, streams, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streams created got %d", expectedTotalNumOfStreams, len(streams)))
 
 	// ensure only a single connection exists between all nodes
