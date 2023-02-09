@@ -12,6 +12,14 @@ import (
 
 func TestConvertMultiError(t *testing.T) {
 	defaultCode := codes.Internal
+	t.Run("single error", func(t *testing.T) {
+		var errors *multierror.Error
+		errors = multierror.Append(errors, status.Error(codes.NotFound, "not found"))
+
+		err := ConvertMultiError(errors, "", defaultCode)
+		assert.Equal(t, codes.NotFound, status.Code(err))
+	})
+
 	t.Run("same code", func(t *testing.T) {
 		var errors *multierror.Error
 		errors = multierror.Append(errors, status.Error(codes.NotFound, "not found"))
