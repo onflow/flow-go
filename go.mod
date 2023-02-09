@@ -88,7 +88,7 @@ require (
 	golang.org/x/crypto v0.1.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.2.0
+	golang.org/x/sys v0.3.0
 	golang.org/x/text v0.4.0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	golang.org/x/tools v0.2.0
@@ -102,6 +102,7 @@ require (
 )
 
 require (
+	github.com/cockroachdb/pebble v0.0.0-20230208232327-2f086b741e65
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/profile v1.7.0
@@ -111,6 +112,7 @@ require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
+	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.9.1 // indirect
@@ -129,7 +131,11 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cockroachdb/errors v1.8.1 // indirect
+	github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f // indirect
+	github.com/cockroachdb/redact v1.0.8 // indirect
+	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
@@ -193,9 +199,11 @@ require (
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
-	github.com/klauspost/compress v1.15.10 // indirect
+	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/koron/go-ssdp v0.0.3 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
@@ -254,6 +262,7 @@ require (
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
+	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
