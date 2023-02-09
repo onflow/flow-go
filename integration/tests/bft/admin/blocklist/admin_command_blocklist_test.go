@@ -27,7 +27,7 @@ func TestAdminCommandBlockList(t *testing.T) {
 func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	// send some authorized messages indicating the network is working as expected
 	a.Orchestrator.sendAuthorizedMsgs(a.T())
-	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
+	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not receive authorized messages on time")
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
 	require.Equal(a.T(), int64(numOfAuthorizedEvents), a.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, a.Orchestrator.unauthorizedEventsReceived.Load()))
 
