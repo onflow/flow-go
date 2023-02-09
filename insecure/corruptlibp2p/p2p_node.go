@@ -11,17 +11,29 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // AcceptAllTopicValidator pubsub validator func that does not perform any validation, it will only attempt to decode the message and update the
 // rawMsg.ValidatorData needed for further processing by the middleware receive loop. Malformed messages that fail to unmarshal or decode will result
 // in a pubsub.ValidationReject result returned.
 func AcceptAllTopicValidator() p2p.TopicValidatorFunc {
-	return func(_ context.Context, _ peer.ID, _ *pubsub.Message) p2p.ValidationResult {
+	return func(_ context.Context, from peer.ID, rawMsg *pubsub.Message) p2p.ValidationResult {
+		var msg message.Message
+		err := msg.Unmarshal(rawMsg.Data)
+		if err != nil {
+			return p2p.ValidationReject
+		}
+
+		rawMsg.ValidatorData = validator.TopicValidatorData{
+			Message: &msg,
+			From:    from,
+		}
 		return p2p.ValidationAccept
 	}
 }
