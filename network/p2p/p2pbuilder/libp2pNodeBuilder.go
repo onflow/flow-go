@@ -293,11 +293,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
 		builder.logger.Info().
+			Str("key", keyResourceManagerLimit).
 			Int64("allowed_memory", mem).
 			Int("allowed_file_descriptors", fd).
 			Msg("allowed memory and file descriptors are fetched from the system")
-		limitLogger := newLimitConfigLogger(builder.logger).loggerForLimits(l)
-		limitLogger.Info().Msg("libp2p resource manager limits are set")
+		newLimitConfigLogger(builder.logger).logResourceManagerLimits(l)
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
 		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")

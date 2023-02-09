@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+const keyResourceManagerLimit = "libp2p_resource_manager_limit"
+
 // notEjectedPeerFilter returns a PeerFilter that will return an error if the peer is unknown or ejected.
 func notEjectedPeerFilter(idProvider module.IdentityProvider) p2p.PeerFilter {
 	return func(p peer.ID) error {
@@ -35,8 +37,9 @@ func newLimitConfigLogger(logger zerolog.Logger) *limitConfigLogger {
 }
 
 // withBaseLimit appends the base limit to the logger with the given prefix.
-func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.BaseLimit) {
-	l.logger = l.logger.With().
+func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.BaseLimit) zerolog.Logger {
+	return l.logger.With().
+		Str("key", keyResourceManagerLimit).
 		Int(fmt.Sprintf("%s_streams", prefix), baseLimit.Streams).
 		Int(fmt.Sprintf("%s_streams_inbound", prefix), baseLimit.StreamsInbound).
 		Int(fmt.Sprintf("%s_streams_outbound", prefix), baseLimit.StreamsOutbound).
@@ -47,46 +50,73 @@ func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.BaseLim
 		Int64(fmt.Sprintf("%s_memory", prefix), baseLimit.Memory).Logger()
 }
 
-func (l *limitConfigLogger) loggerForLimits(config rcmgr.LimitConfig) zerolog.Logger {
-	l.withBaseLimit("system", config.System)
-	l.withBaseLimit("transient", config.Transient)
-	l.withBaseLimit("allowed_listed_system", config.AllowlistedSystem)
-	l.withBaseLimit("allowed_lister_transient", config.AllowlistedTransient)
-	l.withBaseLimit("service_default", config.ServiceDefault)
-	l.withBaseLimit("service_peer_default", config.ServicePeerDefault)
-	l.withBaseLimit("protocol_default", config.ProtocolDefault)
-	l.withBaseLimit("protocol_peer_default", config.ProtocolPeerDefault)
-	l.withBaseLimit("peer_default", config.PeerDefault)
-	l.withBaseLimit("connections", config.Conn)
-	l.withBaseLimit("streams", config.Stream)
-
-	l.withServiceLogger(config.Service)
-	l.withProtocolLogger(config.Protocol)
-	l.withPeerLogger(config.Peer)
-	l.withProtocolPeerLogger(config.ProtocolPeer)
-	return l.logger
+func (l *limitConfigLogger) logResourceManagerLimits(config rcmgr.LimitConfig) {
+	l.logGlobalResourceLimits(config)
+	l.logServiceLimits(config.Service)
+	l.logProtocolLimits(config.Protocol)
+	l.logPeerLimits(config.Peer)
+	l.logPeerProtocolLimits(config.ProtocolPeer)
 }
 
-func (l *limitConfigLogger) withServiceLogger(s map[string]rcmgr.BaseLimit) {
+func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.LimitConfig) {
+	lg := l.withBaseLimit("system", config.System)
+	lg.Info().Msg("system limits set")
+
+	lg = l.withBaseLimit("transient", config.Transient)
+	lg.Info().Msg("transient limits set")
+
+	lg = l.withBaseLimit("allowed_listed_system", config.AllowlistedSystem)
+	lg.Info().Msg("allowed listed system limits set")
+
+	lg = l.withBaseLimit("allowed_lister_transient", config.AllowlistedTransient)
+	lg.Info().Msg("allowed listed transient limits set")
+
+	lg = l.withBaseLimit("service_default", config.ServiceDefault)
+	lg.Info().Msg("service default limits set")
+
+	lg = l.withBaseLimit("service_peer_default", config.ServicePeerDefault)
+	lg.Info().Msg("service peer default limits set")
+
+	lg = l.withBaseLimit("protocol_default", config.ProtocolDefault)
+	lg.Info().Msg("protocol default limits set")
+
+	lg = l.withBaseLimit("protocol_peer_default", config.ProtocolPeerDefault)
+	lg.Info().Msg("protocol peer default limits set")
+
+	lg = l.withBaseLimit("peer_default", config.PeerDefault)
+	lg.Info().Msg("peer default limits set")
+
+	lg = l.withBaseLimit("connections", config.Conn)
+	lg.Info().Msg("connection limits set")
+
+	lg = l.withBaseLimit("streams", config.Stream)
+	lg.Info().Msg("stream limits set")
+}
+
+func (l *limitConfigLogger) logServiceLimits(s map[string]rcmgr.BaseLimit) {
 	for sName, sLimits := range s {
-		l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits)
+		lg.Info().Msg("service limits set")
 	}
 }
 
-func (l *limitConfigLogger) withProtocolLogger(p map[protocol.ID]rcmgr.BaseLimit) {
+func (l *limitConfigLogger) logProtocolLimits(p map[protocol.ID]rcmgr.BaseLimit) {
 	for pName, pLimits := range p {
-		l.withBaseLimit(fmt.Sprintf("protocol_%s", pName), pLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("protocol_%s", pName), pLimits)
+		lg.Info().Msg("protocol limits set")
 	}
 }
 
-func (l *limitConfigLogger) withPeerLogger(p map[peer.ID]rcmgr.BaseLimit) {
+func (l *limitConfigLogger) logPeerLimits(p map[peer.ID]rcmgr.BaseLimit) {
 	for pId, pLimits := range p {
-		l.withBaseLimit(fmt.Sprintf("peer_%s", pId.String()), pLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("peer_%s", pId.String()), pLimits)
+		lg.Info().Msg("peer limits set")
 	}
 }
 
-func (l *limitConfigLogger) withProtocolPeerLogger(p map[protocol.ID]rcmgr.BaseLimit) {
+func (l *limitConfigLogger) logPeerProtocolLimits(p map[protocol.ID]rcmgr.BaseLimit) {
 	for pName, pLimits := range p {
-		l.withBaseLimit(fmt.Sprintf("protocol_peer_%s", pName), pLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("protocol_peer_%s", pName), pLimits)
+		lg.Info().Msg("protocol peer limits set")
 	}
 }
