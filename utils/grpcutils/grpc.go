@@ -6,16 +6,16 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultMaxMsgSize use 16MB as the default message size limit.
+// DefaultMaxMsgSize use 20MB as the default message size limit.
 // grpc library default is 4MB
-const DefaultMaxMsgSize = 1024 * 1024 * 16
+const DefaultMaxMsgSize = 1024 * 1024 * 20
 
 // X509Certificate generates a self-signed x509 TLS certificate from the given key. The generated certificate
 // includes a libp2p extension that specifies the public key and the signature. The certificate does not include any
@@ -49,6 +49,9 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 // DefaultServerTLSConfig returns the default TLS server config with the given cert for a secure GRPC server
 func DefaultServerTLSConfig(cert *tls.Certificate) *tls.Config {
+
+	// TODO(rbtz): remove after we pick up https://github.com/securego/gosec/pull/903
+	// #nosec G402
 	tlsConfig := &tls.Config{
 		MinVersion:   tls.VersionTLS13,
 		Certificates: []tls.Certificate{*cert},

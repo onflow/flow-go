@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ type testContractUpdaterStubs struct {
 	deploymentAuthorized []common.Address
 	removalAuthorized    []common.Address
 
-	auditFunc func(address runtime.Address, code []byte) (bool, error)
+	auditFunc func(address common.Address, code []byte) (bool, error)
 }
 
 func (p testContractUpdaterStubs) RestrictedDeploymentEnabled() bool {
@@ -45,7 +44,7 @@ func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 }
 
 func (p testContractUpdaterStubs) UseContractAuditVoucher(
-	address runtime.Address,
+	address common.Address,
 	code []byte,
 ) (
 	bool,
@@ -60,7 +59,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 		state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")
-	rAdd := runtime.Address(address)
+	rAdd := common.Address(address)
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
@@ -134,22 +133,22 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	authAdd := flow.HexToAddress("01")
-	rAdd := runtime.Address(authAdd)
+	rAdd := common.Address(authAdd)
 	err := accounts.Create(nil, authAdd)
 	require.NoError(t, err)
 
 	authRemove := flow.HexToAddress("02")
-	rRemove := runtime.Address(authRemove)
+	rRemove := common.Address(authRemove)
 	err = accounts.Create(nil, authRemove)
 	require.NoError(t, err)
 
 	authBoth := flow.HexToAddress("03")
-	rBoth := runtime.Address(authBoth)
+	rBoth := common.Address(authBoth)
 	err = accounts.Create(nil, authBoth)
 	require.NoError(t, err)
 
 	unAuth := flow.HexToAddress("04")
-	unAuthR := runtime.Address(unAuth)
+	unAuthR := common.Address(unAuth)
 	err = accounts.Create(nil, unAuth)
 	require.NoError(t, err)
 
@@ -161,7 +160,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 				removalEnabled:       true,
 				deploymentAuthorized: []common.Address{rAdd, rBoth},
 				removalAuthorized:    []common.Address{rRemove, rBoth},
-				auditFunc:            func(address runtime.Address, code []byte) (bool, error) { return false, nil },
+				auditFunc:            func(address common.Address, code []byte) (bool, error) { return false, nil },
 			})
 
 	}
@@ -259,12 +258,12 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	addressWithVoucher := flow.HexToAddress("01")
-	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
+	addressWithVoucherRuntime := common.Address(addressWithVoucher)
 	err := accounts.Create(nil, addressWithVoucher)
 	require.NoError(t, err)
 
 	addressNoVoucher := flow.HexToAddress("02")
-	addressNoVoucherRuntime := runtime.Address(addressNoVoucher)
+	addressNoVoucherRuntime := common.Address(addressNoVoucher)
 	err = accounts.Create(nil, addressNoVoucher)
 	require.NoError(t, err)
 
@@ -273,7 +272,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 		testContractUpdaterStubs{
 			deploymentEnabled: true,
 			removalEnabled:    true,
-			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+			auditFunc: func(address common.Address, code []byte) (bool, error) {
 				if address.String() == addressWithVoucher.String() {
 					return true, nil
 				}
@@ -314,7 +313,8 @@ func TestContract_ContractUpdate(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
-	runtimeAddress := runtime.Address(flowAddress)
+	flowCommonAddress := common.MustBytesToAddress(flowAddress.Bytes())
+	runtimeAddress := common.Address(flowAddress)
 	err := accounts.Create(nil, flowAddress)
 	require.NoError(t, err)
 
@@ -325,7 +325,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 		testContractUpdaterStubs{
 			deploymentEnabled: true,
 			removalEnabled:    true,
-			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+			auditFunc: func(address common.Address, code []byte) (bool, error) {
 				// Ensure the voucher check is only called once,
 				// for the initial contract deployment,
 				// and not for the subsequent update
@@ -353,7 +353,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 		t,
 		[]environment.ContractUpdateKey{
 			{
-				Address: flowAddress,
+				Address: flowCommonAddress,
 				Name:    "TestContract",
 			},
 		},
@@ -388,8 +388,8 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 		mockAccounts,
 		testContractUpdaterStubs{})
 
-	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
-	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
+	address1 := common.Address(flow.HexToAddress("0000000000000001"))
+	address2 := common.Address(flow.HexToAddress("0000000000000002"))
 
 	err := contractUpdater.SetContract(address2, "A", []byte("ABC"), nil)
 	require.NoError(t, err)
@@ -412,7 +412,8 @@ func TestContract_ContractRemoval(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
-	runtimeAddress := runtime.Address(flowAddress)
+	flowCommonAddress := common.MustBytesToAddress(flowAddress.Bytes())
+	runtimeAddress := common.Address(flowAddress)
 	err := accounts.Create(nil, flowAddress)
 	require.NoError(t, err)
 
@@ -423,7 +424,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 			accounts,
 			testContractUpdaterStubs{
 				removalEnabled: true,
-				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+				auditFunc: func(address common.Address, code []byte) (bool, error) {
 					// Ensure the voucher check is only called once,
 					// for the initial contract deployment,
 					// and not for the subsequent update
@@ -451,7 +452,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 			t,
 			[]environment.ContractUpdateKey{
 				{
-					Address: flowAddress,
+					Address: flowCommonAddress,
 					Name:    "TestContract",
 				},
 			},
@@ -487,7 +488,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		contractUpdater := environment.NewContractUpdaterForTesting(
 			accounts,
 			testContractUpdaterStubs{
-				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
+				auditFunc: func(address common.Address, code []byte) (bool, error) {
 					// Ensure the voucher check is only called once,
 					// for the initial contract deployment,
 					// and not for the subsequent update
@@ -515,7 +516,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 			t,
 			[]environment.ContractUpdateKey{
 				{
-					Address: flowAddress,
+					Address: flowCommonAddress,
 					Name:    "TestContract",
 				},
 			},

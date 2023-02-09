@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	"github.com/onflow/flow-go/model/chainsync"
@@ -36,8 +37,8 @@ type NetworkSecurityMetrics interface {
 	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
-	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
@@ -85,20 +86,11 @@ type LibP2PMetrics interface {
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
+	LibP2PConnectionMetrics
 }
 
-type NetworkMetrics interface {
-	LibP2PMetrics
-	NetworkSecurityMetrics
-
-	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string, messageType string)
-
-	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
-
-	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string, messageType string)
+// NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
+type NetworkInboundQueueMetrics interface {
 
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
@@ -108,22 +100,42 @@ type NetworkMetrics interface {
 
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
+}
 
-	DirectMessageStarted(topic string)
-
-	DirectMessageFinished(topic string)
-
-	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
+// NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
+type NetworkCoreMetrics interface {
+	NetworkInboundQueueMetrics
+	// OutboundMessageSent collects metrics related to a message sent by the node.
+	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
+	// InboundMessageReceived collects metrics related to a message received by the node.
+	InboundMessageReceived(sizeBytes int, topic string, protocol string, messageType string)
+	// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
+	DuplicateInboundMessagesDropped(topic string, protocol string, messageType string)
+	// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingStarted(topic string)
+	// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+	UnicastMessageSendingCompleted(topic string)
+	// MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
 	MessageProcessingStarted(topic string)
-
-	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+	// MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
+	// the number of messages being processed by the node.
 	MessageProcessingFinished(topic string, duration time.Duration)
+}
 
+// LibP2PConnectionMetrics encapsulates the metrics collectors for the connection manager of the libp2p node.
+type LibP2PConnectionMetrics interface {
 	// OutboundConnections updates the metric tracking the number of outbound connections of this node
 	OutboundConnections(connectionCount uint)
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+}
+
+// NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
+type NetworkMetrics interface {
+	LibP2PMetrics
+	NetworkSecurityMetrics
+	NetworkCoreMetrics
 }
 
 // EngineMetrics is a generic metrics consumer for node-internal data processing
@@ -438,17 +450,25 @@ type ExecutionDataRequesterMetrics interface {
 }
 
 type RuntimeMetrics interface {
-	// TransactionParsed reports the time spent parsing a single transaction
+	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
 
-	// TransactionChecked reports the time spent checking a single transaction
+	// RuntimeTransactionChecked reports the time spent checking a single transaction
 	RuntimeTransactionChecked(dur time.Duration)
 
-	// TransactionInterpreted reports the time spent interpreting a single transaction
+	// RuntimeTransactionInterpreted reports the time spent interpreting a single transaction
 	RuntimeTransactionInterpreted(dur time.Duration)
 
 	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
 	RuntimeSetNumberOfAccounts(count uint64)
+
+	// RuntimeTransactionProgramsCacheMiss reports a programs cache miss
+	// during transaction execution
+	RuntimeTransactionProgramsCacheMiss()
+
+	// RuntimeTransactionProgramsCacheHit reports a programs cache hit
+	// during transaction execution
+	RuntimeTransactionProgramsCacheHit()
 }
 
 type ProviderMetrics interface {
@@ -546,6 +566,9 @@ type ExecutionMetrics interface {
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+
+	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
+	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)

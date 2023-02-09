@@ -14,12 +14,7 @@ import (
 // TODO If the executor will be a separate process/machine we would need to rework
 // sending view as local data, but that would be much greater refactor of storage anyway
 
-type ComputationOrder struct {
-	Block      *entity.ExecutableBlock
-	View       *delta.View
-	StartState flow.StateCommitment
-}
-
+// TODO(patrick): rm unaccessed fields
 type ComputationResult struct {
 	ExecutableBlock        *entity.ExecutableBlock
 	StateSnapshots         []*delta.SpockSnapshot
@@ -28,27 +23,39 @@ type ComputationResult struct {
 	Events                 []flow.EventsList
 	EventsHashes           []flow.Identifier
 	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
 	TransactionResults     []flow.TransactionResult
 	TransactionResultIndex []int
 	ComputationIntensities meter.MeteredComputationIntensities
 	TrieUpdates            []*ledger.TrieUpdate
 	ExecutionDataID        flow.Identifier
 	SpockSignatures        []crypto.Signature
+	Chunks                 []*flow.Chunk
+	ChunkDataPacks         []*flow.ChunkDataPack
+	EndState               flow.StateCommitment
 }
 
-func NewEmptyComputationResult(block *entity.ExecutableBlock) *ComputationResult {
+func NewEmptyComputationResult(
+	block *entity.ExecutableBlock,
+) *ComputationResult {
 	numCollections := len(block.CompleteCollections) + 1
 	return &ComputationResult{
 		ExecutableBlock:        block,
-		Events:                 make([]flow.EventsList, numCollections),
-		ServiceEvents:          make(flow.EventsList, 0),
-		TransactionResults:     make([]flow.TransactionResult, 0),
-		TransactionResultIndex: make([]int, 0),
+		StateSnapshots:         make([]*delta.SpockSnapshot, 0, numCollections),
 		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
 		Proofs:                 make([][]byte, 0, numCollections),
-		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numCollections),
+		Events:                 make([]flow.EventsList, numCollections),
 		EventsHashes:           make([]flow.Identifier, 0, numCollections),
+		ServiceEvents:          make(flow.EventsList, 0),
+		ConvertedServiceEvents: make(flow.ServiceEventList, 0),
+		TransactionResults:     make([]flow.TransactionResult, 0),
+		TransactionResultIndex: make([]int, 0),
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
+		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numCollections),
+		SpockSignatures:        make([]crypto.Signature, 0, numCollections),
+		Chunks:                 make([]*flow.Chunk, 0, numCollections),
+		ChunkDataPacks:         make([]*flow.ChunkDataPack, 0, numCollections),
+		EndState:               *block.StartState,
 	}
 }
 
@@ -60,6 +67,9 @@ func (cr *ComputationResult) AddTransactionResult(
 		cr.Events[collectionIndex],
 		txn.Events...)
 	cr.ServiceEvents = append(cr.ServiceEvents, txn.ServiceEvents...)
+	cr.ConvertedServiceEvents = append(
+		cr.ConvertedServiceEvents,
+		txn.ConvertedServiceEvents...)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
@@ -72,10 +82,8 @@ func (cr *ComputationResult) AddTransactionResult(
 
 	cr.TransactionResults = append(cr.TransactionResults, txnResult)
 
-	if txn.IsSampled() {
-		for computationKind, intensity := range txn.ComputationIntensities {
-			cr.ComputationIntensities[computationKind] += intensity
-		}
+	for computationKind, intensity := range txn.ComputationIntensities {
+		cr.ComputationIntensities[computationKind] += intensity
 	}
 }
 

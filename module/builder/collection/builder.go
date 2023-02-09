@@ -348,7 +348,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// TODO (ramtin): enable this again
 	// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
-	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	dbInsertSpan, _ := b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)

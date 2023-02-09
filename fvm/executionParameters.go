@@ -6,7 +6,6 @@ import (
 	"math"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -127,10 +126,11 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 	// Check that the service account exists because all the settings are
 	// stored in it
 	serviceAddress := computer.ctx.Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
+	service := common.Address(serviceAddress)
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		computer.ctx.TracerSpan,
 		computer.ctx.EnvironmentParams,
 		txnState,
 		computer.derivedTxnData)
@@ -197,7 +197,7 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	env environment.Environment,
-	service runtime.Address,
+	service common.Address,
 	path cadence.Path,
 	defaultWeights map[KindType]uint64,
 ) (
@@ -241,7 +241,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
 func GetExecutionEffortWeights(
 	env environment.Environment,
-	service runtime.Address,
+	service common.Address,
 ) (
 	computationWeights meter.ExecutionEffortWeights,
 	err error,
@@ -256,7 +256,7 @@ func GetExecutionEffortWeights(
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(
 	env environment.Environment,
-	service runtime.Address,
+	service common.Address,
 ) (
 	memoryWeights meter.ExecutionMemoryWeights,
 	err error,
@@ -271,7 +271,7 @@ func GetExecutionMemoryWeights(
 // GetExecutionMemoryLimit reads the stored execution memory limit from the service account
 func GetExecutionMemoryLimit(
 	env environment.Environment,
-	service runtime.Address,
+	service common.Address,
 ) (
 	memoryLimit uint64,
 	err error,

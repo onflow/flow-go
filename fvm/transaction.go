@@ -1,25 +1,32 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/trace"
 )
+
+func Transaction(
+	txn *flow.TransactionBody,
+	txnIndex uint32,
+) *TransactionProcedure {
+	return NewTransaction(txn.ID(), txnIndex, txn)
+}
 
 // TODO(patrick): pass in initial snapshot time when we start supporting
 // speculative pre-processing / execution.
-func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
+func NewTransaction(
+	txnId flow.Identifier,
+	txnIndex uint32,
+	txnBody *flow.TransactionBody,
+) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     tx.ID(),
-		Transaction:            tx,
-		InitialSnapshotTxIndex: txIndex,
-		TxIndex:                txIndex,
+		ID:                     txnId,
+		Transaction:            txnBody,
+		InitialSnapshotTxIndex: txnIndex,
+		TxIndex:                txnIndex,
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
@@ -31,30 +38,13 @@ type TransactionProcedure struct {
 	TxIndex                uint32
 
 	Logs                   []string
-	Events                 []flow.Event
-	ServiceEvents          []flow.Event
+	Events                 flow.EventsList
+	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
 	ComputationUsed        uint64
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64
 	Err                    errors.CodedError
-	TraceSpan              otelTrace.Span
-}
-
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
-	proc.TraceSpan = traceSpan
-}
-
-func (proc *TransactionProcedure) IsSampled() bool {
-	return proc.TraceSpan != nil
-}
-
-func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
-	tracer module.Tracer,
-	spanName trace.SpanName) otelTrace.Span {
-	if tracer != nil && proc.IsSampled() {
-		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
-	}
-	return trace.NoopSpan
 }
 
 func (proc *TransactionProcedure) NewExecutor(

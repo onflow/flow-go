@@ -94,6 +94,11 @@ func (_m *LibP2PMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// InboundConnections provides a mock function with given fields: connectionCount
+func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
+}
+
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *LibP2PMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -152,6 +157,11 @@ func (_m *LibP2PMetrics) OnPruneReceived(count int) {
 // OnPublishedGossipMessagesReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnPublishedGossipMessagesReceived(count int) {
 	_m.Called(count)
+}
+
+// OutboundConnections provides a mock function with given fields: connectionCount
+func (_m *LibP2PMetrics) OutboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
 }
 
 // RoutingTablePeerAdded provides a mock function with given fields:

@@ -115,7 +115,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 }
 
 type balanceProcessor struct {
-	vm            *fvm.VirtualMachine
+	vm            fvm.VM
 	ctx           fvm.Context
 	view          state.View
 	env           environment.Environment
@@ -150,6 +150,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 
 	env := environment.NewScriptEnvironment(
 		context.Background(),
+		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		txnState,
 		derivedTxnData)

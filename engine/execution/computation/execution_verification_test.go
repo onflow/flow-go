@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -14,7 +13,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -35,13 +33,11 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
@@ -194,7 +190,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// ensure fee deduction events are emitted even though tx fails
 		require.Len(t, cr.Events[1], 3)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -264,8 +260,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 10, transactionEvents)
 
-		// insufficient account balance error as account is at minimum account balance and inclusion fee is non-zero
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
@@ -480,7 +475,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeInsufficientPayerBalance.String())
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -678,10 +673,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
@@ -713,7 +705,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		prov)
 	require.NoError(t, err)
 
-	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
+	view := delta.NewDeltaView(state.LedgerGetRegister(ledger, initialCommit))
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
@@ -738,8 +730,13 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	prevResultId := unittest.IdentifierFixture()
 
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), prevResultId, initialCommit, computationResult)
-	require.NoError(t, err)
+	chdps := computationResult.ChunkDataPacks
+	er := flow.NewExecutionResult(
+		prevResultId,
+		executableBlock.ID(),
+		computationResult.Chunks,
+		computationResult.ConvertedServiceEvents,
+		computationResult.ExecutionDataID)
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
@@ -764,12 +761,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		_, fault, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
 		assert.Nil(t, fault)
 	}

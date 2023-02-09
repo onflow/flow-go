@@ -28,6 +28,20 @@ func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Id
 	return r0
 }
 
+// BatchRemoveChunkBlockIndexByChunkID provides a mock function with given fields: chunkID, batch
+func (_m *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
+	ret := _m.Called(chunkID, batch)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+		r0 = rf(chunkID, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BlockIDByHeight provides a mock function with given fields: height
 func (_m *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	ret := _m.Called(height)

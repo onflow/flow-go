@@ -963,7 +963,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -998,7 +998,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1077,7 +1077,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1137,7 +1137,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.MaxStateInteractionSize = 500_000
 				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
@@ -1177,7 +1177,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.MaxStateInteractionSize = 500_000
 				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
@@ -1703,7 +1703,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
-	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
+	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
 
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
@@ -1734,7 +1734,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1777,7 +1777,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1824,7 +1824,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1875,7 +1875,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.

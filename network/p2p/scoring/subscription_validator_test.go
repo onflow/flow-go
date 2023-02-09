@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
@@ -209,9 +208,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
-	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter())
 
 	// wait for the subscriptions to be established
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)

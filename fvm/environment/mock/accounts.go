@@ -268,13 +268,13 @@ func (_m *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 	return r0, r1
 }
 
-// GetValue provides a mock function with given fields: address, key
-func (_m *Accounts) GetValue(address flow.Address, key string) ([]byte, error) {
-	ret := _m.Called(address, key)
+// GetValue provides a mock function with given fields: id
+func (_m *Accounts) GetValue(id flow.RegisterID) ([]byte, error) {
+	ret := _m.Called(id)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(flow.Address, string) []byte); ok {
-		r0 = rf(address, key)
+	if rf, ok := ret.Get(0).(func(flow.RegisterID) []byte); ok {
+		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -282,8 +282,8 @@ func (_m *Accounts) GetValue(address flow.Address, key string) ([]byte, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Address, string) error); ok {
-		r1 = rf(address, key)
+	if rf, ok := ret.Get(1).(func(flow.RegisterID) error); ok {
+		r1 = rf(id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -342,13 +342,13 @@ func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint64, publicKe
 	return r0, r1
 }
 
-// SetValue provides a mock function with given fields: address, key, value
-func (_m *Accounts) SetValue(address flow.Address, key string, value []byte) error {
-	ret := _m.Called(address, key, value)
+// SetValue provides a mock function with given fields: id, value
+func (_m *Accounts) SetValue(id flow.RegisterID, value []byte) error {
+	ret := _m.Called(id, value)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address, string, []byte) error); ok {
-		r0 = rf(address, key, value)
+	if rf, ok := ret.Get(0).(func(flow.RegisterID, []byte) error); ok {
+		r0 = rf(id, value)
 	} else {
 		r0 = ret.Error(0)
 	}

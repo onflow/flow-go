@@ -5,6 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
@@ -16,9 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -204,7 +207,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork, topicValidator)
@@ -265,17 +268,28 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is received by the destination node
 	unittest.AssertReturnsBefore(t, func() {
 		msg, err := dstnSub.Next(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, payload, msg.Data)
+		assert.Equal(t, sentData, msg.Data)
 	},
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second)
@@ -287,10 +301,21 @@ func testOneToKMessagingFails(ctx context.Context,
 	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is never received by the destination node
@@ -300,13 +325,4 @@ func testOneToKMessagingFails(ctx context.Context,
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second,
 		"nodes on different sporks were able to communicate")
-}
-
-func createTestMessage(t *testing.T) []byte {
-	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, "hello")
-
-	payload, err := msg.Marshal()
-	require.NoError(t, err)
-
-	return payload
 }

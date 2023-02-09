@@ -8,20 +8,21 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 // ContractReader provide read access to contracts.
 type ContractReader struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
 }
 
 func NewContractReader(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 ) *ContractReader {
@@ -33,12 +34,12 @@ func NewContractReader(
 }
 
 func (reader *ContractReader) GetAccountContractNames(
-	address runtime.Address,
+	address common.Address,
 ) (
 	[]string,
 	error,
 ) {
-	defer reader.tracer.StartSpanFromRoot(
+	defer reader.tracer.StartChildSpan(
 		trace.FVMEnvGetAccountContractNames).End()
 
 	err := reader.meter.MeterComputation(
@@ -67,7 +68,7 @@ func (reader *ContractReader) ResolveLocation(
 	[]runtime.ResolvedLocation,
 	error,
 ) {
-	defer reader.tracer.StartExtensiveTracingSpanFromRoot(
+	defer reader.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvResolveLocation).End()
 
 	err := reader.meter.MeterComputation(ComputationKindResolveLocation, 1)
@@ -145,7 +146,7 @@ func (reader *ContractReader) GetCode(
 	[]byte,
 	error,
 ) {
-	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvGetCode).End()
+	defer reader.tracer.StartChildSpan(trace.FVMEnvGetCode).End()
 
 	err := reader.meter.MeterComputation(ComputationKindGetCode, 1)
 	if err != nil {
@@ -175,13 +176,13 @@ func (reader *ContractReader) GetCode(
 }
 
 func (reader *ContractReader) GetAccountContractCode(
-	address runtime.Address,
+	address common.Address,
 	name string,
 ) (
 	code []byte,
 	err error,
 ) {
-	defer reader.tracer.StartSpanFromRoot(
+	defer reader.tracer.StartChildSpan(
 		trace.FVMEnvGetAccountContractCode).End()
 
 	err = reader.meter.MeterComputation(
