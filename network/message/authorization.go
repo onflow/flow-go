@@ -94,7 +94,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -210,7 +210,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}

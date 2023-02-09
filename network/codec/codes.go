@@ -166,9 +166,9 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeBlockProposal:
 		return &messages.BlockProposal{}, what(&messages.BlockProposal{}), nil
 	case CodeBlockVote:
-		return &messages.BlockVote{}, , nil
+		return &messages.BlockVote{}, what(&messages.BlockVote{}), nil
 	case CodeTimeoutObject:
-		return &messages.TimeoutObject{}, s, nil
+		return &messages.TimeoutObject{}, what(&messages.TimeoutObject{}), nil
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
@@ -176,9 +176,9 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 	case CodeClusterBlockVote:
 		return &messages.ClusterBlockVote{}, what(&messages.ClusterBlockVote{}), nil
 	case CodeClusterBlockResponse:
-		return &messages.ClusterBlockResponse{}, , nil
+		return &messages.ClusterBlockResponse{}, what(&messages.ClusterBlockResponse{}), nil
 	case CodeClusterTimeoutObject:
-		return &messages.ClusterTimeoutObject{}, , nil
+		return &messages.ClusterTimeoutObject{}, what(&messages.ClusterTimeoutObject{}), nil
 
 	// protocol state sync
 	case CodeSyncRequest:
