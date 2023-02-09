@@ -143,7 +143,7 @@ func (h *Handler) GetBlockByID(
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
-		return nil, err
+		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}
 
 	var msg *entities.Block
@@ -163,7 +163,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.B
 func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
-		return nil, err
+		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}
 
 	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
