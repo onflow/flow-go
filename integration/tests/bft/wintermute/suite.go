@@ -2,7 +2,7 @@ package wintermute
 
 import (
 	"github.com/rs/zerolog"
-	
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/integration/testnet"

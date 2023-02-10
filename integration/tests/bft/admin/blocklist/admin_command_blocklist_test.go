@@ -41,6 +41,6 @@ func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	a.Orchestrator.sendUnauthorizedMsgs(a.T())
 	time.Sleep(3 * time.Second)
 
-	// messages without correct signature should have all been rejected at the libp2p level and not be delivered to the victim EN.
+	// messages sent after the node is block listed are considered unauthorized, we don't expect to receive any of them.
 	require.Equal(a.T(), int64(0), a.Orchestrator.unauthorizedEventsReceived.Load(), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", a.Orchestrator.unauthorizedEventsReceived.Load()))
 }
