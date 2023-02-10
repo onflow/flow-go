@@ -99,13 +99,7 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
-require (
-	cloud.google.com/go/compute/metadata v0.2.1
-	github.com/montanaflynn/stats v0.6.6
-	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/pkg/profile v1.7.0
-	github.com/slok/go-http-metrics v0.10.0
-)
+require github.com/slok/go-http-metrics v0.10.0
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
