@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"testing"
+	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -222,5 +226,51 @@ func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
 			sig.Address = service
 			tx.EnvelopeSignatures[i] = sig
 		}
+	}
+}
+
+// LogStatus logs current information about the test network state.
+func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *testnet.Client) {
+	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
+	if err != nil {
+		log.Err(err).Msg("failed to get sealed snapshot")
+		return
+	}
+	finalized, err := client.GetLatestFinalizedBlockHeader(ctx)
+	if err != nil {
+		log.Err(err).Msg("failed to get finalized header")
+		return
+	}
+
+	sealed, err := snapshot.Head()
+	require.NoError(t, err)
+	phase, err := snapshot.Phase()
+	require.NoError(t, err)
+	epoch := snapshot.Epochs().Current()
+	counter, err := epoch.Counter()
+	require.NoError(t, err)
+
+	log.Info().Uint64("final_height", finalized.Height).
+		Uint64("sealed_height", sealed.Height).
+		Uint64("sealed_view", sealed.View).
+		Str("cur_epoch_phase", phase.String()).
+		Uint64("cur_epoch_counter", counter).
+		Msg("test run status")
+}
+
+// LogStatusPeriodically periodically logs information about the test network state.
+// It can be run as a goroutine at the beginning of a test run to provide period
+func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Logger, client *testnet.Client, period time.Duration) {
+	log = log.With().Str("util", "status_logger").Logger()
+	for {
+		select {
+		case <-parent.Done():
+			return
+		case <-time.After(period):
+		}
+
+		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+		LogStatus(t, ctx, log, client)
+		cancel()
 	}
 }

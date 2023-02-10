@@ -86,16 +86,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(
+			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
+		)
 
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
-				// ctx := args[0].(fvm.Context)
+				ctx := args[0].(fvm.Context)
 				tx := args[1].(*fvm.TransactionProcedure)
 
 				tx.Events = generateEvents(1, tx.TxIndex)
+
+				getSetAProgram(t, ctx.DerivedBlockData)
 			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
@@ -128,6 +132,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
+		expectedProgramsInCache := 1 // we set one program in the cache
+		exemetrics.On(
+			"ExecutionBlockCachedPrograms",
+			expectedProgramsInCache).
+			Return(nil).
+			Times(1) // 1 block
+
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := mocktracker.NewMockStorage()
 
@@ -153,9 +164,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
 		result, err := exe.ExecuteBlock(
 			context.Background(),
@@ -264,9 +273,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
@@ -308,9 +315,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(opts...)
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -413,9 +418,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
@@ -568,9 +571,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			prov)
 		require.NoError(t, err)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
@@ -659,11 +660,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		const transactionCount = 2
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			flow.AccountStatusRegisterID(flow.BytesToAddress(address.Bytes())),
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -757,11 +758,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		view := delta.NewDeltaView(nil)
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		err = view.Set(
+			flow.AccountStatusRegisterID(flow.BytesToAddress(address.Bytes())),
+			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
@@ -934,8 +935,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-		return ledger.Get(owner, key)
+	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
+		return ledger.Get(id)
 	})
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
@@ -983,10 +984,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	registerTouches := view.Interactions().RegisterTouches()
 
 	// make sure check for account status has been registered
-	id := flow.RegisterID{
-		Owner: string(address.Bytes()),
-		Key:   state.AccountStatusKey,
-	}
+	id := flow.AccountStatusRegisterID(address)
 
 	require.Contains(t, registerTouches, id)
 }
@@ -1011,9 +1009,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	noopCollector := metrics.NewNoopCollector()
 
-	metrics := new(modulemock.ExecutionMetrics)
 	expectedNumberOfEvents := 2
-	expectedEventSize := 912
+	expectedEventSize := 911
+	// bootstrapping does not cache programs
+	expectedCachedPrograms := 0
+
+	metrics := new(modulemock.ExecutionMetrics)
 	metrics.On("ExecutionCollectionExecuted",
 		mock.Anything,  // duration
 		mock.Anything). // stats
@@ -1037,6 +1038,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything).
 		Return(nil).
 		Times(1) // system collection
+
+	metrics.On(
+		"ExecutionBlockCachedPrograms",
+		expectedCachedPrograms).
+		Return(nil).
+		Times(1) // block
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -1067,7 +1074,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewView(ledger.Get)
+	view := delta.NewDeltaView(ledger.Get)
 
 	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
@@ -1086,8 +1093,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		module.ExecutionResultStats{
 			EventCounts:                     expectedNumberOfEvents,
 			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        50,
-			NumberOfBytesWrittenToRegisters: 3404,
+			NumberOfRegistersTouched:        66,
+			NumberOfBytesWrittenToRegisters: 4214,
 			NumberOfCollections:             1,
 			NumberOfTransactions:            1,
 		},
@@ -1166,4 +1173,31 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 		events[i] = event
 	}
 	return events
+}
+
+func getSetAProgram(t *testing.T, derivedBlockData *derived.DerivedBlockData) {
+
+	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(
+		0,
+		0)
+	require.NoError(t, err)
+
+	loc := common.AddressLocation{
+		Name:    "SomeContract",
+		Address: common.MustBytesToAddress([]byte{0x1}),
+	}
+	_, _, got := derivedTxnData.GetProgram(
+		loc,
+	)
+	if got {
+		return
+	}
+
+	derivedTxnData.SetProgram(
+		loc,
+		&derived.Program{},
+		&state.State{},
+	)
+	err = derivedTxnData.Commit()
+	require.NoError(t, err)
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
@@ -59,7 +58,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+
 	logger := unittest.Logger()
 
 	// all nodes subscribe to block topic (common topic among all roles)
@@ -67,19 +66,19 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	groupOneSubs := make([]p2p.Subscription, len(groupOneNodes))
 	var err error
 	for i, node := range groupOneNodes {
-		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// group two
 	groupTwoSubs := make([]p2p.Subscription, len(groupTwoNodes))
 	for i, node := range groupTwoNodes {
-		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// access node group
 	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 
@@ -180,20 +179,20 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	defer p2ptest.StopNodes(t, allNodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+
 	logger := unittest.Logger()
 
 	// all nodes subscribe to block topic (common topic among all roles)
-	_, err := con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+	_, err := con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
-	con2Sub, err := con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+	con2Sub, err := con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// access node group
 	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 		accessNodeSubs[i] = sub
 	}

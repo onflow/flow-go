@@ -131,6 +131,10 @@ type NodeBuilder interface {
 	// ValidateFlags sets any custom validation rules for the command line flags,
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
+
+	// ValidateRootSnapshot sets any custom validation rules for the root snapshot.
+	// This check is executed after other checks but before applying any data from root snapshot.
+	ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params
@@ -199,6 +203,7 @@ type NetworkConfig struct {
 	UnicastMessageTimeout       time.Duration
 	DNSCacheTTL                 time.Duration
 	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	ConnectionManagerConfig     *connection.ManagerConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -222,6 +227,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -251,6 +257,8 @@ type NodeConfig struct {
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeBlockListDistributor notifies consumers of updates to the node block list
 	NodeBlockListDistributor *cache.NodeBlockListDistributor
 }
@@ -279,6 +287,7 @@ func DefaultBaseConfig() *BaseConfig {
 			UnicastRateLimitDryRun:          true,
 			DNSCacheTTL:                     dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

@@ -1,4 +1,4 @@
-# See https://forum.bors.tech/t/bug-wildcard-status-ignores-1-match/438 
+# See https://forum.bors.tech/t/bug-wildcard-status-ignores-1-match/438
 # for why we need to explicitly list all statuses
 
 status = [

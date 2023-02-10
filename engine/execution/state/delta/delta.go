@@ -22,15 +22,14 @@ func NewDelta() Delta {
 //
 // This function will return nil if the given key has been deleted in this delta.
 // Second return parameters indicated if the value has been set/deleted in this delta
-func (d Delta) Get(owner, key string) (flow.RegisterValue, bool) {
-	value, set := d.Data[flow.NewRegisterID(owner, key)]
+func (d Delta) Get(id flow.RegisterID) (flow.RegisterValue, bool) {
+	value, set := d.Data[id]
 	return value, set
 }
 
 // Set records an update in this delta.
-func (d Delta) Set(owner, key string, value flow.RegisterValue) {
-	k := flow.NewRegisterID(owner, key)
-	d.Data[k] = value
+func (d Delta) Set(id flow.RegisterID, value flow.RegisterValue) {
+	d.Data[id] = value
 }
 
 // UpdatedRegisterIDs returns all register ids that were updated by this delta.

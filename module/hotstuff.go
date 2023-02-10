@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
@@ -16,7 +16,7 @@ type HotStuff interface {
 	//
 	// Block proposals must be submitted in order and only if they extend a
 	// block already known to HotStuff core.
-	SubmitProposal(proposal *flow.Header, parentView uint64) (done <-chan struct{})
+	SubmitProposal(proposal *model.Proposal)
 }
 
 // HotStuffFollower is run by non-consensus nodes to observe the block chain
@@ -41,11 +41,12 @@ type HotStuff interface {
 //     in addition to the proposal.
 type HotStuffFollower interface {
 	ReadyDoneAware
+	Startable
 
 	// SubmitProposal feeds a new block proposal into the HotStuffFollower.
 	// This method blocks until the proposal is accepted to the event queue.
 	//
 	// Block proposals must be submitted in order, i.e. a proposal's parent must
 	// have been previously processed by the HotStuffFollower.
-	SubmitProposal(proposal *flow.Header, parentView uint64) (done <-chan struct{})
+	SubmitProposal(proposal *model.Proposal)
 }

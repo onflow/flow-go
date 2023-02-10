@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
@@ -48,7 +47,7 @@ func TestFilterSubscribe(t *testing.T) {
 	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	sub1, err := node1.Subscribe(badTopic, topicValidator)
 	require.NoError(t, err)
@@ -122,7 +121,7 @@ func TestCanSubscribe(t *testing.T) {
 	defer p2ptest.StopNode(t, collectionNode, cancel, 1*time.Second)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)
 	_, err := collectionNode.Subscribe(goodTopic, topicValidator)
