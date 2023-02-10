@@ -40,6 +40,10 @@ type Builder struct {
 	log            zerolog.Logger
 }
 
+// TODO: #6435
+//   - pass in epoch (minimally counter, preferably cluster chain ID as well)
+//   - check candidate reference blocks by view (cheap, but need to get whole header each time - cheap if header in cache)
+//   - if outside view boundary, look up first+final block height of epoch (can cache both)
 func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, opts ...Opt) (*Builder, error) {
 
 	b := Builder{
@@ -348,7 +352,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// TODO (ramtin): enable this again
 	// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
-	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	dbInsertSpan, _ := b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
