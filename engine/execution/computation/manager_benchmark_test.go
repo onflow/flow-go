@@ -117,7 +117,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{},
-				chainID)),
+			)),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,

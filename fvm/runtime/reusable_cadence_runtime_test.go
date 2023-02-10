@@ -5,12 +5,10 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(0, runtime.Config{}, flow.Emulator)
+func TestReusableCadenceRuntimePoolUnbuffered(t *testing.T) {
+	pool := NewReusableCadenceRuntimePool(0, runtime.Config{})
 	require.Nil(t, pool.pool)
 
 	entry := pool.Borrow(nil)
@@ -24,8 +22,8 @@ func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
 	require.NotSame(t, entry, entry2)
 }
 
-func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{}, flow.Emulator)
+func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
+	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
 	require.NotNil(t, pool.pool)
 
 	select {
@@ -51,8 +49,8 @@ func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
 	require.Same(t, entry, entry2)
 }
 
-func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{}, flow.Emulator)
+func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
+	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
 	require.NotNil(t, pool.pool)
 
 	select {

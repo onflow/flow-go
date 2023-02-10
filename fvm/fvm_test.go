@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,17 +69,18 @@ func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		chain, vm := createChainAndVm(flow.Testnet)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		baseOpts := []fvm.Option{
-			fvm.WithChain(chain),
+			// default chain is Testnet
+			fvm.WithChain(flow.Testnet.Chain()),
 			fvm.WithDerivedBlockData(derivedBlockData),
 		}
-
 		opts := append(baseOpts, vmt.contextOptions...)
-
 		ctx := fvm.NewContext(opts...)
+
+		chain := ctx.Chain
+		vm := fvm.NewVirtualMachine()
 
 		view := utils.NewSimpleView()
 
@@ -100,16 +102,17 @@ func (vmt vmTest) run(
 func (vmt vmTest) bootstrapWith(
 	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error,
 ) (bootstrappedVmTest, error) {
-	chain, vm := createChainAndVm(flow.Testnet)
 
 	baseOpts := []fvm.Option{
-		fvm.WithChain(chain),
+		// default chain is Testnet
+		fvm.WithChain(flow.Testnet.Chain()),
 	}
 
 	opts := append(baseOpts, vmt.contextOptions...)
-
 	ctx := fvm.NewContext(opts...)
 
+	chain := ctx.Chain
+	vm := fvm.NewVirtualMachine()
 	view := utils.NewSimpleView()
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
@@ -117,7 +120,6 @@ func (vmt vmTest) bootstrapWith(
 	}
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
-
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
 	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
@@ -2216,4 +2218,72 @@ func TestScriptIterationShouldNotHitsParseRestrictions(t *testing.T) {
 
 			require.NoError(t, err)
 		})(t)
+}
+
+func TestAuthAccountCapabilities(t *testing.T) {
+	test := func(t *testing.T, linkingEnabled bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						1,
+						runtime.Config{
+							AccountLinkingEnabled: linkingEnabled,
+						},
+					),
+				),
+			).
+			run(
+				func(
+					t *testing.T,
+					vm *fvm.VirtualMachine,
+					chain flow.Chain,
+					ctx fvm.Context,
+					view state.View,
+					derivedBlockData *derived.DerivedBlockData,
+				) {
+					// Create an account private key.
+					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+					privateKey := privateKeys[0]
+					require.NoError(t, err)
+
+					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+					accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
+					require.NoError(t, err)
+					account := accounts[0]
+
+					txBody := flow.NewTransactionBody().SetScript([]byte(`
+					   transaction {
+						   prepare(acct: AuthAccount) {
+							   acct.linkAccount(/public/foo)
+						   }
+					   }
+					`)).
+						AddAuthorizer(account).
+						SetPayer(chain.ServiceAddress()).
+						SetProposalKey(chain.ServiceAddress(), 0, 0)
+
+					_ = testutil.SignPayload(txBody, account, privateKey)
+					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+					tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+
+					err = vm.Run(ctx, tx, view)
+					require.NoError(t, err)
+					if linkingEnabled {
+						require.NoError(t, tx.Err)
+					} else {
+						require.Error(t, tx.Err)
+					}
+				},
+			)(t)
+	}
+
+	t.Run("linking enabled", func(t *testing.T) {
+		test(t, true)
+	})
+	t.Run("linking disabled", func(t *testing.T) {
+		test(t, false)
+	})
+
 }
