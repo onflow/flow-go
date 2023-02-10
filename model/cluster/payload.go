@@ -14,11 +14,7 @@ type Payload struct {
 
 	// ReferenceBlockID is the ID of a reference block on the main chain. It
 	// is defined as the ID of the reference block with the lowest height
-	// from all transactions within the collection. If the collection is empty,
-	// the proposer may choose any reference block, so long as it is finalized
-	// and within the epoch the cluster is associated with. If a cluster was
-	// assigned for epoch E, then all of its reference blocks must have a view
-	// in the range [E.FirstView, E.FinalView].
+	// from all transactions within the collection.
 	//
 	// This determines when the collection expires, using the same expiry rules
 	// as transactions. It is also used as the reference point for committee
