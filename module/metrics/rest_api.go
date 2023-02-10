@@ -17,7 +17,7 @@ import (
 
 // Example recorder taken from:
 // https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
-type CustomRecorder interface {
+type RestCollector interface {
 	metrics.Recorder
 	AddTotalRequests(ctx context.Context, service string, id string)
 }
