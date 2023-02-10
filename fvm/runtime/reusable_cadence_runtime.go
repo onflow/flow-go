@@ -182,16 +182,12 @@ type ReusableCadenceRuntimePool struct {
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
 		pool = make(chan *ReusableCadenceRuntime, poolSize)
 	}
-
-	// Enable account linking on all networks except Mainnet
-	config.AccountLinkingEnabled = chainID != flow.Mainnet
 
 	return ReusableCadenceRuntimePool{
 		pool:             pool,
@@ -203,25 +199,21 @@ func newReusableCadenceRuntimePool(
 func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
-		chainID,
 		nil,
 	)
 }
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
-	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		runtime.Config{},
-		chainID,
 		newCustomRuntime,
 	)
 }

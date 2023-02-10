@@ -130,8 +130,9 @@ func New(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled: params.CadenceTracing,
+					// AccountLinking is enabled everywhere except on mainnet
+					AccountLinkingEnabled: chainID != flow.Mainnet,
 				},
-				chainID,
 			),
 		),
 	}
