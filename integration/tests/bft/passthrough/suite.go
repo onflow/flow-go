@@ -14,7 +14,6 @@ import (
 // happy path of Corrupted Conduit Framework (CCF) for BFT testing.
 type Suite struct {
 	bft.BaseSuite
-	ghostID      flow.Identifier // represents id of ghost node
 	exe1ID       flow.Identifier // corrupted execution node 1
 	exe2ID       flow.Identifier // corrupted execution node 2
 	verID        flow.Identifier // corrupted verification node
