@@ -790,24 +790,33 @@ func TestNonExistingProof(t *testing.T) {
 func TestNonExistingInvalidProof(t *testing.T) {
 	forest, err := mtrie.NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
-	paths := testutils.RandomPaths(1)
+	paths := testutils.RandomPaths(2)
+	payloads := testutils.RandomPayloads(len(paths), 10, 20)
+	payloadStorage := unittest.CreateMockPayloadStore()
+
+	existingPaths := paths[1:]
+	existingPayloads := payloads[1:]
+
+	nonExistingPaths := paths[:1]
 
 	activeRoot := forest.GetEmptyRootHash()
 
-	payloadStorage := unittest.CreateMockPayloadStore()
-	read := &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
-	retValues, err := forest.Read(read, payloadStorage)
+	// adding a payload to a path
+	update := &ledger.TrieUpdate{RootHash: activeRoot, Paths: existingPaths, Payloads: existingPayloads}
+	activeRoot, err = forest.Update(update, payloadStorage)
+	require.NoError(t, err, "error updating")
 
-	require.NoError(t, err, "error reading - non existing paths")
-	for _, p := range retValues {
-		require.Equal(t, 0, len(p))
-	}
-
-	read = &ledger.TrieRead{RootHash: activeRoot, Paths: paths}
+	// reading proof for nonExistingPaths
+	read := &ledger.TrieRead{RootHash: activeRoot, Paths: nonExistingPaths}
 	batchProof, err := forest.Proofs(read, payloadStorage)
 	require.NoError(t, err, "error generating proofs")
+
+	// now a malicious node modifies the proof to be Inclusion false
+	// and change the proof such that one interim node has invalid hash
 	batchProof.Proofs[0].Inclusion = false
 	batchProof.Proofs[0].Interims[0] = hash.DummyHash
+
+	// expect the VerifyTrieBatchProof should return false
 	require.False(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
 }
 
