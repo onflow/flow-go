@@ -29,14 +29,14 @@ const (
 type AdminBlockListAttackOrchestrator struct {
 	*bft.BaseOrchestrator
 	sync.Mutex
-	codec                      network.Codec
-	unauthorizedEventsReceived *atomic.Int64
-	authorizedEventsReceived   *atomic.Int64
-	unauthorizedEvents         map[flow.Identifier]*insecure.EgressEvent
-	authorizedEvents           map[flow.Identifier]*insecure.EgressEvent
-	authorizedEventsReceivedWg sync.WaitGroup
-	senderVN                   flow.Identifier
-	receiverEN                 flow.Identifier
+	codec                         network.Codec
+	expectedBlockedEventsReceived *atomic.Int64
+	authorizedEventsReceived      *atomic.Int64
+	expectedBlockedEvents         map[flow.Identifier]*insecure.EgressEvent
+	authorizedEvents              map[flow.Identifier]*insecure.EgressEvent
+	authorizedEventsReceivedWg    sync.WaitGroup
+	senderVN                      flow.Identifier
+	receiverEN                    flow.Identifier
 }
 
 var _ insecure.AttackOrchestrator = &AdminBlockListAttackOrchestrator{}
@@ -47,14 +47,14 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, senderVN, receiverEN f
 			T:      t,
 			Logger: logger,
 		},
-		codec:                      unittest.NetworkCodec(),
-		unauthorizedEventsReceived: atomic.NewInt64(0),
-		authorizedEventsReceived:   atomic.NewInt64(0),
-		unauthorizedEvents:         make(map[flow.Identifier]*insecure.EgressEvent),
-		authorizedEvents:           make(map[flow.Identifier]*insecure.EgressEvent),
-		authorizedEventsReceivedWg: sync.WaitGroup{},
-		senderVN:                   senderVN,
-		receiverEN:                 receiverEN,
+		codec:                         unittest.NetworkCodec(),
+		expectedBlockedEventsReceived: atomic.NewInt64(0),
+		authorizedEventsReceived:      atomic.NewInt64(0),
+		expectedBlockedEvents:         make(map[flow.Identifier]*insecure.EgressEvent),
+		authorizedEvents:              make(map[flow.Identifier]*insecure.EgressEvent),
+		authorizedEventsReceivedWg:    sync.WaitGroup{},
+		senderVN:                      senderVN,
+		receiverEN:                    receiverEN,
 	}
 
 	return orchestrator
@@ -72,9 +72,9 @@ func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.In
 
 	// Track any unauthorized events that are received, these events are sent after the admin blocklist command
 	// is used to block the sender node.
-	if _, ok := a.unauthorizedEvents[event.FlowProtocolEventID]; ok {
+	if _, ok := a.expectedBlockedEvents[event.FlowProtocolEventID]; ok {
 		if event.OriginID == a.senderVN {
-			a.unauthorizedEventsReceived.Inc()
+			a.expectedBlockedEventsReceived.Inc()
 			lg.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
 		}
 	}
@@ -109,13 +109,13 @@ func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	}
 }
 
-// sendUnauthorizedMsgs publishes a number of unauthorized messages. Unauthorized messages are messages that are sent
+// sendExpectedBlockedMsgs publishes a number of unauthorized messages. Unauthorized messages are messages that are sent
 // after the senderVN is blocked via the admin blocklist command. These messages are not expected to be received.
-func (a *AdminBlockListAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
+func (a *AdminBlockListAttackOrchestrator) sendExpectedBlockedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
-		a.unauthorizedEvents[event.FlowProtocolEventID] = event
+		a.expectedBlockedEvents[event.FlowProtocolEventID] = event
 	}
 }
