@@ -38,11 +38,10 @@ func NewDerivedDataInvalidator(
 }
 
 func meterParamOverridesUpdated(env *facadeEnvironment) bool {
-	updatedRegisterIds, _ := env.txnState.RegisterUpdates()
-
 	serviceAccount := string(env.chain.ServiceAddress().Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
-	for _, registerId := range updatedRegisterIds {
+
+	for _, registerId := range env.txnState.UpdatedRegisterIDs() {
 		// The meter param override values are stored in the service account.
 		if registerId.Owner != serviceAccount {
 			continue
@@ -60,8 +59,7 @@ func meterParamOverridesUpdated(env *facadeEnvironment) bool {
 		//
 		// The meter param overrides use storageDomain as input, so any
 		// changes to it must also invalidate the values.
-		if registerId.Key == storageDomain ||
-			state.IsSlabIndex(registerId.Key) {
+		if registerId.Key == storageDomain || registerId.IsSlabIndex() {
 			return true
 		}
 	}

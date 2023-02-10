@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
@@ -62,7 +63,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")
 
-	flowClient, err := client.NewClient(flagAccessAPIAddress, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(flagAccessAPIAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not connect to access API at address %s", flagAccessAPIAddress)
 	}

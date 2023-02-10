@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
@@ -18,6 +19,8 @@ type MetricsReporter interface {
 	RuntimeTransactionChecked(time.Duration)
 	RuntimeTransactionInterpreted(time.Duration)
 	RuntimeSetNumberOfAccounts(count uint64)
+	RuntimeTransactionProgramsCacheMiss()
+	RuntimeTransactionProgramsCacheHit()
 }
 
 // NoopMetricsReporter is a MetricReporter that does nothing.
@@ -34,6 +37,12 @@ func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 
 // RuntimeSetNumberOfAccounts is a noop
 func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
+
+// RuntimeTransactionProgramsCacheMiss is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheMiss() {}
+
+// RuntimeTransactionProgramsCacheHit is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheHit() {}
 
 type ProgramLoggerParams struct {
 	zerolog.Logger
@@ -80,7 +89,8 @@ func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
-	defer logger.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvProgramLog).End()
+	defer logger.tracer.StartExtensiveTracingChildSpan(
+		trace.FVMEnvProgramLog).End()
 
 	if logger.CadenceLoggingEnabled {
 		logger.logs = append(logger.logs, message)
@@ -92,18 +102,30 @@ func (logger *ProgramLogger) Logs() []string {
 	return logger.logs
 }
 
-func (logger *ProgramLogger) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
+func (logger *ProgramLogger) RecordTrace(
+	operation string,
+	location common.Location,
+	duration time.Duration,
+	attrs []attribute.KeyValue,
+) {
 	if location != nil {
 		attrs = append(attrs, attribute.String("location", location.String()))
 	}
-	logger.tracer.RecordChildSpan(
+
+	end := time.Now()
+
+	span := logger.tracer.StartChildSpan(
 		trace.FVMCadenceTrace.Child(operation),
-		duration,
-		attrs)
+		otelTrace.WithAttributes(attrs...),
+		otelTrace.WithTimestamp(end.Add(-duration)))
+	span.End(otelTrace.WithTimestamp(end))
 }
 
 // ProgramParsed captures time spent on parsing a code at specific location
-func (logger *ProgramLogger) ProgramParsed(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramParsed(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("parseProgram", location, duration, nil)
 
 	// These checks prevent re-reporting durations, the metrics collection is
@@ -122,7 +144,10 @@ func (logger *ProgramLogger) ProgramParsed(location common.Location, duration ti
 }
 
 // ProgramChecked captures time spent on checking a code at specific location
-func (logger *ProgramLogger) ProgramChecked(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramChecked(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("checkProgram", location, duration, nil)
 
 	// see the comment for ProgramParsed
@@ -135,7 +160,10 @@ func (logger *ProgramLogger) ProgramChecked(location common.Location, duration t
 }
 
 // ProgramInterpreted captures time spent on interpreting a code at specific location
-func (logger *ProgramLogger) ProgramInterpreted(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramInterpreted(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("interpretProgram", location, duration, nil)
 
 	// see the comment for ProgramInterpreted

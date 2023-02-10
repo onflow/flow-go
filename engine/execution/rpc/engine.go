@@ -24,13 +24,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr        string
-	MaxMsgSize        int  // In bytes
+	MaxMsgSize        uint // In bytes
 	RpcMetricsEnabled bool // enable GRPC metrics reporting
 }
 
@@ -60,13 +59,9 @@ func New(
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	serverOptions := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxMsgSize),
-		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -559,6 +554,7 @@ func (h *handler) GetBlockHeaderByID(
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
+		// the block was retrieved from local storage - so no errors are expected
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}
 

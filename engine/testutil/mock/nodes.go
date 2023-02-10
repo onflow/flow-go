@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -33,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -69,6 +69,7 @@ type GenericNode struct {
 	// context and cancel function used to start/stop components
 	Ctx    irrecoverable.SignalerContext
 	Cancel context.CancelFunc
+	Errs   <-chan error
 
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
@@ -131,8 +132,13 @@ type CollectionNode struct {
 	EpochManagerEngine *epochmgr.Engine
 }
 
-func (n CollectionNode) Ready() <-chan struct{} {
+func (n CollectionNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
+	n.EpochManagerEngine.Start(n.Ctx)
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
@@ -202,11 +208,12 @@ type ExecutionNode struct {
 	ExecutionEngine     *ComputerWrap
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
+	FollowerCore        module.HotStuffFollower
 	FollowerEngine      *followereng.Engine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB
-	VM                  computer.VirtualMachine
+	VM                  fvm.VM
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
@@ -221,11 +228,14 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	// new interface.
 	irctx, _ := irrecoverable.WithSignaler(ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.FollowerCore.Start(irctx)
+	en.FollowerEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
 		en.IngestionEngine,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
@@ -242,6 +252,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 		en.IngestionEngine,
 		en.ReceiptsEngine,
 		en.Ledger,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,

@@ -3,6 +3,7 @@
 package synchronization
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -11,10 +12,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -43,7 +44,7 @@ type Engine struct {
 	me           module.Local
 	participants flow.IdentityList
 	con          network.Conduit
-	comp         network.Engine // compliance layer engine
+	comp         collection.Compliance // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -66,7 +67,7 @@ func New(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	comp network.Engine,
+	comp collection.Compliance,
 	core module.SyncCore,
 	opts ...commonsync.OptionFunc,
 ) (*Engine, error) {
@@ -298,14 +299,18 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		if !e.core.HandleBlock(&block.Header) {
+		header := block.Header
+		if !e.core.HandleBlock(&header) {
 			continue
 		}
-		synced := &events.SyncedClusterBlock{
+		synced := flow.Slashable[messages.ClusterBlockProposal]{
 			OriginID: originID,
-			Block:    block,
+			Message: &messages.ClusterBlockProposal{
+				Block: block,
+			},
 		}
-		e.comp.SubmitLocal(synced)
+		// forward the block to the compliance engine for validation and processing
+		e.comp.OnSyncedClusterBlock(synced)
 	}
 }
 
@@ -362,7 +367,7 @@ func (e *Engine) pollHeight() {
 		Height: head.Height,
 	}
 	err = e.con.Multicast(req, synccore.DefaultPollNodes, e.participants.NodeIDs()...)
-	if err != nil {
+	if err != nil && !errors.Is(err, network.EmptyTargetList) {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
 	}

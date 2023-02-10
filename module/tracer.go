@@ -2,9 +2,7 @@ package module
 
 import (
 	"context"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,12 +12,15 @@ import (
 var (
 	_ Tracer = &trace.Tracer{}
 	_ Tracer = &trace.NoopTracer{}
-	_ Tracer = &trace.LogTracer{}
 )
 
 // Tracer interface for tracers in flow. Uses open tracing span definitions
 type Tracer interface {
 	ReadyDoneAware
+
+	// BlockRootSpan returns the block's empty root span.  The returned span
+	// has already ended, and should only be used for creating children span.
+	BlockRootSpan(blockID flow.Identifier) otelTrace.Span
 
 	// StartBlockSpan starts an span for a block, built as a child of rootSpan.
 	// It also returns the context including this span which can be used for
@@ -47,19 +48,6 @@ type Tracer interface {
 		context.Context,
 	)
 
-	// StartTransactionSpan starts an span for a transaction, built as a child
-	// of rootSpan.  It also returns the context including this span which can
-	// be used for nested calls.
-	StartTransactionSpan(
-		ctx context.Context,
-		transactionID flow.Identifier,
-		spanName trace.SpanName,
-		opts ...otelTrace.SpanStartOption,
-	) (
-		otelTrace.Span,
-		context.Context,
-	)
-
 	StartSpanFromContext(
 		ctx context.Context,
 		operationName trace.SpanName,
@@ -75,15 +63,16 @@ type Tracer interface {
 		opts ...otelTrace.SpanStartOption,
 	) otelTrace.Span
 
-	// RecordSpanFromParent records an span at finish time
-	// start time will be computed by reducing time.Now() - duration
-	RecordSpanFromParent(
+	ShouldSample(entityID flow.Identifier) bool
+
+	// StartSampledSpanFromParent starts a real span from the parent span
+	// if the entity should be sampled.  Otherwise, it returns a no-op span.
+	StartSampledSpanFromParent(
 		parentSpan otelTrace.Span,
+		entityID flow.Identifier,
 		operationName trace.SpanName,
-		duration time.Duration,
-		attrs []attribute.KeyValue,
 		opts ...otelTrace.SpanStartOption,
-	)
+	) otelTrace.Span
 
 	// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 	// executes the function f, and finishes the span once the function returns.

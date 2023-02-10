@@ -27,7 +27,7 @@ func Test_NewAccountCreator_GeneratingUpdatesState(t *testing.T) {
 	_, err := creator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", state.AddressStateKey)
+	stateBytes, err := view.Get(flow.AddressStateRegisterID)
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
@@ -35,7 +35,9 @@ func Test_NewAccountCreator_GeneratingUpdatesState(t *testing.T) {
 
 func Test_NewAccountCreator_UsesLedgerState(t *testing.T) {
 	view := utils.NewSimpleView()
-	err := view.Set("", state.AddressStateKey, flow.HexToAddress("01").Bytes())
+	err := view.Set(
+		flow.AddressStateRegisterID,
+		flow.HexToAddress("01").Bytes())
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
@@ -45,7 +47,7 @@ func Test_NewAccountCreator_UsesLedgerState(t *testing.T) {
 	_, err = creator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", state.AddressStateKey)
+	stateBytes, err := view.Get(flow.AddressStateRegisterID)
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))

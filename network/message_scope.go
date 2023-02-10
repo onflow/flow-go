@@ -15,31 +15,14 @@ const (
 	eventIDPackingPrefix = "libp2ppacking"
 )
 
-// ProtocolType defines the type of the protocol a message is sent over. Currently, we have two types of protocols:
-// - unicast: a message is sent to a single node through a direct connection.
-// - pubsub: a message is sent to a set of nodes through a pubsub channel.
-type ProtocolType string
-
-func (m ProtocolType) String() string {
-	return string(m)
-}
-
-const (
-	// ProtocolTypeUnicast is protocol type for unicast messages.
-	ProtocolTypeUnicast ProtocolType = "unicast"
-
-	// ProtocolTypePubSub is the protocol type for pubsub messages.
-	ProtocolTypePubSub ProtocolType = "pubsub"
-)
-
 // IncomingMessageScope captures the context around an incoming message that is received by the network layer.
 type IncomingMessageScope struct {
-	originId       flow.Identifier     // the origin node ID.
-	targetIds      flow.IdentifierList // the target node IDs (i.e., intended recipients).
-	eventId        hash.Hash           // hash of the payload and channel.
-	msg            *message.Message    // the raw message received.
-	decodedPayload interface{}         // decoded payload of the message.
-	protocol       ProtocolType        // the type of protocol used to receive the message.
+	originId       flow.Identifier      // the origin node ID.
+	targetIds      flow.IdentifierList  // the target node IDs (i.e., intended recipients).
+	eventId        hash.Hash            // hash of the payload and channel.
+	msg            *message.Message     // the raw message received.
+	decodedPayload interface{}          // decoded payload of the message.
+	protocol       message.ProtocolType // the type of protocol used to receive the message.
 }
 
 // NewIncomingScope creates a new incoming message scope.
@@ -47,7 +30,7 @@ type IncomingMessageScope struct {
 // safe to crash the node when receiving a message.
 // It errors if event id (i.e., hash of the payload and channel) cannot be computed, or if it fails to
 // convert the target IDs from bytes slice to a flow.IdentifierList.
-func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
+func NewIncomingScope(originId flow.Identifier, protocol message.ProtocolType, msg *message.Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
 	eventId, err := EventId(channels.Channel(msg.ChannelID), msg.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute event id: %w", err)
@@ -79,7 +62,7 @@ func (m IncomingMessageScope) DecodedPayload() interface{} {
 	return m.decodedPayload
 }
 
-func (m IncomingMessageScope) Protocol() ProtocolType {
+func (m IncomingMessageScope) Protocol() message.ProtocolType {
 	return m.protocol
 }
 
@@ -100,7 +83,7 @@ func (m IncomingMessageScope) EventID() []byte {
 }
 
 func (m IncomingMessageScope) PayloadType() string {
-	return MessageType(m.msg.Payload)
+	return MessageType(m.decodedPayload)
 }
 
 // OutgoingMessageScope captures the context around an outgoing message that is about to be sent.
@@ -110,7 +93,7 @@ type OutgoingMessageScope struct {
 	payload   interface{}                       // the payload to be sent.
 	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
 	msg       *message.Message                  // raw proto message sent on wire.
-	protocol  ProtocolType                      // the type of protocol used to send the message.
+	protocol  message.ProtocolType              // the type of protocol used to send the message.
 }
 
 // NewOutgoingScope creates a new outgoing message scope.
@@ -123,7 +106,7 @@ func NewOutgoingScope(
 	channelId channels.Channel,
 	payload interface{},
 	encoder func(interface{}) ([]byte, error),
-	protocolType ProtocolType) (*OutgoingMessageScope, error) {
+	protocolType message.ProtocolType) (*OutgoingMessageScope, error) {
 	scope := &OutgoingMessageScope{
 		targetIds: targetIds,
 		channelId: channelId,
@@ -132,13 +115,13 @@ func NewOutgoingScope(
 		protocol:  protocolType,
 	}
 
-	if protocolType == ProtocolTypeUnicast {
+	if protocolType == message.ProtocolTypeUnicast {
 		// for unicast messages, we should have exactly one target.
 		if len(targetIds) != 1 {
 			return nil, fmt.Errorf("expected exactly one target id for unicast message, got: %d", len(targetIds))
 		}
 	}
-	if protocolType == ProtocolTypePubSub {
+	if protocolType == message.ProtocolTypePubSub {
 		// for pubsub messages, we should have at least one target.
 		if len(targetIds) == 0 {
 			return nil, fmt.Errorf("expected at least one target id for pubsub message, got: %d", len(targetIds))

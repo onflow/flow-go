@@ -7,9 +7,11 @@ import (
 	"github.com/spf13/pflag"
 
 	flowconsensus "github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -102,8 +104,10 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		finalizationDistributor *pubsub.FinalizationDistributor
 		finalizedHeader         *commonsync.FinalizedHeaderCache
 
-		followerEng *follower.Engine           // the follower engine
-		collector   module.VerificationMetrics // used to collect metrics of all engines
+		committee    *committees.Consensus
+		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
+		followerEng  *follower.Engine           // the follower engine
+		collector    module.VerificationMetrics // used to collect metrics of all engines
 	)
 
 	v.FlowNodeBuilder.
@@ -189,7 +193,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -317,21 +321,20 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			// initialize cleaner for DB
-			cleaner := badger.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
+		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			// initialize consensus committee's membership state
-			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
 
 			packer := hotsignature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
@@ -347,12 +350,34 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := flowconsensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
-				node.RootQC, finalized, pending)
+			followerCore, err = flowconsensus.NewFollower(
+				node.Logger,
+				committee,
+				node.Storage.Headers,
+				final,
+				verifier,
+				finalizationDistributor,
+				node.RootBlock.Header,
+				node.RootQC,
+				finalized,
+				pending,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
+			return followerCore, nil
+		}).
+		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize cleaner for DB
+			cleaner := badger.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(committee, packer)
+			validator := validator.New(committee, verifier)
+
+			var err error
 			followerEng, err = follower.New(
 				node.Logger,
 				node.Network,
@@ -365,6 +390,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerState,
 				pendingBlocks,
 				followerCore,
+				validator,
 				syncCore,
 				node.Tracer,
 				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),

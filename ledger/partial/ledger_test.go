@@ -119,24 +119,26 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// create empty update
 	emptyState := l.InitialState()
 
-	view := delta.NewView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
+	view := delta.NewDeltaView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
 
 	registerID := flow.NewRegisterID("b", "nk")
 
-	v, err := view.Get(registerID.Owner, registerID.Key)
+	v, err := view.Get(registerID)
 	require.NoError(t, err)
 	require.Empty(t, v)
 
-	ids, values := view.Delta().RegisterUpdates()
-	updated, err := ledger.NewUpdate(
-		emptyState,
-		executionState.RegisterIDSToKeys(ids),
-		executionState.RegisterValuesToValues(values),
-	)
+	keys, values := executionState.RegisterEntriesToKeysValues(
+		view.Delta().UpdatedRegisters())
+
+	updated, err := ledger.NewUpdate(emptyState, keys, values)
 	require.NoError(t, err)
 
-	allRegisters := view.Interactions().AllRegisters()
-	allKeys := executionState.RegisterIDSToKeys(allRegisters)
+	allRegisters := view.Interactions().AllRegisterIDs()
+	allKeys := make([]ledger.Key, len(allRegisters))
+	for i, id := range allRegisters {
+		allKeys[i] = executionState.RegisterIDToKey(id)
+	}
+
 	newState := updated.State()
 
 	proofQuery, err := ledger.NewQuery(newState, allKeys)

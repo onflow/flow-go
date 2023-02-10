@@ -138,9 +138,9 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
+func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, key)),
+		RegisterIDToKey(id),
 	)
 }
 
@@ -154,37 +154,31 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+func RegisterEntriesToKeysValues(
+	entries flow.RegisterEntries,
+) (
+	[]ledger.Key,
+	[]ledger.Value,
+) {
+	keys := make([]ledger.Key, len(entries))
+	values := make([]ledger.Value, len(entries))
+	for i, entry := range entries {
+		keys[i] = RegisterIDToKey(entry.Key)
+		values[i] = entry.Value
 	}
-	return keys
-}
-
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
-	}
-	return vals
+	return keys, values
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
-	return func(owner, key string) (flow.RegisterValue, error) {
-		regID := flow.RegisterID{
-			Owner: owner,
-			Key:   key,
-		}
-
+	return func(regID flow.RegisterID) (flow.RegisterValue, error) {
 		if value, ok := readCache[regID]; ok {
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, key)
+		query, err := makeSingleValueQuery(commitment, regID)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
@@ -193,7 +187,7 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", regID, commitment, err)
 		}
 
 		// Prevent caching of value with len zero
@@ -209,21 +203,17 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 }
 
 func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewView(LedgerGetRegister(s.ls, commitment))
+	return delta.NewDeltaView(LedgerGetRegister(s.ls, commitment))
 }
 
 type RegisterUpdatesHolder interface {
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	UpdatedRegisters() flow.RegisterEntries
 }
 
 func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	ids, values := ruh.RegisterUpdates()
+	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
 
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
@@ -236,13 +226,6 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 
 	return flow.StateCommitment(commit), trieUpdate, nil
 }
-
-//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.End()
-//
-//	return CommitDelta(s.ls, delta, baseState)
-//}
 
 func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
 

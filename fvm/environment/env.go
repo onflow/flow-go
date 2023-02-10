@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -19,7 +20,10 @@ type Environment interface {
 	runtime.Interface
 
 	// Tracer
-	StartChildSpan(name trace.SpanName) tracing.TracerSpan
+	StartChildSpan(
+		name trace.SpanName,
+		options ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan
 
 	Meter
 
@@ -34,8 +38,9 @@ type Environment interface {
 	Logs() []string
 
 	// EventEmitter
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
+	Events() flow.EventsList
+	ServiceEvents() flow.EventsList
+	ConvertedServiceEvents() flow.ServiceEventList
 
 	// SystemContracts
 	AccountsStorageCapacity(

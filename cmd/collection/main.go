@@ -7,12 +7,18 @@ import (
 	"github.com/spf13/pflag"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/model/bootstrap"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/utils/grpcutils"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -28,19 +34,16 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/chainsync"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -53,25 +56,24 @@ import (
 func main() {
 
 	var (
-		txLimit                                uint
-		maxCollectionSize                      uint
-		maxCollectionByteSize                  uint64
-		maxCollectionTotalGas                  uint64
-		maxCollectionRequestCacheSize          uint32 // collection provider engine
-		collectionProviderWorkers              uint   // collection provider engine
-		builderExpiryBuffer                    uint
-		builderPayerRateLimitDryRun            bool
-		builderPayerRateLimit                  float64
-		builderUnlimitedPayers                 []string
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		startupTimeString                      string
-		startupTime                            time.Time
+		txLimit                           uint
+		maxCollectionSize                 uint
+		maxCollectionByteSize             uint64
+		maxCollectionTotalGas             uint64
+		maxCollectionRequestCacheSize     uint32 // collection provider engine
+		collectionProviderWorkers         uint   // collection provider engine
+		builderExpiryBuffer               uint
+		builderPayerRateLimitDryRun       bool
+		builderPayerRateLimit             float64
+		builderUnlimitedPayers            []string
+		hotstuffMinTimeout                time.Duration
+		hotstuffTimeoutAdjustmentFactor   float64
+		hotstuffHappyPathMaxRoundFailures uint64
+		blockRateDelay                    time.Duration
+		startupTimeString                 string
+		startupTime                       time.Time
 
+		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.MutableState
 		ingestConf              = ingest.DefaultConfig()
 		rpcConf                 rpc.Config
@@ -85,6 +87,7 @@ func main() {
 		push              *pusher.Engine
 		ing               *ingest.Engine
 		mainChainSyncCore *chainsync.Core
+		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -104,6 +107,8 @@ func main() {
 			"maximum number of transactions in the memory pool")
 		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
+		flags.UintVar(&rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize,
+			"the maximum message size in bytes for messages sent or received over grpc")
 		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
@@ -132,19 +137,12 @@ func main() {
 			"maximum byte size of the proposed collection")
 		flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 			"maximum total amount of maxgas of transactions in proposed collections")
-		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
-			"the initial timeout for the hotstuff pacemaker")
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
-			"the lower timeout bound for the hotstuff pacemaker")
-		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
-			timeout.DefaultConfig.TimeoutIncrease,
-			"multiplicative increase of timeout value in case of time out event")
-		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
-			timeout.DefaultConfig.TimeoutDecrease,
-			"multiplicative decrease of timeout value in case of progress")
-		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
-			timeout.DefaultConfig.VoteAggregationTimeoutFraction,
-			"additional fraction of replica timeout that the primary will wait for votes")
+			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
+			"adjustment of timeout duration in case of time out event")
+		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
+			"number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -217,7 +215,8 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			log := node.Logger.With().Str("sync_chain_id", node.RootChainID.String()).Logger()
+			mainChainSyncCore, err = chainsync.New(log, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -259,36 +258,28 @@ func main() {
 
 			return validator, err
 		}).
-		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// create a finalizer that will handling updating the protocol
-			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
+		Component("consensus committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-
-			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
-
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-
+			mainConsensusCommittee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(mainConsensusCommittee)
+			return mainConsensusCommittee, err
+		}).
+		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// create a finalizer for updating the protocol
+			// state when the follower detects newly finalized blocks
+			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			// creates a consensus follower with noop consumer as the notifier
-			followerCore, err := consensus.NewFollower(
+			followerCore, err = consensus.NewFollower(
 				node.Logger,
 				mainConsensusCommittee,
 				node.Storage.Headers,
@@ -303,6 +294,17 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
+			return followerCore, nil
+		}).
+		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize cleaner for DB
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
+
+			validator := validator.New(mainConsensusCommittee, verifier)
 
 			followerEng, err = followereng.New(
 				node.Logger,
@@ -316,6 +318,7 @@ func main() {
 				followerState,
 				followerBuffer,
 				followerCore,
+				validator,
 				mainChainSyncCore,
 				node.Tracer,
 				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
@@ -452,7 +455,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := factories.NewProposalEngineFactory(
+			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -467,12 +470,16 @@ func main() {
 				return nil, err
 			}
 
+			syncCoreFactory, err := factories.NewSyncCoreFactory(node.Logger, node.SyncCoreConfig)
+			if err != nil {
+				return nil, err
+			}
+
 			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -484,11 +491,9 @@ func main() {
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
+				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
 			}
 
 			if !startupTime.IsZero() {
@@ -500,6 +505,8 @@ func main() {
 				node.Me,
 				node.DB,
 				node.State,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				createMetrics,
 				opts...,
 			)
@@ -523,14 +530,24 @@ func main() {
 				qcContractClients,
 			)
 
+			messageHubFactory := factories.NewMessageHubFactory(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.State,
+			)
+
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
 				pools,
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
-				proposalFactory,
+				complianceEngineFactory,
+				syncCoreFactory,
 				syncFactory,
+				messageHubFactory,
 			)
 
 			heightEvents := gadgets.NewHeights()

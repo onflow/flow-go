@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,15 +33,15 @@ func main() {
 
 		topic1 := channels.TestNetworkChannel.String()
 		topic2 := channels.TestMetricsChannel.String()
-		protocol1 := network.ProtocolTypeUnicast.String()
-		protocol2 := network.ProtocolTypePubSub.String()
+		protocol1 := message.ProtocolTypeUnicast.String()
+		protocol2 := message.ProtocolTypePubSub.String()
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())
-			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
-			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
+			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeLocalTimeout)
+			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffIdleDuration(10)
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))

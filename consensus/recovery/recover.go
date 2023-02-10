@@ -17,25 +17,13 @@ import (
 // received but not finalized, and that share the latest finalized block as a common
 // ancestor.
 func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header, validator hotstuff.Validator, onProposal func(*model.Proposal) error) error {
-	blocks := make(map[flow.Identifier]*flow.Header, len(pending)+1)
-
-	// finalized is the root
-	blocks[finalized.ID()] = finalized
-
 	log.Info().Int("total", len(pending)).Msgf("recovery started")
 
 	// add all pending blocks to forks
 	for _, header := range pending {
-		blocks[header.ID()] = header
-
-		// parent must exist in storage, because the index has the parent ID
-		parent, ok := blocks[header.ParentID]
-		if !ok {
-			return fmt.Errorf("could not find the parent block %x for header %x", header.ParentID, header.ID())
-		}
 
 		// convert the header into a proposal
-		proposal := model.ProposalFromFlow(header, parent.View)
+		proposal := model.ProposalFromFlow(header)
 
 		// verify the proposal
 		err := validator.ValidateProposal(proposal)

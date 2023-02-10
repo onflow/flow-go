@@ -42,9 +42,9 @@ type MutableState interface {
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while
-	// still checking that the given block is a valid extension of the protocol
-	// state. Depending on implementation it might be a lighter version that checks only
-	// block header.
+	// still checking that the given block is a valid extension of the protocol state.
+	// Depending on implementation it might be a lighter version that checks only block header.
+	// The candidate block must have passed HotStuff validation before being passed to Extend.
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid
@@ -58,12 +58,4 @@ type MutableState interface {
 	// forwards the pointer to the latest finalized state.
 	// TODO error docs
 	Finalize(ctx context.Context, blockID flow.Identifier) error
-
-	// MarkValid marks the block header with the given block hash as valid.
-	// At this level, we can only mark one block at a time as valid. This
-	// implies that the parent of the block to be marked as valid
-	// has to be already valid.
-	// It modifies the persistent immutable protocol state accordingly.
-	// TODO error docs
-	MarkValid(blockID flow.Identifier) error
 }

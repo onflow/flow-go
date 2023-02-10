@@ -27,16 +27,6 @@ func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// InsertBlockValidity marks a block as valid or invalid, defined by the consensus algorithm.
-func InsertBlockValidity(blockID flow.Identifier, valid bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockValidity, blockID), valid)
-}
-
-// RetrieveBlockValidity returns a block's validity wrt the consensus algorithm.
-func RetrieveBlockValidity(blockID flow.Identifier, valid *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBlockValidity, blockID), valid)
-}
-
 func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutedBlock), blockID)
 }
@@ -76,6 +66,13 @@ func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) f
 // RemoveBlockIDByChunkID removes chunkID-blockID index by chunkID
 func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
+}
+
+// BatchRemoveBlockIDByChunkID removes chunkID-to-blockID index entries keyed by a chunkID in a provided batch.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func BatchRemoveBlockIDByChunkID(chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
