@@ -27,10 +27,8 @@ const (
 
 // AdminBlockListAttackOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages received before and after the senderVN is blocked by the receiverEN via the admin blocklist command.
 type AdminBlockListAttackOrchestrator struct {
+	*bft.BaseOrchestrator
 	sync.Mutex
-	t                          *testing.T
-	logger                     zerolog.Logger
-	orchestratorNetwork        insecure.OrchestratorNetwork
 	codec                      network.Codec
 	unauthorizedEventsReceived *atomic.Int64
 	authorizedEventsReceived   *atomic.Int64
@@ -45,8 +43,10 @@ var _ insecure.AttackOrchestrator = &AdminBlockListAttackOrchestrator{}
 
 func NewOrchestrator(t *testing.T, logger zerolog.Logger, senderVN, receiverEN flow.Identifier) *AdminBlockListAttackOrchestrator {
 	orchestrator := &AdminBlockListAttackOrchestrator{
-		t:                          t,
-		logger:                     logger.With().Str("component", "bft-test-orchestrator").Logger(),
+		BaseOrchestrator: &bft.BaseOrchestrator{
+			T:      t,
+			Logger: logger,
+		},
 		codec:                      unittest.NetworkCodec(),
 		unauthorizedEventsReceived: atomic.NewInt64(0),
 		authorizedEventsReceived:   atomic.NewInt64(0),
@@ -60,32 +60,11 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, senderVN, receiverEN f
 	return orchestrator
 }
 
-// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node. This attack orchestrator
-// simply passes through messages without changes to the orchestrator network.
-func (a *AdminBlockListAttackOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
-	lg := a.logger.With().
-		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
-		Str("channel", event.Channel.String()).
-		Str("protocol", event.Protocol.String()).
-		Uint32("target_num", event.TargetNum).
-		Strs("target_ids", logging.IDs(event.TargetIds)).
-		Str("flow_protocol_event", logging.Type(event.FlowProtocolEvent)).Logger()
-
-	err := a.orchestratorNetwork.SendEgress(event)
-	if err != nil {
-		lg.Error().Err(err).Msg("could not pass through egress event")
-		return err
-	}
-
-	lg.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("egress event passed through successfully")
-	return nil
-}
-
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
 // This handler will track authorized messages that are expected to be received by the receiverEN before we block the sender.
 // It also tracks unauthorized messages received if any that are expected to be blocked after the senderVN is blocked via the admin blocklist command.
 func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
-	lg := a.logger.With().
+	lg := a.Logger.With().
 		Hex("origin_id", logging.ID(event.OriginID)).
 		Str("channel", event.Channel.String()).
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
@@ -108,7 +87,7 @@ func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.In
 		a.authorizedEventsReceivedWg.Done()
 	}
 
-	err := a.orchestratorNetwork.SendIngress(event)
+	err := a.OrchestratorNetwork.SendIngress(event)
 	if err != nil {
 		lg.Error().Err(err).Msg("could not pass through ingress event")
 		return err
@@ -118,16 +97,12 @@ func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.In
 	return nil
 }
 
-func (a *AdminBlockListAttackOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
-	a.orchestratorNetwork = orchestratorNetwork
-}
-
 // sendAuthorizedMsgs publishes a number of authorized messages from the senderVN. Authorized messages are messages
 // that are sent before the senderVN is blocked.
 func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := bft.RequestChunkDataPackFixture(a.t, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
-		err := a.orchestratorNetwork.SendEgress(event)
+		event := bft.RequestChunkDataPackFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
+		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		a.authorizedEvents[event.FlowProtocolEventID] = event
 		a.authorizedEventsReceivedWg.Add(1)
@@ -138,8 +113,8 @@ func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 // after the senderVN is blocked via the admin blocklist command. These messages are not expected to be received.
 func (a *AdminBlockListAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
-		event := bft.RequestChunkDataPackFixture(a.t, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
-		err := a.orchestratorNetwork.SendEgress(event)
+		event := bft.RequestChunkDataPackFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
+		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		a.unauthorizedEvents[event.FlowProtocolEventID] = event
 	}

@@ -368,7 +368,7 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                 []NodeConfig
+	Nodes                 NodeConfigs
 	ConsensusFollowers    []ConsensusFollowerConfig
 	Name                  string
 	NClusters             uint
@@ -379,7 +379,7 @@ type NetworkConfig struct {
 
 type NetworkConfigOpt func(*NetworkConfig)
 
-func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
 		Name:                  name,
@@ -396,7 +396,7 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
 		Name:                  name,
@@ -461,122 +461,6 @@ func (n *NetworkConfig) Less(i, j int) bool {
 
 func (n *NetworkConfig) Swap(i, j int) {
 	n.Nodes[i], n.Nodes[j] = n.Nodes[j], n.Nodes[i]
-}
-
-// NodeConfig defines the input config for a particular node, specified prior
-// to network creation.
-type NodeConfig struct {
-	Role                  flow.Role
-	Corrupted             bool
-	Weight                uint64
-	Identifier            flow.Identifier
-	LogLevel              zerolog.Level
-	Ghost                 bool
-	AdditionalFlags       []string
-	Debug                 bool
-	SupportsUnstakedNodes bool // only applicable to Access node
-}
-
-func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
-	c := NodeConfig{
-		Role:       role,
-		Weight:     flow.DefaultInitialWeight,
-		Identifier: unittest.IdentifierFixture(), // default random ID
-		LogLevel:   zerolog.DebugLevel,           // log at debug by default
-	}
-
-	for _, apply := range opts {
-		apply(&c)
-	}
-
-	return c
-}
-
-// NewNodeConfigSet creates a set of node configs with the given role. The nodes
-// are given sequential IDs with a common prefix to make reading logs easier.
-func NewNodeConfigSet(n uint, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
-
-	// each node in the set has a common 4-digit prefix, separated from their
-	// index with a `0` character
-	idPrefix := uint(rand.Intn(10000) * 100)
-
-	confs := make([]NodeConfig, n)
-	for i := uint(0); i < n; i++ {
-		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(idPrefix+i+1))...)
-	}
-
-	return confs
-}
-
-func WithID(id flow.Identifier) func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.Identifier = id
-	}
-}
-
-// WithIDInt sets the node ID so the hex representation matches the input.
-// Useful for having consistent and easily readable IDs in test logs.
-func WithIDInt(id uint) func(config *NodeConfig) {
-
-	idStr := strconv.Itoa(int(id))
-	// left pad ID with zeros
-	pad := strings.Repeat("0", 64-len(idStr))
-	hex := pad + idStr
-
-	// convert hex to ID
-	flowID, err := flow.HexStringToIdentifier(hex)
-	if err != nil {
-		panic(err)
-	}
-
-	return WithID(flowID)
-}
-
-func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.LogLevel = level
-	}
-}
-
-func WithDebugImage(debug bool) func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.Debug = debug
-	}
-}
-
-// AsCorrupted sets the configuration of a node as corrupted, hence the node is pulling
-// the corrupted image of its role at the build time.
-// A corrupted image is running with Corruptible Conduit Factory hence enabling BFT testing
-// on the node.
-func AsCorrupted() func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		if config.Ghost {
-			panic("a node cannot be both corrupted and ghost at the same time")
-		}
-		config.Corrupted = true
-	}
-}
-
-func AsGhost() func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		if config.Corrupted {
-			panic("a node cannot be both corrupted and ghost at the same time")
-		}
-		config.Ghost = true
-	}
-}
-
-func SupportsUnstakedNodes() func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.SupportsUnstakedNodes = true
-	}
-}
-
-// WithAdditionalFlag adds additional flags to the command
-func WithAdditionalFlag(flag string) func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.AdditionalFlags = append(config.AdditionalFlags, flag)
-	}
 }
 
 // tempDir creates a temporary directory at /tmp/flow-integration-bootstrap

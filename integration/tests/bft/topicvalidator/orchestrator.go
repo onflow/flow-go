@@ -10,9 +10,9 @@ import (
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/integration/tests/bft"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,11 +31,7 @@ const (
 
 // TopicValidatorAttackOrchestrator represents an insecure.AttackOrchestrator track incoming unauthorized messages and authorized messages received by victim nodes.
 type TopicValidatorAttackOrchestrator struct {
-	sync.Mutex
-	t                          *testing.T
-	logger                     zerolog.Logger
-	orchestratorNetwork        insecure.OrchestratorNetwork
-	codec                      network.Codec
+	*bft.BaseOrchestrator
 	unauthorizedEventsReceived []flow.Identifier
 	authorizedEventsReceived   []flow.Identifier
 	unauthorizedEvents         map[flow.Identifier]*insecure.EgressEvent
@@ -51,9 +47,10 @@ var _ insecure.AttackOrchestrator = &TopicValidatorAttackOrchestrator{}
 
 func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN, victimEN, victimVN flow.Identifier) *TopicValidatorAttackOrchestrator {
 	orchestrator := &TopicValidatorAttackOrchestrator{
-		t:                          t,
-		logger:                     logger.With().Str("component", "bft-test-orchestrator").Logger(),
-		codec:                      unittest.NetworkCodec(),
+		BaseOrchestrator: &bft.BaseOrchestrator{
+			T:      t,
+			Logger: logger.With().Str("component", "bft-test-orchestrator").Logger(),
+		},
 		unauthorizedEventsReceived: make([]flow.Identifier, 0),
 		authorizedEventsReceived:   make([]flow.Identifier, 0),
 		unauthorizedEvents:         make(map[flow.Identifier]*insecure.EgressEvent),
@@ -71,31 +68,11 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN
 	return orchestrator
 }
 
-// HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
-func (o *TopicValidatorAttackOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
-	lg := o.logger.With().
-		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
-		Str("channel", event.Channel.String()).
-		Str("protocol", event.Protocol.String()).
-		Uint32("target_num", event.TargetNum).
-		Strs("target_ids", logging.IDs(event.TargetIds)).
-		Str("flow_protocol_event", logging.Type(event.FlowProtocolEvent)).Logger()
-
-	err := o.orchestratorNetwork.SendEgress(event)
-	if err != nil {
-		lg.Error().Err(err).Msg("could not pass through egress event")
-		return err
-	}
-
-	lg.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("egress event passed through successfully")
-	return nil
-}
-
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
 // This handler will track any unauthorized messages that are expected to be blocked at the topic validator.
 // It also tracks all the authorized messages that are expected to be delivered to the node.
 func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
-	lg := o.logger.With().
+	lg := o.Logger.With().
 		Hex("origin_id", logging.ID(event.OriginID)).
 		Str("channel", event.Channel.String()).
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
@@ -115,7 +92,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 		o.authorizedEventReceivedWg.Done()
 	}
 
-	err := o.orchestratorNetwork.SendIngress(event)
+	err := o.OrchestratorNetwork.SendIngress(event)
 
 	if err != nil {
 		lg.Error().Err(err).Msg("could not pass through ingress event")
@@ -125,14 +102,10 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 	return nil
 }
 
-func (o *TopicValidatorAttackOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
-	o.orchestratorNetwork = orchestratorNetwork
-}
-
 // sendUnauthorizedMsgs publishes a few combinations of unauthorized messages from the corrupted AN to the corrupted EN.
 func (o *TopicValidatorAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for _, event := range o.unauthorizedEvents {
-		err := o.orchestratorNetwork.SendEgress(event)
+		err := o.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 	}
 }
@@ -140,7 +113,7 @@ func (o *TopicValidatorAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 // sendAuthorizedMsgs sends a number of authorized messages.
 func (o *TopicValidatorAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for _, event := range o.authorizedEvents {
-		err := o.orchestratorNetwork.SendEgress(event)
+		err := o.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 	}
 }
@@ -169,7 +142,7 @@ func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
 			ChunkID: unittest.IdentifierFixture(),
 			Nonce:   rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataReq)
+		eventID := unittest.GetFlowProtocolEventID(o.T, channel, chunkDataReq)
 		event := &insecure.EgressEvent{
 			CorruptOriginId:     o.victimVN,
 			Channel:             channel,
@@ -190,7 +163,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
 		unauthorizedProposal := unittest.ProposalFixture()
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, unauthorizedProposal)
+		eventID := unittest.GetFlowProtocolEventID(o.T, channel, unauthorizedProposal)
 		unauthorizedMsgByRole := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -213,7 +186,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n 
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
+		eventID := unittest.GetFlowProtocolEventID(o.T, channel, syncReq)
 		unauthorizedMsgOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -236,7 +209,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedUnicastOnChannelEvent
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
 		}
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, syncReq)
+		eventID := unittest.GetFlowProtocolEventID(o.T, channel, syncReq)
 		unauthorizedUnicastOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerAN,
 			Channel:             channel,
@@ -256,7 +229,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvent
 	channel := channels.ProvideChunks
 	for i := 0; i < n; i++ {
 		chunkDataResponse := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
-		eventID := unittest.GetFlowProtocolEventID(o.t, channel, chunkDataResponse)
+		eventID := unittest.GetFlowProtocolEventID(o.T, channel, chunkDataResponse)
 		unauthorizedPublishOnChannel := &insecure.EgressEvent{
 			CorruptOriginId:     o.attackerEN,
 			Channel:             channel,
