@@ -6,8 +6,8 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-// ExecutionDataReceivedCallback is a callback that is called ExecutionData is received for a new block
-type ExecutionDataReceivedCallback func(*execution_data.BlockExecutionData)
+// OnExecutionDataReceivedConsumer is a callback that is called ExecutionData is received for a new block
+type OnExecutionDataReceivedConsumer func(*execution_data.BlockExecutionData)
 
 // ExecutionDataRequester is a component that syncs ExecutionData from the network, and exposes
 // a callback that is called when a new ExecutionData is received
@@ -18,5 +18,5 @@ type ExecutionDataRequester interface {
 	OnBlockFinalized(*model.Block)
 
 	// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
-	AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback)
+	AddOnExecutionDataFetchedConsumer(fn OnExecutionDataReceivedConsumer)
 }

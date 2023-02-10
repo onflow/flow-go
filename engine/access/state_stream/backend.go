@@ -43,7 +43,7 @@ type StateStreamBackend struct {
 	execDataCache    *lru.Cache
 	broadcaster      *engine.Broadcaster
 	sendTimeout      time.Duration
-	latestBlockCache *LatestEntityIDCache
+	latestBlockCache LatestExecDataCache
 }
 
 func New(
@@ -54,7 +54,7 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *lru.Cache,
 	broadcaster *engine.Broadcaster,
-	latestBlockCache *LatestEntityIDCache,
+	latestBlockCache LatestExecDataCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -138,7 +138,7 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 	}
 
 	// finally, if no start block ID or height is provided, use the latest block
-	header, err := b.headers.ByBlockID(b.latestBlockCache.Get())
+	header, err := b.headers.ByBlockID(b.latestBlockCache.LastBlockID())
 	if err != nil {
 		// this should never happen and would indicate there's an issue with the protocol state,
 		// but do not crash the node as a result of an external request.

@@ -425,6 +425,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
+	var execDataDistributor *edrequester.ExecutionDataDistributor
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -531,6 +532,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
 			}
 
+			execDataDistributor = edrequester.NewExecutionDataDistributor()
+
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
@@ -545,6 +548,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.ExecutionDataRequester.AddOnExecutionDataFetchedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -565,6 +569,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Results,
 				node.Logger,
 				node.RootChainID,
+				execDataDistributor,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 			)
@@ -573,7 +578,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 			builder.StateStreamEng = stateStreamEng
 
-			builder.ExecutionDataRequester.AddOnExecutionDataFetchedConsumer(builder.StateStreamEng.OnExecutionData)
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
 
 			return builder.StateStreamEng, nil
 		})

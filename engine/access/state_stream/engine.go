@@ -20,6 +20,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type LatestExecDataCache interface {
+	LastBlockID() flow.Identifier
+}
+
 // Config defines the configurable options for the ingress server.
 type Config struct {
 	ListenAddr              string
@@ -41,7 +45,7 @@ type Engine struct {
 
 	execDataBroadcaster *engine.Broadcaster
 	execDataCache       *lru.Cache
-	latestExecDataCache *LatestEntityIDCache
+	latestExecDataCache LatestExecDataCache
 
 	stateStreamGrpcAddress net.Addr
 }
@@ -55,6 +59,7 @@ func NewEng(
 	results storage.ExecutionResults,
 	log zerolog.Logger,
 	chainID flow.ChainID,
+	latestExecDataCache LatestExecDataCache,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
 ) (*Engine, error) {
@@ -93,7 +98,6 @@ func NewEng(
 		return nil, fmt.Errorf("could not create cache: %w", err)
 	}
 
-	latestExecDataCache := NewLatestEntityIDCache()
 	broadcaster := engine.NewBroadcaster()
 
 	backend, err := New(logger, headers, seals, results, execDataStore, execDataCache, broadcaster, latestExecDataCache)
@@ -126,7 +130,6 @@ func NewEng(
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionData) {
 	e.log.Trace().Msgf("received execution data %v", executionData.BlockID)
 	_ = e.execDataCache.Add(executionData.BlockID, executionData)
-	e.latestExecDataCache.Set(executionData.BlockID)
 	e.execDataBroadcaster.Publish()
 	e.log.Trace().Msg("sent broadcast notification")
 }

@@ -136,7 +136,7 @@ type executionDataRequester struct {
 	notificationConsumer *jobqueue.ComponentConsumer
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
-	consumers []state_synchronization.ExecutionDataReceivedCallback
+	consumers []state_synchronization.OnExecutionDataReceivedConsumer
 
 	consumerMu sync.RWMutex
 }
@@ -257,7 +257,7 @@ func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
+func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
 
