@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -32,31 +33,33 @@ func TestConnectionGating(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create 2 nodes
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, node1Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node1Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
 			return nil
 		})))
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
 
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node2Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
 			return nil
 		})))
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -107,6 +110,7 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
+	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1, node1Id := p2ptest.NodeFixture(
 		t,
@@ -143,9 +147,11 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil // allow all connections.
 		})))
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -166,6 +172,7 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkID := unittest.IdentifierFixture()
+	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1, node1Id := p2ptest.NodeFixture(
 		t,
@@ -183,9 +190,11 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(p peer.ID) error {
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return fmt.Errorf("disallowed connection") // rejecting all connections.
 		})))
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -289,6 +298,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
+	idProvider := mockmodule.NewIdentityProvider(t)
 	defer cancel()
 
 	count := 5
@@ -321,7 +331,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				}
 				return list
 			}),
-			p2ptest.WithConnectionGater(testutils.NewConnectionGater(func(pid peer.ID) error {
+			p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 				return disallowedList.ForEach(func(id *flow.Identity, _ struct{}) error {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
@@ -331,6 +341,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 					return nil
 				})
 			})))
+		idProvider.On("ByPeerID", node.Host().ID()).Return(&id, true).Maybe()
 
 		nodes = append(nodes, node)
 		ids = append(ids, &id)

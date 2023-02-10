@@ -55,8 +55,10 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 		id := NewRegisterID(owner, key)
 		require.False(t, id.IsInternalState())
 	}
-	requireTrue("", UUIDKey)
-	requireTrue("", AddressStateKey)
+	require.True(t, UUIDRegisterID.IsInternalState())
+	requireFalse("", UUIDKey)
+	require.True(t, AddressStateRegisterID.IsInternalState())
+	requireFalse("", AddressStateKey)
 	requireFalse("", "other")
 	requireFalse("Address", UUIDKey)
 	requireFalse("Address", AddressStateKey)
@@ -77,7 +79,7 @@ func TestRegisterID_String(t *testing.T) {
 	require.False(t, utf8.ValidString(id.Key))
 	printable := id.String()
 	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "0102030a/$189", printable)
+	require.Equal(t, "000000000102030a/$189", printable)
 
 	// non slab invalid utf-8
 	id = NewRegisterID("b\xc5y", "a\xc5z")
@@ -85,5 +87,5 @@ func TestRegisterID_String(t *testing.T) {
 	require.False(t, utf8.ValidString(id.Key))
 	printable = id.String()
 	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "62c579/#61c57a", printable)
+	require.Equal(t, "000000000062c579/#61c57a", printable)
 }

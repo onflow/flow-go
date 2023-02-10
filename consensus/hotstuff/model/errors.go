@@ -10,19 +10,55 @@ import (
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 	ErrInvalidSignature  = errors.New("invalid signature")
+	// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is
+	// outside of all cached epochs. This can happen when a query is made for a view in the
+	// next epoch, if that epoch is not committed yet. This can also happen when an
+	// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
+	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why the voter didn't vote for a block proposal.
+// NoVoteError contains the reason why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
-	Msg string
+	Err error
 }
 
-func (e NoVoteError) Error() string { return e.Msg }
+func (e NoVoteError) Error() string { return fmt.Sprintf("not voting - %s", e.Err.Error()) }
+
+func (e NoVoteError) Unwrap() error {
+	return e.Err
+}
 
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
 	var e NoVoteError
 	return errors.As(err, &e)
+}
+
+func NewNoVoteErrorf(msg string, args ...interface{}) error {
+	return NoVoteError{Err: fmt.Errorf(msg, args...)}
+}
+
+// NoTimeoutError contains the reason why hotstuff.SafetyRules refused to generate a `TimeoutObject` [TO] for the current view.
+type NoTimeoutError struct {
+	Err error
+}
+
+func (e NoTimeoutError) Error() string {
+	return fmt.Sprintf("conditions not satisfied to generate valid TimeoutObject: %s", e.Err.Error())
+}
+
+func (e NoTimeoutError) Unwrap() error {
+	return e.Err
+}
+
+// IsNoTimeoutError returns whether an error is NoTimeoutError
+func IsNoTimeoutError(err error) bool {
+	var e NoTimeoutError
+	return errors.As(err, &e)
+}
+
+func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
+	return NoTimeoutError{Err: fmt.Errorf(msg, args...)}
 }
 
 // InvalidFormatError indicates that some data has an incompatible format.
@@ -77,13 +113,54 @@ type MissingBlockError struct {
 }
 
 func (e MissingBlockError) Error() string {
-	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
+	return fmt.Sprintf("missing Proposal at view %d with ID %v", e.View, e.BlockID)
 }
 
 // IsMissingBlockError returns whether an error is MissingBlockError
 func IsMissingBlockError(err error) bool {
 	var e MissingBlockError
 	return errors.As(err, &e)
+}
+
+// InvalidQCError indicates that the QC for block identified by `BlockID` and `View` is invalid
+type InvalidQCError struct {
+	BlockID flow.Identifier
+	View    uint64
+	Err     error
+}
+
+func (e InvalidQCError) Error() string {
+	return fmt.Sprintf("invalid QC for block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+}
+
+// IsInvalidQCError returns whether an error is InvalidQCError
+func IsInvalidQCError(err error) bool {
+	var e InvalidQCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidQCError) Unwrap() error {
+	return e.Err
+}
+
+// InvalidTCError indicates that the TC for view identified by `View` is invalid
+type InvalidTCError struct {
+	View uint64
+	Err  error
+}
+
+func (e InvalidTCError) Error() string {
+	return fmt.Sprintf("invalid TC at view %d: %s", e.View, e.Err.Error())
+}
+
+// IsInvalidTCError returns whether an error is InvalidQCError
+func IsInvalidTCError(err error) bool {
+	var e InvalidTCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTCError) Unwrap() error {
+	return e.Err
 }
 
 // InvalidBlockError indicates that the block with identifier `BlockID` is invalid
@@ -109,27 +186,36 @@ func (e InvalidBlockError) Unwrap() error {
 
 // InvalidVoteError indicates that the vote with identifier `VoteID` is invalid
 type InvalidVoteError struct {
-	VoteID flow.Identifier
-	View   uint64
-	Err    error
+	Vote *Vote
+	Err  error
 }
 
 func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
 	return InvalidVoteError{
-		VoteID: vote.ID(),
-		View:   vote.View,
-		Err:    fmt.Errorf(msg, args...),
+		Vote: vote,
+		Err:  fmt.Errorf(msg, args...),
 	}
 }
 
 func (e InvalidVoteError) Error() string {
-	return fmt.Sprintf("invalid vote %x for view %d: %s", e.VoteID, e.View, e.Err.Error())
+	return fmt.Sprintf("invalid vote at view %d for block %x: %s", e.Vote.View, e.Vote.BlockID, e.Err.Error())
 }
 
 // IsInvalidVoteError returns whether an error is InvalidVoteError
 func IsInvalidVoteError(err error) bool {
 	var e InvalidVoteError
 	return errors.As(err, &e)
+}
+
+// AsInvalidVoteError determines whether the given error is a InvalidVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidVoteError(err error) (*InvalidVoteError, bool) {
+	var e InvalidVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
 }
 
 func (e InvalidVoteError) Unwrap() error {
@@ -146,6 +232,11 @@ type ByzantineThresholdExceededError struct {
 
 func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
+}
+
+func IsByzantineThresholdExceededError(err error) bool {
+	var target ByzantineThresholdExceededError
+	return errors.As(err, &target)
 }
 
 // DoubleVoteError indicates that a consensus replica has voted for two different
@@ -297,4 +388,83 @@ func (e InvalidSignerError) Unwrap() error { return e.err }
 func IsInvalidSignerError(err error) bool {
 	var e InvalidSignerError
 	return errors.As(err, &e)
+}
+
+// DoubleTimeoutError indicates that a consensus replica has created two different
+// timeout objects for same view.
+type DoubleTimeoutError struct {
+	FirstTimeout       *TimeoutObject
+	ConflictingTimeout *TimeoutObject
+	err                error
+}
+
+func (e DoubleTimeoutError) Error() string {
+	return e.err.Error()
+}
+
+// IsDoubleTimeoutError returns whether an error is DoubleTimeoutError
+func IsDoubleTimeoutError(err error) bool {
+	var e DoubleTimeoutError
+	return errors.As(err, &e)
+}
+
+// AsDoubleTimeoutError determines whether the given error is a DoubleTimeoutError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsDoubleTimeoutError(err error) (*DoubleTimeoutError, bool) {
+	var e DoubleTimeoutError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+func (e DoubleTimeoutError) Unwrap() error {
+	return e.err
+}
+
+func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg string, args ...interface{}) error {
+	return DoubleTimeoutError{
+		FirstTimeout:       firstTimeout,
+		ConflictingTimeout: conflictingTimeout,
+		err:                fmt.Errorf(msg, args...),
+	}
+}
+
+// InvalidTimeoutError indicates that the embedded timeout object is invalid
+type InvalidTimeoutError struct {
+	Timeout *TimeoutObject
+	Err     error
+}
+
+func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interface{}) error {
+	return InvalidTimeoutError{
+		Timeout: timeout,
+		Err:     fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidTimeoutError) Error() string {
+	return fmt.Sprintf("invalid timeout %x for view %d: %s", e.Timeout.ID(), e.Timeout.View, e.Err.Error())
+}
+
+// IsInvalidTimeoutError returns whether an error is InvalidTimeoutError
+func IsInvalidTimeoutError(err error) bool {
+	var e InvalidTimeoutError
+	return errors.As(err, &e)
+}
+
+// AsInvalidTimeoutError determines whether the given error is a InvalidTimeoutError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidTimeoutError(err error) (*InvalidTimeoutError, bool) {
+	var e InvalidTimeoutError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+func (e InvalidTimeoutError) Unwrap() error {
+	return e.Err
 }

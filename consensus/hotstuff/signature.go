@@ -101,6 +101,55 @@ type WeightedSignatureAggregator interface {
 	Aggregate() (flow.IdentifierList, []byte, error)
 }
 
+// TimeoutSignatureAggregator aggregates timeout signatures for one particular view.
+// When instantiating a TimeoutSignatureAggregator, the following information is supplied:
+//   - The view for which the aggregator collects timeouts.
+//   - For each replicas that is authorized to send a timeout at this particular view:
+//     the node ID, public staking keys, and weight
+//
+// Timeouts for other views or from non-authorized replicas are rejected.
+// In their TimeoutObjects, replicas include a signature over the pair (view, newestQCView),
+// where `view` is the view number the timeout is for and `newestQCView` is the view of
+// the newest QC known to the replica. TimeoutSignatureAggregator collects these signatures,
+// internally tracks the total weight of all collected signatures. Note that in general the
+// signed messages are different, which makes the aggregation a comparatively expensive operation.
+// Upon calling `Aggregate`, the TimeoutSignatureAggregator aggregates all valid signatures collected
+// up to this point. The aggregate signature is guaranteed to be correct, as only valid signatures
+// are excepted as inputs.
+// TimeoutSignatureAggregator internally tracks the total weight of all collected signatures.
+// Implementations must be concurrency safe.
+type TimeoutSignatureAggregator interface {
+	// VerifyAndAdd verifies the signature under the stored public keys and adds the signature and the corresponding
+	// highest QC to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
+	// The total weight of all collected signatures (excluding duplicates) is returned regardless
+	// of any returned error.
+	// Expected errors during normal operations:
+	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+	//  - model.DuplicatedSignerError if the signer has been already added
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error)
+
+	// TotalWeight returns the total weight presented by the collected signatures.
+	TotalWeight() uint64
+
+	// View returns the view that this instance is aggregating signatures for.
+	View() uint64
+
+	// Aggregate aggregates the signatures and returns with additional data.
+	// Aggregated signature will be returned as SigData of timeout certificate.
+	// Caller can be sure that resulting signature is valid.
+	// Expected errors during normal operations:
+	//  - model.InsufficientSignaturesError if no signatures have been added yet
+	Aggregate() (signersInfo []TimeoutSignerInfo, aggregatedSig crypto.Signature, exception error)
+}
+
+// TimeoutSignerInfo is a helper structure that stores the QC views that each signer
+// contributed to a TC. Used as result of TimeoutSignatureAggregator.Aggregate()
+type TimeoutSignerInfo struct {
+	NewestQCView uint64
+	Signer       flow.Identifier
+}
+
 // BlockSignatureData is an intermediate struct for Packer to pack the
 // aggregated signature data into raw bytes or unpack from raw bytes.
 type BlockSignatureData struct {
@@ -114,11 +163,11 @@ type BlockSignatureData struct {
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
 	// Pack serializes the provided BlockSignatureData into a precursor format of a QC.
-	// blockID is the block that the aggregated signature is for.
+	// view is the view of the block that the aggregated signature is for.
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
 	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-	Pack(blockID flow.Identifier, sig *BlockSignatureData) (signerIndices []byte, sigData []byte, err error)
+	Pack(view uint64, sig *BlockSignatureData) (signerIndices []byte, sigData []byte, err error)
 
 	// Unpack de-serializes the provided signature data.
 	// sig is the aggregated signature data

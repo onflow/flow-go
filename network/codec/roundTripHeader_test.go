@@ -1,7 +1,6 @@
 package codec_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,10 +29,16 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.BlockProposal)
 	decodedBlock := decoded.Block.ToInternal()
-	assert.Equal(t, block.Header.ProposerSigData, decodedBlock.Header.ProposerSigData)
-	messageHeader := fmt.Sprintf("- .Header=%+v\n", block.Header)
-	decodedHeader := fmt.Sprintf("- .Header=%+v\n", decodedBlock.Header)
-	assert.Equal(t, messageHeader, decodedHeader)
+	// compare LastViewTC separately, because it is a pointer field
+	if decodedBlock.Header.LastViewTC == nil {
+		assert.Equal(t, block.Header.LastViewTC, decodedBlock.Header.LastViewTC)
+	} else {
+		assert.Equal(t, *block.Header.LastViewTC, *decodedBlock.Header.LastViewTC)
+	}
+	// compare the rest of the header
+	// manually set LastViewTC fields to be equal to pass the Header pointer comparison
+	decodedBlock.Header.LastViewTC = block.Header.LastViewTC
+	assert.Equal(t, *block.Header, *decodedBlock.Header)
 }
 
 func TestRoundTripHeaderViaCBOR(t *testing.T) {

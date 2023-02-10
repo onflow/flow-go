@@ -246,15 +246,21 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
+	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
-	connGater := testutils.NewConnectionGater(func(pid peer.ID) error {
+	connGater := testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if messageRateLimiter.IsRateLimited(pid) {
 			return fmt.Errorf("rate-limited peer")
 		}
 
 		return nil
 	})
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor), testutils.WithConnectionGater(connGater))
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
+		m.logger,
+		1,
+		testutils.WithUnicastRateLimiterDistributor(distributor),
+		testutils.WithConnectionGater(connGater))
+	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
@@ -411,8 +417,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
+	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 	// create connection gater, connection gater will refuse connections from rate limited nodes
-	connGater := testutils.NewConnectionGater(func(pid peer.ID) error {
+	connGater := testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if bandwidthRateLimiter.IsRateLimited(pid) {
 			return fmt.Errorf("rate-limited peer")
 		}
@@ -420,7 +427,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		return nil
 	})
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1, testutils.WithUnicastRateLimiterDistributor(distributor), testutils.WithConnectionGater(connGater))
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
+		m.logger,
+		1,
+		testutils.WithUnicastRateLimiterDistributor(distributor),
+		testutils.WithConnectionGater(connGater))
+	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),

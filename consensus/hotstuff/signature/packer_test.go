@@ -2,6 +2,7 @@ package signature
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -17,9 +18,9 @@ import (
 
 func newPacker(identities flow.IdentityList) *ConsensusSigDataPacker {
 	// mock consensus committee
-	committee := &mocks.Committee{}
-	committee.On("Identities", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.IdentityList {
+	committee := &mocks.DynamicCommittee{}
+	committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
 			return identities
 		},
 		nil,
@@ -54,14 +55,14 @@ func makeBlockSigData(committee flow.IdentityList) *hotstuff.BlockSignatureData 
 func TestPackUnpack(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
 	// create packer with the committee
 	packer := newPacker(committee)
 
 	// pack & unpack
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -117,7 +118,7 @@ func TestPackUnpack_EmptySigners(t *testing.T) {
 func TestPackUnpackManyNodes(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(200, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 	stakingSigners := make([]flow.Identifier, 0)
 	for i := 0; i < 60; i++ {
@@ -134,7 +135,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	packer := newPacker(committee)
 
 	// pack & unpack
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -161,13 +162,13 @@ func TestPackUnpackManyNodes(t *testing.T) {
 func TestFailToDecode(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
 	// create packer with the committee
 	packer := newPacker(committee)
 
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -184,13 +185,13 @@ func TestFailToDecode(t *testing.T) {
 func TestMismatchSignerIDs(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(9, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee[:6])
 
 	// create packer with the committee
 	packer := newPacker(committee)
 
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -216,13 +217,13 @@ func TestMismatchSignerIDs(t *testing.T) {
 func TestInvalidSigType(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
 	// create packer with the committee
 	packer := newPacker(committee)
 
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -250,7 +251,7 @@ func TestInvalidSigType(t *testing.T) {
 func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	// prepare data for testing
 	committee := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners:               committee.NodeIDs(),
@@ -264,7 +265,7 @@ func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	packer := newPacker(committee)
 
 	// pack & unpack
-	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(view, blockSigData)
 	require.NoError(t, err)
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(committee, signerIndices)
@@ -295,7 +296,7 @@ func TestPackWithoutRBAggregatedSig(t *testing.T) {
 	committee := identities.NodeIDs()
 
 	// prepare data for testing
-	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
 
 	aggregatedSig := unittest.SignatureFixture()
 	reconstructedSig := unittest.SignatureFixture()
@@ -320,10 +321,10 @@ func TestPackWithoutRBAggregatedSig(t *testing.T) {
 	packer := newPacker(identities)
 
 	// pack
-	signerIDs_A, sig_A, err := packer.Pack(blockID, blockSigDataWithEmptySlices)
+	signerIDs_A, sig_A, err := packer.Pack(view, blockSigDataWithEmptySlices)
 	require.NoError(t, err)
 
-	signerIDs_B, sig_B, err := packer.Pack(blockID, blockSigDataWithNils)
+	signerIDs_B, sig_B, err := packer.Pack(view, blockSigDataWithNils)
 	require.NoError(t, err)
 
 	// should be the same

@@ -27,16 +27,6 @@ func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// InsertBlockValidity marks a block as valid or invalid, defined by the consensus algorithm.
-func InsertBlockValidity(blockID flow.Identifier, valid bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockValidity, blockID), valid)
-}
-
-// RetrieveBlockValidity returns a block's validity wrt the consensus algorithm.
-func RetrieveBlockValidity(blockID flow.Identifier, valid *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBlockValidity, blockID), valid)
-}
-
 func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutedBlock), blockID)
 }

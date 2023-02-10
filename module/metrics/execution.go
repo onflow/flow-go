@@ -39,6 +39,7 @@ type ExecutionCollector struct {
 	readDurationPerValue                   prometheus.Histogram
 	blockComputationUsed                   prometheus.Histogram
 	blockComputationVector                 *prometheus.GaugeVec
+	blockCachedPrograms                    prometheus.Gauge
 	blockMemoryUsed                        prometheus.Histogram
 	blockEventCounts                       prometheus.Histogram
 	blockEventSize                         prometheus.Histogram
@@ -71,6 +72,8 @@ type ExecutionCollector struct {
 	scriptMemoryEstimate                   prometheus.Histogram
 	scriptMemoryDifference                 prometheus.Histogram
 	numberOfAccounts                       prometheus.Gauge
+	programsCacheMiss                      prometheus.Counter
+	programsCacheHit                       prometheus.Counter
 	chunkDataPackRequestProcessedTotal     prometheus.Counter
 	chunkDataPackProofSize                 prometheus.Histogram
 	chunkDataPackCollectionSize            prometheus.Histogram
@@ -253,6 +256,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "block_execution_effort_vector",
 		Help:      "execution effort vector of the last executed block by computation kind",
 	}, []string{LabelComputationKind})
+
+	blockCachedPrograms := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_cached_programs",
+		Help:      "Number of cached programs at the end of block execution",
+	})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
@@ -543,6 +553,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		blockExecutionTime:                     blockExecutionTime,
 		blockComputationUsed:                   blockComputationUsed,
 		blockComputationVector:                 blockComputationVector,
+		blockCachedPrograms:                    blockCachedPrograms,
 		blockMemoryUsed:                        blockMemoryUsed,
 		blockEventCounts:                       blockEventCounts,
 		blockEventSize:                         blockEventSize,
@@ -650,6 +661,20 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of existing accounts on the network",
 		}),
 
+		programsCacheMiss: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_miss",
+			Help:      "the number of times a program was not found in the cache and had to be loaded",
+		}),
+
+		programsCacheHit: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_hit",
+			Help:      "the number of times a program was found in the cache",
+		}),
+
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -704,6 +729,10 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 
 func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
 	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
+}
+
+func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
+	ec.blockCachedPrograms.Set(float64(programs))
 }
 
 // TransactionExecuted reports stats for executing a transaction
@@ -890,6 +919,14 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 
 func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
+}
+
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheMiss() {
+	ec.programsCacheMiss.Inc()
+}
+
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
+	ec.programsCacheHit.Inc()
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
