@@ -303,7 +303,10 @@ func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm
 		options...,
 	)
 
-	_ = vm.Run(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view)
+	if err != nil {
+		panic(err)
+	}
 	return view
 }
 
