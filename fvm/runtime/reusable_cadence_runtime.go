@@ -45,10 +45,10 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:     rt,
-		Environment: runtime.NewBaseInterpreterEnvironment(runtime.Config{}),
+		Environment: runtime.NewBaseInterpreterEnvironment(config),
 	}
 
 	setAccountFrozen := stdlib.StandardLibraryValue{
@@ -242,7 +242,9 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 		reusable = NewReusableCadenceRuntime(
 			WrappedCadenceRuntime{
 				pool.newRuntime(),
-			})
+			},
+			pool.config,
+		)
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
