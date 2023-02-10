@@ -31,7 +31,7 @@ type recorder struct {
 
 // NewRecorder returns a new metrics recorder that implements the recorder
 // using Prometheus as the backend.
-func NewRecorder(cfg metricsProm.Config) CustomRecorder {
+func NewRestCollector(cfg metricsProm.Config) RestCollector {
 	if len(cfg.DurationBuckets) == 0 {
 		cfg.DurationBuckets = prometheus.DefBuckets
 	}
