@@ -8,14 +8,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
-	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/integration/tests/bft"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -107,7 +105,7 @@ func (s *SignatureValidationAttackOrchestrator) HandleIngressEvent(event *insecu
 // framework needs to have an eye on what it receives (i.e., ingress traffic).
 func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
-		event := s.requestChunkDataPackFixture(s.attackerVNNoMsgSigning, s.victimENID)
+		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNNoMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.unauthorizedEvents[event.FlowProtocolEventID] = event
@@ -118,30 +116,11 @@ func (s *SignatureValidationAttackOrchestrator) sendUnauthorizedMsgs(t *testing.
 // This func allows us to ensure that unauthorized messages have been processed.
 func (s *SignatureValidationAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := s.requestChunkDataPackFixture(s.attackerVNWithMsgSigning, s.victimENID)
+		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNWithMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		s.authorizedEvents[event.FlowProtocolEventID] = event
 		s.authorizedEventReceivedWg.Add(1)
-	}
-}
-
-// requestChunkDataPackFixture returns an insecure.EgressEvent with messages.ChunkDataRequest payload and the provided node ID as the originID.
-func (s *SignatureValidationAttackOrchestrator) requestChunkDataPackFixture(originID, targetID flow.Identifier) *insecure.EgressEvent {
-	channel := channels.RequestChunks
-	chunkDataReq := &messages.ChunkDataRequest{
-		ChunkID: unittest.IdentifierFixture(),
-		Nonce:   rand.Uint64(),
-	}
-	eventID := unittest.GetFlowProtocolEventID(s.T, channel, chunkDataReq)
-	return &insecure.EgressEvent{
-		CorruptOriginId:     originID,
-		Channel:             channel,
-		Protocol:            insecure.Protocol_PUBLISH,
-		TargetNum:           0,
-		TargetIds:           flow.IdentifierList{targetID},
-		FlowProtocolEvent:   chunkDataReq,
-		FlowProtocolEventID: eventID,
 	}
 }
 

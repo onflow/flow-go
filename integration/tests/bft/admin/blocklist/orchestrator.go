@@ -101,7 +101,7 @@ func (a *AdminBlockListAttackOrchestrator) HandleIngressEvent(event *insecure.In
 // that are sent before the senderVN is blocked.
 func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := bft.RequestChunkDataPackFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
+		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		a.authorizedEvents[event.FlowProtocolEventID] = event
@@ -113,7 +113,7 @@ func (a *AdminBlockListAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 // after the senderVN is blocked via the admin blocklist command. These messages are not expected to be received.
 func (a *AdminBlockListAttackOrchestrator) sendExpectedBlockedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
-		event := bft.RequestChunkDataPackFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
+		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
 		a.expectedBlockedEvents[event.FlowProtocolEventID] = event

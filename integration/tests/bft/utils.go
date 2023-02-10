@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// RequestChunkDataPackFixture returns an insecure.EgressEvent with messages.ChunkDataRequest payload and the provided node ID as the originID.
-func RequestChunkDataPackFixture(t *testing.T, originID, targetID flow.Identifier, protocol insecure.Protocol) *insecure.EgressEvent {
+// RequestChunkDataPackEgressFixture returns an insecure.EgressEvent with messages.ChunkDataRequest payload and the provided node ID as the originID.
+func RequestChunkDataPackEgressFixture(t *testing.T, originID, targetID flow.Identifier, protocol insecure.Protocol) *insecure.EgressEvent {
 	channel := channels.RequestChunks
 	chunkDataReq := &messages.ChunkDataRequest{
 		ChunkID: unittest.IdentifierFixture(),
