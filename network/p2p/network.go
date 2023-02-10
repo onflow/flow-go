@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/utils/logging"
-
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -21,9 +19,11 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -378,7 +378,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		channel,
 		payload,
 		n.codec.Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	if err != nil {
 		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
@@ -390,7 +390,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), network.ProtocolTypeUnicast.String(), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), message.ProtocolTypeUnicast.String(), msg.PayloadType())
 
 	return nil
 }
@@ -442,27 +442,27 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 }
 
 // sendOnChannel sends the message on channel to targets.
-func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, targetIDs []flow.Identifier) error {
+func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targetIDs []flow.Identifier) error {
 	n.logger.Debug().
-		Interface("message", message).
+		Interface("message", msg).
 		Str("channel", channel.String()).
 		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	msg, err := network.NewOutgoingScope(targetIDs, channel, message, n.codec.Encode, network.ProtocolTypePubSub)
+	scope, err := network.NewOutgoingScope(targetIDs, channel, msg, n.codec.Encode, message.ProtocolTypePubSub)
 	if err != nil {
 		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg)
+	err = n.mw.Publish(scope)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), network.ProtocolTypePubSub.String(), msg.PayloadType())
+	n.metrics.OutboundMessageSent(scope.Size(), scope.Channel().String(), message.ProtocolTypePubSub.String(), scope.PayloadType())
 
 	return nil
 }
