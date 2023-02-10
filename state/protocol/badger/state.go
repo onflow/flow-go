@@ -324,14 +324,18 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
-		// we only know the initial epoch first height for spork root snapshots (single self-sealing root block)
-		if lowest.Header.Height == highest.Header.Height {
+
+		// we only know the first height of the current epoch for spork root snapshots
+		ok, err := protocol.IsSporkRootSnapshot(root)
+		if err != nil {
+			return fmt.Errorf("could not check for spork root snapshot: %w", err)
+		}
+		if ok {
 			err = operation.InsertEpochFirstHeight(epochCounter, highest.Header.Height)(tx)
 			if err != nil {
-				return fmt.Errorf("could not index current epoch first height: %w", err)
+				return fmt.Errorf("could not index epoch first height: %w", err)
 			}
 		}
-
 		return nil
 	}
 }

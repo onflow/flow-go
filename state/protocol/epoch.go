@@ -147,20 +147,15 @@ type Epoch interface {
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	DKG() (DKG, error)
 
+	// FirstHeight returns the height of the first block of the epoch.
+	// The first block of the epoch is defined...
+	//   ... <- L <-|- F <- ...
+	// TODO docs
+	FirstHeight() (uint64, error)
+
 	// FinalHeight returns the height of the last block of the epoch.
 	// The last block of the epoch is defined...
 	//   ... <- L <-|- F <- ...
 	// TODO docs
 	FinalHeight() (uint64, error)
-}
-
-// EpochSchedule is the pre-determined start and end-points of the epoch and the
-// DKG which will run during the epoch.
-// TODO opt: replace individual getters with this?
-type EpochSchedule struct {
-	FirstView          uint64
-	DKGPhase1FinalView uint64
-	DKGPhase2FinalView uint64
-	DKGPhase3FinalView uint64
-	FinalView          uint64
 }

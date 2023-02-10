@@ -81,6 +81,13 @@ func (e Epoch) FinalHeight() (uint64, error) {
 	return 0, protocol.ErrEpochNotEnded
 }
 
+func (e Epoch) FirstHeight() (uint64, error) {
+	if e.enc.FirstHeight != nil {
+		return *e.enc.FirstHeight, nil
+	}
+	return 0, protocol.ErrEpochNotStarted
+}
+
 type Epochs struct {
 	enc EncodableEpochs
 }
@@ -166,6 +173,10 @@ func (es *setupEpoch) DKG() (protocol.DKG, error) {
 	return nil, protocol.ErrNextEpochNotCommitted
 }
 
+func (es *setupEpoch) FirstHeight() (uint64, error) {
+	return 0, protocol.ErrEpochNotStarted
+}
+
 func (es *setupEpoch) FinalHeight() (uint64, error) {
 	return 0, protocol.ErrEpochNotEnded
 }
@@ -239,10 +250,21 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
-// endedEpoch is an epoch which has ended. It has all the information of a committed
-// epoch, plus information about the epoch's final block.
-type endedEpoch struct {
+// startedEpoch is an epoch which has started, but not ended (ie. the current epoch.)
+// It has all the information of a committedEpoch, plus the epoch's first block height.
+type startedEpoch struct {
 	committedEpoch
+	firstHeight uint64
+}
+
+func (e *startedEpoch) FirstHeight() (uint64, error) {
+	return e.firstHeight, nil
+}
+
+// endedEpoch is an epoch which has ended (ie. the previous epoch). It has all the
+// information of a startedEpoch, plus the epoch's final block height.
+type endedEpoch struct {
+	startedEpoch
 	finalHeight uint64
 }
 
@@ -284,16 +306,40 @@ func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommi
 	return epoch, nil
 }
 
-// NewEndedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit events, and the epoch's final block height.
+// NewStartedEpoch returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first block height.
 // No errors are expected during normal operations.
-func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, finalHeight uint64) (*Epoch, error) {
-	convertible := &endedEpoch{
+func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) (*Epoch, error) {
+	convertible := &startedEpoch{
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
 			},
 			commitEvent: commitEvent,
+		},
+		firstHeight: firstHeight,
+	}
+	epoch, err := FromEpoch(convertible)
+	// since we are passing in a concrete service event, no errors are expected
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error constructing started epoch from service events: %s", err.Error())
+	}
+	return epoch, nil
+}
+
+// NewEndedEpoch returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's final block height.
+// No errors are expected during normal operations.
+func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) (*Epoch, error) {
+	convertible := &endedEpoch{
+		startedEpoch: startedEpoch{
+			committedEpoch: committedEpoch{
+				setupEpoch: setupEpoch{
+					setupEvent: setupEvent,
+				},
+				commitEvent: commitEvent,
+			},
+			firstHeight: firstHeight,
 		},
 		finalHeight: finalHeight,
 	}
