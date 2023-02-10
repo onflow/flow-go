@@ -146,11 +146,13 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		}
 		errors = multierror.Append(errors, err)
 	}
+
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
-	return nil, errToReturn
+
+	return nil, rpc.ConvertMultiError(errors, "failed to execute script on execution nodes", codes.Internal)
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
