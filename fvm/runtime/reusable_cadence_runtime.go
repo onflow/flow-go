@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -180,16 +179,12 @@ type ReusableCadenceRuntimePool struct {
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 	newCustomRuntime func() runtime.Runtime,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
 		pool = make(chan *ReusableCadenceRuntime, poolSize)
 	}
-
-	// Enable account linking on all networks except Mainnet
-	config.AccountLinkingEnabled = chainID != flow.Mainnet
 
 	return ReusableCadenceRuntimePool{
 		pool:             pool,
@@ -201,25 +196,21 @@ func newReusableCadenceRuntimePool(
 func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
-		chainID,
 		nil,
 	)
 }
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
-	chainID flow.ChainID,
 	newCustomRuntime func() runtime.Runtime,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		runtime.Config{},
-		chainID,
 		newCustomRuntime,
 	)
 }
