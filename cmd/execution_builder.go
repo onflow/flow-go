@@ -968,7 +968,10 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		receiptRequestQueue,
 		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
-		filter.HasRole(flow.RoleConsensus),
+		filter.And(
+			filter.HasWeight(true),
+			filter.HasRole(flow.RoleConsensus),
+		),
 		retrieve,
 	)
 	return eng, err
