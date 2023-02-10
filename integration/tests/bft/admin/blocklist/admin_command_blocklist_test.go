@@ -20,14 +20,14 @@ func TestAdminCommandBlockList(t *testing.T) {
 }
 
 // TestAdminCommandBlockList ensures that the blocklist admin command works as expected. When a node is blocked via the admin blocklist command
-// the libp2p connection to that node should be pruned immediately and the connection should start to block incoming connection request. This test
+// the libp2p connection to that node should be pruned immediately and the connection gater should start to block incoming connection requests. This test
 // sets up 2 corrupt nodes a sender and receiver, the sender will send messages before and after being blocked by the receiver node via
 // the blocklist admin command. The receiver node is expected to receive messages like normal before blocking the sender, after blocking the sender
-// it should not receive any messages.
+// it should not receive any messages. The reason this test is conducted via two corrupt nodes is to empower the test logic to command one (corrupt) node to send a message and to examine the other (corrupt) node to check whether it has received the message.
 func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	// send some authorized messages indicating the network is working as expected
 	a.Orchestrator.sendAuthorizedMsgs(a.T())
-	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
+	unittest.RequireReturnsBefore(a.T(), a.Orchestrator.authorizedEventsReceivedWg.Wait, 5*time.Second, "could not receive authorized messages on time")
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
 	require.Equal(a.T(), int64(numOfAuthorizedEvents), a.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, a.Orchestrator.unauthorizedEventsReceived.Load()))
 
