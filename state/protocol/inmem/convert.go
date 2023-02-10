@@ -187,6 +187,26 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 		epoch.Clusters = append(epoch.Clusters, convertedCluster.enc)
 	}
 
+	// convert height bounds
+	firstHeight, err := from.FirstHeight()
+	if errors.Is(err, protocol.ErrEpochNotStarted) {
+		// if this epoch hasn't been started yet, return the epoch as-is
+		return &Epoch{epoch}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get first height: %w", err)
+	}
+	epoch.FirstHeight = &firstHeight
+	finalHeight, err := from.FinalHeight()
+	if errors.Is(err, protocol.ErrEpochNotEnded) {
+		// if this epoch hasn't ended yet, return the epoch as-is
+		return &Epoch{epoch}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get final height: %w", err)
+	}
+	epoch.FinalHeight = &finalHeight
+
 	return &Epoch{epoch}, nil
 }
 
@@ -283,7 +303,7 @@ func SnapshotFromBootstrapStateWithParams(
 		}
 	}
 
-	current, err := NewCommittedEpoch(setup, commit)
+	current, err := NewStartedEpoch(setup, commit, root.Header.Height)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
 	}

@@ -604,7 +604,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)
 			}
 		}
-		if isFirstBlockOfEpoch {
+		if isFirstBlockOfEpoch && !epochFallbackTriggered {
 			err = operation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)

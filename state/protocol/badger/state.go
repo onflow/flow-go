@@ -250,10 +250,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 // state to keep track of special block heights and views.
 func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		epochCounter, err := root.Epochs().Current().Counter()
-		if err != nil {
-			return fmt.Errorf("could not get current epoch counter: %w", err)
-		}
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -325,17 +321,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
 
-		// we only know the first height of the current epoch for spork root snapshots
-		ok, err := protocol.IsSporkRootSnapshot(root)
-		if err != nil {
-			return fmt.Errorf("could not check for spork root snapshot: %w", err)
-		}
-		if ok {
-			err = operation.InsertEpochFirstHeight(epochCounter, highest.Header.Height)(tx)
-			if err != nil {
-				return fmt.Errorf("could not index epoch first height: %w", err)
-			}
-		}
 		return nil
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -486,7 +488,17 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
 	}
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	firstHeight, _, epochStarted, _, err := q.retrieveEpochHeightBounds(setup.Counter)
+	if err != nil {
+		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
+	}
+
+	var epoch protocol.Epoch
+	if epochStarted {
+		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
+	} else {
+		epoch, err = inmem.NewCommittedEpoch(setup, commit)
+	}
 	if err != nil {
 		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
 		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
@@ -569,10 +581,67 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
 	}
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
+	if err != nil {
+		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
+	}
+	var epoch protocol.Epoch
+	if epochEnded {
+		epoch, err = inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
+	} else {
+		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
+	}
 	if err != nil {
 		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
 		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
 	}
+
 	return epoch
+}
+
+// retrieveEpochHeightBounds retrieves the height bounds for an epoch.
+// Height bounds are NOT fork-aware, and are only determined upon finalization.
+//
+// Since the protocol state's API is fork-aware, we may be querying an
+// un-finalized block - see below for an example of this behaviour:
+//
+//	Epoch 1    Epoch 2
+//	A <- B <-|- C <- D
+//
+// Suppose block B is the latest finalized block and we have queried block D.
+// Then, epoch 1 has not yet ended, because the first block of epoch 2 has not been finalized.
+// In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
+// No errors are expected during normal operation.
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, epochStarted, epochEnded bool, err error) {
+	err = q.snap.state.db.View(func(tx *badger.Txn) error {
+		// Retrieve the epoch's first height
+		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				epochStarted = false
+				epochEnded = false
+				return nil
+			}
+			return err // unexpected error
+		}
+		epochStarted = true
+
+		var currentEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(epoch+1, &currentEpochFirstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				epochEnded = false
+				return nil
+			}
+			return err // unexpected error
+		}
+		finalHeight = currentEpochFirstHeight - 1
+		epochEnded = true
+
+		return nil
+	})
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	return firstHeight, finalHeight, epochStarted, epochEnded, nil
 }

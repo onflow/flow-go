@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
-	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storutil "github.com/onflow/flow-go/storage/util"
@@ -186,23 +185,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
-		})
-	})
-
-	t.Run("should not index epoch first block for non-spork-root snapshot", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildFinalizedBlock(t, state, block1)
-			child := unittest.BlockWithParentFixture(block1.Header)
-			buildBlock(t, state, child)
-
-			return state.AtBlockID(block1.ID())
-		})
-
-		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
-			var firstEpochHeight uint64
-			err = db.View(operation.RetrieveEpochFirstHeight(rootSnapshot.Encodable().Epochs.Current.Counter, &firstEpochHeight))
-			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 
