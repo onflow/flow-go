@@ -2,7 +2,7 @@ package requirement
 
 import (
 	"github.com/rs/zerolog"
-	
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/bft"
