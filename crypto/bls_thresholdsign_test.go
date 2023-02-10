@@ -268,7 +268,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
 			// non BLS key share
-			seed := make([]byte, KeyGenSeedMinLenECDSAP256)
+			seed := make([]byte, KeyGenSeedMinLen)
 			_, err = rand.Read(seed)
 			require.NoError(t, err)
 			skEcdsa, err := GeneratePrivateKey(ECDSAP256, seed)

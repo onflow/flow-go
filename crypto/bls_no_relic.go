@@ -18,8 +18,7 @@ import (
 const relic_panic = "function is not supported when building without \"relic\" Go build tag"
 
 const (
-	SignatureLenBLSBLS12381     = 48
-	KeyGenSeedMinLenBLSBLS12381 = 48
+	SignatureLenBLSBLS12381 = 48
 )
 
 // bls.go functions
