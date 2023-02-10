@@ -3,10 +3,10 @@ package blocklist
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"net/http"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -18,9 +18,8 @@ import (
 // Suite represents a test suite ensures the admin block list command works as expected.
 type Suite struct {
 	bft.BaseSuite
-	nodeIDs      []flow.Identifier // used to keep identifier of nodes in testnet
-	senderVN     flow.Identifier   // node ID of corrupted node that will send messages in the test. The sender node will be blocked.
-	receiverEN   flow.Identifier   // node ID of corrupted node that will receive messages in the test
+	senderVN     flow.Identifier // node ID of corrupted node that will send messages in the test. The sender node will be blocked.
+	receiverEN   flow.Identifier // node ID of corrupted node that will receive messages in the test
 	Orchestrator *AdminBlockListAttackOrchestrator
 }
 
