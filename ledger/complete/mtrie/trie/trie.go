@@ -753,7 +753,13 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof, pay
 	if head.IsLeaf() {
 		if head.IsDefaultNode() {
 			// if a leaf is a default node, means nothing is stored on this path,
-			// we return non-inclusion proof
+			// we return proof for non-existing path
+			for i, path := range paths {
+				proofs[i].Path = path
+				proofs[i].Payload = ledger.EmptyPayload()
+				proofs[i].Inclusion = true
+			}
+
 			return nil
 		}
 
