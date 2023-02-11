@@ -94,9 +94,9 @@ func (mt *MTrie) RootNode() *node.Node {
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
 	if mt.IsEmpty() {
-		return fmt.Sprintf("Empty Trie with default root hash: %x\n", mt.RootHash())
+		return fmt.Sprintf("Empty Trie with default root hash: %v\n", mt.RootHash())
 	}
-	trieStr := fmt.Sprintf("Trie root hash: %x\n", mt.RootHash())
+	trieStr := fmt.Sprintf("Trie root hash: %v\n", mt.RootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
 
@@ -429,6 +429,10 @@ func NewTrieWithUpdatedRegisters(
 		return nil, 0, fmt.Errorf("could not update storage with leaf node updates: %w", err)
 	}
 
+	if updatedTrie.RootNode().IsDefaultNode() {
+		return NewEmptyMTrie(), 0, nil
+	}
+
 	return updatedTrie, maxDepthTouched, nil
 }
 
@@ -521,7 +525,7 @@ func update(
 		return parentNode, 0, 0, nodeHeight, nil
 	}
 
-	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
+	if len(paths) == 1 && parentNode.IsDefaultNode() && compactLeaf == nil {
 		n = node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 		if payloads[0].IsEmpty() {
 			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
@@ -531,48 +535,48 @@ func update(
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
-		// if parentNode is a unpruned node, then
-		if parentNode.IsDefaultNode() && len(paths) == 1 {
-			return parentNode, 0, 0, nodeHeight, nil
-		}
-
-		// check if the parent node path is among the updated paths
-		found := false
-		parentLeafHash := parentNode.ExpandedLeafHash()
-
-		parentPath, parentPayload, err := payloadStorage.Get(parentLeafHash)
-		if err != nil {
-			return nil, 0, 0, 0, fmt.Errorf("could not get payload for parent leaf hash %v: %w", parentLeafHash, err)
-		}
-
-		for i, p := range paths {
-			if p == parentPath {
-				// the case where the recursion stops: only one path to update
-				if len(paths) == 1 {
-					if !parentPayload.ValueEquals(&payloads[i]) {
-						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
-
-						allocatedRegCountDelta, allocatedRegSizeDelta =
-							computeAllocatedRegDeltas(parentPayload, &payloads[i])
-
-						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight, nil
-					}
-					// avoid creating a new node when the same payload is written
-					return parentNode, 0, 0, nodeHeight, nil
-				}
-				// the case where the recursion carries on: len(paths)>1
-				found = true
-
-				allocatedRegCountDelta, allocatedRegSizeDelta =
-					computeAllocatedRegDeltasFromHigherHeight(parentPayload)
-
-				break
-			}
-		}
-		if !found {
-			// if the parent node carries a path not included in the input path, then the parent node
-			// represents a compact leaf that needs to be carried down the recursion.
+		if parentNode.IsDefaultNode() {
 			compactLeaf = parentNode
+		} else {
+
+			// check if the parent node path is among the updated paths
+			found := false
+			parentLeafHash := parentNode.ExpandedLeafHash()
+
+			parentPath, parentPayload, err := payloadStorage.Get(parentLeafHash)
+			if err != nil {
+				return nil, 0, 0, 0, fmt.Errorf("could not get payload for parent leaf hash %v: %w", parentLeafHash, err)
+			}
+
+			for i, p := range paths {
+				if p == parentPath {
+					// the case where the recursion stops: only one path to update
+					if len(paths) == 1 {
+						if !parentPayload.ValueEquals(&payloads[i]) {
+							n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
+
+							allocatedRegCountDelta, allocatedRegSizeDelta =
+								computeAllocatedRegDeltas(parentPayload, &payloads[i])
+
+							return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight, nil
+						}
+						// avoid creating a new node when the same payload is written
+						return parentNode, 0, 0, nodeHeight, nil
+					}
+					// the case where the recursion carries on: len(paths)>1
+					found = true
+
+					allocatedRegCountDelta, allocatedRegSizeDelta =
+						computeAllocatedRegDeltasFromHigherHeight(parentPayload)
+
+					break
+				}
+			}
+			if !found {
+				// if the parent node carries a path not included in the input path, then the parent node
+				// represents a compact leaf that needs to be carried down the recursion.
+				compactLeaf = parentNode
+			}
 		}
 	}
 

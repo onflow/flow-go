@@ -920,7 +920,6 @@ func TestValueSizesWithDuplicatePaths(t *testing.T) {
 //   - update trie with removed paths and empty payloads
 //   - update trie with removed paths and non-empty payloads
 func TestTrieAllocatedRegCountRegSize(t *testing.T) {
-	t.Skip("skip")
 
 	rng := &LinearCongruentialGenerator{seed: 0}
 
