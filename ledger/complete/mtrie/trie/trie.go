@@ -352,6 +352,15 @@ func NewTrieWithUpdatedRegisters(
 	if err != nil {
 		return nil, 0, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
+
+	if prune {
+		// update function only prune the child nodes, so we need to check whether
+		// the root node can be pruned as well.
+		// if can be pruned, return the default empty trie
+		if updatedTrie.RootNode().IsDefaultNode() {
+			return NewEmptyMTrie(), maxDepthTouched, nil
+		}
+	}
 	return updatedTrie, maxDepthTouched, nil
 }
 
