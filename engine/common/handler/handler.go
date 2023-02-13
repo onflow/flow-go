@@ -66,20 +66,29 @@ func (n *AsyncEventHandler) RegisterProcessor(processor EventHandlerFunc) {
 
 // processEventWorker is a worker that processes events from the request channel.
 func (n *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext) {
-
 	for {
 		select {
+		case <-ctx.Done():
+			n.log.Debug().Msg("processing event worker terminated")
+			return
 		case <-n.handler.GetNotifier():
-			// there is at least a single event to process.
+			n.processMessages(ctx)
+		}
+	}
+}
+
+func (n *AsyncEventHandler) processMessages(ctx irrecoverable.SignalerContext) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
 			msg, ok := n.queue.Get()
 			if !ok {
 				// no more events to process
 				return
 			}
 			n.processor(msg.OriginID, msg.Payload)
-		case <-ctx.Done():
-			n.log.Debug().Msg("processing event worker terminated")
-			return
 		}
 	}
 }
