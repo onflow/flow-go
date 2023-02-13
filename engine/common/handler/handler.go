@@ -38,6 +38,9 @@ func NewAsyncEventHandler(
 		log:   log.With().Str("component", "async_event_handler").Logger(),
 		queue: q,
 		handler: engine.NewMessageHandler(log, engine.NewNotifier(), engine.Pattern{
+			Match: func(message *engine.Message) bool {
+				return true
+			},
 			Store: q,
 		}),
 	}
@@ -93,7 +96,7 @@ func (n *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) 
 	err := n.handler.Process(originId, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
-			n.log.Warn().Msgf("%v delivered unsupported message %T through %v", originId)
+			n.log.Warn().Err(err).Msgf("delivered unsupported message %T through %v", event, originId)
 			return nil
 		}
 		return fmt.Errorf("unexpected error while processing event: %w", err)
