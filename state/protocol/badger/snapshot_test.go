@@ -1017,6 +1017,10 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 	})
 }
 
+// TODO(6485) test:
+//  - heights are queryable when expected for all cases below
+//  - rename to EpochBoundaries
+
 // test that querying the first view of an epoch returns the appropriate value
 func TestSnapshot_EpochFirstView(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()

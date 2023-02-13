@@ -150,12 +150,12 @@ type Epoch interface {
 	// FirstHeight returns the height of the first block of the epoch.
 	// The first block of the epoch is defined...
 	//   ... <- L <-|- F <- ...
-	// TODO docs
+	// TODO(6485) docs
 	FirstHeight() (uint64, error)
 
 	// FinalHeight returns the height of the last block of the epoch.
 	// The last block of the epoch is defined...
 	//   ... <- L <-|- F <- ...
-	// TODO docs
+	// TODO(6485)
 	FinalHeight() (uint64, error)
 }
