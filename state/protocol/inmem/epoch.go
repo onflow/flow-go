@@ -43,12 +43,12 @@ func (e Epoch) DKG() (protocol.DKG, error) {
 	if e.enc.DKG != nil {
 		return DKG{*e.enc.DKG}, nil
 	}
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
 	if e.enc.Clusters == nil {
-		return nil, protocol.ErrEpochNotCommitted
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 
 	if i >= uint(len(e.enc.Clusters)) {
@@ -59,7 +59,7 @@ func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
 
 func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
 	if e.enc.Clusters == nil {
-		return nil, protocol.ErrEpochNotCommitted
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 
 	for _, cluster := range e.enc.Clusters {
@@ -144,15 +144,15 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 }
 
 func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) DKG() (protocol.DKG, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) RandomSource() ([]byte, error) {

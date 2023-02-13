@@ -267,13 +267,13 @@ func (h *handler) GetTransactionResult(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	reqTxID := req.GetTransactionId()
 	txID, err := convert.TransactionID(reqTxID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transactionID: %v", err)
 	}
 
 	var statusCode uint32 = 0
@@ -329,7 +329,7 @@ func (h *handler) GetTransactionResultByIndex(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	index := req.GetIndex()
@@ -387,7 +387,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	// Get all tx results
@@ -483,15 +483,18 @@ func (h *handler) GetAccountAtBlockID(
 	blockID := req.GetBlockId()
 	blockFlowID, err := convert.BlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	flowAddress, err := convert.Address(req.GetAddress(), h.chain.Chain())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
@@ -554,6 +557,7 @@ func (h *handler) GetBlockHeaderByID(
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
+		// the block was retrieved from local storage - so no errors are expected
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}
 

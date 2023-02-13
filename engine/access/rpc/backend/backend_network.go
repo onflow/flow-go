@@ -73,7 +73,7 @@ func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisi
 		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
 	}
 
-	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Lowest().Header.Height)
+	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Sealed().Header.Height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
 	}

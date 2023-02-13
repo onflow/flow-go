@@ -58,11 +58,6 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 	return nil, nil
 }
 
-func (s Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	// canonical snapshots don't have any descendants
-	return nil, nil
-}
-
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }

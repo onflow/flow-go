@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -146,10 +147,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.stopControl.IsPaused() {
-		if e.uploader.Enabled() {
-			if err := e.uploader.RetryUploads(); err != nil {
-				e.log.Warn().Msg("failed to re-upload all ComputationResults")
-			}
+		if err := e.uploader.RetryUploads(); err != nil {
+			e.log.Warn().Msg("failed to re-upload all ComputationResults")
 		}
 
 		err := e.reloadUnexecutedBlocks()
@@ -263,7 +262,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.ValidDescendants()
+	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -428,7 +427,8 @@ func (e *Engine) reloadBlock(
 
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: BlockProcessable might be called multiple times for the same block.
+// NOTE: BlockProcessable might be called multiple times for the same block.
+// NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header) {
 
 	// skip if stopControl tells to skip
@@ -619,13 +619,18 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	if e.uploader.Enabled() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	defer wg.Wait()
+
+	go func() {
+		defer wg.Done()
 		err := e.uploader.Upload(ctx, computationResult)
 		if err != nil {
 			lg.Err(err).Msg("error while uploading block")
 			// continue processing. uploads should not block execution
 		}
-	}
+	}()
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult)
 	if errors.Is(err, storage.ErrDataMismatch) {
@@ -1183,8 +1188,6 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState := result.EndState
-	chdps := result.ChunkDataPacks
 	executionResult := flow.NewExecutionResult(
 		previousErID,
 		block.ID(),
@@ -1210,14 +1213,10 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.SaveExecutionResults(childCtx,
-		block.Header,
-		endState,
-		chdps,
-		executionReceipt,
-		result.Events,
-		result.ServiceEvents,
-		result.TransactionResults)
+	err = e.execState.SaveExecutionResults(
+		childCtx,
+		result,
+		executionReceipt)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1225,7 +1224,7 @@ func (e *Engine) saveExecutionResults(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).
-		Hex("final_state", endState[:]).
+		Hex("final_state", result.EndState[:]).
 		Msg("saved computation results")
 
 	return executionReceipt, nil
