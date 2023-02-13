@@ -429,10 +429,6 @@ func NewTrieWithUpdatedRegisters(
 		return nil, 0, fmt.Errorf("could not update storage with leaf node updates: %w", err)
 	}
 
-	if updatedTrie.RootNode().IsDefaultNode() {
-		return NewEmptyMTrie(), 0, nil
-	}
-
 	return updatedTrie, maxDepthTouched, nil
 }
 

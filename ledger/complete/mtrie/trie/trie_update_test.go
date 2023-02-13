@@ -129,12 +129,12 @@ func Test_AddingPayloadUntilFull(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint16(2), depth)
 	fmt.Println(t3)
-	require.Equal(t, t1, t3)
+	require.True(t, t1.Equals(t3))
 
 	fmt.Println("=== removing 1 payload at 00000000")
 	t4, depth, err := trie.NewTrieWithUpdatedRegisters(t3, paths[0:1], emptyPayloads, true, payloadStorage)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), depth)
 	fmt.Println(t4)
-	require.Equal(t, t0, t4)
+	require.True(t, t0.Equals(t4))
 }
