@@ -20,8 +20,7 @@ func (g *GetAccount) Build(r *Request) error {
 }
 
 func (g *GetAccount) Parse(rawAddress string, rawHeight string) error {
-	var address Address
-	err := address.Parse(rawAddress)
+	address, err := ParseAddress(rawAddress)
 	if err != nil {
 		return err
 	}
@@ -32,7 +31,7 @@ func (g *GetAccount) Parse(rawAddress string, rawHeight string) error {
 		return err
 	}
 
-	g.Address = address.Flow()
+	g.Address = address
 	g.Height = height.Flow()
 
 	// default to last block
