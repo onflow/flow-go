@@ -361,7 +361,6 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 				return fmt.Errorf("invalid commit: %w", err)
 			}
 
-			// index first height
 			err = indexFirstHeight(previous)(tx.DBTxn)
 			if err != nil {
 				return fmt.Errorf("could not index epoch first height: %w", err)
@@ -392,7 +391,6 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 			return fmt.Errorf("invalid commit: %w", err)
 		}
 
-		// index first height
 		err = indexFirstHeight(current)(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("could not index epoch first height: %w", err)

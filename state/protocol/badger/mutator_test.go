@@ -592,7 +592,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 // B8 is the final block of the epoch.
 // B9 is the first block of the NEXT epoch.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	// create a event consumer to test epoch transition events
+	// create an event consumer to test epoch transition events
 	consumer := mockprotocol.NewConsumer(t)
 	consumer.On("BlockFinalized", mock.Anything)
 	consumer.On("BlockProcessable", mock.Anything)
@@ -821,6 +821,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
+		err = state.Finalize(context.Background(), block8.ID())
+		require.NoError(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
 		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
@@ -856,10 +858,22 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView).Once()
 		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView).Once()
 
-		err = state.Finalize(context.Background(), block8.ID())
-		require.NoError(t, err)
+		// before block 9 is finalized, the epoch 1-2 boundary is unknown
+		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		assert.ErrorIs(t, err, realprotocol.ErrEpochNotEnded)
+		_, err = state.AtBlockID(block9.ID()).Epochs().Current().FirstHeight()
+		assert.ErrorIs(t, err, realprotocol.ErrEpochNotStarted)
+
 		err = state.Finalize(context.Background(), block9.ID())
 		require.NoError(t, err)
+
+		// once block 9 is finalized, epoch 2 has unambiguously begun - the epoch 1-2 boundary is known
+		epoch1FinalHeight, err := state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		require.NoError(t, err)
+		assert.Equal(t, block8.Header.Height, epoch1FinalHeight)
+		epoch2FirstHeight, err := state.AtBlockID(block9.ID()).Epochs().Current().FirstHeight()
+		require.NoError(t, err)
+		assert.Equal(t, block9.Header.Height, epoch2FirstHeight)
 	})
 }
 
