@@ -35,7 +35,7 @@ type invalidControlMessage struct {
 
 func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i int) {
 	// TODO: handle error
-	_ = g.handler.Process(flow.ZeroID, invalidControlMessage{
+	_ = g.handler.Submit(flow.ZeroID, invalidControlMessage{
 		peerID:  id,
 		msgType: messageType,
 		count:   i,

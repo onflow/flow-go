@@ -21,11 +21,10 @@ type AsyncEventHandler struct {
 	component.Component
 	cm *component.ComponentManager
 
-	log        zerolog.Logger
-	handler    *engine.MessageHandler
-	queue      engine.MessageStore
-	msgChannel chan *engine.Message
-	processor  EventHandlerFunc
+	log       zerolog.Logger
+	handler   *engine.MessageHandler
+	queue     engine.MessageStore
+	processor EventHandlerFunc
 }
 
 func NewAsyncEventHandler(
@@ -44,9 +43,12 @@ func NewAsyncEventHandler(
 	}
 
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(n.processEventShovlerWorker)
 	for i := uint(0); i < workerCount; i++ {
-		cm.AddWorker(n.processEventWorker)
+		cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			n.processEventWorker(ctx)
+		})
 	}
 
 	n.cm = cm.Build()
@@ -59,64 +61,28 @@ func (n *AsyncEventHandler) RegisterProcessor(processor EventHandlerFunc) {
 	n.processor = processor
 }
 
-// processEventShovlerWorker is constantly listening on the MessageHandler for new events,
-// and pushes new events into the request channel to be picked by workers.
-func (n *AsyncEventHandler) processEventShovlerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	n.log.Debug().Msg("process event shovler started")
+// processEventWorker is a worker that processes events from the request channel.
+func (n *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext) {
 
 	for {
 		select {
 		case <-n.handler.GetNotifier():
 			// there is at least a single event to process.
-			n.processAvailableEvents(ctx)
+			msg, ok := n.queue.Get()
+			if !ok {
+				// no more events to process
+				return
+			}
+			n.processor(msg.OriginID, msg.Payload)
 		case <-ctx.Done():
-			// close the internal channel, the workers will drain the channel before exiting
-			close(n.msgChannel)
 			n.log.Debug().Msg("processing event worker terminated")
 			return
 		}
 	}
 }
 
-// processAvailableEvents processes all available events in the queue.
-func (n *AsyncEventHandler) processAvailableEvents(ctx irrecoverable.SignalerContext) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		msg, ok := n.queue.Get()
-		if !ok {
-			// no more events to process
-			return
-		}
-
-		n.log.Trace().Msg("shovler is queuing messages for processing")
-		n.msgChannel <- msg
-		n.log.Trace().Msg("shovler queued up messages for processing")
-	}
-}
-
-// processEventWorker is a worker that processes events from the request channel.
-func (n *AsyncEventHandler) processEventWorker(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	for {
-		msg, ok := <-n.msgChannel
-		if !ok {
-			n.log.Trace().Msg("processing event worker terminated")
-			return
-		}
-		n.processor(msg.OriginID, msg.Payload)
-	}
-}
-
-// Process is the main entry point for the event handler. It receives an event, and asynchronously queues it for processing.
-func (n *AsyncEventHandler) Process(originId flow.Identifier, event interface{}) error {
+// Submit is the main entry point for the event handler. It receives an event, and asynchronously queues it for processing.
+func (n *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) error {
 	select {
 	case <-n.cm.ShutdownSignal():
 		n.log.Warn().Msg("received event after shutdown")
