@@ -271,9 +271,12 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	previousExecutionResultID flow.Identifier,
 	expectBroadcast bool,
 	newStateCommitment flow.StateCommitment,
-	computationResult *execution.ComputationResult) *protocol.Snapshot {
+	computationResult *execution.ComputationResult,
+) *protocol.Snapshot {
 	if computationResult == nil {
-		computationResult = executionUnittest.ComputationResultForBlockFixture(executableBlock)
+		computationResult = executionUnittest.ComputationResultForBlockFixture(
+			previousExecutionResultID,
+			executableBlock)
 	}
 
 	if len(computationResult.StateCommitments) > 0 {
@@ -287,8 +290,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	eb.StartState = &newStateCommitment
 
 	ctx.computationManager.
-		On("ComputeBlock", mock.Anything, &eb, mock.Anything).Run(func(args mock.Arguments) {
-	}).
+		On("ComputeBlock", mock.Anything, previousExecutionResultID, &eb, mock.Anything).
 		Return(computationResult, nil).Once()
 
 	ctx.executionState.On("NewView", newStateCommitment).Return(new(delta.View))
@@ -469,9 +471,16 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blockA, nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wg.Done()
+			},
+			blockB,
+			unittest.IdentifierFixture(),
+			true,
+			*blockB.StartState,
+			nil)
 
 		wg.Add(1) // wait for block B to be executed
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
@@ -567,32 +576,53 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		// expect B and C to be loaded by loading unexecuted blocks in engine Ready
 		wg.Add(2)
 
-		blockBSnapshot := ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			require.False(t, bDone)
-			require.False(t, cDone)
-			wg.Done()
+		blockBSnapshot := ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				require.False(t, bDone)
+				require.False(t, cDone)
+				wg.Done()
 
-			// make sure block B execution takes enough time so C can start executing to showcase an error
-			time.Sleep(10 * time.Millisecond)
+				// make sure block B execution takes enough time so C can start executing to showcase an error
+				time.Sleep(10 * time.Millisecond)
 
-			bDone = true
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
+				bDone = true
+			},
+			blockB,
+			unittest.IdentifierFixture(),
+			true,
+			*blockB.StartState,
+			nil)
 
-		blockCSnapshot := ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			require.True(t, bDone)
-			require.False(t, cDone)
+		blockCSnapshot := ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				require.True(t, bDone)
+				require.False(t, cDone)
 
-			wg.Done()
-			cDone = true
+				wg.Done()
+				cDone = true
 
-		}, blockC, unittest.IdentifierFixture(), true, *blockC.StartState, nil)
+			},
+			blockC,
+			unittest.IdentifierFixture(),
+			true,
+			*blockC.StartState,
+			nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			require.True(t, bDone)
-			require.True(t, cDone)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				require.True(t, bDone)
+				require.True(t, cDone)
 
-			wg.Done()
-		}, blockD, unittest.IdentifierFixture(), true, *blockC.StartState, nil)
+				wg.Done()
+			},
+			blockD,
+			unittest.IdentifierFixture(),
+			true,
+			*blockC.StartState,
+			nil)
 
 		// mock loading unexecuted blocks at startup
 		ctx.executionState.On("GetHighestExecutedBlockID", mock.Anything).Return(blockB.Height(), blockB.ID(), nil)
@@ -679,17 +709,31 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		// add extra flag to make sure B was indeed executed before C
 		wasBExecuted := false
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wgPut.Wait()
-			wg.Done()
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wgPut.Wait()
+				wg.Done()
 
-			wasBExecuted = true
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
+				wasBExecuted = true
+			},
+			blockB,
+			unittest.IdentifierFixture(),
+			true,
+			*blockB.StartState,
+			nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-			require.True(t, wasBExecuted)
-		}, blockC, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wg.Done()
+				require.True(t, wasBExecuted)
+			},
+			blockC,
+			unittest.IdentifierFixture(),
+			true,
+			*blockB.StartState,
+			nil)
 
 		// make sure collection requests are sent
 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
@@ -805,19 +849,40 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		wgC := sync.WaitGroup{}
 		wgC.Add(1)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wgB.Wait()
-			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wgB.Wait()
+				wg.Done()
+			},
+			blockB,
+			unittest.IdentifierFixture(),
+			true,
+			*blockB.StartState,
+			nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wgC.Wait()
-			wg.Done()
-		}, blockC, unittest.IdentifierFixture(), true, *blockC.StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wgC.Wait()
+				wg.Done()
+			},
+			blockC,
+			unittest.IdentifierFixture(),
+			true,
+			*blockC.StartState,
+			nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-		}, blockD, unittest.IdentifierFixture(), true, *blockD.StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wg.Done()
+			},
+			blockD,
+			unittest.IdentifierFixture(),
+			true,
+			*blockD.StartState,
+			nil)
 
 		// make sure collection requests are sent
 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
@@ -929,10 +994,38 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 		}
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], blockAExecutionResultID, true, *blocks["B"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], blockAExecutionResultID, true, *blocks["C"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), true, *blocks["D"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["A"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["A"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["B"],
+			blockAExecutionResultID,
+			true,
+			*blocks["B"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["C"],
+			blockAExecutionResultID,
+			true,
+			*blocks["C"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["D"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["D"].StartState,
+			nil)
 
 		wg.Add(1)
 		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
@@ -1020,8 +1113,22 @@ func TestStopAtHeight(t *testing.T) {
 		ctx.blocks.EXPECT().ByID(blocks["C"].ID()).Times(0)
 		ctx.blocks.EXPECT().ByID(blocks["D"].ID()).Times(0)
 
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), true, *blocks["B"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["A"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["A"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["B"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["B"].StartState,
+			nil)
 
 		assert.False(t, ctx.stopControl.IsPaused())
 
@@ -1065,13 +1172,25 @@ func TestStopAtHeight(t *testing.T) {
 		require.False(t, ok)
 
 		// make sure C and D were not executed
-		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-			return eb.ID() == blocks["C"].ID()
-		}), mock.Anything)
+		ctx.computationManager.AssertNotCalled(
+			t,
+			"ComputeBlock",
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+				return eb.ID() == blocks["C"].ID()
+			}),
+			mock.Anything)
 
-		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-			return eb.ID() == blocks["D"].ID()
-		}), mock.Anything)
+		ctx.computationManager.AssertNotCalled(
+			t,
+			"ComputeBlock",
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+				return eb.ID() == blocks["D"].ID()
+			}),
+			mock.Anything)
 	})
 }
 
@@ -1133,7 +1252,14 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).
 			Return(flow.StateCommitment{}, nil).Maybe()
 
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["A"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["A"].StartState,
+			nil)
 
 		assert.False(t, ctx.stopControl.IsPaused())
 
@@ -1164,13 +1290,25 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		_, ok = commits[blocks["C"].ID()]
 		require.False(t, ok)
 
-		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-			return eb.ID() == blocks["B"].ID()
-		}), mock.Anything)
+		ctx.computationManager.AssertNotCalled(
+			t,
+			"ComputeBlock",
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+				return eb.ID() == blocks["B"].ID()
+			}),
+			mock.Anything)
 
-		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-			return eb.ID() == blocks["C"].ID()
-		}), mock.Anything)
+		ctx.computationManager.AssertNotCalled(
+			t,
+			"ComputeBlock",
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
+				return eb.ID() == blocks["C"].ID()
+			}),
+			mock.Anything)
 	})
 }
 
@@ -1189,14 +1327,12 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	me.EXPECT().NodeID()
 	me.EXPECT().Sign(gomock.Any(), gomock.Any())
 
-	cr := executionUnittest.ComputationResultFixture(nil)
+	cr := executionUnittest.ComputationResultFixture(
+		previousExecutionResultID,
+		nil)
 	cr.ExecutableBlock = executableBlock
 	startState := unittest.StateCommitmentFixture()
 	cr.ExecutableBlock.StartState = &startState
-
-	execState.
-		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
-		Return(previousExecutionResultID, nil)
 
 	execState.
 		On("SaveExecutionResults", mock.Anything, cr, mock.Anything).
@@ -1329,10 +1465,38 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		identity := *ctx.identity
 		identity.Weight = 0
 
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], unittest.IdentifierFixture(), true, *blocks["C"].StartState, nil)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false, *blocks["D"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["A"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["A"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["B"],
+			unittest.IdentifierFixture(),
+			false,
+			*blocks["B"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["C"],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks["C"].StartState,
+			nil)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			onPersisted,
+			blocks["D"],
+			unittest.IdentifierFixture(),
+			false,
+			*blocks["D"].StartState,
+			nil)
 
 		wg.Add(1)
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
@@ -1729,7 +1893,10 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
 		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
 
-		computationResultB := executionUnittest.ComputationResultForBlockFixture(blockB)
+		parentBlockExecutionResultID := unittest.IdentifierFixture()
+		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			parentBlockExecutionResultID,
+			blockB)
 
 		// configure upload manager with a single uploader
 		uploader1 := uploadermock.NewUploader(ctx.t)
@@ -1746,9 +1913,16 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blockA, nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, computationResultB)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wg.Done()
+			},
+			blockB,
+			parentBlockExecutionResultID,
+			true,
+			*blockB.StartState,
+			computationResultB)
 
 		wg.Add(1) // wait for block B to be executed
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
@@ -1779,7 +1953,11 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
 		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
 
-		computationResultB := executionUnittest.ComputationResultForBlockFixture(blockB)
+		previousExecutionResultID := unittest.IdentifierFixture()
+
+		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			previousExecutionResultID,
+			blockB)
 
 		// configure upload manager with a single uploader that returns an error
 		uploader1 := uploadermock.NewUploader(ctx.t)
@@ -1796,9 +1974,16 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blockA, nil)
 
-		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, computationResultB)
+		ctx.assertSuccessfulBlockComputation(
+			commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {
+				wg.Done()
+			},
+			blockB,
+			previousExecutionResultID,
+			true,
+			*blockB.StartState,
+			computationResultB)
 
 		wg.Add(1) // wait for block B to be executed
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)

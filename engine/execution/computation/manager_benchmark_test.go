@@ -192,7 +192,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 			b.StartTimer()
 			start := time.Now()
-			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			res, err := engine.ComputeBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				executableBlock,
+				blockView)
 			elapsed += time.Since(start)
 			b.StopTimer()
 
