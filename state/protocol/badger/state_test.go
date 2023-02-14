@@ -26,10 +26,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TODO(6485) test
-//  - bootstrap basic indexes first epoch first height
-//  - bootstrap with prev epoch indexes last epoch first/final height
-
 // TestBootstrapAndOpen verifies after bootstrapping with a root snapshot
 // we should be able to open it and got the same state.
 func TestBootstrapAndOpen(t *testing.T) {
@@ -144,6 +140,87 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, committedPhaseSnapshot, state.Final())
+	})
+}
+
+// TestBootstrap_EpochHeightBoundaries tests that epoch height indexes are indexed
+// when they are available in the input snapshot.
+func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
+	t.Parallel()
+	// start with a regular post-spork root snapshot
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
+
+	t.Run("root snapshot", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+	})
+
+	t.Run("with next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.BuildEpoch().CompleteEpoch()
+			heights, ok := builder.EpochHeights(1)
+			require.True(t, ok)
+			return state.AtHeight(heights.Committed)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first and final height of not started next epoch should be unknown
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			_, err = state.Final().Epochs().Next().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+	})
+	t.Run("with previous epoch", func(t *testing.T) {
+		var epoch1FinalHeight uint64
+		var epoch2FirstHeight uint64
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.
+				BuildEpoch().CompleteEpoch(). // build epoch 2
+				BuildEpoch()                  // build epoch 3
+			heights, ok := builder.EpochHeights(2)
+			epoch2FirstHeight = heights.FirstHeight()
+			epoch1FinalHeight = epoch2FirstHeight - 1
+			require.True(t, ok)
+			// return snapshot from within epoch 2 (middle epoch)
+			return state.AtHeight(heights.Setup)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch2FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first and final height of completed previous epoch should be known
+			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, firstHeight, epoch1FirstHeight)
+			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			require.NoError(t, err)
+			assert.Equal(t, finalHeight, epoch1FinalHeight)
+		})
 	})
 }
 

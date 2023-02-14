@@ -1111,53 +1111,55 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 
-		epoch0FirstHeight := head.Height
+		epoch1FirstHeight := head.Height
 		t.Run("epoch 0 - EpochStaking phase", func(t *testing.T) {
 			// first height of started current epoch should be known
 			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
 			require.NoError(t, err)
-			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
 		})
 
-		// build epoch 0 (but don't complete it yet)
+		// build first epoch (but don't complete it yet)
 		epochBuilder.BuildEpoch()
 
 		t.Run("epoch 0 - EpochCommitted phase", func(t *testing.T) {
 			// first height of started current epoch should be known
 			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
 			require.NoError(t, err)
-			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
-			// first height of not started next epoch should be unknown
+			// first and final height of not started next epoch should be unknown
 			_, err = state.Final().Epochs().Next().FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
 		})
 
 		// complete epoch 0 (enter epoch 1)
 		epochBuilder.CompleteEpoch()
 		epoch0Heights, ok := epochBuilder.EpochHeights(1)
 		require.True(t, ok)
-		epoch0FinalHeight := epoch0Heights.FinalHeight()
-		epoch1FirstHeight := epoch0FinalHeight + 1
+		epoch1FinalHeight := epoch0Heights.FinalHeight()
+		epoch2FirstHeight := epoch1FinalHeight + 1
 
 		t.Run("epoch 1 - EpochStaking phase", func(t *testing.T) {
 			// first and final height of completed previous epoch should be known
 			firstHeight, err := state.Final().Epochs().Previous().FirstHeight()
 			require.NoError(t, err)
-			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
 			require.NoError(t, err)
-			assert.Equal(t, epoch0FinalHeight, finalHeight)
+			assert.Equal(t, epoch1FinalHeight, finalHeight)
 
 			// first height of started current epoch should be known
 			firstHeight, err = state.Final().Epochs().Current().FirstHeight()
 			require.NoError(t, err)
-			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			assert.Equal(t, epoch2FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
