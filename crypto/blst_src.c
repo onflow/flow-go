@@ -1,8 +1,4 @@
-/*
- * Copyright Supranational LLC
- * Licensed under the Apache License, Version 2.0, see LICENSE for details.
- * SPDX-License-Identifier: Apache-2.0
- */
+// +build relic
 
 #include "keygen.c"
 #include "hash_to_field.c"
@@ -21,7 +17,3 @@
 #include "consts.c"
 #include "vect.c"
 #include "exports.c"
-#include "rb_tree.c"
-#ifdef BLST_FR_PENTAROOT
-# include "pentaroot.c"
-#endif
