@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/handler"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,8 +23,8 @@ func TestAsyncEventHandler_SingleEvent(t *testing.T) {
 	originId := unittest.IdentifierFixture()
 	event := "test-event"
 
-	// Test case 1: Test submit method
-	h := handler.NewAsyncEventHandler(unittest.Logger(), 10, 2)
+	q := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+	h := handler.NewAsyncEventHandler(unittest.Logger(), q, 2)
 	eventProcessed := make(chan struct{})
 	h.RegisterProcessor(func(originId flow.Identifier, event interface{}) {
 		require.Equal(t, originId, originId)
@@ -44,9 +46,10 @@ func TestAsyncEventHandler_SingleEvent(t *testing.T) {
 	unittest.RequireCloseBefore(t, h.Done(), 100*time.Millisecond, "could not stop handler")
 }
 
-// TestAsyncEventHandler_MultipleEvents tests the async event handler with multiple events. It submits multiple events to
-// the handler and checks if the events are processed by the handler.
-func TestAsyncEventHandler_MultipleEvents(t *testing.T) {
+// testAsyncEventHandlerWithMultipleConcurrentEvents is a test helper that tests the async event handler with multiple events.
+// It submits multiple events to the handler and checks if each event is processed by the handler exactly once.
+// The second argument is a function that generates a new origin identifier for each event.
+func testAsyncEventHandlerWithMultipleConcurrentEvents(t *testing.T, idFactory func() flow.Identifier) {
 	size := 10
 	workers := uint(5)
 
@@ -56,11 +59,12 @@ func TestAsyncEventHandler_MultipleEvents(t *testing.T) {
 	}, 10)
 
 	for i := 0; i < size; i++ {
-		tc[i].originId = unittest.IdentifierFixture()
+		tc[i].originId = idFactory()
 		tc[i].event = fmt.Sprintf("test-event-%d", i)
 	}
 
-	h := handler.NewAsyncEventHandler(unittest.Logger(), uint32(size), workers)
+	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
+	h := handler.NewAsyncEventHandler(unittest.Logger(), q, workers)
 
 	processedEvents := unittest.NewProtectedMap[string, struct{}]()
 	allEventsProcessed := sync.WaitGroup{}
@@ -98,4 +102,16 @@ func TestAsyncEventHandler_MultipleEvents(t *testing.T) {
 	unittest.RequireReturnsBefore(t, allEventsProcessed.Wait, 10*time.Second, "events not processed")
 	cancel()
 	unittest.RequireCloseBefore(t, h.Done(), 100*time.Millisecond, "could not stop handler")
+}
+
+func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testing.T) {
+	testAsyncEventHandlerWithMultipleConcurrentEvents(t, func() flow.Identifier {
+		return unittest.IdentifierFixture()
+	})
+}
+
+func TestAsyncEventHandler_MultipleConcurrentEvents_IdenticalIdentifier(t *testing.T) {
+	testAsyncEventHandlerWithMultipleConcurrentEvents(t, func() flow.Identifier {
+		return flow.ZeroID
+	})
 }
