@@ -20,6 +20,7 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain) (*mu
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
+	v1SubRouter.Use(middleware.MetricsMiddleware())
 
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 

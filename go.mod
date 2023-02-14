@@ -99,6 +99,8 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
+require github.com/slok/go-http-metrics v0.10.0
+
 require (
 	cloud.google.com/go v0.105.0 // indirect
 	cloud.google.com/go/compute v1.12.1 // indirect
