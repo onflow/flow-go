@@ -15,6 +15,8 @@ type GossipSubInspectorNotificationDistributor struct {
 	notifiers []p2p.GossipSubRpcInspectorConsumer
 }
 
+type InspectorNotificationDistributorOption func(*GossipSubInspectorNotificationDistributor)
+
 func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, queueSize uint32, workerCount uint) *GossipSubInspectorNotificationDistributor {
 	g := &GossipSubInspectorNotificationDistributor{
 		handler: handler.NewAsyncEventHandler(log, queueSize, workerCount),
