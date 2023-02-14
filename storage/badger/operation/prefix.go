@@ -45,6 +45,7 @@ const (
 	codeExecutionReceiptMeta = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
+	codeQuorumCertificate    = 39
 
 	// codes for indexing single identifier by identifier/integeter
 	codeHeightToBlock           = 40 // index mapping height to block ID
