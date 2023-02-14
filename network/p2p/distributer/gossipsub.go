@@ -48,7 +48,6 @@ func (g *GossipSubInspectorNotificationDistributor) ProcessQueuedNotifications(_
 		for _, notifier := range g.notifiers {
 			notifier.OnInvalidControlMessage(notification.peerID, notification.msgType, notification.count)
 		}
-		break
 	default:
 		g.log.Fatal().Msgf("unknown notification type: %T", notification)
 	}
