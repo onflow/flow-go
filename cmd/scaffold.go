@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
@@ -963,9 +964,15 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
+		heroStoreOpts := make([]queue.HeroStoreConfigOption, 0)
+		if node.HeroCacheMetricsEnable {
+			collector := metrics.BlockListNotificationQueueMetricFactory(node.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		fnb.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		fnb.NodeBlockListDistributor = cache.DefaultNodeBlockListDistributor(fnb.Logger, heroStoreOpts...)
 		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
