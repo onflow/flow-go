@@ -1017,10 +1017,6 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 	})
 }
 
-// TODO(6485) test:
-//  - heights are queryable when expected for all cases below
-//  - rename to EpochBoundaries
-
 // test that querying the first view of an epoch returns the appropriate value
 func TestSnapshot_EpochFirstView(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
@@ -1096,6 +1092,75 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 					assert.Equal(t, epoch2FirstView, actualFirstView)
 				}
 			})
+		})
+	})
+}
+
+// TestSnapshot_EpochHeightBoundaries tests querying epoch height boundaries in various conditions.
+//   - FirstHeight should be queryable as soon as the epoch's first block is finalized,
+//     otherwise should return protocol.ErrEpochNotStarted
+//   - FinalHeight should be queryable as soon as the next epoch's first block is finalized,
+//     otherwise should return protocol.ErrEpochNotEnded
+func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+
+		epoch0FirstHeight := head.Height
+		t.Run("epoch 0 - EpochStaking phase", func(t *testing.T) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+
+		// build epoch 0 (but don't complete it yet)
+		epochBuilder.BuildEpoch()
+
+		t.Run("epoch 0 - EpochCommitted phase", func(t *testing.T) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first height of not started next epoch should be unknown
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+		})
+
+		// complete epoch 0 (enter epoch 1)
+		epochBuilder.CompleteEpoch()
+		epoch0Heights, ok := epochBuilder.EpochHeights(1)
+		require.True(t, ok)
+		epoch0FinalHeight := epoch0Heights.FinalHeight()
+		epoch1FirstHeight := epoch0FinalHeight + 1
+
+		t.Run("epoch 1 - EpochStaking phase", func(t *testing.T) {
+			// first and final height of completed previous epoch should be known
+			firstHeight, err := state.Final().Epochs().Previous().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch0FirstHeight, firstHeight)
+			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch0FinalHeight, finalHeight)
+
+			// first height of started current epoch should be known
+			firstHeight, err = state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
 		})
 	})
 }
