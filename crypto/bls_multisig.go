@@ -27,7 +27,7 @@ import (
 //  - batch verification of multiple signatures of a single message under multiple
 //  public keys: use a binary tree of aggregations to find the invalid signatures.
 
-// #cgo CFLAGS: -g -Wall -std=c99
+// #cgo CFLAGS:
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"

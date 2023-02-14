@@ -3,7 +3,7 @@
 
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99
+// #cgo CFLAGS:
 // #include "bls_thresholdsign_include.h"
 import "C"
 

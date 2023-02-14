@@ -8,7 +8,7 @@
 #define _REL_MISC_INCLUDE_H
 
 #include "relic.h"
-#include "blst.h"
+#include "blst_include.h"
 
 #define VALID     RLC_OK
 #define INVALID   RLC_ERR

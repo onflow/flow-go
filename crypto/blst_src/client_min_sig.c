@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "keygen.c"
+/*#include "keygen.c"
 #include "e1.c"
 #include "hash_to_field.c"
 #include "map_to_g1.c"
@@ -14,4 +14,4 @@
 #include "recip.c"
 #include "consts.c"
 #include "vect.c"
-#include "exports.c"
+#include "exports.c"*/
