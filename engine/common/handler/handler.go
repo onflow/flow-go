@@ -94,6 +94,9 @@ func (n *AsyncEventHandler) processMessages(ctx irrecoverable.SignalerContext) {
 }
 
 // Submit is the main entry point for the event handler. It receives an event, and asynchronously queues it for processing.
+// On a happy path it returns nil. Any returned error is unexpected and indicates a bug in the code.
+// It is safe to call Submit concurrently.
+// It is safe to call Submit after Shutdown.
 func (n *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) error {
 	select {
 	case <-n.cm.ShutdownSignal():
@@ -104,10 +107,6 @@ func (n *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) 
 
 	err := n.handler.Process(originId, event)
 	if err != nil {
-		if engine.IsIncompatibleInputTypeError(err) {
-			n.log.Warn().Err(err).Msgf("delivered unsupported message %T through %v", event, originId)
-			return nil
-		}
 		return fmt.Errorf("unexpected error while processing event: %w", err)
 	}
 
