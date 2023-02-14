@@ -928,6 +928,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
+	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
@@ -936,20 +937,21 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
-		Headers:      headers,
-		Guarantees:   guarantees,
-		Receipts:     receipts,
-		Results:      results,
-		Seals:        seals,
-		Index:        index,
-		Payloads:     payloads,
-		Blocks:       blocks,
-		Transactions: transactions,
-		Collections:  collections,
-		Setups:       setups,
-		EpochCommits: epochCommits,
-		Statuses:     statuses,
-		Commits:      commits,
+		Headers:            headers,
+		Guarantees:         guarantees,
+		Receipts:           receipts,
+		Results:            results,
+		Seals:              seals,
+		Index:              index,
+		Payloads:           payloads,
+		Blocks:             blocks,
+		QuorumCertificates: qcs,
+		Transactions:       transactions,
+		Collections:        collections,
+		Setups:             setups,
+		EpochCommits:       epochCommits,
+		Statuses:           statuses,
+		Commits:            commits,
 	}
 
 	return nil
