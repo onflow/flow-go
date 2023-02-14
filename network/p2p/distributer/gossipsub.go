@@ -34,12 +34,14 @@ type invalidControlMessage struct {
 }
 
 func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i int) {
-	// TODO: handle error
-	_ = g.handler.Submit(flow.ZeroID, invalidControlMessage{
+	err := g.handler.Submit(flow.ZeroID, invalidControlMessage{
 		peerID:  id,
 		msgType: messageType,
 		count:   i,
 	})
+	if err != nil {
+		g.log.Fatal().Err(err).Msg("failed to submit invalid control message event to handler")
+	}
 }
 
 func (g *GossipSubInspectorNotificationDistributor) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
