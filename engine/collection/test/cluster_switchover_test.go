@@ -90,7 +90,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 	// create a root snapshot with the given number of initial clusters
 	root, result, seal := unittest.BootstrapFixture(tc.identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 
@@ -215,6 +215,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	// start all node components
 	nodes := make([]module.ReadyDoneAware, 0, len(tc.nodes))
 	for _, node := range tc.nodes {
+		node.Start(tc.T())
 		nodes = append(nodes, node)
 	}
 

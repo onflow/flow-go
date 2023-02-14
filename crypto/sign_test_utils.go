@@ -105,23 +105,52 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+// tests the key generation constraints with regards to the input seed, mainly
+// the seed length constraints and the result determinicity.
 func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
-	// valid seed lengths
-	seed := make([]byte, minLen)
-	_, err := GeneratePrivateKey(salg, seed)
-	assert.NoError(t, err)
-	seed = make([]byte, maxLen)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.NoError(t, err)
-	// invalid seed lengths
-	seed = make([]byte, minLen-1)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.Error(t, err)
-	assert.True(t, IsInvalidInputsError(err))
-	seed = make([]byte, maxLen+1)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.Error(t, err)
-	assert.True(t, IsInvalidInputsError(err))
+	t.Run("seed length check", func(t *testing.T) {
+		// valid seed lengths
+		seed := make([]byte, minLen)
+		_, err := GeneratePrivateKey(salg, seed)
+		assert.NoError(t, err)
+		if maxLen > 0 {
+			seed = make([]byte, maxLen)
+			_, err = GeneratePrivateKey(salg, seed)
+			assert.NoError(t, err)
+		}
+		// invalid seed lengths
+		seed = make([]byte, minLen-1)
+		_, err = GeneratePrivateKey(salg, seed)
+		assert.Error(t, err)
+		assert.True(t, IsInvalidInputsError(err))
+		if maxLen > 0 {
+			seed = make([]byte, maxLen+1)
+			_, err = GeneratePrivateKey(salg, seed)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+		}
+	})
+
+	t.Run("deterministic generation", func(t *testing.T) {
+		r := time.Now().UnixNano()
+		mrand.Seed(r)
+		t.Logf("math rand seed is %d", r)
+		// same seed results in the same key
+		seed := make([]byte, minLen)
+		read, err := mrand.Read(seed)
+		require.Equal(t, read, minLen)
+		require.NoError(t, err)
+		sk1, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		sk2, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		assert.True(t, sk1.Equals(sk2))
+		// different seed results in a different key
+		seed[0] ^= 1 // alter a seed bit
+		sk2, err = GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		assert.False(t, sk1.Equals(sk2))
+	})
 }
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {

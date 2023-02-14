@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
@@ -34,7 +35,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
-	"github.com/onflow/flow-go/engine/consensus/provider"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -54,7 +55,9 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -69,28 +72,26 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                         uint
-		resultLimit                            uint
-		approvalLimit                          uint
-		sealLimit                              uint
-		pendingReceiptsLimit                   uint
-		minInterval                            time.Duration
-		maxInterval                            time.Duration
-		maxSealPerBlock                        uint
-		maxGuaranteePerBlock                   uint
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		chunkAlpha                             uint
-		requiredApprovalsForSealVerification   uint
-		requiredApprovalsForSealConstruction   uint
-		emergencySealing                       bool
-		dkgControllerConfig                    dkgmodule.ControllerConfig
-		startupTimeString                      string
-		startupTime                            time.Time
+		guaranteeLimit                       uint
+		resultLimit                          uint
+		approvalLimit                        uint
+		sealLimit                            uint
+		pendingReceiptsLimit                 uint
+		minInterval                          time.Duration
+		maxInterval                          time.Duration
+		maxSealPerBlock                      uint
+		maxGuaranteePerBlock                 uint
+		hotstuffMinTimeout                   time.Duration
+		hotstuffTimeoutAdjustmentFactor      float64
+		hotstuffHappyPathMaxRoundFailures    uint64
+		blockRateDelay                       time.Duration
+		chunkAlpha                           uint
+		requiredApprovalsForSealVerification uint
+		requiredApprovalsForSealConstruction uint
+		emergencySealing                     bool
+		dkgControllerConfig                  dkgmodule.ControllerConfig
+		startupTimeString                    string
+		startupTime                          time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -105,10 +106,10 @@ func main() {
 		receipts                mempool.ExecutionTree
 		seals                   mempool.IncorporatedResultSeals
 		pendingReceipts         mempool.PendingReceipts
-		prov                    *provider.Engine
 		receiptRequester        *requester.Engine
 		syncCore                *chainsync.Core
 		comp                    *compliance.Engine
+		hot                     module.HotStuff
 		conMetrics              module.ConsensusMetrics
 		mainMetrics             module.HotstuffMetrics
 		receiptValidator        module.ReceiptValidator
@@ -117,6 +118,8 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		committee               *committees.Consensus
+		epochLookup             *epochs.EpochLookup
 		hotstuffModules         *consensus.HotstuffModules
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
@@ -136,11 +139,9 @@ func main() {
 		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
 		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
-		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
-		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
+		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
@@ -171,6 +172,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -357,7 +359,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
@@ -487,17 +489,6 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
-			)
-			return prov, err
-		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			core := ingestion.NewCore(
 				node.Logger,
@@ -518,6 +509,16 @@ func main() {
 
 			return ing, err
 		}).
+		Component("hotstuff committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
+		Component("epoch lookup", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			epochLookup, err = epochs.NewEpochLookup(node.State)
+			node.ProtocolEvents.AddConsumer(epochLookup)
+			return epochLookup, err
+		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
@@ -534,15 +535,9 @@ func main() {
 				)),
 			)
 
-			// initialize Main consensus committee's state
-			var committee hotstuff.Committee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
+			// wrap Main consensus committee with metrics
+			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			epochLookup := epochs.NewEpochLookup(node.State)
 			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
@@ -553,12 +548,13 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
+			// create consensus logger
+			logger := createLogger(node.Logger, node.RootChainID)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
-				node.Logger,
+				logger,
 				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
 			)
 
 			notifier.AddConsumer(finalizationDistributor)
@@ -584,10 +580,14 @@ func main() {
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
-			validator := consensus.NewValidator(mainMetrics, committee, forks)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+			voteAggregator, err := consensus.NewVoteAggregator(
+				logger,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
@@ -596,21 +596,45 @@ func main() {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:                notifier,
-				Committee:               committee,
-				Signer:                  signer,
-				Persist:                 persist,
-				QCCreatedDistributor:    qcDistributor,
-				FinalizationDistributor: finalizationDistributor,
-				Forks:                   forks,
-				Validator:               validator,
-				Aggregator:              aggregator,
+			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
+				logger,
+				timeoutCollectorDistributor,
+				committee,
+				validator,
+				msig.ConsensusTimeoutTag,
+			)
+			timeoutAggregator, err := consensus.NewTimeoutAggregator(
+				logger,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				notifier,
+				timeoutProcessorFactory,
+				timeoutCollectorDistributor,
+				lowestViewForVoteProcessing,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
 			}
 
-			return aggregator, nil
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:                    notifier,
+				Committee:                   wrappedCommittee,
+				Signer:                      signer,
+				Persist:                     persist,
+				QCCreatedDistributor:        qcDistributor,
+				FinalizationDistributor:     finalizationDistributor,
+				TimeoutCollectorDistributor: timeoutCollectorDistributor,
+				Forks:                       forks,
+				Validator:                   validator,
+				VoteAggregator:              voteAggregator,
+				TimeoutAggregator:           timeoutAggregator,
+			}
+
+			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
-		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -634,15 +658,12 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialized block builder: %w", err)
 			}
-
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			opts := []consensus.Option{
-				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
+				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithConfigRegistrar(node.ConfigManager),
 			}
@@ -650,54 +671,16 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
 			}
 
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			complianceCore, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore,
-				hotstuffModules.Aggregator,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(
-				node.Logger,
-				node.Network,
-				node.Me,
-				prov,
-				complianceCore,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
 			// initialize hotstuff consensus algorithm
-			hot, err := consensus.NewParticipant(
-				node.Logger,
+			hot, err = consensus.NewParticipant(
+				createLogger(node.Logger, node.RootChainID),
 				mainMetrics,
 				build,
-				comp,
 				finalizedBlock,
 				pending,
 				hotstuffModules,
@@ -706,10 +689,70 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
+			return hot, nil
+		}).
+		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
-			comp = comp.WithConsensus(hot)
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			logger := createLogger(node.Logger, node.RootChainID)
+			complianceCore, err := compliance.NewCore(logger,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				mainMetrics,
+				node.Metrics.Compliance,
+				node.Tracer,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Validator,
+				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(
+				logger,
+				node.Me,
+				complianceCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
+			}
+
 			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+
 			return comp, nil
+		}).
+		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			messageHub, err := message_hub.NewMessageHub(
+				createLogger(node.Logger, node.RootChainID),
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				comp,
+				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
+				node.State,
+				node.Storage.Payloads,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
+			}
+			hotstuffModules.Notifier.AddConsumer(messageHub)
+			return messageHub, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)

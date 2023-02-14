@@ -193,6 +193,7 @@ func (c *Client) Account() *sdk.Account {
 	return c.account
 }
 
+// WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", txID)
@@ -215,7 +216,7 @@ func (c *Client) WaitForSealed(ctx context.Context, txID sdk.Identifier) (*sdk.T
 		} else {
 			fmt.Print(".")
 		}
-		time.Sleep(time.Second)
+		time.Sleep(250 * time.Millisecond)
 	}
 
 	fmt.Println()
@@ -224,7 +225,8 @@ func (c *Client) WaitForSealed(ctx context.Context, txID sdk.Identifier) (*sdk.T
 	return result, err
 }
 
-// GetLatestProtocolSnapshot ...
+// GetLatestProtocolSnapshot returns the latest protocol state snapshot.
+// The snapshot head is latest finalized - tail of sealing segment is latest sealed.
 func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot, error) {
 	b, err := c.client.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
@@ -261,6 +263,16 @@ func (c *Client) GetLatestSealedBlockHeader(ctx context.Context) (*sdk.BlockHead
 	return header, nil
 }
 
+// GetLatestFinalizedBlockHeader returns full block header for the latest finalized block
+func (c *Client) GetLatestFinalizedBlockHeader(ctx context.Context) (*sdk.BlockHeader, error) {
+	header, err := c.client.GetLatestBlockHeader(ctx, false)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
+	}
+
+	return header, nil
+}
+
 func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) {
 	var (
 		address sdk.Address
@@ -281,6 +293,19 @@ func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) 
 	return address, found
 }
 
+// CreatedAccounts returns the addresses of all accounts created in the given transaction,
+// in the order they were created.
+func (c *Client) CreatedAccounts(txResp *sdk.TransactionResult) []sdk.Address {
+	var addresses []sdk.Address
+	for _, event := range txResp.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			addresses = append(addresses, accountCreatedEvent.Address())
+		}
+	}
+	return addresses
+}
+
 func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
 	if role == flow.RoleCollection {
 		return "250000.0", 250000.0, nil
@@ -295,7 +320,7 @@ func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
 		return "135000.0", 135000.0, nil
 	}
 	if role == flow.RoleAccess {
-		return "0.0", 0.0, nil
+		return "100.0", 100.0, nil
 	}
 
 	return "", 0, fmt.Errorf("could not get token amount by role: %v", role)

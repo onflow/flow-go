@@ -1,98 +1,133 @@
-//go:build timesensitivetest
-// +build timesensitivetest
-
-// This file includes a few time sensitive tests. They might pass on your powerful local machine
-// but fail on slow CI machine.
-// For now, these tests are only for local. Run it with the build tag on:
-// > go test --tags=relic,timesensitivetest ./...
-
 package integration_test
 
 import (
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/channels"
 )
 
-// verify if a node lost some messages, it's still able to catch up.
+// TestMessagesLost verifies if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
+	stopper := NewStopper(30, 0)
+	participantsData := createConsensusIdentities(t, 4)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	nodes, stopper, hub := createNodes(t, 5, 1000)
+	hub.WithFilter(blockNodesFirstMessages(10, nodes[0]))
 
-	hub.WithFilter(blockNodesForFirstNMessages(50, nodes[0]))
-	runNodes(nodes)
+	runFor(time.Minute)
 
-	<-stopper.stopped
-
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
 	cleanupNodes(nodes)
 }
 
-// verify if each receiver lost 10% messages, the network can still reach consensus
+// TestMessagesLostAcrossNetwork verifies if each receiver lost 10% messages, the network can still reach consensus.
 func TestMessagesLostAcrossNetwork(t *testing.T) {
+	stopper := NewStopper(10, 0)
+	participantsData := createConsensusIdentities(t, 4)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	hub.WithFilter(blockReceiverMessagesRandomly(0.1))
 
-	hub.WithFilter(blockReceiverMessagesByPercentage(10))
-	runNodes(nodes)
+	runFor(time.Minute)
 
-	<-stopper.stopped
-
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 50)
+
 	cleanupNodes(nodes)
 }
 
-// verify if each receiver receive delayed messages, the network can still reach consensus
-// the delay might skip some blocks, so should expect to see some gaps in the finalized views
-// like this:
-// [1 2 3 4 10 11 12 17 20 21 22 23 28 31 33 36 39 44 47 53 58 61 62 79 80 88 89 98 101 106 108 111 115 116 119 120 122 123 124 126 127 128 129 130 133 134 135 138 141 142 143 144]
+// TestDelay verifies that we still reach consensus even if _all_ messages are significantly
+// delayed. Due to the delay, some proposals might be orphaned. The message delay is sampled
+// for each message from the interval [0.1*hotstuffTimeout, 0.5*hotstuffTimeout].
 func TestDelay(t *testing.T) {
-
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	stopper := NewStopper(30, 0)
+	participantsData := createConsensusIdentities(t, 4)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(delayReceiverMessagesByRange(hotstuffTimeout/10, hotstuffTimeout/2))
-	runNodes(nodes)
 
-	<-stopper.stopped
+	runFor(time.Minute)
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
 	cleanupNodes(nodes)
 }
 
-// verify that if a node always
+// TestOneNodeBehind verifies that if one node (here node 0) consistently experiences a significant
+// delay receiving messages beyond the hotstuff timeout, the committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
-	nodes, stopper, hub := createNodes(t, 5, 1500)
+	stopper := NewStopper(30, 0)
+	participantsData := createConsensusIdentities(t, 3)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
 			return false, hotstuffTimeout + time.Millisecond
 		}
 		// no block or delay to other nodes
 		return false, 0
 	})
-	runNodes(nodes)
 
-	<-stopper.stopped
+	runFor(time.Minute)
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 60)
+
+	cleanupNodes(nodes)
+}
+
+// TestTimeoutRebroadcast drops
+// * all proposals at view 5
+// * the first timeout object per view for _every_ sender
+// In this configuration, the _initial_ broadcast is insufficient for replicas to make
+// progress in view 5 (neither in the happy path, because the proposal is always dropped
+// nor on the unhappy path for the _first_ attempt to broadcast timeout objects). We
+// expect that replica will eventually broadcast its timeout object again.
+func TestTimeoutRebroadcast(t *testing.T) {
+	stopper := NewStopper(5, 0)
+	participantsData := createConsensusIdentities(t, 4)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+
+	// nodeID -> view -> numTimeoutMessages
+	lock := new(sync.Mutex)
+	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		switch m := event.(type) {
+		case *messages.BlockProposal:
+			return m.Block.Header.View == 5, 0 // drop proposals only for view 5
+		case *messages.TimeoutObject:
+			// drop first timeout object for every sender for every view
+			lock.Lock()
+			blockedPerView, found := blockedTimeoutObjectsTracker[sender.id.NodeID]
+			if !found {
+				blockedPerView = make(map[uint64]uint64)
+				blockedTimeoutObjectsTracker[sender.id.NodeID] = blockedPerView
+			}
+			blocked := blockedPerView[m.View] + 1
+			blockedPerView[m.View] = blocked
+			lock.Unlock()
+			return blocked == 1, 0
+		}
+		// no block or delay to other nodes
+		return false, 0
+	})
+
+	runFor(10 * time.Second)
+
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+
 	cleanupNodes(nodes)
 }

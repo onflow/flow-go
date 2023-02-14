@@ -59,7 +59,7 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			// end of snapshots
 			return nil
 		}
-		m, err := snap[0].Delta.MarshalJSON()
+		m, err := json.Marshal(snap[0].Delta.UpdatedRegisters())
 		if err != nil {
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}

@@ -117,7 +117,7 @@ jobs:
         cache: true
     - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
-      uses: nick-invision/retry@v2
+      uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 3
@@ -128,7 +128,7 @@ jobs:
       #  RACE_DETECTOR: 1
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
-      uses: nick-invision/retry@v2
+      uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 3
@@ -180,7 +180,7 @@ jobs:
           VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 25
           max_attempts: ${{ matrix.retries }}
@@ -232,7 +232,7 @@ jobs:
       #  RACE_DETECTOR: 1
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
-      uses: nick-invision/retry@v2
+      uses: nick-fields/retry@v2
       with:
         timeout_minutes: 15
         max_attempts: 2

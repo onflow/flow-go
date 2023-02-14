@@ -68,16 +68,12 @@ func (u *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	return nil, u.err
-}
-
 func (u *Snapshot) RandomSource() ([]byte, error) {
 	return nil, u.err
 }
 
 func (u *Snapshot) Params() protocol.GlobalParams {
-	return &Params{u.err}
+	return Params{u.err}
 }
 
 func (u *Snapshot) VersionBeacon() (*flow.VersionBeacon, uint64, error) {

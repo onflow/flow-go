@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,7 +25,8 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	// staking phase for this test
 	s.StakingAuctionLen = 10
 	s.DKGPhaseLen = 50
-	s.EpochLen = 200
+	s.EpochLen = 300
+	s.EpochCommitSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
@@ -38,7 +40,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.AwaitEpochPhase(s.ctx, 0, flow.EpochPhaseSetup, time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -53,14 +55,14 @@ func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	epoch1Counter, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 
-	// wait for the final view of the first epoch
-	s.TimedLogf("waiting for the final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
-	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
-	s.TimedLogf("sealed final view (%d) of epoch %d", epoch1FinalView, epoch1Counter)
+	// wait for the first view of the second epoch
+	s.TimedLogf("waiting for the first view (%d) of second epoch %d", epoch1FinalView+1, epoch1Counter+1)
+	s.AwaitFinalizedView(s.ctx, epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("finalized first view (%d) of second epoch %d", epoch1FinalView+1, epoch1Counter+1)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
-	s.assertEpochCounter(s.ctx, 1)
+	s.AssertInEpoch(s.ctx, epoch1Counter+1)
 
 	// submit a smoke test transaction to verify the network can seal a transaction
 	s.TimedLogf("sending smoke test transaction in second epoch")

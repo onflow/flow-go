@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -62,8 +63,8 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 		if identity.NetworkPubKey == nil {
 			connection, err = grpc.Dial(
 				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
 				return err
@@ -76,7 +77,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 
 			connection, err = grpc.Dial(
 				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
@@ -291,10 +292,11 @@ type FlowAccessAPIForwarder struct {
 	upstream    []access.AccessAPIClient
 	connections []*grpc.ClientConn
 	timeout     time.Duration
+	maxMsgSize  uint
 }
 
-func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration) (*FlowAccessAPIForwarder, error) {
-	forwarder := &FlowAccessAPIForwarder{}
+func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
+	forwarder := &FlowAccessAPIForwarder{maxMsgSize: maxMsgSize}
 	err := forwarder.setFlowAccessAPI(identities, timeout)
 	return forwarder, err
 }

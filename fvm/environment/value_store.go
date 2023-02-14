@@ -123,14 +123,12 @@ func (store *valueStore) GetValue(
 ) {
 	defer store.tracer.StartChildSpan(trace.FVMEnvGetValue).End()
 
-	key := string(keyBytes)
-
-	address := flow.BytesToAddress(owner)
-	if state.IsFVMStateKey(string(owner), key) {
-		return nil, errors.NewInvalidFVMStateAccessError(address, key, "read")
+	id := flow.CadenceRegisterID(owner, keyBytes)
+	if id.IsInternalState() {
+		return nil, errors.NewInvalidInternalStateAccessError(id, "read")
 	}
 
-	v, err := store.accounts.GetValue(address, key)
+	v, err := store.accounts.GetValue(id)
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -150,11 +148,9 @@ func (store *valueStore) SetValue(
 ) error {
 	defer store.tracer.StartChildSpan(trace.FVMEnvSetValue).End()
 
-	key := string(keyBytes)
-
-	address := flow.BytesToAddress(owner)
-	if state.IsFVMStateKey(string(owner), key) {
-		return errors.NewInvalidFVMStateAccessError(address, key, "modify")
+	id := flow.CadenceRegisterID(owner, keyBytes)
+	if id.IsInternalState() {
+		return errors.NewInvalidInternalStateAccessError(id, "modify")
 	}
 
 	err := store.meter.MeterComputation(
@@ -164,7 +160,7 @@ func (store *valueStore) SetValue(
 		return fmt.Errorf("set value failed: %w", err)
 	}
 
-	err = store.accounts.SetValue(address, key, value)
+	err = store.accounts.SetValue(id, value)
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}

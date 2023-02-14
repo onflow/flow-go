@@ -140,10 +140,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[flow.RegisterID]*ledger.Key)
 	var problematicTx flow.Identifier
-	getRegister := func(owner, key string) (flow.RegisterValue, error) {
-		// check if register has been provided in the chunk data pack
-		registerID := flow.NewRegisterID(owner, key)
-
+	getRegister := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
 		registerKey := executionState.RegisterIDToKey(registerID)
 
 		query, err := ledger.NewQuerySingleValue(ledger.State(chunkDataPack.StartState), registerKey)
@@ -174,7 +171,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return value, nil
 	}
 
-	chunkView := delta.NewView(getRegister)
+	chunkView := delta.NewDeltaView(getRegister)
 
 	// executes all transactions in this chunk
 	for i, tx := range transactions {

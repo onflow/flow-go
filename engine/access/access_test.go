@@ -52,6 +52,7 @@ type Suite struct {
 	state                *protocol.State
 	snapshot             *protocol.Snapshot
 	epochQuery           *protocol.EpochQuery
+	params               *protocol.Params
 	signerIndicesDecoder *hsmock.BlockSignerDecoder
 	signerIds            flow.IdentifierList
 	log                  zerolog.Logger
@@ -60,6 +61,7 @@ type Suite struct {
 	collClient           *accessmock.AccessAPIClient
 	execClient           *accessmock.ExecutionAPIClient
 	me                   *module.Local
+	rootBlock            *flow.Header
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	backend              *backend.Backend
@@ -82,10 +84,11 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 
-	header := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-	params.On("Root").Return(header, nil)
-	suite.state.On("Params").Return(params).Maybe()
+	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	suite.params = new(protocol.Params)
+	suite.params.On("Root").Return(suite.rootBlock, nil)
+	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
+	suite.state.On("Params").Return(suite.params).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
@@ -863,9 +866,10 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
 	epochs.On("Current").Return(epoch)
-	snap := new(protocol.Snapshot)
-	snap.On("Epochs").Return(epochs)
-	snap.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
+	snap := protocol.NewSnapshot(suite.T())
+	snap.On("Epochs").Return(epochs).Maybe()
+	snap.On("Params").Return(suite.params).Maybe()
+	snap.On("Head").Return(block.Header, nil).Maybe()
 
 	suite.state.On("AtBlockID", mock.Anything).Return(snap).Once() // initial height lookup in ingestion engine
 	suite.state.On("AtBlockID", refBlockID).Return(snap)

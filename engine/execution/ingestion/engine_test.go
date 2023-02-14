@@ -23,10 +23,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	state "github.com/onflow/flow-go/engine/execution/state/mock"
+	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
-
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -60,6 +60,52 @@ func init() {
 	myIdentity.Role = flow.RoleExecution
 }
 
+// ExecutionState is a mocked version of execution state that
+// simulates some of its behavior for testing purpose
+type mockExecutionState struct {
+	sync.Mutex
+	stateMock.ExecutionState
+	commits map[flow.Identifier]flow.StateCommitment
+}
+
+func newMockExecutionState(seal *flow.Seal) *mockExecutionState {
+	commits := make(map[flow.Identifier]flow.StateCommitment)
+	commits[seal.BlockID] = seal.FinalState
+	return &mockExecutionState{
+		commits: commits,
+	}
+}
+
+func (es *mockExecutionState) StateCommitmentByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) (
+	flow.StateCommitment,
+	error,
+) {
+	es.Lock()
+	defer es.Unlock()
+	commit, ok := es.commits[blockID]
+	if !ok {
+		return flow.DummyStateCommitment, storageerr.ErrNotFound
+	}
+
+	return commit, nil
+}
+
+func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
+	parentExecuted, err := state.IsBlockExecuted(
+		context.Background(),
+		es,
+		block.Header.ParentID)
+	require.NoError(t, err)
+	require.True(t, parentExecuted, "parent block not executed")
+
+	es.Lock()
+	defer es.Unlock()
+	es.commits[block.ID()] = unittest.StateCommitmentFixture()
+}
+
 type testingContext struct {
 	t                   *testing.T
 	engine              *Engine
@@ -70,7 +116,7 @@ type testingContext struct {
 	collectionConduit   *mocknetwork.Conduit
 	computationManager  *computation.ComputationManager
 	providerEngine      *provider.ProviderEngine
-	executionState      *state.ExecutionState
+	executionState      *stateMock.ExecutionState
 	snapshot            *protocol.Snapshot
 	identity            *flow.Identity
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
@@ -114,7 +160,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
-	executionState := new(state.ExecutionState)
+	executionState := new(stateMock.ExecutionState)
 	snapshot := new(protocol.Snapshot)
 
 	var engine *Engine
@@ -254,30 +300,19 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	mocked := ctx.executionState.
 		On("SaveExecutionResults",
 			mock.Anything,
-			executableBlock.Block.Header,
-			newStateCommitment,
-			mock.MatchedBy(func(fs []*flow.ChunkDataPack) bool {
-				for _, f := range fs {
-					if f.StartState != *executableBlock.StartState {
-						return false
-					}
-				}
-				return true
-			}),
+			computationResult,
 			mock.MatchedBy(func(executionReceipt *flow.ExecutionReceipt) bool {
 				return executionReceipt.ExecutionResult.BlockID == executableBlock.Block.ID() &&
 					executionReceipt.ExecutionResult.PreviousResultID == previousExecutionResultID
 			}),
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
 		).
 		Return(nil)
 
 	mocked.RunFn =
 		func(args mock.Arguments) {
-			blockID := args[1].(*flow.Header).ID()
-			commit := args[2].(flow.StateCommitment)
+			result := args[1].(*execution.ComputationResult)
+			blockID := result.ExecutableBlock.Block.Header.ID()
+			commit := result.EndState
 
 			ctx.mu.Lock()
 			commits[blockID] = commit
@@ -577,7 +612,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 
 		blockASnapshot.On("Head").Return(&blockA, nil)
 		blockCSnapshot.On("Head").Return(blockC.Block.Header, nil)
-		blockCSnapshot.On("ValidDescendants").Return(nil, nil)
+		blockCSnapshot.On("Descendants").Return(nil, nil)
 
 		ctx.state.On("AtHeight", blockC.Height()).Return(blockCSnapshot)
 
@@ -1143,13 +1178,12 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 
 func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
-	execState := new(state.ExecutionState)
+	execState := new(stateMock.ExecutionState)
 
 	ctrl := gomock.NewController(t)
 	me := module.NewMockLocal(ctrl)
 
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
-	startState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	// mock execution state conversion and signing of
@@ -1157,12 +1191,17 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	me.EXPECT().NodeID()
 	me.EXPECT().Sign(gomock.Any(), gomock.Any())
 
+	cr := executionUnittest.ComputationResultFixture(nil)
+	cr.ExecutableBlock = executableBlock
+	startState := unittest.StateCommitmentFixture()
+	cr.ExecutableBlock.StartState = &startState
+
 	execState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
 	execState.
-		On("SaveExecutionResults", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("SaveExecutionResults", mock.Anything, cr, mock.Anything).
 		Return(nil)
 
 	e := Engine{
@@ -1172,10 +1211,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		me:        me,
 	}
 
-	cr := executionUnittest.ComputationResultFixture(nil)
-	cr.ExecutableBlock = executableBlock
-
-	er, err := e.saveExecutionResults(context.Background(), cr, startState)
+	er, err := e.saveExecutionResults(context.Background(), cr)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)
@@ -1373,7 +1409,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 // 	require.True(t, shouldTriggerStateSync(20, 29, 10))
 // }
 
-func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
+func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
@@ -1460,7 +1496,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
@@ -1485,7 +1521,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
@@ -1510,7 +1546,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		es.ExecuteBlock(t, blockA)
@@ -1540,7 +1576,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		es.ExecuteBlock(t, blockA)
@@ -1571,7 +1607,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		es.ExecuteBlock(t, blockA)
@@ -1601,7 +1637,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 		require.NoError(t, ps.Finalize(blockA.ID()))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		es.ExecuteBlock(t, blockA)
@@ -1656,7 +1692,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := mocks.NewExecutionState(seal)
+		es := newMockExecutionState(seal)
 
 		engine := newIngestionEngine(t, ps, es)
 

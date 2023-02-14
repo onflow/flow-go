@@ -78,7 +78,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	})
 }
 
-// TestBlacklistedNode tests proper handling of identities _on_ the blocklist:
+// TestDenylistedNode tests proper handling of identities _on_ the blocklist:
 //   - For any identity `i` with `i.NodeID ∈ blocklist`, the returned identity
 //     should have `i.Ejected` set to `true` (irrespective of the `Ejected`
 //     flag's initial returned by the wrapped `IdentityProvider`).
@@ -91,7 +91,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 //     While returning (non-nil identity, false) is not a defined return value,
 //     we expect the wrapper to nevertheless handle this case to increase its
 //     generality.
-func (s *NodeBlocklistWrapperTestSuite) TestBlacklistedNode() {
+func (s *NodeBlocklistWrapperTestSuite) TestDenylistedNode() {
 	blocklist := unittest.IdentityListFixture(11)
 	s.mockNotifier.On("OnNodeBlockListUpdate", blocklist.NodeIDs()).Once()
 	err := s.wrapper.Update(blocklist.NodeIDs())
