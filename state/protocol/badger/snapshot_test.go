@@ -1142,9 +1142,9 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 
 		// complete epoch 1 (enter epoch 2)
 		epochBuilder.CompleteEpoch()
-		epoch0Heights, ok := epochBuilder.EpochHeights(1)
+		epoch1Heights, ok := epochBuilder.EpochHeights(1)
 		require.True(t, ok)
-		epoch1FinalHeight := epoch0Heights.FinalHeight()
+		epoch1FinalHeight := epoch1Heights.FinalHeight()
 		epoch2FirstHeight := epoch1FinalHeight + 1
 
 		t.Run("second epoch - EpochStaking phase", func(t *testing.T) {
