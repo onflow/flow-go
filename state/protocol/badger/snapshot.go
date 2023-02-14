@@ -611,6 +611,11 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 // Suppose block B is the latest finalized block and we have queried block D.
 // Then, epoch 1 has not yet ended, because the first block of epoch 2 has not been finalized.
 // In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
+// Returns:
+//   - (0, 0, false, false, nil) if epoch is not started
+//   - (firstHeight, 0, true, false, nil) if epoch is started but not ended
+//   - (firstHeight, finalHeight, true, true, nil) if epoch is ended
+//
 // No errors are expected during normal operation.
 func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, epochStarted, epochEnded bool, err error) {
 	err = q.snap.state.db.View(func(tx *badger.Txn) error {

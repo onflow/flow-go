@@ -868,7 +868,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// once block 9 is finalized, epoch 2 has unambiguously begun - the epoch 1-2 boundary is known
-		epoch1FinalHeight, err := state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		epoch1FinalHeight, err := state.AtBlockID(block9.ID()).Epochs().Previous().FinalHeight()
 		require.NoError(t, err)
 		assert.Equal(t, block8.Header.Height, epoch1FinalHeight)
 		epoch2FirstHeight, err := state.AtBlockID(block9.ID()).Epochs().Current().FirstHeight()
