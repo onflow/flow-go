@@ -3,6 +3,7 @@ package trie_test
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/onflow/flow-go/ledger"
@@ -253,16 +254,14 @@ func Test_Lookup_RemoveUntilEmpty(t *testing.T) {
 			fullTrie, group.Paths, nEmptyPayloads(len(group.Paths)), true, payloadStorage)
 		require.NoError(t, err)
 
-		// the following 2 steps verifies that for the removed paths, the payload no longer exists,
-		// for not removed paths, the payload still exists
-		// 1. build a lookup
-		lookup := make(map[ledger.Path]*ledger.Payload)
-		for i, path := range group.Paths {
-			payload := group.Payloads[i]
-			lookup[path] = &payload
-		}
+		// there are 2 cases to verify here:
+		// 1. deleting an existing payload, the deleted payload should no longer exists
+		// 2. deleting an non-existing payload, the non-existing payload should still not exist
 
-		// 2. use the lookup to check
+		// build a lookup to check if which payloads exist and which are not.
+		lookup := toLookup(group.Paths, group.Payloads)
+
+		// verify the 2 cases
 		for _, path := range group.Paths {
 			payloadRead, err := updated.ReadSinglePayload(path, payloadStorage)
 			require.NoError(t, err)
@@ -271,28 +270,83 @@ func Test_Lookup_RemoveUntilEmpty(t *testing.T) {
 			if isDeleted {
 				require.True(t, payloadRead.IsEmpty())
 			} else {
-				require.True(t, payloadRead.Equals(deletedPayload))
+				require.True(t, payloadRead.Equals(&deletedPayload))
 			}
-		}
-
-		// verify the same path can be deleted again:
-		// deleting all paths again regardless the path has payload or not, verify no path has payload
-		allDeleted, _, err := trie.NewTrieWithUpdatedRegisters(
-			updated, paths, nEmptyPayloads(len(paths)), true, payloadStorage)
-
-		for _, path := range paths {
-			payloadRead, err := allDeleted.ReadSinglePayload(path, payloadStorage)
-			require.NoError(t, err)
-
-			require.True(t, payloadRead.IsEmpty())
 		}
 	}
 }
 
 func Test_RootHash_AddUntilFull(t *testing.T) {
+	paths := getAllPathsAtLevel2()
+	payloads := testutils.RandomPayloads(4, 10, 20)
+
+	groups := getPermutationPathsPayloads(paths, payloads)
+	for _, group := range groups {
+		payloadStorage := unittest.CreateMockPayloadStore()
+		updated, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(), group.Paths, group.Payloads, true, payloadStorage)
+		require.NoError(t, err)
+
+		expectedRootHash := computeRootHash(paths, group.Paths, group.Payloads)
+		require.Equal(t, expectedRootHash, updated.RootHash())
+	}
 }
 
 func Test_RootHash_RemoveUntilEmpty(t *testing.T) {
+	// prepare paths for a trie with only 2 levels, which has 4 payloads in total
+	paths := getAllPathsAtLevel2()
+	randoms := testutils.RandomPayloads(4, 10, 20)
+	payloads := toPayloads(randoms)
+
+	groups := getPermutationPathsPayloads(paths, randoms)
+
+	for _, group := range groups {
+		payloadStorage := unittest.CreateMockPayloadStore()
+
+		// create a full trie with all 4 payloads added
+		fullTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(), paths, payloads, true, payloadStorage)
+		require.NoError(t, err)
+
+		// remove some payloads at the given paths
+		updated, _, err := trie.NewTrieWithUpdatedRegisters(
+			fullTrie, group.Paths, nEmptyPayloads(len(group.Paths)), true, payloadStorage)
+		require.NoError(t, err)
+
+		// lookup for deleted payload
+		deletedLookup := toLookup(group.Paths, group.Payloads)
+
+		// find the remaining payloads
+		remaining := &pathAndPayload{}
+		for i, path := range paths {
+			_, isDeleted := deletedLookup[path]
+			if !isDeleted {
+				remaining.Paths = append(remaining.Paths, path)
+				remaining.Payloads = append(remaining.Payloads, payloads[i])
+			}
+		}
+
+		// compute the expected root hash with remaining payloads stored in a trie,
+		// and use it to verify
+		expectedRootHash := computeRootHash(paths, remaining.Paths, remaining.Payloads)
+		require.Equal(t, expectedRootHash, updated.RootHash(),
+			fmt.Sprintf("root hash mismatch after deleting paths [%v] from a full trie", printPaths(group.Paths)))
+	}
+}
+
+func printPaths(paths []ledger.Path) string {
+	all := getAllPathsAtLevel2()
+	lookup := map[ledger.Path]string{
+		all[0]: "00",
+		all[1]: "01",
+		all[2]: "10",
+		all[3]: "11",
+	}
+	shorts := make([]string, 0)
+	for _, path := range paths {
+		shorts = append(shorts, lookup[path])
+	}
+	return strings.Join(shorts, ",")
 }
 
 func Test_Prove_AddUntilFull(t *testing.T) {
@@ -301,36 +355,41 @@ func Test_Prove_AddUntilFull(t *testing.T) {
 func Test_Prove_RemoveUntilEmpty(t *testing.T) {
 }
 
-func computeRootHash(paths []ledger.Path, payloads []*ledger.Payload) hash.Hash {
-	lookup := make(map[ledger.Path]*ledger.Payload)
+func toLookup(paths []ledger.Path, payloads []ledger.Payload) map[ledger.Path]ledger.Payload {
+	lookup := make(map[ledger.Path]ledger.Payload)
 
 	for i, path := range paths {
 		lookup[path] = payloads[i]
 	}
-	path1, path2, path3, path4 := paths[0], paths[1], paths[2], paths[3]
+	return lookup
+}
 
-	//     h7
-	//   /    \
-	//  h5    h6
-	// /  \  /  \
-	// h1 h2 h3 h4
-	h1 := getLeafHash(path1, lookup)
-	h2 := getLeafHash(path2, lookup)
-	h3 := getLeafHash(path3, lookup)
-	h4 := getLeafHash(path4, lookup)
+func computeRootHash(paths []ledger.Path, groupPath []ledger.Path, groupPayloads []ledger.Payload) ledger.RootHash {
+	path1, path2, path3, path4 := paths[0], paths[1], paths[2], paths[3]
+	lookup := toLookup(groupPath, groupPayloads)
+
+	//       h7
+	//   0/     \1
+	//   h5     h6
+	// 0/ \1  0/ \1
+	// h1 h2  h3 h4
+	h1 := getLeafHash(path1, lookup) // 00
+	h2 := getLeafHash(path2, lookup) // 01
+	h3 := getLeafHash(path3, lookup) // 10
+	h4 := getLeafHash(path4, lookup) // 11
 	h5 := hash.HashInterNode(h1, h2)
 	h6 := hash.HashInterNode(h3, h4)
 	h7 := hash.HashInterNode(h5, h6)
-	return h7
+	return ledger.RootHash(h7)
 }
 
-func getLeafHash(path ledger.Path, lookup map[ledger.Path]*ledger.Payload) hash.Hash {
+func getLeafHash(path ledger.Path, lookup map[ledger.Path]ledger.Payload) hash.Hash {
 	payload, ok := lookup[path]
 	height := 256 - 2
 	if !ok {
 		return ledger.GetDefaultHashForHeight(height)
 	}
 
-	leaf := node.NewLeaf(path, payload, height)
+	leaf := node.NewLeaf(path, &payload, height)
 	return leaf.Hash()
 }
