@@ -466,13 +466,7 @@ func (builder *FollowerServiceBuilder) initNodeInfo() error {
 }
 
 func (builder *FollowerServiceBuilder) InitIDProviders() {
-	builder.Module("id providers", func(node *cmd.NodeConfig) error {
-		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
-		if err != nil {
-			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
-		}
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-
+	builder.Component("block list distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		heroStoreOpts := make([]queue.HeroStoreConfigOption, 0)
 		if node.HeroCacheMetricsEnable {
 			collector := metrics.BlockListNotificationQueueMetricFactory(node.MetricsRegisterer)
@@ -481,7 +475,18 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.NodeBlockListDistributor = cache.DefaultNodeBlockListDistributor(node.Logger, heroStoreOpts...)
+		builder.NodeBlockListDistributor = cache.DefaultNodeBlockListDistributor(builder.Logger, heroStoreOpts...)
+
+		return builder.NodeBlockListDistributor, nil
+	})
+
+	builder.Module("id providers", func(node *cmd.NodeConfig) error {
+		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
+		if err != nil {
+			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
+		}
+		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+		
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)

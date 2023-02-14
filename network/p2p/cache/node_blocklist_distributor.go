@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/handler"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
@@ -19,6 +21,9 @@ const DefaultBlockListNotificationQueueCacheSize = 100
 
 // NodeBlockListDistributor subscribes to changes in the NodeBlocklistWrapper block list.
 type NodeBlockListDistributor struct {
+	component.Component
+	cm *component.ComponentManager
+
 	nodeBlockListConsumers []p2p.NodeBlockListConsumer
 	handler                *handler.AsyncEventHandler
 	logger                 zerolog.Logger
@@ -51,6 +56,21 @@ func NewNodeBlockListDistributor(logger zerolog.Logger, store engine.MessageStor
 	}
 
 	h.RegisterProcessor(d.ProcessQueuedNotifications)
+
+	cm := component.NewComponentManagerBuilder()
+	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+
+		h.Start(ctx)
+		<-h.Ready()
+		d.logger.Info().Msg("node block list distributor started")
+
+		<-ctx.Done()
+		d.logger.Debug().Msg("node block list distributor shutting down")
+	})
+
+	d.cm = cm.Build()
+	d.Component = d.cm
 
 	return d
 }
