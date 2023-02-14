@@ -9,11 +9,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/queue"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
-type EventHandlerFunc func(flow.Identifier, interface{})
+// EventProcessorFunc is a function that processes an event. It is used by the AsyncEventHandler to process events.
+// The first argument is the identifier of the event's origin, and the second argument is the event itself.
+// The function is expected to be concurrency safe.
+// Processing an event is the last step in the event's lifecycle within the AsyncEventHandler.
+type EventProcessorFunc func(flow.Identifier, interface{})
 
 // AsyncEventHandler is a component that asynchronously handles events, i.e., concurrency safe and non-blocking.
 // It queues up the events and spawns a number of workers to process the events.
@@ -23,25 +26,27 @@ type AsyncEventHandler struct {
 
 	log       zerolog.Logger
 	handler   *engine.MessageHandler
-	queue     engine.MessageStore
-	processor EventHandlerFunc
+	store     engine.MessageStore
+	processor EventProcessorFunc
 }
 
+// NewAsyncEventHandler creates a new AsyncEventHandler.
+// The first argument is the logger to be used by the AsyncEventHandler.
+// The second argument is the message store to be used by the AsyncEventHandler for temporarily storing events till they are processed.
+// The third argument is the number of workers to be spawned by the AsyncEventHandler to pick up events from the message store and process them.
 func NewAsyncEventHandler(
 	log zerolog.Logger,
-	queueSize uint32,
+	store engine.MessageStore,
 	workerCount uint) *AsyncEventHandler {
 
-	q := queue.NewHeroStore(queueSize, log, metrics.NewNoopCollector())
-
-	n := &AsyncEventHandler{
+	h := &AsyncEventHandler{
 		log:   log.With().Str("component", "async_event_handler").Logger(),
-		queue: q,
+		store: store,
 		handler: engine.NewMessageHandler(log, engine.NewNotifier(), engine.Pattern{
 			Match: func(message *engine.Message) bool {
 				return true
 			},
-			Store: q,
+			Store: store,
 		}),
 	}
 
@@ -50,45 +55,53 @@ func NewAsyncEventHandler(
 		cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 
-			n.processEventWorker(ctx)
+			h.processEventWorker(ctx)
 		})
 	}
 
-	n.cm = cm.Build()
-	n.Component = n.cm
+	h.cm = cm.Build()
+	h.Component = h.cm
 
-	return n
+	return h
 }
 
-func (n *AsyncEventHandler) RegisterProcessor(processor EventHandlerFunc) {
-	n.processor = processor
+func (a *AsyncEventHandler) RegisterProcessor(processor EventProcessorFunc) {
+	a.processor = processor
 }
 
-// processEventWorker is a worker that processes events from the request channel.
-func (n *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext) {
+// processEventWorker is a worker that is spawned by the AsyncEventHandler to process events.
+// The worker is blocked on the handler's notifier channel, and wakes up whenever a new event is received.
+// On waking up, the worker keeps processing events till the message store is empty.
+func (a *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
-			n.log.Debug().Msg("processing event worker terminated")
+			a.log.Debug().Msg("processing event worker terminated")
 			return
-		case <-n.handler.GetNotifier():
-			n.processMessages(ctx)
+		case <-a.handler.GetNotifier():
+			a.processEvents(ctx)
 		}
 	}
 }
 
-func (n *AsyncEventHandler) processMessages(ctx irrecoverable.SignalerContext) {
+// processEvents is part of the worker's logic. It keeps processing events till the message store is empty.
+func (a *AsyncEventHandler) processEvents(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			msg, ok := n.queue.Get()
+			msg, ok := a.store.Get()
 			if !ok {
-				// no more events to process
+				a.log.Trace().Msg("no more events to process, returning")
 				return
 			}
-			n.processor(msg.OriginID, msg.Payload)
+			lg := a.log.With().
+				Hex("origin_id", logging.ID(msg.OriginID)).
+				Str("payload", fmt.Sprintf("%v", msg.Payload)).Logger()
+			lg.Trace().Msg("processing event")
+			a.processor(msg.OriginID, msg.Payload)
+			lg.Trace().Msg("event processed")
 		}
 	}
 }
@@ -97,15 +110,15 @@ func (n *AsyncEventHandler) processMessages(ctx irrecoverable.SignalerContext) {
 // On a happy path it returns nil. Any returned error is unexpected and indicates a bug in the code.
 // It is safe to call Submit concurrently.
 // It is safe to call Submit after Shutdown.
-func (n *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) error {
+func (a *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) error {
 	select {
-	case <-n.cm.ShutdownSignal():
-		n.log.Warn().Msg("received event after shutdown")
+	case <-a.cm.ShutdownSignal():
+		a.log.Warn().Msg("received event after shutdown")
 		return nil
 	default:
 	}
 
-	err := n.handler.Process(originId, event)
+	err := a.handler.Process(originId, event)
 	if err != nil {
 		return fmt.Errorf("unexpected error while processing event: %w", err)
 	}
