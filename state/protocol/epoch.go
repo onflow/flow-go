@@ -148,14 +148,28 @@ type Epoch interface {
 	DKG() (DKG, error)
 
 	// FirstHeight returns the height of the first block of the epoch.
-	// The first block of the epoch is defined...
-	//   ... <- L <-|- F <- ...
-	// TODO(6485) docs
+	// The first block of an epoch E is defined as the block B with the lowest
+	// height so that: B.View >= E.FirstView
+	// The first block of an epoch is not defined until it is finalized, so this
+	// value is only guaranteed to be defined for `Current` epochs of finalized snapshots.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
+	// * protocol.ErrEpochNotStarted if the first block of the epoch has not been finalized yet.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FirstHeight() (uint64, error)
 
-	// FinalHeight returns the height of the last block of the epoch.
-	// The last block of the epoch is defined...
-	//   ... <- L <-|- F <- ...
-	// TODO(6485)
+	// FinalHeight returns the height of the final block of the epoch.
+	// The final block of an epoch E is defined as the parent of the first
+	// block in epoch E+1 (see definition from FirstHeight).
+	// The final block of an epoch is not defined until its child is finalized,
+	// so this value is only guaranteed to be defined for `Previous` epochs of finalized snapshots.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
+	// * protocol.ErrEpochNotEnded if the first block of the next epoch has not been finalized yet.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FinalHeight() (uint64, error)
 }
