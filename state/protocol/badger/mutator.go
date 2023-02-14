@@ -84,13 +84,14 @@ func NewFullConsensusState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	qcs storage.QuorumCertificates,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(state, index, payloads, qcs, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
