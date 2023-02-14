@@ -4,4 +4,6 @@
 // blst related definitions
 // eventually this file would replace blst.h
 
+#include "blst.h"
+
 #endif
