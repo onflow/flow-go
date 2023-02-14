@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -38,6 +39,7 @@ type FollowerState struct {
 
 	index      storage.Index
 	payloads   storage.Payloads
+	qcs        storage.QuorumCertificates
 	tracer     module.Tracer
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
@@ -441,6 +443,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
+		}
+
+		qc := model.QuorumCertificateFromFlow(candidate.Header)
+		err = m.qcs.StoreTx(qc)(tx)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not store qc: %w", err)
 		}
 
 		// index the latest sealed block in this fork
