@@ -50,21 +50,19 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return err
 	}
 
-	var payer Address
-	err = payer.Parse(tx.Payer)
+	payer, err := ParseAddress(tx.Payer)
 	if err != nil {
 		return fmt.Errorf("invalid payer: %w", err)
 	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
 	for i, auth := range tx.Authorizers {
-		var a Address
-		err := a.Parse(auth)
+		a, err := ParseAddress(auth)
 		if err != nil {
 			return err
 		}
 
-		auths[i] = a.Flow()
+		auths[i] = a
 	}
 
 	var proposal ProposalKey
@@ -108,7 +106,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		Arguments:          args.Flow(),
 		GasLimit:           gasLimit,
 		ProposalKey:        proposal.Flow(),
-		Payer:              payer.Flow(),
+		Payer:              payer,
 		Authorizers:        auths,
 		PayloadSignatures:  payloadSigs.Flow(),
 		EnvelopeSignatures: envelopeSigs.Flow(),
