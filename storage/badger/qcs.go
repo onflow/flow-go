@@ -24,7 +24,7 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *QuorumCertificates {
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		qc := val.(*flow.QuorumCertificate)
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertQuorumCertificate(qc)))
+		return transaction.WithTx(operation.InsertQuorumCertificate(qc))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
