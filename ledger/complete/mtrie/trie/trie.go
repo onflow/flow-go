@@ -94,9 +94,9 @@ func (mt *MTrie) RootNode() *node.Node {
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
 	if mt.IsEmpty() {
-		return fmt.Sprintf("Empty Trie with default root hash: %x\n", mt.RootHash())
+		return fmt.Sprintf("Empty Trie with default root hash: %v\n", mt.RootHash())
 	}
-	trieStr := fmt.Sprintf("Trie root hash: %x\n", mt.RootHash())
+	trieStr := fmt.Sprintf("Trie root hash: %v\n", mt.RootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
 
