@@ -1,7 +1,6 @@
 package trie_test
 
 import (
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,27 +10,45 @@ import (
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_PathCreation(t *testing.T) {
-	paths := []ledger.Path{
-		testutils.PathByUint8(1 << 7),   // 1000...
-		testutils.PathByUint8(1 << 6),   // 1000...
-		testutils.PathByUint16(1 << 15), // 1000...
-		testutils.PathByUint16(1 << 14), // 1000...
-	}
-
-	// emptyTrie := trie.NewEmptyMTrie()
-	for _, path := range paths {
-		fmt.Println(path)
-	}
-	// payload := testutils.LightPayload(11, 12345)
-	var p ledger.Path
-	binary.BigEndian.PutUint32(p[28:32], 1)
-	fmt.Println(p)
-}
+// There are some steps to test a Merkle trie implementation:
+//
+// 1. Test basic insertion and lookup operations:
+//    Verify that we can insert key-value pairs (path and payload) to the trie and
+//    look them up using their key (path).
+//    See:
+// 				Test_Lookup_AddUntilFull
+// 				Test_Lookup_RemoveUntilEmpty
+//
+// 2. Test hash computation:
+//    Verify that the hash values of the nodes in the trie are correctly computed based on the
+//    hash values of their children.
+//		See:
+//				Test_RootHash_AddUntilFull
+//				Test_RootHash_RemoveUntilEmpty
+//
+// 3. Test proof generation:
+//    Verify that the implementation correctly verifies the proof of key-value pairs given its key
+//    and the root node hash.
+// 		See:
+//				Test_Prove_AddUntilFull
+//
+// For simplicity, we use the top 2-levels to test the above properties. With a 2-level tree, it can store
+//  4 payloads on the leaf nodes [n1,n2,n3,n4] on the 4 paths: [00,01,01,11]
+//         n7
+//     0/     \1
+//     n5     n6
+//   0/ \1  0/ \1
+//   n1 n2  n3 n4
+//
+// As the 256-levels mtrie implemented compaction, which allows a subtrie with only one payload to be compacted
+// into a single compacted leaf node, we can use the 256 levels mtrie as a 2-levels tree, and it should have the
+// same merkle trie properties. This allows us to write simplier tests to verify all the above properties, as
+// if we are testing the implementation of a 2-levels tree.
 
 // a full trie with 4 payloads at bottom
 func Test_FullTrie4_Update(t *testing.T) {
@@ -99,9 +116,9 @@ func getAllPathsAtLevel2() []ledger.Path {
 	}
 }
 
-// adding payloads to the trie until full
-func Test_AddingPayloadUntilFull(t *testing.T) {
-	// prepare paths for a trie with only 2 levels, which has 4 payloads in total
+// Verify simple insertaion and lookup operation
+func Test_AddRemovePayload(t *testing.T) {
+	// prepare paths for a 2-levels tree, which can store 4 payloads in total on different paths.
 	paths := getAllPathsAtLevel2()
 
 	// prepare payloads, the value doesn't matter
@@ -112,19 +129,16 @@ func Test_AddingPayloadUntilFull(t *testing.T) {
 
 	t0 := trie.NewEmptyMTrie()
 	payloadStorage := unittest.CreateMockPayloadStore()
-	fmt.Println(t0)
 
 	fmt.Println("=== adding 1 payload at 00000000")
 	t1, depth, err := trie.NewTrieWithUpdatedRegisters(t0, paths[0:1], payloads[0:1], true, payloadStorage)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), depth)
-	fmt.Println(t1)
 
 	fmt.Println("=== adding 1 payload at 01000000")
 	t2, depth, err := trie.NewTrieWithUpdatedRegisters(t1, paths[1:2], payloads[1:2], true, payloadStorage)
 	require.NoError(t, err)
 	require.Equal(t, uint16(2), depth)
-	fmt.Println(t2)
 
 	emptyPayloads := []ledger.Payload{
 		*ledger.EmptyPayload(),
@@ -134,14 +148,12 @@ func Test_AddingPayloadUntilFull(t *testing.T) {
 	t3, depth, err := trie.NewTrieWithUpdatedRegisters(t2, paths[1:2], emptyPayloads, true, payloadStorage)
 	require.NoError(t, err)
 	require.Equal(t, uint16(2), depth)
-	fmt.Println(t3)
 	require.True(t, t1.Equals(t3))
 
 	fmt.Println("=== removing 1 payload at 00000000")
 	t4, depth, err := trie.NewTrieWithUpdatedRegisters(t3, paths[0:1], emptyPayloads, true, payloadStorage)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), depth)
-	fmt.Println(t4)
 	require.True(t, t0.Equals(t4))
 }
 
@@ -150,12 +162,33 @@ type pathAndPayload struct {
 	Payloads []ledger.Payload
 }
 
+// Verify the basic insertaion and lookup operation.
+// In order to verify we can lookup from a 2-levels tree in any state, we could enum all
+// the possible 2-levels tree state by adding sets of payloads to different paths.
+// For a 2-levels tree, there are (4 * 3 * 2 * 1 = 24) possibilities:
+// For instance,
+// adding 4 payloads will create a full tree:
+//       n7
+//      /  \
+//    n5    n6
+//   / \   / \
+//  n1 n2 n3 n4
+//
+// adding 2 payloads at [00, 10], will create a tree:
+//      n3
+//		 / \
+// 		n1  n2
 func Test_Lookup_AddUntilFull(t *testing.T) {
-	// prepare paths for a trie with only 2 levels, which has 4 payloads in total
+	// prepare paths for a 2-levels tree, which can store 4 payloads in total on different paths.
 	paths := getAllPathsAtLevel2()
 	payloads := testutils.RandomPayloads(4, 10, 20)
 
+	// enum the 24 possibilities for different paths set
+	// each group contains a unique set of paths to be stored in a trie
 	groups := getPermutationPathsPayloads(paths, payloads)
+
+	// for each unique set of paths, create a tree using it, and verify the payload can be
+	// retrieved by the paths, and verify retrieving payload for non existing path will return empty payload
 	for _, group := range groups {
 		payloadStorage := unittest.CreateMockPayloadStore()
 		updated, _, err := trie.NewTrieWithUpdatedRegisters(
@@ -233,14 +266,18 @@ func toPayloads(pointers []*ledger.Payload) []ledger.Payload {
 	return payloads
 }
 
+// Verify that existing payload can be removed from the trie, and looking up removed payload should
+// return empty payload
 func Test_Lookup_RemoveUntilEmpty(t *testing.T) {
-	// prepare paths for a trie with only 2 levels, which has 4 payloads in total
+	// prepare paths for a 2-levels tree, which can store 4 payloads in total on different paths.
 	paths := getAllPathsAtLevel2()
 	randoms := testutils.RandomPayloads(4, 10, 20)
 	payloads := toPayloads(randoms)
 
 	groups := getPermutationPathsPayloads(paths, randoms)
 
+	// enum 24 different sets of paths to be removed from a full 2-levels tree,
+	// and verify the lookup operation.
 	for _, group := range groups {
 		payloadStorage := unittest.CreateMockPayloadStore()
 
@@ -276,10 +313,13 @@ func Test_Lookup_RemoveUntilEmpty(t *testing.T) {
 	}
 }
 
+// verify the root hash can be correctly computed
 func Test_RootHash_AddUntilFull(t *testing.T) {
 	paths := getAllPathsAtLevel2()
 	payloads := testutils.RandomPayloads(4, 10, 20)
 
+	// enum 24 different sets of payloads, and create different trees using each set of payloads
+	// verify the root hash is correct
 	groups := getPermutationPathsPayloads(paths, payloads)
 	for _, group := range groups {
 		payloadStorage := unittest.CreateMockPayloadStore()
@@ -292,6 +332,7 @@ func Test_RootHash_AddUntilFull(t *testing.T) {
 	}
 }
 
+// verify the root hash can be correctly computed when tree nodes are removed.
 func Test_RootHash_RemoveUntilEmpty(t *testing.T) {
 	// prepare paths for a trie with only 2 levels, which has 4 payloads in total
 	paths := getAllPathsAtLevel2()
@@ -349,10 +390,116 @@ func printPaths(paths []ledger.Path) string {
 	return strings.Join(shorts, ",")
 }
 
-func Test_Prove_AddUntilFull(t *testing.T) {
+// verify the generation of proof.for existing paths
+// enum all different sets of payloads and create all unique 2-level trees, and verify
+// it can generate inclusion proof for existing payloads, and non-inclusion proof for non-existing payloads
+func Test_Prove_PartialPathsFromFullTree(t *testing.T) {
+	paths := getAllPathsAtLevel2()
+	randoms := testutils.RandomPayloads(4, 10, 20)
+	payloads := toPayloads(randoms)
+
+	groups := getPermutationPathsPayloads(paths, randoms)
+
+	// for each unique set of payloads, using them to create unique 2 level tree.
+	// verify that a batch proof can be created for existing payloads
+	// verify that a partial trie can be created by a light client from a batch proof and the trie root hash
+	// verify that the same payloads can be retrieved from the partial trie
+	// verify that retrieving non existing payload from the partial trie would get ErrMissingPath error
+	for _, group := range groups {
+
+		payloadStorage := unittest.CreateMockPayloadStore()
+		fullTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(), paths, payloads, true, payloadStorage)
+		require.NoError(t, err)
+
+		proof, err := fullTrie.UnsafeProofs(group.Paths, payloadStorage)
+		require.NoError(t, err)
+
+		proofTrie, err := ptrie.NewPSMT(fullTrie.RootHash(), proof)
+		require.NoError(t, err)
+
+		for i, path := range group.Paths {
+			payload := group.Payloads[i]
+			foundPayload, err := proofTrie.GetSinglePayload(path)
+			require.NoError(t, err)
+			require.False(t, foundPayload.IsEmpty(), fmt.Sprintf("an added payload at path %v should be found, but not",
+				path))
+			require.True(t, foundPayload.Equals(&payload),
+				fmt.Sprintf("expect the payload from proof to equal to the one from the trie, %v != %v",
+					foundPayload, payload))
+		}
+
+		nonExistingPaths := findNonExistingPaths(paths, group.Paths)
+		if len(nonExistingPaths) > 0 {
+			_, err = proofTrie.Get(nonExistingPaths)
+			require.NotNil(t, err, fmt.Sprintf("paths to add %v, paths not exist %v", group.Paths, nonExistingPaths))
+
+			errMissing, ok := err.(*ptrie.ErrMissingPath)
+			require.True(t, ok, err)
+			require.Equal(t, nonExistingPaths, errMissing.Paths)
+		}
+	}
 }
 
-func Test_Prove_RemoveUntilEmpty(t *testing.T) {
+// verify the generation of proof for non-existing paths
+// enum all different sets of payloads and create 24 unique 2-level trees, and verify
+// it can generate inclusion proof for existing payloads, and non-inclusion proof for non-existing payloads
+func Test_Prove_NonExistingPaths(t *testing.T) {
+	paths := getAllPathsAtLevel2()
+	randoms := testutils.RandomPayloads(4, 10, 20)
+
+	groups := getPermutationPathsPayloads(paths, randoms)
+
+	// for each unique set of payloads, using them to create unique 2 level tree.
+	// verify that a batch proof can be created for both existing payloads and non-existing paths
+	// verify that a partial trie can be created by a light client from a batch proof and the trie root hash
+	// verify that the same payloads can be retrieved from the partial trie
+	// verify that retrieving non existing payload from the partial trie would get ErrMissingPath error
+	for _, group := range groups {
+
+		payloadStorage := unittest.CreateMockPayloadStore()
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(), group.Paths, group.Payloads, true, payloadStorage)
+		require.NoError(t, err)
+
+		nonExistingPaths := findNonExistingPaths(paths, group.Paths)
+
+		// before generating the proof, the trie needs to be updated with empty payloads
+		// on the paths to be used for generating proofs
+		// note: prune: false
+		withEmptyPayloads, _, err := trie.NewTrieWithUpdatedRegisters(
+			updatedTrie, nonExistingPaths, nEmptyPayloads(len(nonExistingPaths)), false, payloadStorage)
+		require.NoError(t, err)
+
+		// proof can be generated for all paths including existing and non-existing paths
+		proof, err := withEmptyPayloads.UnsafeProofs(paths, payloadStorage)
+		require.NoError(t, err)
+
+		proofTrie, err := ptrie.NewPSMT(updatedTrie.RootHash(), proof)
+		require.NoError(t, err)
+
+		// for existing paths, the light client can retrieve the payload
+		for i, path := range group.Paths {
+			payload := group.Payloads[i]
+			foundPayload, err := proofTrie.GetSinglePayload(path)
+			require.NoError(t, err)
+			require.False(t, foundPayload.IsEmpty(), fmt.Sprintf("an added payload at path %v to trie with paths %v should be found, but not",
+				path, group.Paths))
+			require.True(t, foundPayload.Equals(&payload),
+				fmt.Sprintf("expect the payload from proof to equal to the one from the trie, %v != %v",
+					foundPayload, payload))
+		}
+
+		// for nonExistingPaths, the light client will get empty payload for them
+		if len(nonExistingPaths) > 0 {
+			emptyPayloads, err := proofTrie.Get(nonExistingPaths)
+			require.NoError(t, err)
+
+			for _, empty := range emptyPayloads {
+				require.True(t, empty.IsEmpty(), empty)
+			}
+		}
+	}
 }
 
 func toLookup(paths []ledger.Path, payloads []ledger.Payload) map[ledger.Path]ledger.Payload {
