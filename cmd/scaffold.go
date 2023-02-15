@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/distributer"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -966,7 +967,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		fnb.NodeBlockListDistributor = cache.DefaultNodeBlockListDistributor(fnb.Logger, heroStoreOpts...)
+		fnb.NodeBlockListDistributor = distributer.DefaultNodeBlockListDistributor(fnb.Logger, heroStoreOpts...)
 
 		return fnb.NodeBlockListDistributor, nil
 	})
