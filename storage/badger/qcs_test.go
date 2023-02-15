@@ -48,7 +48,7 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 		require.NoError(t, err)
 
 		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(otherQC))
-		require.ErrorAs(t, err, &storage.ErrAlreadyExists)
+		require.ErrorIs(t, err, &storage.ErrAlreadyExists)
 
 		actual, err := store.ByBlockID(otherQC.BlockID)
 		require.NoError(t, err)
