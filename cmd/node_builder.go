@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 
 	"github.com/dgraph-io/badger/v2"
@@ -258,8 +259,8 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeBlockListDistributor notifies consumers of updates to the node block list
-	NodeBlockListDistributor *distributor.NodeBlockList
+	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
+	NodeDisallowListDistributor *distributor.DisallowListNotificationConsumer
 }
 
 func DefaultBaseConfig() *BaseConfig {
