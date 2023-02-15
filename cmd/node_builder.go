@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/distributer"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 
 	"github.com/dgraph-io/badger/v2"
@@ -27,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -260,7 +260,7 @@ type NodeConfig struct {
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeBlockListDistributor notifies consumers of updates to the node block list
-	NodeBlockListDistributor *cache.NodeBlockListDistributor
+	NodeBlockListDistributor *distributer.NodeBlockListDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
