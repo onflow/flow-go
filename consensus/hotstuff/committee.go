@@ -122,15 +122,17 @@ type DynamicCommittee interface {
 	IdentityByBlock(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 }
 
-// BlockSignerDecoder defines how to convert the SignerIndices field within a particular
-// block header to the identifiers of the nodes which signed the block.
+// BlockSignerDecoder defines how to convert the ParentSignerIndices field within a
+// particular block header to the identifiers of the nodes which signed the block.
 type BlockSignerDecoder interface {
 	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+	// Note: A block header contains a quorum certificate for its parent, which proves that the
+	// consensus committee has reached agreement on validity of parent block. Consequently, the
+	// returned IdentifierList contains the consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
-	//  * state.UnknownBlockError if block has not been ingested yet
-	//    TODO: this sentinel could be changed to `ErrViewForUnknownEpoch` once we merge the active pacemaker
-	//  * signature.InvalidSignerIndicesError if signer indices included in the header do
-	//    not encode a valid subset of the consensus committee
+	//   - model.ErrViewForUnknownEpoch if the given block's parent is within an unknown epoch
+	//   - signature.InvalidSignerIndicesError if signer indices included in the header do
+	//     not encode a valid subset of the consensus committee
 	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
 }
 

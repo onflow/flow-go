@@ -37,7 +37,7 @@ type MsgAuthConfig struct {
 //   - ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
 //   - ErrUnauthorizedUnicastOnChannel: the message is not authorized to be sent via unicast protocol.
 //   - ErrUnauthorizedPublishOnChannel: the message is not authorized to be sent via publish protocol.
-func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel, protocol Protocol) error {
+func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel, protocol ProtocolType) error {
 	authConfig, ok := m.Config[channel]
 	if !ok {
 		return ErrUnauthorizedMessageOnChannel
@@ -66,11 +66,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 			channels.PushBlocks: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ReceiveBlocks = PushBlocks
 		},
 	}
@@ -82,7 +82,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -94,7 +94,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -108,11 +108,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles:  flow.Roles(),
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -124,11 +124,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -140,11 +140,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles:  flow.Roles(),
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -156,11 +156,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles:  flow.Roles(),
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -172,7 +172,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -186,7 +186,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -198,7 +198,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -210,7 +210,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			},
 		},
 	}
@@ -222,7 +222,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -236,7 +236,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushGuarantees: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ReceiveGuarantees = PushGuarantees
 		},
 	}
@@ -248,7 +248,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushTransactions: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ReceiveTransactions = PushTransactions
 		},
 	}
@@ -262,7 +262,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushReceipts: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleExecution},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ReceiveReceipts = PushReceipts
 		},
 	}
@@ -274,7 +274,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushApprovals: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleVerification},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ReceiveApprovals = PushApprovals
 		},
 	}
@@ -288,7 +288,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.RequestChunks: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleVerification},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
@@ -300,7 +300,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ProvideChunks: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleExecution},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
@@ -314,7 +314,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.RequestApprovalsByChunk: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolPublish},
+				AllowedProtocols: Protocols{ProtocolTypePubSub},
 			}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
 		},
 	}
@@ -326,7 +326,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ProvideApprovalsByChunk: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleVerification},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
 		},
 	}
@@ -340,11 +340,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.RequestReceiptsByBlockID: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 			channels.RequestCollections: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleAccess, flow.RoleExecution},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -356,11 +356,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ProvideReceiptsByBlockID: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleExecution},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 			channels.ProvideCollections: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleCollection},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -374,11 +374,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.TestNetworkChannel: {
 				AuthorizedRoles:  flow.Roles(),
-				AllowedProtocols: Protocols{ProtocolPublish, ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypePubSub, ProtocolTypeUnicast},
 			},
 			channels.TestMetricsChannel: {
 				AuthorizedRoles:  flow.Roles(),
-				AllowedProtocols: Protocols{ProtocolPublish, ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypePubSub, ProtocolTypeUnicast},
 			},
 		},
 	}
@@ -392,7 +392,7 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.DKGCommittee: {
 				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
-				AllowedProtocols: Protocols{ProtocolUnicast},
+				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
 	}

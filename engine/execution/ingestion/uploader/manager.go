@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// Manager encapsulates the logic for uploading computation results to cloud storage. It
+// Manager encapsulates the logic for uploading computation results to cloud
+// storage.
 type Manager struct {
 	enabled   bool
 	tracer    module.Tracer
@@ -53,9 +54,16 @@ func (m *Manager) Enabled() bool {
 
 // Upload uploads the given computation result with all uploaders
 // Any errors returned by the uploaders may be considered benign
-func (m *Manager) Upload(ctx context.Context, result *execution.ComputationResult) error {
+func (m *Manager) Upload(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	if !m.enabled {
+		return nil
+	}
 
 	var group errgroup.Group
 
@@ -78,6 +86,10 @@ func (m *Manager) Upload(ctx context.Context, result *execution.ComputationResul
 func (m *Manager) RetryUploads() (err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	if !m.enabled {
+		return nil
+	}
 
 	for _, u := range m.uploaders {
 		switch retryableUploaderWraper := u.(type) {

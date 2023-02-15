@@ -14,6 +14,8 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -328,16 +330,17 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 	return v
 }
 
+// ExecuteGetNodeInfoScript executes a script to get staking info about the given node.
+func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
+	cdcNodeID, err := cadence.NewString(nodeID.String())
+	require.NoError(s.T(), err)
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetNodeInfoScript(env), []cadence.Value{cdcNodeID})
+	require.NoError(s.T(), err)
+	return v
+}
+
 // SubmitSetApprovedListTx adds a node to the approved node list, this must be done when a node joins the protocol during the epoch staking phase
 func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
-	ids := make([]cadence.Value, 0)
-	for _, id := range identities {
-		idCDC, err := cadence.NewString(id.String())
-		require.NoError(s.T(), err)
-
-		ids = append(ids, idCDC)
-	}
-
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -349,7 +352,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.client.SDKServiceAddress()).
 		AddAuthorizer(idTableAddress)
-	err = tx.AddArgument(cadence.NewArray(ids))
+	err = tx.AddArgument(blueprints.SetStakingAllowlistTxArg(identities))
 	require.NoError(s.T(), err)
 
 	err = s.client.SignAndSendTransaction(ctx, tx)
@@ -386,18 +389,6 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 	// check if node is in proposed table
 	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
-}
-
-// assertNodeNotApprovedOrProposed executes the read approved nodes list and get proposed table scripts
-// and checks that the info.NodeID is not included in either - this means the node would be excluded from future epochs
-func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
-	// ensure node ID not in approved list
-	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
-	require.NotContainsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in approved nodes list: %x", nodeID)
-
-	// check if node is not in proposed table
-	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, nodeID)
-	require.NotContainsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in proposed table: %x", nodeID)
 }
 
 // newTestContainerOnNetwork configures a new container on the suites network
@@ -501,6 +492,14 @@ func (s *Suite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
+}
+
+// AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
+// in the epoch's identity table.
+func (s *Suite) AssertNodeNotParticipantInEpoch(epoch protocol.Epoch, nodeID flow.Identifier) {
+	identities, err := epoch.InitialIdentities()
+	require.NoError(s.T(), err)
+	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
 // AwaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
@@ -685,8 +684,8 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.AwaitFinalizedView(s.ctx, epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
-	// make sure container to replace removed from smart contract state
-	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
+	// make sure container to replace is not a member of epoch 2
+	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().Next(), containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
