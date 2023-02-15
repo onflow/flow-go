@@ -935,9 +935,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return ledger.Get(id)
-	})
+	view := delta.NewDeltaView(ledger)
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 
@@ -1074,7 +1072,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)

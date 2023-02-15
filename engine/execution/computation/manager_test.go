@@ -149,7 +149,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
@@ -201,7 +201,10 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	view := delta.NewDeltaView(
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
 	blockView := view.NewChild()
 
 	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
@@ -223,7 +226,7 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	scriptView := view.NewChild()
 
@@ -281,9 +284,10 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return nil, fmt.Errorf("error getting register")
-	})
+	view := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		func(id flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, fmt.Errorf("error getting register")
+		}))
 
 	scriptView := view.NewChild()
 
@@ -695,7 +699,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	eventEncoder.enabled = true

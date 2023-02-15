@@ -226,7 +226,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		prov)
 	require.NoError(tb, err)
 
-	view := delta.NewDeltaView(exeState.LedgerGetRegister(ledger, initialCommit))
+	view := delta.NewDeltaView(
+		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)

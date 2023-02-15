@@ -20,6 +20,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type invalidAccountStatusKeyStorageSnapshot struct{}
+
+func (invalidAccountStatusKeyStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	if id.Key == flow.AccountStatusKey {
+		return nil, fmt.Errorf("error getting register %s", id)
+	}
+	return nil, nil
+}
+
 func createAccount(
 	t *testing.T,
 	vm fvm.VM,
@@ -1310,12 +1324,8 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-					if id.Key == flow.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s", id)
-					}
-					return nil, nil
-				})
+				view := delta.NewDeltaView(
+					invalidAccountStatusKeyStorageSnapshot{})
 
 				err := vm.Run(ctx, script, view)
 				require.ErrorContains(
@@ -1523,12 +1533,8 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				newview := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-					if id.Key == flow.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s", id)
-					}
-					return nil, nil
-				})
+				newview := delta.NewDeltaView(
+					invalidAccountStatusKeyStorageSnapshot{})
 
 				err := vm.Run(ctx, script, newview)
 				require.ErrorContains(

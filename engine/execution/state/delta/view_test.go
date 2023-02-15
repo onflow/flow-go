@@ -11,6 +11,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type testStorage map[flow.RegisterID]string
+
+func (storage testStorage) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return flow.RegisterValue(storage[id]), nil
+}
+
 func TestViewGet(t *testing.T) {
 	registerID := flow.NewRegisterID("fruit", "")
 
@@ -23,27 +29,20 @@ func TestViewGet(t *testing.T) {
 	})
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
-		v := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-			if id == registerID {
-				return flow.RegisterValue("orange"), nil
-			}
-
-			return nil, nil
-		})
+		v := delta.NewDeltaView(
+			testStorage{
+				registerID: "orange",
+			})
 		b, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-			if id == registerID {
-				return flow.RegisterValue("orange"), nil
-			}
-
-			return nil, nil
-		})
-
+		v := delta.NewDeltaView(
+			testStorage{
+				registerID: "orange",
+			})
 		err := v.Set(registerID, flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
@@ -56,7 +55,7 @@ func TestViewGet(t *testing.T) {
 func TestViewSet(t *testing.T) {
 	registerID := flow.NewRegisterID("fruit", "")
 
-	v := delta.NewDeltaView(delta.AlwaysEmptyGetRegisterFunc)
+	v := delta.NewDeltaView(nil)
 
 	err := v.Set(registerID, flow.RegisterValue("apple"))
 	assert.NoError(t, err)
@@ -324,18 +323,11 @@ func TestView_RegisterTouches(t *testing.T) {
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-			if id == registerID1 {
-				return flow.RegisterValue("orange"), nil
-			}
-
-			if id == registerID2 {
-				return flow.RegisterValue("carrot"), nil
-			}
-
-			return nil, nil
-		})
-
+		v := delta.NewDeltaView(
+			testStorage{
+				registerID1: "orange",
+				registerID2: "carrot",
+			})
 		_, err := v.Get(registerID1)
 		assert.NoError(t, err)
 
@@ -363,16 +355,11 @@ func TestView_AllRegisterIDs(t *testing.T) {
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-			if id == idA {
-				return flow.RegisterValue("a_value"), nil
-			}
-
-			if id == idB {
-				return flow.RegisterValue("b_value"), nil
-			}
-			return nil, nil
-		})
+		v := delta.NewDeltaView(
+			testStorage{
+				idA: "a_value",
+				idB: "b_value",
+			})
 
 		_, err := v.Get(idA)
 		assert.NoError(t, err)
@@ -395,16 +382,11 @@ func TestView_AllRegisterIDs(t *testing.T) {
 		assert.Len(t, allRegs, 6)
 	})
 	t.Run("With Merge", func(t *testing.T) {
-		v := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-			if id == idA {
-				return flow.RegisterValue("a_value"), nil
-			}
-
-			if id == idB {
-				return flow.RegisterValue("b_value"), nil
-			}
-			return nil, nil
-		})
+		v := delta.NewDeltaView(
+			testStorage{
+				idA: "a_value",
+				idB: "b_value",
+			})
 
 		vv := v.NewChild()
 		_, err := vv.Get(idA)
