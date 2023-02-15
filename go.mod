@@ -101,6 +101,8 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
+require github.com/slok/go-http-metrics v0.10.0
+
 require (
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
