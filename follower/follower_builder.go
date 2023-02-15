@@ -486,7 +486,7 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-		
+
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
