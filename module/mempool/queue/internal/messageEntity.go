@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -29,5 +31,7 @@ func (m MessageEntity) Checksum() flow.Identifier {
 }
 
 func identifierOfMessage(msg *engine.Message) flow.Identifier {
-	return flow.MakeID(msg)
+	id := flow.MakeID(msg)
+	fmt.Printf("id: %x msg: %v \n", id, msg)
+	return id
 }

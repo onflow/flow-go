@@ -65,8 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware        = (*Middleware)(nil)
-	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
+	_ network.Middleware       = (*Middleware)(nil)
+	_ p2p.DisallowListConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for

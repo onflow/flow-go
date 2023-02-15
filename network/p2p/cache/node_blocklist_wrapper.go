@@ -39,14 +39,14 @@ type NodeBlocklistWrapper struct {
 
 	identityProvider module.IdentityProvider
 	blocklist        IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
-	notifier         p2p.NodeBlockListConsumer
+	notifier         p2p.DisallowListConsumer
 }
 
 var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 
 // NewNodeBlocklistWrapper wraps the given `IdentityProvider`. The blocklist is
 // loaded from the database (or assumed to be empty if no database entry is present).
-func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB, notifier p2p.NodeBlockListConsumer) (*NodeBlocklistWrapper, error) {
+func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB, notifier p2p.DisallowListConsumer) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)

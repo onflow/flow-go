@@ -19,20 +19,20 @@ import (
 const blockListDistributorWorkerCount = 1
 const DefaultBlockListNotificationQueueCacheSize = 100
 
-// NodeBlockList subscribes to changes in the NodeBlocklistWrapper block list.
-type NodeBlockList struct {
+// DisallowListNotificationConsumer subscribes to changes in the NodeBlocklistWrapper block list.
+type DisallowListNotificationConsumer struct {
 	component.Component
 	cm *component.ComponentManager
 
-	nodeBlockListConsumers []p2p.NodeBlockListConsumer
+	nodeBlockListConsumers []p2p.DisallowListConsumer
 	handler                *handler.AsyncEventHandler
 	logger                 zerolog.Logger
 	lock                   sync.RWMutex
 }
 
-var _ p2p.NodeBlockListConsumer = (*NodeBlockList)(nil)
+var _ p2p.DisallowListConsumer = (*DisallowListNotificationConsumer)(nil)
 
-func DefaultNodeBlockList(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *NodeBlockList {
+func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListNotificationConsumer {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultBlockListNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -43,14 +43,14 @@ func DefaultNodeBlockList(logger zerolog.Logger, opts ...queue.HeroStoreConfigOp
 	}
 
 	store := queue.NewHeroStore(cfg.SizeLimit, logger, cfg.Collector)
-	return NewNodeBlockList(logger, store)
+	return NewDisallowListConsumer(logger, store)
 }
 
-func NewNodeBlockList(logger zerolog.Logger, store engine.MessageStore) *NodeBlockList {
+func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
 	h := handler.NewAsyncEventHandler(logger, store, blockListDistributorWorkerCount)
 
-	d := &NodeBlockList{
-		nodeBlockListConsumers: make([]p2p.NodeBlockListConsumer, 0),
+	d := &DisallowListNotificationConsumer{
+		nodeBlockListConsumers: make([]p2p.DisallowListConsumer, 0),
 		handler:                h,
 		logger:                 logger.With().Str("component", "node_blocklist_distributor").Logger(),
 	}
@@ -75,23 +75,23 @@ func NewNodeBlockList(logger zerolog.Logger, store engine.MessageStore) *NodeBlo
 	return d
 }
 
-// blockListUpdateEvent is the event that is submitted to the handler when the block list is updated.
-type blockListUpdateEvent struct {
-	blockList flow.IdentifierList
+// BlockListUpdateNotification is the event that is submitted to the handler when the block list is updated.
+type BlockListUpdateNotification struct {
+	BlockList flow.IdentifierList
 }
 
-func (d *NodeBlockList) AddConsumer(consumer p2p.NodeBlockListConsumer) {
+func (d *DisallowListNotificationConsumer) AddConsumer(consumer p2p.DisallowListConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.nodeBlockListConsumers = append(d.nodeBlockListConsumers, consumer)
 }
 
-func (d *NodeBlockList) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
+func (d *DisallowListNotificationConsumer) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
 	// we submit the block list update event to the handler to be processed by the worker.
 	// the origin id is set to flow.ZeroID because the block list update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
-	err := d.handler.Submit(flow.ZeroID, blockListUpdateEvent{
-		blockList: blockList,
+	err := d.handler.Submit(flow.ZeroID, BlockListUpdateNotification{
+		BlockList: blockList,
 	})
 
 	if err != nil {
@@ -99,16 +99,16 @@ func (d *NodeBlockList) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
 	}
 }
 
-func (d *NodeBlockList) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
-	var consumers []p2p.NodeBlockListConsumer
+func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
+	var consumers []p2p.DisallowListConsumer
 	d.lock.RLock()
 	consumers = d.nodeBlockListConsumers
 	d.lock.RUnlock()
 
 	switch notification := notification.(type) {
-	case blockListUpdateEvent:
+	case BlockListUpdateNotification:
 		for _, consumer := range consumers {
-			consumer.OnNodeBlockListUpdate(notification.blockList)
+			consumer.OnNodeBlockListUpdate(notification.BlockList)
 		}
 	default:
 		d.logger.Fatal().Msgf("unknown notification type: %T", notification)
