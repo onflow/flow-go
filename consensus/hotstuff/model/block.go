@@ -22,22 +22,13 @@ func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
 		BlockID:     header.ID(),
 		View:        header.View,
-		QC:          QuorumCertificateFromFlow(header),
+		QC:          header.QuorumCertificate(),
 		ProposerID:  header.ProposerID,
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}
 
 	return &block
-}
-
-func QuorumCertificateFromFlow(header *flow.Header) *flow.QuorumCertificate {
-	return &flow.QuorumCertificate{
-		BlockID:       header.ParentID,
-		View:          header.ParentView,
-		SignerIndices: header.ParentVoterIndices,
-		SigData:       header.ParentVoterSigData,
-	}
 }
 
 // GenesisBlockFromFlow returns a HotStuff block model representing a genesis

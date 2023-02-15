@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -448,7 +447,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
-		qc := model.QuorumCertificateFromFlow(candidate.Header)
+		qc := candidate.Header.QuorumCertificate()
 		err = m.qcs.StoreTx(qc)(tx)
 		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 			return fmt.Errorf("could not store qc: %w", err)
