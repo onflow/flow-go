@@ -10,7 +10,7 @@ import (
 // This specific storage allows to store and query QCs discovered from both consensus participants and followers.
 // When stored, QCs are indexed by the ID of the block they reference (not the block they are included within).
 // In the example below, `QC_1` is indexed by `Block_1.ID()`
-//   Block_1 <- Block_2(QC_1)
+// Block_1 <- Block_2(QC_1)
 type QuorumCertificates interface {
 	// StoreTx stores a Quorum Certificate as part of database transaction QC is indexed by QC.BlockID.
 	// * storage.ErrAlreadyExists if QC for blockID already exists
