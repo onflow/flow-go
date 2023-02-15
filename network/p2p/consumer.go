@@ -38,5 +38,5 @@ type GossipSubRpcInspectorConsumer interface {
 	// The int parameter is the count of invalid messages received from the peer.
 	// Prerequisites:
 	// Implementation must be concurrency safe and non-blocking.
-	OnInvalidControlMessage(peer.ID, ControlMessageType, int)
+	OnInvalidControlMessage(peer.ID, ControlMessageType, uint64)
 }

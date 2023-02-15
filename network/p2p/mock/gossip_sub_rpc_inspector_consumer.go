@@ -15,7 +15,7 @@ type GossipSubRpcInspectorConsumer struct {
 }
 
 // OnInvalidControlMessage provides a mock function with given fields: _a0, _a1, _a2
-func (_m *GossipSubRpcInspectorConsumer) OnInvalidControlMessage(_a0 peer.ID, _a1 p2p.ControlMessageType, _a2 int) {
+func (_m *GossipSubRpcInspectorConsumer) OnInvalidControlMessage(_a0 peer.ID, _a1 p2p.ControlMessageType, _a2 uint64) {
 	_m.Called(_a0, _a1, _a2)
 }
 
