@@ -1,7 +1,8 @@
-package distributer_test
+package distributor_test
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -12,14 +13,17 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/distributer"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestGossipSubInspectorNotification tests the gossip sub inspector notification by adding two consumers to the
+// notification distributor component and sending a random set of notifications to the notification component. The test
+// verifies that the consumers receive the notifications.
 func TestGossipSubInspectorNotification(t *testing.T) {
-	g := distributer.DefaultGossipSubInspectorNotification(unittest.Logger())
+	g := distributor.DefaultGossipSubInspectorNotification(unittest.Logger())
 
 	c1 := mockp2p.NewGossipSubRpcInspectorConsumer(t)
 	c2 := mockp2p.NewGossipSubRpcInspectorConsumer(t)
@@ -27,28 +31,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	g.AddConsumer(c1)
 	g.AddConsumer(c2)
 
-	tt := []distributer.InvalidControlMessage{
-		{
-			PeerIDStr: p2ptest.PeerIdFixture(t).String(),
-			MsgType:   p2p.CtrlMsgGraft,
-			Count:     uint64(1),
-		},
-		{
-			PeerIDStr: p2ptest.PeerIdFixture(t).String(),
-			MsgType:   p2p.CtrlMsgPrune,
-			Count:     2,
-		},
-		{
-			PeerIDStr: p2ptest.PeerIdFixture(t).String(),
-			MsgType:   p2p.CtrlMsgIHave,
-			Count:     3,
-		},
-		{
-			PeerIDStr: p2ptest.PeerIdFixture(t).String(),
-			MsgType:   p2p.CtrlMsgIWant,
-			Count:     1,
-		},
-	}
+	tt := invalidControlMessageNotificationListFixture(t, 100)
 
 	c1Done := sync.WaitGroup{}
 	c1Done.Add(len(tt))
@@ -63,10 +46,10 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 		count, ok := args.Get(2).(uint64)
 		require.True(t, ok)
 
-		require.Contains(t, tt, distributer.InvalidControlMessage{
-			PeerIDStr: peerID.String(),
-			MsgType:   msgType,
-			Count:     count,
+		require.Contains(t, tt, distributor.InvalidControlMessageNotification{
+			PeerID:  peerID,
+			MsgType: msgType,
+			Count:   count,
 		})
 
 		// ensure consumer see each peer once
@@ -89,10 +72,10 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 		count, ok := args.Get(2).(uint64)
 		require.True(t, ok)
 
-		require.Contains(t, tt, distributer.InvalidControlMessage{
-			PeerIDStr: peerID.String(),
-			MsgType:   msgType,
-			Count:     count,
+		require.Contains(t, tt, distributor.InvalidControlMessageNotification{
+			PeerID:  peerID,
+			MsgType: msgType,
+			Count:   count,
 		})
 		// ensure consumer see each peer once
 		require.False(t, c2Seen.Has(peerID))
@@ -110,7 +93,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			g.OnInvalidControlMessage(peer.ID(tt[i].PeerIDStr), tt[i].MsgType, tt[i].Count)
+			g.OnInvalidControlMessage(tt[i].PeerID, tt[i].MsgType, tt[i].Count)
 		}(i)
 	}
 
@@ -118,5 +101,20 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	unittest.RequireReturnsBefore(t, c2Done.Wait, 1*time.Second, "events are not received by consumer 2")
 	cancel()
 	unittest.RequireCloseBefore(t, g.Done(), 100*time.Millisecond, "could not stop handler")
+}
 
+func invalidControlMessageNotificationListFixture(t *testing.T, n int) []distributor.InvalidControlMessageNotification {
+	list := make([]distributor.InvalidControlMessageNotification, n)
+	for i := 0; i < n; i++ {
+		list[i] = invalidControlMessageNotificationFixture(t)
+	}
+	return list
+}
+
+func invalidControlMessageNotificationFixture(t *testing.T) distributor.InvalidControlMessageNotification {
+	return distributor.InvalidControlMessageNotification{
+		PeerID:  p2ptest.PeerIdFixture(t),
+		MsgType: []p2p.ControlMessageType{p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant}[rand.Intn(4)],
+		Count:   rand.Uint64(),
+	}
 }

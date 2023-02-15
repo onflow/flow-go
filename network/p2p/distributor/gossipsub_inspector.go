@@ -1,4 +1,4 @@
-package distributer
+package distributor
 
 import (
 	"sync"
@@ -76,17 +76,17 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 	return g
 }
 
-type invalidControlMessage struct {
-	peerID  peer.ID
-	msgType p2p.ControlMessageType
-	count   int
+type InvalidControlMessageNotification struct {
+	PeerID  peer.ID
+	MsgType p2p.ControlMessageType
+	Count   uint64
 }
 
-func (g *GossipSubInspectorNotification) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i int) {
-	err := g.handler.Submit(flow.ZeroID, invalidControlMessage{
-		peerID:  id,
-		msgType: messageType,
-		count:   i,
+func (g *GossipSubInspectorNotification) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i uint64) {
+	err := g.handler.Submit(flow.ZeroID, InvalidControlMessageNotification{
+		PeerID:  id,
+		MsgType: messageType,
+		Count:   i,
 	})
 	if err != nil {
 		g.logger.Fatal().Err(err).Msg("failed to submit invalid control message event to handler")
@@ -107,9 +107,9 @@ func (g *GossipSubInspectorNotification) ProcessQueuedNotifications(_ flow.Ident
 	g.lock.RUnlock()
 
 	switch notification := notification.(type) {
-	case invalidControlMessage:
+	case InvalidControlMessageNotification:
 		for _, notifier := range consumers {
-			notifier.OnInvalidControlMessage(notification.peerID, notification.msgType, notification.count)
+			notifier.OnInvalidControlMessage(notification.PeerID, notification.MsgType, notification.Count)
 		}
 	default:
 		g.logger.Fatal().Msgf("unknown notification type: %T", notification)
