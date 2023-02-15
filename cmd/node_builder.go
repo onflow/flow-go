@@ -260,7 +260,7 @@ type NodeConfig struct {
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeBlockListDistributor notifies consumers of updates to the node block list
-	NodeBlockListDistributor *distributer.NodeBlockListDistributor
+	NodeBlockListDistributor *distributer.NodeBlockList
 }
 
 func DefaultBaseConfig() *BaseConfig {

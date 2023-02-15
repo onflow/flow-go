@@ -967,7 +967,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		fnb.NodeBlockListDistributor = distributer.DefaultNodeBlockListDistributor(fnb.Logger, heroStoreOpts...)
+		fnb.NodeBlockListDistributor = distributer.DefaultNodeBlockList(fnb.Logger, heroStoreOpts...)
 
 		return fnb.NodeBlockListDistributor, nil
 	})

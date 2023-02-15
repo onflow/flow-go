@@ -21,9 +21,9 @@ const (
 	DefaultGossipSubInspectorNotificationQueueWorkerCount = 1
 )
 
-// GossipSubInspectorNotificationDistributor is a component that distributes gossipsub rpc inspector notifications to
+// GossipSubInspectorNotification is a component that distributes gossipsub rpc inspector notifications to
 // registered consumers.
-type GossipSubInspectorNotificationDistributor struct {
+type GossipSubInspectorNotification struct {
 	component.Component
 	cm *component.ComponentManager
 
@@ -33,9 +33,9 @@ type GossipSubInspectorNotificationDistributor struct {
 	lock      sync.RWMutex
 }
 
-var _ p2p.GossipSubRpcInspectorConsumer = (*GossipSubInspectorNotificationDistributor)(nil)
+var _ p2p.GossipSubRpcInspectorConsumer = (*GossipSubInspectorNotification)(nil)
 
-func DefaultGossipSubInspectorNotificationDistributor(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *GossipSubInspectorNotificationDistributor {
+func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *GossipSubInspectorNotification {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultGossipSubInspectorNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -46,12 +46,12 @@ func DefaultGossipSubInspectorNotificationDistributor(logger zerolog.Logger, opt
 	}
 
 	store := queue.NewHeroStore(cfg.SizeLimit, logger, cfg.Collector)
-	return NewGossipSubInspectorNotificationDistributor(logger, store)
+	return NewGossipSubInspectorNotification(logger, store)
 }
 
-func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotificationDistributor {
+func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
 	h := handler.NewAsyncEventHandler(log, store, DefaultGossipSubInspectorNotificationQueueWorkerCount)
-	g := &GossipSubInspectorNotificationDistributor{
+	g := &GossipSubInspectorNotification{
 		handler: h,
 		logger:  log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),
 	}
@@ -82,7 +82,7 @@ type invalidControlMessage struct {
 	count   int
 }
 
-func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i int) {
+func (g *GossipSubInspectorNotification) OnInvalidControlMessage(id peer.ID, messageType p2p.ControlMessageType, i int) {
 	err := g.handler.Submit(flow.ZeroID, invalidControlMessage{
 		peerID:  id,
 		msgType: messageType,
@@ -93,14 +93,14 @@ func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(id p
 	}
 }
 
-func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
+func (g *GossipSubInspectorNotification) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
 	g.notifiers = append(g.notifiers, consumer)
 }
 
-func (g *GossipSubInspectorNotificationDistributor) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
+func (g *GossipSubInspectorNotification) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
 	var consumers []p2p.GossipSubRpcInspectorConsumer
 	g.lock.RLock()
 	consumers = g.notifiers

@@ -19,8 +19,8 @@ import (
 const blockListDistributorWorkerCount = 1
 const DefaultBlockListNotificationQueueCacheSize = 100
 
-// NodeBlockListDistributor subscribes to changes in the NodeBlocklistWrapper block list.
-type NodeBlockListDistributor struct {
+// NodeBlockList subscribes to changes in the NodeBlocklistWrapper block list.
+type NodeBlockList struct {
 	component.Component
 	cm *component.ComponentManager
 
@@ -30,9 +30,9 @@ type NodeBlockListDistributor struct {
 	lock                   sync.RWMutex
 }
 
-var _ p2p.NodeBlockListConsumer = (*NodeBlockListDistributor)(nil)
+var _ p2p.NodeBlockListConsumer = (*NodeBlockList)(nil)
 
-func DefaultNodeBlockListDistributor(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *NodeBlockListDistributor {
+func DefaultNodeBlockList(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *NodeBlockList {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultBlockListNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -43,13 +43,13 @@ func DefaultNodeBlockListDistributor(logger zerolog.Logger, opts ...queue.HeroSt
 	}
 
 	store := queue.NewHeroStore(cfg.SizeLimit, logger, cfg.Collector)
-	return NewNodeBlockListDistributor(logger, store)
+	return NewNodeBlockList(logger, store)
 }
 
-func NewNodeBlockListDistributor(logger zerolog.Logger, store engine.MessageStore) *NodeBlockListDistributor {
+func NewNodeBlockList(logger zerolog.Logger, store engine.MessageStore) *NodeBlockList {
 	h := handler.NewAsyncEventHandler(logger, store, blockListDistributorWorkerCount)
 
-	d := &NodeBlockListDistributor{
+	d := &NodeBlockList{
 		nodeBlockListConsumers: make([]p2p.NodeBlockListConsumer, 0),
 		handler:                h,
 		logger:                 logger.With().Str("component", "node_blocklist_distributor").Logger(),
@@ -80,13 +80,13 @@ type blockListUpdateEvent struct {
 	blockList flow.IdentifierList
 }
 
-func (d *NodeBlockListDistributor) AddConsumer(consumer p2p.NodeBlockListConsumer) {
+func (d *NodeBlockList) AddConsumer(consumer p2p.NodeBlockListConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.nodeBlockListConsumers = append(d.nodeBlockListConsumers, consumer)
 }
 
-func (d *NodeBlockListDistributor) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
+func (d *NodeBlockList) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
 	// we submit the block list update event to the handler to be processed by the worker.
 	// the origin id is set to flow.ZeroID because the block list update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
@@ -99,7 +99,7 @@ func (d *NodeBlockListDistributor) OnNodeBlockListUpdate(blockList flow.Identifi
 	}
 }
 
-func (d *NodeBlockListDistributor) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
+func (d *NodeBlockList) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
 	var consumers []p2p.NodeBlockListConsumer
 	d.lock.RLock()
 	consumers = d.nodeBlockListConsumers
