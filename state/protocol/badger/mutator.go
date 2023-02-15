@@ -579,7 +579,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		events = append(events, epochTransitionEvents...)
 	}
 
-	versionBeacon := m.versionBeaconOnBlockFinalized()
+	versionBeacon, err := m.versionBeaconOnBlockFinalized(header)
+	if err != nil {
+		return fmt.Errorf("cannot process version beacon: %w", err)
+	}
 
 	// Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
@@ -816,8 +819,11 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
+			case *flow.VersionBeacon:
+				// skips known service events types, but still error out for unexpected types
+				continue
 			default:
-				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", event)
+				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", ev)
 			}
 		}
 	}
@@ -880,23 +886,55 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 }
 
-func (m *FollowerState) versionBeaconOnBlockFinalized(header *flow.Header) *flow.VersionBeacon {
-case *flow.VersionBeacon:
+func (m *FollowerState) versionBeaconOnBlockFinalized(header *flow.Header) (*flow.VersionBeacon, error) {
 
-	err := isValidVersionBeacon(ev)
+	var versionBeacon *flow.VersionBeacon
+
+	parent, err := m.blocks.ByID(header.ParentID)
 	if err != nil {
-	if protocol.IsInvalidServiceEventError(err) {
-	m.log.Err(err).Str("block_id", blockID.String()).Msg("invalid VersionBeacon service event")
-	continue
-	} else {
-	return fmt.Errorf("unexpected error during VersionBeacon validation: %w", err)
-	}
+		return nil, fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
 	}
 
-	// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
-	// events in a single result. However, should this happen we will keep only the last one, since it's newer
-	// and takes precedence anyway
-	versionBeacon = ev
+	// track service event driven metrics and protocol events that should be emitted
+	for _, seal := range parent.Payload.Seals {
+
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+		}
+		for _, event := range result.ServiceEvents {
+
+			switch ev := event.Event.(type) {
+			case *flow.VersionBeacon:
+
+				err := isValidVersionBeacon(ev)
+				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						m.log.Err(err).Str("block_id", parent.ID().String()).Msg("invalid VersionBeacon service event")
+						continue
+					} else {
+						return nil, fmt.Errorf("unexpected error during VersionBeacon validation: %w", err)
+					}
+				}
+
+				// Service events are strictly controlled within a system, and we don't envision multiple Version Beacon
+				// events in a single result. However, should this happen we will keep only the last one, since it's newer
+				// and takes precedence anyway
+				versionBeacon = ev
+
+				// skip known service event types
+			case *flow.EpochSetup:
+				continue
+			case *flow.EpochCommit:
+				continue
+				// error out on unknown type
+			default:
+				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
+			}
+		}
+	}
+
+	return versionBeacon, nil
 }
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
@@ -1050,4 +1088,3 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 	}
 	return
 }
-

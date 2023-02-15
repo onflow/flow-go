@@ -3,6 +3,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/coreos/go-semver/semver"
 
@@ -209,7 +210,7 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 // Please refer to documentation of flow.VersionBeacon for a description of what's expected of a valid VersionBeacon.
 func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 	if len(vb.RequiredVersions) == 0 {
-		return protocol.NewInvalidServiceEventError("required versions empty")
+		return protocol.NewInvalidServiceEventErrorf("required versions empty")
 	}
 
 	// handle case when only one version is present
@@ -224,7 +225,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 
 		// next version must higher than previous one
 		if current.Height >= next.Height {
-			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
+			return protocol.NewInvalidServiceEventErrorf("higher requirement (index=%d) height(%d) at or below previous height(%d) (index=%d)", i+1, next.Height, current.Height, i)
 		}
 
 		currentVersion, err := validateRequirement(current)
@@ -238,7 +239,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 		}
 
 		if nextVersion.LessThan(*currentVersion) {
-			return protocol.NewInvalidServiceEventError("higher requirement (index=%d) semver(%s) lower than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
+			return protocol.NewInvalidServiceEventErrorf("higher requirement (index=%d) semver(%s) lower than previous(%s) (index=%d)", i+1, nextVersion, currentVersion, i)
 		}
 	}
 
@@ -252,7 +253,7 @@ func isValidVersionBeacon(vb *flow.VersionBeacon) error {
 func validateRequirement(vr flow.VersionControlRequirement) (*semver.Version, error) {
 	version, err := semver.NewVersion(vr.Version)
 	if err != nil {
-		return nil, protocol.NewInvalidServiceEventError("invalid semver(%s) for required height %d: %w", vr.Version, vr.Height, err)
+		return nil, protocol.NewInvalidServiceEventErrorf("invalid semver(%s) for required height %d: %w", vr.Version, vr.Height, err)
 	}
 	return version, nil
 }

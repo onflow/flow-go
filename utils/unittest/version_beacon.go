@@ -59,8 +59,8 @@ func addToState(t *testing.T, state protocol.MutableState, block *flow.Block, fi
 	err := state.Extend(context.Background(), block)
 	require.NoError(t, err)
 
-	err = state.MarkValid(block.ID())
-	require.NoError(t, err)
+	//err = state.MarkValid(block.ID())
+	//require.NoError(t, err)
 
 	if finalize {
 		err = state.Finalize(context.Background(), block.ID())
