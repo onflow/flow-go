@@ -9,6 +9,6 @@ transaction {
 
     let versionBeacon = serviceAccount.borrow<&NodeVersionBeacon.NodeVersionAdmin>(from: NodeVersionBeacon.NodeVersionAdminStoragePath)
         ?? panic("Could not borrow version admin from storage path")
-    versionBeacon.emitNodeVersionTableUpdated()
+    versionBeacon.emitVersionBeacon()
   }
 }

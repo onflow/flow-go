@@ -376,12 +376,6 @@ func createNode(
 	versionBeaconsDB := storage.NewVersionBeacons(metricsCollector, db)
 	consumer := events.NewDistributor()
 
-	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, versionBeaconsDB, rootSnapshot)
-	require.NoError(t, err)
-
-	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
-	require.NoError(t, err)
-
 	localID := identity.ID()
 
 	// log with node index an ID
@@ -389,6 +383,12 @@ func createNode(
 		Int("index", index).
 		Hex("node_id", localID[:]).
 		Logger()
+
+	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, versionBeaconsDB, rootSnapshot)
+	require.NoError(t, err)
+
+	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	require.NoError(t, err)
 
 	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, log, consumer,
 		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
@@ -401,13 +401,7 @@ func createNode(
 		id:    identity,
 	}
 
-	// log with node index an ID
-	log := unittest.Logger().With().
-		Int("index", index).
-		Hex("node_id", localID[:]).
-		Logger()
-
-	stopConsumer := stopper.AddNode(node)
+	stopper.AddNode(node)
 
 	counterConsumer := &CounterConsumer{
 		finalized: func(total uint) {
