@@ -1255,7 +1255,7 @@ var EpochCommitFixtureJSON = `
 var VersionBeaconFixtureJSON = `{
   "type": "Event",
   "value": {
-    "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionTable",
+    "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionBeacon",
     "fields": [
       {
         "name": "RequiredVersions",
@@ -1278,22 +1278,63 @@ var VersionBeaconFixtureJSON = `{
                     "name": "version",
                     "value": {
                       "type": "String",
-                      "value": "2.13.7"
-                    }
+                      "value": {
+                        "id": "A.01cf0e2f2f715450.NodeVersionBeacon.Semver",
+                        "fields": [
+                          {
+                            "value": {
+                              "value": "2",
+                              "type": "UInt8"
+                            },
+                            "name": "major"
+                          },
+                          {
+                            "value": {
+                              "value": "13",
+                              "type": "UInt8"
+                            },
+                            "name": "minor"
+                          },
+                          {
+                            "value": {
+                              "value": "7",
+                              "type": "UInt8"
+                            },
+                            "name": "patch"
+                          },
+                          {
+                            "value": {
+                              "value": {
+                                "value": "",
+                                "type": "String"
+                              },
+                              "type": "Optional"
+                            },
+                            "name": "preRelease"
+                          }
+                        ]
+                      },
+                      "type": "Struct"
+                    },
+                    "name": "version"
                   }
                 ]
-              }
+              },
+              "type": "Struct"
             }
-          ]
-        }
+          ],
+          "type": "Array"
+        },
+        "name": "versionBoundaries"
       },
       {
-        "name": "Sequence",
         "value": {
-          "type": "UInt64",
-          "value": "5"
-        }
+          "value": "5",
+          "type": "UInt64"
+        },
+        "name": "sequence"
       }
     ]
-  }
+  },
+  "type": "Event"
 }`
