@@ -14,7 +14,8 @@ import (
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
-	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+
+	// extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 
 	// ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
@@ -60,7 +61,7 @@ func init() {
 }
 
 func addCommands() {
-	rootCmd.AddCommand(extract.Cmd)
+	// rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
