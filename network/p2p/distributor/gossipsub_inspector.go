@@ -18,7 +18,7 @@ import (
 
 const (
 	DefaultGossipSubInspectorNotificationQueueCacheSize   = 10_000
-	DefaultGossipSubInspectorNotificationQueueWorkerCount = 1
+	defaultGossipSubInspectorNotificationQueueWorkerCount = 1
 )
 
 // GossipSubInspectorNotification is a component that distributes gossipsub rpc inspector notifications to
@@ -50,7 +50,7 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 }
 
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
-	h := handler.NewAsyncEventHandler(log, store, DefaultGossipSubInspectorNotificationQueueWorkerCount)
+	h := handler.NewAsyncEventHandler(log, store, defaultGossipSubInspectorNotificationQueueWorkerCount)
 	g := &GossipSubInspectorNotification{
 		handler: h,
 		logger:  log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),

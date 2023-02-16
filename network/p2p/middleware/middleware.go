@@ -347,7 +347,7 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 }
 
 // OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
-func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
+func (m *Middleware) OnNodeDisallowListUpdate(blockList flow.IdentifierList) {
 	for _, pid := range m.peerIDs(blockList) {
 		err := m.libP2PNode.RemovePeer(pid)
 		if err != nil {

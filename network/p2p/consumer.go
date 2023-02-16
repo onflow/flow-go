@@ -15,7 +15,7 @@ type DisallowListConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnNodeBlockListUpdate(list flow.IdentifierList)
+	OnNodeDisallowListUpdate(list flow.IdentifierList)
 }
 
 // ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.

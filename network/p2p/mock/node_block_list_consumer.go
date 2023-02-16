@@ -13,7 +13,7 @@ type NodeBlockListConsumer struct {
 }
 
 // OnNodeBlockListUpdate provides a mock function with given fields: list
-func (_m *NodeBlockListConsumer) OnNodeBlockListUpdate(list flow.IdentifierList) {
+func (_m *NodeBlockListConsumer) OnNodeDisallowListUpdate(list flow.IdentifierList) {
 	_m.Called(list)
 }
 

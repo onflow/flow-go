@@ -15,26 +15,30 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// blockListDistributorWorkerCount is the number of workers used to process block list updates.
-const blockListDistributorWorkerCount = 1
-const DefaultBlockListNotificationQueueCacheSize = 100
+const (
+	// disallowListDistributorWorkerCount is the number of workers used to process disallow list updates.
+	disallowListDistributorWorkerCount = 1
+
+	// DefaultDisallowListNotificationQueueCacheSize is the default size of the disallow list notification queue.
+	DefaultDisallowListNotificationQueueCacheSize = 100
+)
 
 // DisallowListNotificationConsumer subscribes to changes in the NodeBlocklistWrapper block list.
 type DisallowListNotificationConsumer struct {
 	component.Component
 	cm *component.ComponentManager
 
-	nodeBlockListConsumers []p2p.DisallowListConsumer
-	handler                *handler.AsyncEventHandler
-	logger                 zerolog.Logger
-	lock                   sync.RWMutex
+	consumers []p2p.DisallowListConsumer
+	handler   *handler.AsyncEventHandler
+	logger    zerolog.Logger
+	lock      sync.RWMutex
 }
 
 var _ p2p.DisallowListConsumer = (*DisallowListNotificationConsumer)(nil)
 
 func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListNotificationConsumer {
 	cfg := &queue.HeroStoreConfig{
-		SizeLimit: DefaultBlockListNotificationQueueCacheSize,
+		SizeLimit: DefaultDisallowListNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
 	}
 
@@ -47,12 +51,12 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 }
 
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
-	h := handler.NewAsyncEventHandler(logger, store, blockListDistributorWorkerCount)
+	h := handler.NewAsyncEventHandler(logger, store, disallowListDistributorWorkerCount)
 
 	d := &DisallowListNotificationConsumer{
-		nodeBlockListConsumers: make([]p2p.DisallowListConsumer, 0),
-		handler:                h,
-		logger:                 logger.With().Str("component", "node_blocklist_distributor").Logger(),
+		consumers: make([]p2p.DisallowListConsumer, 0),
+		handler:   h,
+		logger:    logger.With().Str("component", "node_disallow_distributor").Logger(),
 	}
 
 	h.RegisterProcessor(d.ProcessQueuedNotifications)
@@ -63,10 +67,10 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 
 		h.Start(ctx)
 		<-h.Ready()
-		d.logger.Info().Msg("node block list distributor started")
+		d.logger.Info().Msg("node disallow list distributor started")
 
 		<-ctx.Done()
-		d.logger.Debug().Msg("node block list distributor shutting down")
+		d.logger.Debug().Msg("node disallow list distributor shutting down")
 	})
 
 	d.cm = cm.Build()
@@ -75,40 +79,40 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 	return d
 }
 
-// BlockListUpdateNotification is the event that is submitted to the handler when the block list is updated.
-type BlockListUpdateNotification struct {
-	BlockList flow.IdentifierList
+// DisallowListUpdateNotification is the event that is submitted to the handler when the disallow list is updated.
+type DisallowListUpdateNotification struct {
+	DisallowList flow.IdentifierList
 }
 
 func (d *DisallowListNotificationConsumer) AddConsumer(consumer p2p.DisallowListConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	d.nodeBlockListConsumers = append(d.nodeBlockListConsumers, consumer)
+	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *DisallowListNotificationConsumer) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
-	// we submit the block list update event to the handler to be processed by the worker.
-	// the origin id is set to flow.ZeroID because the block list update event is not associated with a specific node.
+func (d *DisallowListNotificationConsumer) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
+	// we submit the disallow list update event to the handler to be processed by the worker.
+	// the origin id is set to flow.ZeroID because the disallow list update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
-	err := d.handler.Submit(flow.ZeroID, BlockListUpdateNotification{
-		BlockList: blockList,
+	err := d.handler.Submit(flow.ZeroID, DisallowListUpdateNotification{
+		DisallowList: disallowList,
 	})
 
 	if err != nil {
-		d.logger.Fatal().Err(err).Msg("failed to submit block list update event to handler")
+		d.logger.Fatal().Err(err).Msg("failed to submit disallow list update event to handler")
 	}
 }
 
 func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
 	var consumers []p2p.DisallowListConsumer
 	d.lock.RLock()
-	consumers = d.nodeBlockListConsumers
+	consumers = d.consumers
 	d.lock.RUnlock()
 
 	switch notification := notification.(type) {
-	case BlockListUpdateNotification:
+	case DisallowListUpdateNotification:
 		for _, consumer := range consumers {
-			consumer.OnNodeBlockListUpdate(notification.BlockList)
+			consumer.OnNodeDisallowListUpdate(notification.DisallowList)
 		}
 	default:
 		d.logger.Fatal().Msgf("unknown notification type: %T", notification)
