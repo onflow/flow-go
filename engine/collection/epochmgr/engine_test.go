@@ -43,16 +43,16 @@ type mockComponents struct {
 	messageHub        *mockcomponent.Component
 }
 
-func newMockComponents() *mockComponents {
+func newMockComponents(t *testing.T) *mockComponents {
 
 	components := &mockComponents{
-		state:             new(cluster.State),
-		prop:              new(mockcomponent.Component),
-		sync:              new(mockmodule.ReadyDoneAware),
-		hotstuff:          new(mockmodule.HotStuff),
-		voteAggregator:    new(mockhotstuff.VoteAggregator),
-		timeoutAggregator: new(mockhotstuff.TimeoutAggregator),
-		messageHub:        new(mockcomponent.Component),
+		state:             cluster.NewState(t),
+		prop:              mockcomponent.NewComponent(t),
+		sync:              mockmodule.NewReadyDoneAware(t),
+		hotstuff:          mockmodule.NewHotStuff(t),
+		voteAggregator:    mockhotstuff.NewVoteAggregator(t),
+		timeoutAggregator: mockhotstuff.NewTimeoutAggregator(t),
+		messageHub:        mockcomponent.NewComponent(t),
 	}
 	unittest.ReadyDoneify(components.prop)
 	unittest.ReadyDoneify(components.sync)
@@ -104,18 +104,18 @@ type Suite struct {
 func (suite *Suite) SetupTest() {
 
 	suite.log = unittest.Logger()
-	suite.me = new(mockmodule.Local)
-	suite.state = new(protocol.State)
-	suite.snap = new(protocol.Snapshot)
+	suite.me = mockmodule.NewLocal(suite.T())
+	suite.state = protocol.NewState(suite.T())
+	suite.snap = protocol.NewSnapshot(suite.T())
 
 	suite.epochs = make(map[uint64]*protocol.Epoch)
 	suite.components = make(map[uint64]*mockComponents)
 
-	suite.signer = new(mockhotstuff.Signer)
-	suite.client = new(mockmodule.QCContractClient)
-	suite.voter = new(mockmodule.ClusterRootQCVoter)
-	suite.factory = new(epochmgr.EpochComponentsFactory)
-	suite.heights = new(events.Heights)
+	suite.signer = mockhotstuff.NewSigner(suite.T())
+	suite.client = mockmodule.NewQCContractClient(suite.T())
+	suite.voter = mockmodule.NewClusterRootQCVoter(suite.T())
+	suite.factory = epochmgr.NewEpochComponentsFactory(suite.T())
+	suite.heights = events.NewHeights(suite.T())
 
 	// mock out Create so that it instantiates the appropriate mocks
 	suite.factory.On("Create", mock.Anything).
@@ -124,7 +124,7 @@ func (suite *Suite) SetupTest() {
 			suite.Require().Truef(ok, "invalid type %T", args.Get(0))
 			counter, err := epoch.Counter()
 			suite.Require().Nil(err)
-			suite.components[counter] = newMockComponents()
+			suite.components[counter] = newMockComponents(suite.T())
 		}).
 		Return(
 			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
@@ -139,13 +139,13 @@ func (suite *Suite) SetupTest() {
 			},
 			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).messageHub },
 			func(epoch realprotocol.Epoch) error { return nil },
-		)
+		).Maybe()
 
 	suite.phase = flow.EpochPhaseSetup
 	suite.header = unittest.BlockHeaderFixture()
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.counter)
 	suite.state.On("Final").Return(suite.snap)
-	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap)
+	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(
 		func() *flow.Header { return suite.header },
@@ -267,6 +267,8 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 	suite.voter.AssertExpectations(suite.T()) // TODO replace with new constructor
 }
+
+//func (suite *Suite) TestStartAfterEpochBoundary() {}
 
 // TestStartAsUnauthorizedNode test that when a collection node joins the network
 // at an epoch boundary, they must start running during the EpochSetup phase in the
