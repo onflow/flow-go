@@ -474,8 +474,6 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
 		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationConsumer(builder.Logger, heroStoreOpts...)
 
 		return builder.NodeDisallowListDistributor, nil
@@ -488,9 +486,11 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of the disallow-listed nodes to true
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+			return fmt.Errorf("could not initialize disallow list wrapper: %w", err)
 		}
 
 		// use the default identifier provider

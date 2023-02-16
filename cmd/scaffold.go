@@ -969,8 +969,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
 		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationConsumer(fnb.Logger, heroStoreOpts...)
 
 		return fnb.NodeDisallowListDistributor, nil
@@ -983,15 +981,17 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+			return fmt.Errorf("could not initialize disallow list wrapper: %w", err)
 		}
-		node.IdentityProvider = blocklistWrapper
+		node.IdentityProvider = disallowListWrapper
 
 		// register the blocklist for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
 		if err != nil {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
