@@ -1026,12 +1026,12 @@ func TestStopAtHeight(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsPaused())
 
 		wg.Add(1)
-		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		wg.Add(1)
-		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
-		ctx.engine.BlockProcessable(blocks["C"].Block.Header)
-		ctx.engine.BlockProcessable(blocks["D"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["C"].Block.Header, nil)
+		ctx.engine.BlockProcessable(blocks["D"].Block.Header, nil)
 
 		// wait until all 4 blocks have been executed
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
@@ -1138,8 +1138,8 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsPaused())
 
 		executionWg.Add(1)
-		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
-		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
 		assert.False(t, ctx.stopControl.IsPaused())
 

@@ -429,7 +429,7 @@ func (e *Engine) reloadBlock(
 // have passed consensus validation) received from the consensus nodes
 // NOTE: BlockProcessable might be called multiple times for the same block.
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
-func (e *Engine) BlockProcessable(b *flow.Header) {
+func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// skip if stopControl tells to skip
 	if !e.stopControl.blockProcessable(b) {

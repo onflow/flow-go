@@ -484,7 +484,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 
 	// trigger BlockProcessable for parent blocks above root height
 	if parent.Height > m.rootHeight {
-		m.consumer.BlockProcessable(parent)
+		m.consumer.BlockProcessable(parent, nil)
 	}
 
 	return nil
