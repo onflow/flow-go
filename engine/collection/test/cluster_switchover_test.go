@@ -124,7 +124,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state
-	states := make([]protocol.MutableState, 0, len(collectors))
+	states := make([]protocol.ParticipantState, 0, len(collectors))
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}

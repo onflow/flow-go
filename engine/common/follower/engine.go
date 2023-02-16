@@ -47,7 +47,7 @@ type Engine struct {
 	cleaner               storage.Cleaner
 	headers               storage.Headers
 	payloads              storage.Payloads
-	state                 protocol.MutableState
+	state                 protocol.ParticipantState
 	pending               module.PendingBlockBuffer
 	follower              module.HotStuffFollower
 	validator             hotstuff.Validator
@@ -89,7 +89,7 @@ func New(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,

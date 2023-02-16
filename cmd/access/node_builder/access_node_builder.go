@@ -192,7 +192,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.MutableState
+	FollowerState              protocol.ParticipantState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *consensuspubsub.FinalizationDistributor

@@ -430,12 +430,12 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 }
 
 // buildBlock extends the protocol state by the given block
-func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
+func buildBlock(t *testing.T, state protocol.ParticipantState, block *flow.Block) {
 	require.NoError(t, state.Extend(context.Background(), block))
 }
 
 // buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
-func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
+func buildFinalizedBlock(t *testing.T, state protocol.ParticipantState, block *flow.Block) {
 	require.NoError(t, state.Extend(context.Background(), block))
 	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }

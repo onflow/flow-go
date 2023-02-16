@@ -61,7 +61,7 @@ type StateFixture struct {
 	SecretsDB      *badger.DB
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
-	State          protocol.MutableState
+	State          protocol.ParticipantState
 }
 
 // GenericNode implements a generic in-process node for tests.
@@ -82,7 +82,7 @@ type GenericNode struct {
 	Payloads           storage.Payloads
 	Blocks             storage.Blocks
 	QuorumCertificates storage.QuorumCertificates
-	State              protocol.MutableState
+	State              protocol.ParticipantState
 	Index              storage.Index
 	Me                 module.Local
 	Net                *stub.Network
@@ -204,7 +204,7 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState        protocol.MutableState
+	MutableState        protocol.ParticipantState
 	IngestionEngine     *ingestion.Engine
 	ExecutionEngine     *ComputerWrap
 	RequestEngine       *requester.Engine

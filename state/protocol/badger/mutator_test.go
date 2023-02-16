@@ -133,7 +133,7 @@ func TestExtendValid(t *testing.T) {
 
 func TestSealedIndex(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -252,7 +252,7 @@ func TestSealedIndex(t *testing.T) {
 
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		_, seal, err := rootSnapshot.SealedResult()
@@ -315,7 +315,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -338,7 +338,7 @@ func TestExtendMissingParent(t *testing.T) {
 
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -370,7 +370,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 func TestExtendHeightTooLarge(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -389,7 +389,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 // with view of block referred by ParentID.
 func TestExtendInconsistentParentView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -407,7 +407,7 @@ func TestExtendInconsistentParentView(t *testing.T) {
 
 func TestExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -439,7 +439,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 
 func TestExtendInvalidChainID(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -464,7 +464,7 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.Payload.Guarantees = nil
@@ -498,7 +498,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 	validator := mockmodule.NewReceiptValidator(t)
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -530,7 +530,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 
 func TestExtendReceiptsValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		block2 := unittest.BlockWithParentFixture(head)
@@ -871,7 +871,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -983,7 +983,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 //	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1084,7 +1084,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	// setupState initializes the protocol state for a test case
 	// * creates and finalizes a new block for the first seal to reference
 	// * creates a factory method for test cases to generated valid EpochSetup events
-	setupState := func(t *testing.T, db *badger.DB, state *protocol.MutableState) (
+	setupState := func(t *testing.T, db *badger.DB, state *protocol.ParticipantState) (
 		*flow.Block,
 		func(...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
 	) {
@@ -1128,7 +1128,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong counter to trigger EECC without error
 	t.Run("wrong counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1155,7 +1155,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong final view to trigger EECC without error
 	t.Run("invalid final view (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1182,7 +1182,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with empty seed to trigger EECC without error
 	t.Run("empty seed (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1217,7 +1217,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	// * creates and finalizes a new block for the first seal to reference
 	// * creates a factory method for test cases to generated valid EpochSetup events
 	// * creates a factory method for test cases to generated valid EpochCommit events
-	setupState := func(t *testing.T, state *protocol.MutableState) (
+	setupState := func(t *testing.T, state *protocol.ParticipantState) (
 		*flow.Block,
 		func(*flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
 		func(*flow.Block, ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal),
@@ -1275,7 +1275,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	}
 
 	t.Run("without setup (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, _, createCommit := setupState(t, state)
 
 			_, receipt, seal := createCommit(block1)
@@ -1300,7 +1300,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong counter to trigger EECC without error
 	t.Run("inconsistent counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1339,7 +1339,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong cluster QCs to trigger EECC without error
 	t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1378,7 +1378,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong dkg participants to trigger EECC without error
 	t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1427,7 +1427,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -1507,7 +1507,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1565,7 +1565,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1665,7 +1665,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1973,7 +1973,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 // guarantees with invalid guarantors
 func TestExtendInvalidGuarantee(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create a valid block
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -2062,7 +2062,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// TODO: test the guarantee has bad reference block ID that would return ErrEpochNotCommitted
 		// this case is not easy to create, since the test case has no such block yet.
-		// we need to refactor the MutableState to add a guaranteeValidator, so that we can mock it and
+		// we need to refactor the ParticipantState to add a guaranteeValidator, so that we can mock it and
 		// return the ErrEpochNotCommitted for testing
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound

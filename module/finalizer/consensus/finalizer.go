@@ -21,7 +21,7 @@ import (
 type Finalizer struct {
 	db      *badger.DB
 	headers storage.Headers
-	state   protocol.MutableState
+	state   protocol.ParticipantState
 	cleanup CleanupFunc
 	tracer  module.Tracer
 }
@@ -29,7 +29,7 @@ type Finalizer struct {
 // NewFinalizer creates a new finalizer for the temporary state.
 func NewFinalizer(db *badger.DB,
 	headers storage.Headers,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	tracer module.Tracer,
 	options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{

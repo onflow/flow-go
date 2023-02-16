@@ -73,7 +73,7 @@ func TestSnapshot_Params(t *testing.T) {
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		// build some non-root blocks
 		head := rootHeader
 		const nBlocks = 10
@@ -120,7 +120,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
 		for i := 5; i > 3; i-- {
 			for _, block := range unittest.ChainFixtureFrom(i, head) {
@@ -703,7 +703,7 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 	collID := cluster.Members()[0].NodeID
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		block1 := unittest.BlockWithParentFixture(head)
 		buildFinalizedBlock(t, state, block1)
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
@@ -744,7 +744,7 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
 		// bootstrap from snapshot
-		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 			block7 := unittest.BlockWithParentFixture(block6.Header)
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(block1.ID()))
 			guarantee.ChainID = cluster.ChainID()
@@ -935,7 +935,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epoch1Counter := result.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
@@ -1026,7 +1026,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)
@@ -1117,7 +1117,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
 	rootSnapshot := unittest.RootSnapshotFixture(epoch1Identities)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)

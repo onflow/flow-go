@@ -106,7 +106,7 @@ type FollowerServiceBuilder struct {
 
 	// components
 	LibP2PNode              p2p.LibP2PNode
-	FollowerState           protocol.MutableState
+	FollowerState           protocol.ParticipantState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache

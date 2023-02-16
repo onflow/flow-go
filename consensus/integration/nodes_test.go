@@ -146,7 +146,7 @@ type Node struct {
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
 	messageHub        *message_hub.MessageHub
-	state             *bprotocol.MutableState
+	state             *bprotocol.ParticipantState
 	headers           *storage.Headers
 	net               *Network
 }

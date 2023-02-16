@@ -50,7 +50,7 @@ type BuilderSuite struct {
 	state cluster.MutableState
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.MutableState
+	protoState protocol.ParticipantState
 
 	pool    mempool.Transactions
 	builder *builder.Builder

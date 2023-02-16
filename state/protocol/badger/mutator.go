@@ -25,10 +25,9 @@ import (
 // FollowerState implements a lighter version of a mutable protocol state.
 // When extending the state, it performs hardly any checks on the block payload.
 // Instead, the FollowerState relies on the consensus nodes to run the full
-// payload check. Consequently, a block B should only be considered valid, if
-// a child block with a valid header is known. The child block's header
-// includes quorum certificate, which proves that a super-majority of consensus
-// nodes consider block B as valid.
+// payload check and uses quorum certificates to prove validity of block payloads.
+// Consequently, a block B should only be considered valid, if
+// there is a certifying QC for that block QC.View == Block.View && QC.BlockID == Block.ID().
 //
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks
@@ -44,13 +43,17 @@ type FollowerState struct {
 	blockTimer protocol.BlockTimer
 }
 
-// MutableState implements a mutable protocol state. When extending the
-// state with a new block, it checks the _entire_ block payload.
-type MutableState struct {
+var _ protocol.FollowerState = (*FollowerState)(nil)
+
+// ParticipantState implements a mutable state for consensus participant. It can extend the
+// state with a new block, by checking the _entire_ block payload.
+type ParticipantState struct {
 	*FollowerState
 	receiptValidator module.ReceiptValidator
 	sealValidator    module.SealValidator
 }
+
+var _ protocol.ParticipantState = (*ParticipantState)(nil)
 
 // NewFollowerState initializes a light-weight version of a mutable protocol
 // state. This implementation is suitable only for NON-Consensus nodes.
@@ -89,25 +92,25 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-) (*MutableState, error) {
+) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(state, index, payloads, qcs, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
-	return &MutableState{
+	return &ParticipantState{
 		FollowerState:    followerState,
 		receiptValidator: receiptValidator,
 		sealValidator:    sealValidator,
 	}, nil
 }
 
-// Extend extends the protocol state of a CONSENSUS FOLLOWER. While it checks
+// ExtendCertified extends the protocol state of a CONSENSUS FOLLOWER. While it checks
 // the validity of the header; it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to
-// validate the full payload. Therefore, a follower a QC (i.e. a child block) as
-// proof that a block is valid.
-func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
-
+// validate the full payload. Payload validity can be proved by a valid quorum certificate.
+// Certifying QC must match candidate block: candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
+// NOTE: this function expects that `certifyingQC` has been validated.
+func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
@@ -134,7 +137,7 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
-func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
@@ -256,7 +259,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 // guaranteeExtend verifies the validity of the collection guarantees that are
 // included in the block. Specifically, we check for expired collections and
 // duplicated collections (also including ancestor blocks).
-func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
 	defer span.End()
@@ -337,7 +340,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 
 // sealExtend checks the compliance of the payload seals. Returns last seal that form a chain for
 // candidate block.
-func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
@@ -357,7 +360,7 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 //   - No seal has been included for the respective block in this particular fork
 //
 // We require the receipts to be sorted by block height (within a payload).
-func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
 	defer span.End()

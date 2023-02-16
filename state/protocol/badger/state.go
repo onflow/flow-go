@@ -37,6 +37,8 @@ type State struct {
 	sporkRootBlockHeight uint64
 }
 
+var _ protocol.State = (*State)(nil)
+
 type BootstrapConfig struct {
 	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
 	// an unstaked node

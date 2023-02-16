@@ -41,7 +41,7 @@ type MutatorSuite struct {
 	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
-	protoState   protocol.MutableState
+	protoState   protocol.ParticipantState
 	protoGenesis *flow.Header
 
 	state cluster.MutableState
