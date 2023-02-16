@@ -60,8 +60,8 @@ func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *Hero
 	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
 }
 
-func BlockListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingBlockListNotificationQueue, registrar)
+func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
 func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {

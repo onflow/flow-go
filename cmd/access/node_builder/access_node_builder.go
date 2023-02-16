@@ -698,10 +698,10 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 }
 
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
-	builder.Component("block list distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		heroStoreOpts := make([]queue.HeroStoreConfigOption, 0)
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(node.DisallowListNotificationCacheSize)}
 		if node.HeroCacheMetricsEnable {
-			collector := metrics.BlockListNotificationQueueMetricFactory(node.MetricsRegisterer)
+			collector := metrics.DisallowListNotificationQueueMetricFactory(node.MetricsRegisterer)
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
 

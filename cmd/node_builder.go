@@ -204,6 +204,10 @@ type NetworkConfig struct {
 	DNSCacheTTL                 time.Duration
 	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
 	ConnectionManagerConfig     *connection.ManagerConfig
+	// size of the queue for notifications about new peers in the disallow list.
+	DisallowListNotificationCacheSize uint32
+	// size of the queue for notifications about gossipsub RPC inspections.
+	GossipSubRPCInspectorNotificationCacheSize uint32
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -278,16 +282,18 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
-			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
-			UnicastMessageRateLimit:         0,
-			UnicastBandwidthRateLimit:       0,
-			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
-			UnicastRateLimitLockoutDuration: 10,
-			UnicastRateLimitDryRun:          true,
-			DNSCacheTTL:                     dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
+			PeerScoringEnabled:                         scoring.DefaultPeerScoringEnabled,
+			UnicastMessageRateLimit:                    0,
+			UnicastBandwidthRateLimit:                  0,
+			UnicastBandwidthBurstLimit:                 middleware.LargeMsgMaxUnicastMsgSize,
+			UnicastRateLimitLockoutDuration:            10,
+			UnicastRateLimitDryRun:                     true,
+			DNSCacheTTL:                                dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
+			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
+			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

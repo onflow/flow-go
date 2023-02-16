@@ -77,7 +77,7 @@ const (
 	ResourceEpochSetup                              = "epoch_setup"
 	ResourceEpochCommit                             = "epoch_commit"
 	ResourceEpochStatus                             = "epoch_status"
-	ResourceNetworkingBlockListNotificationQueue    = "networking_block_list_notification_queue"
+	ResourceNetworkingDisallowListNotificationQueue = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingReceiveCache                  = "networking_received_message"        // networking layer
 	ResourcePublicNetworkingReceiveCache            = "public_networking_received_message" // networking layer
