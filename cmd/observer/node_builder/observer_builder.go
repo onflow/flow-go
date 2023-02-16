@@ -751,7 +751,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize disallow list: %w", err)
+			return fmt.Errorf("could not initialize disallow list wrapper: %w", err)
 		}
 
 		// use the default identifier provider
