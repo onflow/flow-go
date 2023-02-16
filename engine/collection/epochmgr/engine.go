@@ -143,22 +143,34 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	}
 }
 
-// checkShouldStartLastEpochComponentsOnStartup
-// TODO docs
+// checkShouldStartLastEpochComponentsOnStartup checks whether we should re-instantiate
+// consensus components for the previous epoch upon startup, and if so, starts them.
+// One cluster is responsible for a portion of transactions with reference blocks
+// with one epoch. Since transactions may use reference blocks up to flow.DefaultTransactionExpiry
+// many heights old, clusters don't shut down until this many blocks have been finalized
+// past the final block of the cluster's epoch.
+// No errors are expected during normal operation.
 func (e *Engine) checkShouldStartLastEpochComponentsOnStartup(engineCtx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
 
 	finalHeader, err := finalSnapshot.Head()
 	if err != nil {
-		return err
+		return fmt.Errorf("[unexpected] could not get finalized header: %w", err)
 	}
 	finalizedHeight := finalHeader.Height
 
 	prevEpoch := finalSnapshot.Epochs().Previous()
 	prevEpochCounter, err := prevEpoch.Counter()
 	if err != nil {
-		return err
+		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil
+		}
+		return fmt.Errorf("[unexpected] could not get previous epoch counter: %w", err)
 	}
 	prevEpochFinalHeight, err := prevEpoch.FinalHeight()
+	if err != nil {
+		// no expected errors because we are querying finalized snapshot
+		return fmt.Errorf("[unexpected] could not get previous epoch final height: %w", err)
+	}
 	prevEpochClusterConsensusStopHeight := prevEpochFinalHeight + flow.DefaultTransactionExpiry + 1
 
 	log := e.log.With().
@@ -169,24 +181,23 @@ func (e *Engine) checkShouldStartLastEpochComponentsOnStartup(engineCtx irrecove
 		Logger()
 
 	if finalizedHeight > prevEpochClusterConsensusStopHeight {
-		log.Debug().Msgf("not re-starting previous epoch cluster consensus on startup - past stop height",
-			finalizedHeight, prevEpochFinalHeight, prevEpochClusterConsensusStopHeight)
+		log.Debug().Msg("not re-starting previous epoch cluster consensus on startup - past stop height")
 		return nil
 	}
 
 	components, err := e.createEpochComponents(prevEpoch)
 	if err != nil {
 		if errors.Is(err, ErrNotAuthorizedForEpoch) {
-			// don't set up consensus components if we aren't authorized in current epoch
+			// don't set up consensus components if we aren't authorized in previous epoch
 			log.Info().Msg("node is not authorized for previous epoch - skipping re-initializing last epoch cluster consensus")
 			return nil
 		}
-		return err
+		return fmt.Errorf("[unexpected] could not create previous epoch components: %w", err)
 	}
 	err = e.startEpochComponents(engineCtx, prevEpochCounter, components)
 	if err != nil {
 		// all failures to start epoch components are critical
-		return fmt.Errorf("could not start epoch components: %w", err)
+		return fmt.Errorf("[unexpected] could not epoch components: %w", err)
 	}
 	e.prepareToStopEpochComponents(prevEpochCounter, prevEpochFinalHeight)
 
