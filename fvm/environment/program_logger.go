@@ -19,6 +19,8 @@ type MetricsReporter interface {
 	RuntimeTransactionChecked(time.Duration)
 	RuntimeTransactionInterpreted(time.Duration)
 	RuntimeSetNumberOfAccounts(count uint64)
+	RuntimeTransactionProgramsCacheMiss()
+	RuntimeTransactionProgramsCacheHit()
 }
 
 // NoopMetricsReporter is a MetricReporter that does nothing.
@@ -35,6 +37,12 @@ func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 
 // RuntimeSetNumberOfAccounts is a noop
 func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
+
+// RuntimeTransactionProgramsCacheMiss is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheMiss() {}
+
+// RuntimeTransactionProgramsCacheHit is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheHit() {}
 
 type ProgramLoggerParams struct {
 	zerolog.Logger
@@ -85,6 +93,15 @@ func (logger *ProgramLogger) ProgramLog(message string) error {
 		trace.FVMEnvProgramLog).End()
 
 	if logger.CadenceLoggingEnabled {
+
+		// If cadence logging is enabled (which is usually in the
+		// emulator or emulator based tools),
+		// we log the message to the zerolog logger so that they can be tracked
+		// while stepping through a transaction/script.
+		logger.Logger().
+			Debug().
+			Msgf("Cadence log: %s", message)
+
 		logger.logs = append(logger.logs, message)
 	}
 	return nil

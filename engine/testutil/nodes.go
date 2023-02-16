@@ -17,13 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/p2p/cache"
-
-	"github.com/onflow/flow-go/module/mempool/queue"
-
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
@@ -77,6 +75,7 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -85,6 +84,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -169,11 +169,12 @@ func GenericNodeWithStateFixture(t testing.TB,
 	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
 		Ctx:            ctx,
 		Cancel:         cancel,
+		Errs:           errs,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -308,7 +309,7 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 	)
 	require.NoError(t, err)
 
-	proposalFactory, err := factories.NewProposalEngineFactory(
+	complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 		node.Log,
 		node.Net,
 		node.Me,
@@ -318,12 +319,14 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 	)
 	require.NoError(t, err)
 
+	syncCoreFactory, err := factories.NewSyncCoreFactory(node.Log, chainsync.DefaultConfig())
+	require.NoError(t, err)
+
 	syncFactory, err := factories.NewSyncEngineFactory(
 		node.Log,
 		node.Metrics,
 		node.Net,
 		node.Me,
-		chainsync.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -335,10 +338,19 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		node.Me,
 		node.PublicDB,
 		node.State,
+		node.Metrics,
+		node.Metrics,
 		createMetrics,
-		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)
+
+	messageHubFactory := factories.NewMessageHubFactory(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics,
+		node.State,
+	)
 
 	factory := factories.NewEpochComponentsFactory(
 		node.Me,
@@ -346,8 +358,10 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		builderFactory,
 		clusterStateFactory,
 		hotstuffFactory,
-		proposalFactory,
+		complianceEngineFactory,
+		syncCoreFactory,
 		syncFactory,
+		messageHubFactory,
 	)
 
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
@@ -625,7 +639,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)
@@ -672,12 +686,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
+	// mock out hotstuff validator
+	validator := new(mockhotstuff.Validator)
+	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, validator, syncCore, node.Tracer)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
@@ -709,6 +726,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		GenericNode:         node,
 		MutableState:        followerState,
 		IngestionEngine:     ingestionEngine,
+		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
 		SyncEngine:          syncEngine,
 		ExecutionEngine:     computation,
@@ -752,14 +770,30 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+var _ hotstuff.Replicas = (*RoundRobinLeaderSelection)(nil)
+var _ hotstuff.DynamicCommittee = (*RoundRobinLeaderSelection)(nil)
+
+func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
 	return s.identities, nil
 }
 
-func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
-		return nil, fmt.Errorf("not found")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
+	}
+
+	return id, nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+	return s.identities, nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
+	id, found := s.identities.ByNodeID(participantID)
+	if !found {
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
 	return id, nil
 }
@@ -768,11 +802,19 @@ func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier,
 	return s.identities[int(view)%len(s.identities)].NodeID, nil
 }
 
+func (s *RoundRobinLeaderSelection) QuorumThresholdForView(_ uint64) (uint64, error) {
+	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
+}
+
+func (s *RoundRobinLeaderSelection) TimeoutThresholdForView(_ uint64) (uint64, error) {
+	return committees.WeightThresholdToTimeout(s.identities.TotalWeight()), nil
+}
+
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
 	return s.me
 }
 
-func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 	return nil, fmt.Errorf("error")
 }
 
@@ -789,8 +831,9 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 	// mock finalization updater
 	verifier := &mockhotstuff.Verifier{}
-	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 

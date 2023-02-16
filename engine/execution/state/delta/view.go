@@ -9,9 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// GetRegisterFunc is a function that returns the value for a register.
-type GetRegisterFunc func(owner, key string) (flow.RegisterValue, error)
-
 // A View is a read-only view into a ledger stored in an underlying data source.
 //
 // A ledger view records writes to a delta that can be used to update the
@@ -26,7 +23,8 @@ type View struct {
 	spockSecret       []byte
 	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
-	readFunc          GetRegisterFunc
+
+	storage StorageSnapshot
 }
 
 type Snapshot struct {
@@ -46,17 +44,28 @@ type SpockSnapshot struct {
 	SpockSecret []byte
 }
 
-func AlwaysEmptyGetRegisterFunc(owner, key string) (flow.RegisterValue, error) {
-	return nil, nil
+// TODO(patrick): rm after updating emulator.
+func NewView(
+	readFunc func(owner string, key string) (flow.RegisterValue, error),
+) *View {
+	return NewDeltaView(
+		ReadFuncStorageSnapshot{
+			ReadFunc: func(id flow.RegisterID) (flow.RegisterValue, error) {
+				return readFunc(id.Owner, id.Key)
+			},
+		})
 }
 
-// NewView instantiates a new ledger view with the provided read function.
-func NewView(readFunc GetRegisterFunc) *View {
+// NewDeltaView instantiates a new ledger view with the provided read function.
+func NewDeltaView(storage StorageSnapshot) *View {
+	if storage == nil {
+		storage = EmptyStorageSnapshot{}
+	}
 	return &View{
 		delta:             NewDelta(),
 		spockSecretLock:   &sync.Mutex{},
 		regTouchSet:       make(map[flow.RegisterID]struct{}),
-		readFunc:          readFunc,
+		storage:           storage,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
 }
@@ -112,7 +121,7 @@ func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (v *View) NewChild() state.View {
-	return NewView(v.Peek)
+	return NewDeltaView(NewPeekerStorageSnapshot(v))
 }
 
 func (v *View) DropDelta() {
@@ -137,13 +146,12 @@ func (v *View) UpdatedRegisters() flow.RegisterEntries {
 //
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
-func (v *View) Get(owner, key string) (flow.RegisterValue, error) {
+func (v *View) Get(registerID flow.RegisterID) (flow.RegisterValue, error) {
 	var err error
-	registerID := flow.NewRegisterID(owner, key)
 
-	value, exists := v.delta.Get(owner, key)
+	value, exists := v.delta.Get(registerID)
 	if !exists {
-		value, err = v.readFunc(owner, key)
+		value, err = v.storage.Get(registerID)
 		if err != nil {
 			return nil, fmt.Errorf("get register failed: %w", err)
 		}
@@ -162,18 +170,17 @@ func (v *View) Get(owner, key string) (flow.RegisterValue, error) {
 }
 
 // Peek reads the value without registering the read, as when used as parent read function
-func (v *View) Peek(owner, key string) (flow.RegisterValue, error) {
-	value, exists := v.delta.Get(owner, key)
+func (v *View) Peek(id flow.RegisterID) (flow.RegisterValue, error) {
+	value, exists := v.delta.Get(id)
 	if exists {
 		return value, nil
 	}
 
-	return v.readFunc(owner, key)
+	return v.storage.Get(id)
 }
 
 // Set sets a register value in this view.
-func (v *View) Set(owner, key string, value flow.RegisterValue) error {
-	registerID := flow.NewRegisterID(owner, key)
+func (v *View) Set(registerID flow.RegisterID, value flow.RegisterValue) error {
 	// every time we write something to delta (order preserving) we update
 	// the spock secret with both the register ID and value.
 
@@ -190,26 +197,8 @@ func (v *View) Set(owner, key string, value flow.RegisterValue) error {
 	// capture register touch
 	v.regTouchSet[registerID] = struct{}{}
 	// add key value to delta
-	v.delta.Set(owner, key, value)
+	v.delta.Set(registerID, value)
 	return nil
-}
-
-// Touch explicitly adds a register to the touched registers set.
-func (v *View) Touch(owner, key string) error {
-
-	k := flow.NewRegisterID(owner, key)
-
-	// capture register touch
-	v.regTouchSet[k] = struct{}{}
-	// increase reads
-	v.readsCount++
-
-	return nil
-}
-
-// Delete removes a register in this view.
-func (v *View) Delete(owner, key string) error {
-	return v.Set(owner, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.
@@ -274,10 +263,4 @@ func (v *View) SpockSecret() []byte {
 	}
 	v.spockSecretLock.Unlock()
 	return v.spockSecret
-}
-
-// Detach detaches view from parent, by setting readFunc to
-// default, empty one
-func (v *View) Detach() {
-	v.readFunc = AlwaysEmptyGetRegisterFunc
 }

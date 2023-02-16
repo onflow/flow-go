@@ -43,19 +43,19 @@ func TestCodec_Decode(t *testing.T) {
 	t.Run("returns error when message code is invalid", func(t *testing.T) {
 		t.Parallel()
 
-		decoded, err := c.Decode([]byte{codec.CodeMin})
+		decoded, err := c.Decode([]byte{codec.CodeMin.Uint8()})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
 
-		decoded, err = c.Decode([]byte{codec.CodeMax})
+		decoded, err = c.Decode([]byte{codec.CodeMax.Uint8()})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
 
-		decoded, err = c.Decode([]byte{codec.CodeMin - 1})
+		decoded, err = c.Decode([]byte{codec.CodeMin.Uint8() - 1})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
 
-		decoded, err = c.Decode([]byte{codec.CodeMax + 1})
+		decoded, err = c.Decode([]byte{codec.CodeMax.Uint8() + 1})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
 	})
@@ -63,7 +63,7 @@ func TestCodec_Decode(t *testing.T) {
 	t.Run("returns error when unmarshalling fails - empty", func(t *testing.T) {
 		t.Parallel()
 
-		decoded, err := c.Decode([]byte{codec.CodeBlockProposal})
+		decoded, err := c.Decode([]byte{codec.CodeBlockProposal.Uint8()})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrMsgUnmarshal(err))
 	})
@@ -75,7 +75,7 @@ func TestCodec_Decode(t *testing.T) {
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
 
-		encoded[0] = codec.CodeCollectionGuarantee
+		encoded[0] = codec.CodeCollectionGuarantee.Uint8()
 
 		decoded, err := c.Decode(encoded)
 		assert.Nil(t, decoded)

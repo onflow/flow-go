@@ -271,7 +271,8 @@ func CreateAccountsWithSimpleAddresses(
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}
-				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				addr = flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
 		}
@@ -303,7 +304,10 @@ func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm
 		options...,
 	)
 
-	_ = vm.Run(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view)
+	if err != nil {
+		panic(err)
+	}
 	return view
 }
 

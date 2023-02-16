@@ -292,7 +292,7 @@ var useContractAuditVoucherSpec = ContractFunctionSpec{
 // UseContractAuditVoucher executes the use a contract deployment audit voucher
 // contract.
 func (sys *SystemContracts) UseContractAuditVoucher(
-	address common.Address,
+	address flow.Address,
 	code string,
 ) (bool, error) {
 	resultCdc, err := sys.Invoke(

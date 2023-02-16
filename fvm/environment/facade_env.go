@@ -128,6 +128,7 @@ func newFacadeEnvironment(
 		Programs: NewPrograms(
 			tracer,
 			meter,
+			params.MetricsReporter,
 			txnState,
 			accounts,
 			derivedTxnData),
@@ -203,7 +204,7 @@ func NewTransactionEnvironment(
 		tracer,
 		env.Meter,
 		env.accounts,
-		env.TransactionInfo,
+		params.TransactionInfoParams.TxBody.Authorizers,
 		params.Chain,
 		params.ContractUpdaterParams,
 		env.ProgramLogger,

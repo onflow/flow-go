@@ -91,6 +91,34 @@ func (fcv *ChunkVerifier) Verify(
 		vc.IsSystemChunk)
 }
 
+type partialLedgerStorageSnapshot struct {
+	snapshot delta.StorageSnapshot
+
+	unknownRegTouch map[flow.RegisterID]struct{}
+}
+
+func (storage *partialLedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	value, err := storage.snapshot.Get(id)
+	if err != nil && errors.Is(err, ledger.ErrMissingKeys{}) {
+		storage.unknownRegTouch[id] = struct{}{}
+
+		// don't send error just return empty byte slice
+		// we always assume empty value for missing registers (which might
+		// cause the transaction to fail)
+		// but after execution we check unknownRegTouch and if any
+		// register is inside it, code won't generate approvals and
+		// it activates a challenge
+		return flow.RegisterValue{}, nil
+	}
+
+	return value, err
+}
+
 func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context fvm.Context,
 	transactionOffset uint32,
@@ -125,7 +153,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	if err != nil {
 		// TODO provide more details based on the error type
-		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
+		return nil, chmodels.NewCFInvalidVerifiableChunk(
+				"error constructing partial trie: ",
+				err,
+				chIndex,
+				execResID),
 			nil
 	}
 
@@ -138,44 +170,16 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
-	unknownRegTouch := make(map[flow.RegisterID]*ledger.Key)
+	unknownRegTouch := make(map[flow.RegisterID]struct{})
+	chunkView := delta.NewDeltaView(
+		&partialLedgerStorageSnapshot{
+			snapshot: executionState.NewLedgerStorageSnapshot(
+				psmt,
+				chunkDataPack.StartState),
+			unknownRegTouch: unknownRegTouch,
+		})
+
 	var problematicTx flow.Identifier
-	getRegister := func(owner, key string) (flow.RegisterValue, error) {
-		// check if register has been provided in the chunk data pack
-		registerID := flow.NewRegisterID(owner, key)
-
-		registerKey := executionState.RegisterIDToKey(registerID)
-
-		query, err := ledger.NewQuerySingleValue(ledger.State(chunkDataPack.StartState), registerKey)
-
-		if err != nil {
-			return nil, fmt.Errorf("cannot create query: %w", err)
-		}
-
-		value, err := psmt.GetSingleValue(query)
-		if err != nil {
-			if errors.Is(err, ledger.ErrMissingKeys{}) {
-
-				unknownRegTouch[registerID] = &registerKey
-
-				// don't send error just return empty byte slice
-				// we always assume empty value for missing registers (which might cause the transaction to fail)
-				// but after execution we check unknownRegTouch and if any
-				// register is inside it, code won't generate approvals and
-				// it activates a challenge
-
-				return []byte{}, nil
-			}
-			// append to missing keys if error is ErrMissingKeys
-
-			return nil, fmt.Errorf("cannot query register: %w", err)
-		}
-
-		return value, nil
-	}
-
-	chunkView := delta.NewView(getRegister)
-
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
@@ -204,8 +208,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {
 		var missingRegs []string
-		for _, key := range unknownRegTouch {
-			missingRegs = append(missingRegs, key.String())
+		for id := range unknownRegTouch {
+			missingRegs = append(missingRegs, id.String())
 		}
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx), nil
 	}

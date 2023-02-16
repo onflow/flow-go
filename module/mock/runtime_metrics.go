@@ -33,6 +33,16 @@ func (_m *RuntimeMetrics) RuntimeTransactionParsed(dur time.Duration) {
 	_m.Called(dur)
 }
 
+// RuntimeTransactionProgramsCacheHit provides a mock function with given fields:
+func (_m *RuntimeMetrics) RuntimeTransactionProgramsCacheHit() {
+	_m.Called()
+}
+
+// RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
+func (_m *RuntimeMetrics) RuntimeTransactionProgramsCacheMiss() {
+	_m.Called()
+}
+
 type mockConstructorTestingTNewRuntimeMetrics interface {
 	mock.TestingT
 	Cleanup(func())

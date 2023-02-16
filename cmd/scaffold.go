@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -123,11 +122,14 @@ type FlowNodeBuilder struct {
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
+	extraRootSnapshotCheck   func(protocol.Snapshot) error
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
 }
+
+var _ NodeBuilder = (*FlowNodeBuilder)(nil)
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
 	defaultConfig := DefaultBaseConfig()
@@ -169,6 +171,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.Float64Var(&fnb.BaseConfig.LibP2PResourceManagerConfig.FileDescriptorsRatio, "libp2p-fd-ratio", defaultConfig.LibP2PResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
 	fnb.flags.Float64Var(&fnb.BaseConfig.LibP2PResourceManagerConfig.MemoryLimitRatio, "libp2p-memory-limit", defaultConfig.LibP2PResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
+	fnb.flags.IntVar(&fnb.BaseConfig.ConnectionManagerConfig.LowWatermark, "libp2p-connmgr-low", defaultConfig.ConnectionManagerConfig.LowWatermark, "low watermarking for libp2p connection manager")
+	fnb.flags.IntVar(&fnb.BaseConfig.ConnectionManagerConfig.HighWatermark, "libp2p-connmgr-high", defaultConfig.ConnectionManagerConfig.HighWatermark, "high watermarking for libp2p connection manager")
+	fnb.flags.DurationVar(&fnb.BaseConfig.ConnectionManagerConfig.GracePeriod, "libp2p-connmgr-grace", defaultConfig.ConnectionManagerConfig.GracePeriod, "grace period for libp2p connection manager")
+	fnb.flags.DurationVar(&fnb.BaseConfig.ConnectionManagerConfig.SilencePeriod, "libp2p-connmgr-silence", defaultConfig.ConnectionManagerConfig.SilencePeriod, "silence period for libp2p connection manager")
+
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
@@ -232,12 +239,12 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			persist := persister.New(node.DB, node.RootChainID)
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				curView, err := persist.GetStarted()
+				livenessData, err := persist.GetLivenessData()
 				if err != nil {
 					return 0, err
 				}
 
-				return curView, nil
+				return livenessData.CurrentView, nil
 			}
 		}
 
@@ -281,21 +288,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	connGaterInterceptSecureFilters := make([]p2p.PeerFilter, 0)
 	peerManagerFilters := make([]p2p.PeerFilter, 0)
 
-	// log and collect metrics for unicast messages that are rate limited
-	onUnicastRateLimit := func(peerID peer.ID, role, msgType string, topic channels.Topic, reason ratelimit.RateLimitReason) {
-		fnb.Logger.Warn().
-			Str("peer_id", peerID.String()).
-			Str("role", role).
-			Str("message_type", msgType).
-			Str("topic", topic.String()).
-			Str("reason", reason.String()).
-			Bool(logging.KeySuspicious, true).
-			Msg("unicast peer rate limited")
-		fnb.Metrics.Network.OnRateLimitedUnicastMessage(role, msgType, topic.String(), reason.String())
-	}
+	fnb.UnicastRateLimiterDistributor = ratelimit.NewUnicastRateLimiterDistributor()
+	fnb.UnicastRateLimiterDistributor.AddConsumer(fnb.Metrics.Network)
 
-	// setup default noop unicast rate limiters
-	unicastRateLimiters := ratelimit.NewRateLimiters(ratelimit.NewNoopRateLimiter(), ratelimit.NewNoopRateLimiter(), onUnicastRateLimit, ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun))
+	// setup default rate limiter options
+	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun),
+		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
+	}
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
@@ -304,7 +304,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastMessageRateLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.MessageRateLimiter = unicastMessageRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -315,6 +315,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// don't create outbound connections to rate limited peers
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
+
 	}
 
 	// override noop unicast bandwidth rate limiter
@@ -324,7 +325,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.UnicastBandwidthBurstLimit,
 			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
 		)
-		unicastRateLimiters.BandWidthRateLimiter = unicastBandwidthRateLimiter
+		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
@@ -334,6 +335,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
 	}
+
+	// setup unicast rate limiters
+	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -357,6 +361,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
 			fnb.LibP2PResourceManagerConfig,
+			fnb.UnicastRateLimiterDistributor,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -549,6 +554,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	log.Msg("flags loaded")
 
 	return fnb.extraFlagsValidation()
+}
+
+func (fnb *FlowNodeBuilder) ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder {
+	fnb.extraRootSnapshotCheck = f
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
@@ -1098,6 +1108,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
 
+	// perform extra checks requested by specific node types
+	if fnb.extraRootSnapshotCheck != nil {
+		err = fnb.extraRootSnapshotCheck(rootSnapshot)
+		if err != nil {
+			return fmt.Errorf("failed to perform extra checks on root snapshot: %w", err)
+		}
+	}
+
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
 	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
@@ -1480,25 +1498,6 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 	return fnb.Component(name, f)
 }
 
-// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
-// already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
-	for i := 0; i < len(fnb.modules); i++ {
-		if fnb.modules[i].name == name {
-			// found module with the name, override it.
-			fnb.modules[i] = namedModuleFunc{
-				fn:   f,
-				name: name,
-			}
-
-			return fnb
-		}
-	}
-
-	// no module found with the same name, hence just adding it.
-	return fnb.Module(name, f)
-}
-
 // RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
 // Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -1519,6 +1518,25 @@ func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory
 		errorHandler: errorHandler,
 	})
 	return fnb
+}
+
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no module found with the same name, hence just adding it.
+	return fnb.Module(name, f)
 }
 
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {

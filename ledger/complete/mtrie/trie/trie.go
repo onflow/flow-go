@@ -480,11 +480,17 @@ type updateResult struct {
 	err                    error
 }
 
-// update traverses the subtree, updates the stored registers, and returns:
-//   - new or original node (n)
+// update traverses the subtree recursively and create new nodes with
+// the updated payloads on the given paths
+//
+// it returns:
+//   - new updated node or original node if nothing was updated
 //   - allocated register count delta in subtrie (allocatedRegCountDelta)
 //   - allocated register size delta in subtrie (allocatedRegSizeDelta)
 //   - lowest height reached during recursive update in subtrie (lowestHeightTouched)
+//
+// update also compact a subtree into a single compact leaf node in the case where
+// there is only 1 payload stored in the subtree.
 //
 // allocatedRegCountDelta and allocatedRegSizeDelta are used to compute updated
 // trie's allocated register count and size.  lowestHeightTouched is used to
@@ -495,17 +501,16 @@ type updateResult struct {
 //     (excluding the bit at index headHeight)
 //   - paths are NOT duplicated
 func update(
-	nodeHeight int,
-	parentNode *node.Node,
-	paths []ledger.Path,
-	payloads []ledger.Payload,
-	compactLeaf *node.Node,
-	prune bool,
-	payloadStorage ledger.PayloadStorage,
+	nodeHeight int, // the height of the node during traversing the subtree
+	currentNode *node.Node, // the current node on the travesing path, if it's nil it means the trie has no node on this path
+	paths []ledger.Path, // the paths to update the payloads
+	payloads []ledger.Payload, // the payloads to be updated at the given paths
+	compactLeaf *node.Node, // a compact leaf node from its ancester, it could be nil
+	prune bool, // prune is a flag for whether pruning nodes with empty payload. not pruning is useful for generating proof, expecially non-inclusion proof
+	payloadStorage ledger.PayloadStorage, // for getting and setting the payloads stored on leaf nodes
 ) (n *node.Node, allocatedRegCountDelta int64, allocatedRegSizeDelta int64, lowestHeightTouched int, err error) {
-	// No new paths to write
+	// No new path to update
 	if len(paths) == 0 {
-		// check is a compactLeaf from a higher height is still left.
 		if compactLeaf != nil {
 			leafHash := compactLeaf.ExpandedLeafHash()
 			compactPath, leafPayload, err := payloadStorage.Get(leafHash)
@@ -513,57 +518,68 @@ func update(
 				return nil, 0, 0, 0, fmt.Errorf("could not get payload by leaf hash %v: %w", leafHash, err)
 			}
 
-			// create a new node for the compact leaf path and payload. The old node shouldn't
-			// be recycled as it is still used by the tree copy before the update.
+			// if a compactLeaf from a higher height is still left,
+			// then expand the compact leaf node to the current height by creating a new compact leaf
+			// node with the same path and payload.
+			// The old node shouldn't be recycled as it is still used by the tree copy before the update.
 			n = node.NewLeaf(compactPath, leafPayload, nodeHeight)
 			return n, 0, 0, nodeHeight, nil
 		}
-		return parentNode, 0, 0, nodeHeight, nil
+		// if no path to update and there is no compact leaf node on this path, we return
+		// the current node regardless it exists or not.
+		return currentNode, 0, 0, nodeHeight, nil
 	}
 
-	if len(paths) == 1 && parentNode.IsDefaultNode() && compactLeaf == nil {
+	if len(paths) == 1 && currentNode.IsDefaultNode() && compactLeaf == nil {
+		// if there is only 1 path to update, and the existing tree has no node on this path, also
+		// no compact leaf node from its ancester, it means we are storing a payload on a new path,
 		n = node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 		if payloads[0].IsEmpty() {
-			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
+			// if we are storing an empty node, then no register is allocated
+			// allocatedRegCountDelta and allocatedRegSizeDelta should both be 0
 			return n, 0, 0, nodeHeight, nil
 		}
+		// if we are storing a non-empty node, we are allocating a new register
 		return n, 1, int64(payloads[0].Size()), nodeHeight, nil
 	}
 
-	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
-		if parentNode.IsDefaultNode() {
-			compactLeaf = parentNode
+	if currentNode != nil && currentNode.IsLeaf() { // if we're here then compactLeaf == nil
+		// check if the current node path is among the updated paths
+		if currentNode.IsDefaultNode() {
+			compactLeaf = currentNode
 		} else {
 
 			// check if the parent node path is among the updated paths
 			found := false
-			parentLeafHash := parentNode.ExpandedLeafHash()
+			leafHash := currentNode.ExpandedLeafHash()
 
-			parentPath, parentPayload, err := payloadStorage.Get(parentLeafHash)
+			currentPath, currentPayload, err := payloadStorage.Get(leafHash)
 			if err != nil {
-				return nil, 0, 0, 0, fmt.Errorf("could not get payload for parent leaf hash %v: %w", parentLeafHash, err)
+				return nil, 0, 0, 0, fmt.Errorf("could not get payload for current leaf hash %v: %w", leafHash, err)
 			}
 
 			for i, p := range paths {
-				if p == parentPath {
+				if p == currentPath {
 					// the case where the recursion stops: only one path to update
 					if len(paths) == 1 {
-						if !parentPayload.ValueEquals(&payloads[i]) {
+						if !currentPayload.ValueEquals(&payloads[i]) {
+							// check if the only path to update has the same payload.
+							// if payload is the same, we could skip the update to avoid creating duplicated node
 							n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
 							allocatedRegCountDelta, allocatedRegSizeDelta =
-								computeAllocatedRegDeltas(parentPayload, &payloads[i])
+								computeAllocatedRegDeltas(currentPayload, &payloads[i])
 
 							return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight, nil
 						}
 						// avoid creating a new node when the same payload is written
-						return parentNode, 0, 0, nodeHeight, nil
+						return currentNode, 0, 0, nodeHeight, nil
 					}
 					// the case where the recursion carries on: len(paths)>1
 					found = true
 
 					allocatedRegCountDelta, allocatedRegSizeDelta =
-						computeAllocatedRegDeltasFromHigherHeight(parentPayload)
+						computeAllocatedRegDeltasFromHigherHeight(currentPayload)
 
 					break
 				}
@@ -571,15 +587,15 @@ func update(
 			if !found {
 				// if the parent node carries a path not included in the input path, then the parent node
 				// represents a compact leaf that needs to be carried down the recursion.
-				compactLeaf = parentNode
+				compactLeaf = currentNode
 			}
 		}
 	}
 
-	// in the remaining code: the registers to update are strictly larger than 1:
-	//   - either len(paths)>1
+	// in the remaining code:
+	//   - either len(paths) > 1
 	//   - or len(paths) == 1 and compactLeaf!= nil
-	//   - or len(paths) == 1 and parentNode != nil && !parentNode.IsLeaf()
+	//   - or len(paths) == 1 and currentNode != nil && !currentNode.IsLeaf()
 
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
@@ -606,26 +622,26 @@ func update(
 		}
 	}
 
-	// set the parent node children
-	var lchildParent, rchildParent *node.Node
-	if parentNode != nil {
-		lchildParent = parentNode.LeftChild()
-		rchildParent = parentNode.RightChild()
+	// set the node children
+	var oldLeftChild, oldRightChild *node.Node
+	if currentNode != nil {
+		oldLeftChild = currentNode.LeftChild()
+		oldRightChild = currentNode.RightChild()
 	}
 
 	// recurse over each branch
-	var lChild, rChild *node.Node
+	var newLeftChild, newRightChild *node.Node
 	var lRegCountDelta, rRegCountDelta int64
 	var lRegSizeDelta, rRegSizeDelta int64
 	var lLowestHeightTouched, rLowestHeightTouched int
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched, err = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune, payloadStorage)
+		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched, err = update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune, payloadStorage)
 		if err != nil {
 			return nil, 0, 0, 0, fmt.Errorf("could not update: %w", err)
 		}
-		rChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched, err = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune, payloadStorage)
+		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched, err = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune, payloadStorage)
 		if err != nil {
 			return nil, 0, 0, 0, fmt.Errorf("could not update: %w", err)
 		}
@@ -639,11 +655,11 @@ func update(
 		// channel is faster and uses fewer allocs/op in this case.
 		results := make(chan updateResult, 1)
 		go func(retChan chan<- updateResult) {
-			child, regCountDelta, regSizeDelta, lowestHeightTouched, err := update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune, payloadStorage)
+			child, regCountDelta, regSizeDelta, lowestHeightTouched, err := update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune, payloadStorage)
 			retChan <- updateResult{child, regCountDelta, regSizeDelta, lowestHeightTouched, err}
 		}(results)
 
-		rChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched, err = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune, payloadStorage)
+		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched, err = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune, payloadStorage)
 		if err != nil {
 			return nil, 0, 0, 0, fmt.Errorf("could not update: %w", err)
 		}
@@ -653,7 +669,7 @@ func update(
 		if ret.err != nil {
 			return nil, 0, 0, 0, fmt.Errorf("could not update: %w", err)
 		}
-		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.allocatedRegCountDelta, ret.allocatedRegSizeDelta, ret.lowestHeightTouched
+		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.allocatedRegCountDelta, ret.allocatedRegSizeDelta, ret.lowestHeightTouched
 	}
 
 	allocatedRegCountDelta += lRegCountDelta + rRegCountDelta
@@ -664,18 +680,20 @@ func update(
 	// payload is re-written at a register. CAUTION: we only check that the children are
 	// unchanged. This is only sufficient for interim nodes (for leaf nodes, the children
 	// might be unchanged, i.e. both nil, but the payload could have changed).
-	if !parentNode.IsLeaf() && lChild == lchildParent && rChild == rchildParent {
-		return parentNode, 0, 0, lowestHeightTouched, nil
+	// In case the current node was a leaf, we _cannot reuse_ it, because we potentially
+	// updated registers in the sub-trie
+	if !currentNode.IsLeaf() && newLeftChild == oldLeftChild && newRightChild == oldRightChild {
+		return currentNode, 0, 0, lowestHeightTouched, nil
 	}
 
-	// In case the parent node was a leaf, we _cannot reuse_ it, because we potentially
-	// updated registers in the sub-trie
+	// if prune is on, then will check and create a compact leaf node if one child is nil, and the
+	// other child is a leaf node
 	if prune {
-		n = node.NewInterimCompactifiedNode(nodeHeight, lChild, rChild)
+		n = node.NewInterimCompactifiedNode(nodeHeight, newLeftChild, newRightChild)
 		return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched, nil
 	}
 
-	n = node.NewInterimNode(nodeHeight, lChild, rChild)
+	n = node.NewInterimNode(nodeHeight, newLeftChild, newRightChild)
 	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched, nil
 }
 
@@ -898,15 +916,15 @@ func dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 		return nil
 	}
 
-	if lChild := n.LeftChild(); lChild != nil {
-		err := dumpAsJSON(lChild, encoder)
+	if newLeftChild := n.LeftChild(); newLeftChild != nil {
+		err := dumpAsJSON(newLeftChild, encoder)
 		if err != nil {
 			return err
 		}
 	}
 
-	if rChild := n.RightChild(); rChild != nil {
-		err := dumpAsJSON(rChild, encoder)
+	if newRightChild := n.RightChild(); newRightChild != nil {
+		err := dumpAsJSON(newRightChild, encoder)
 		if err != nil {
 			return err
 		}

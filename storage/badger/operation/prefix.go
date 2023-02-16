@@ -16,20 +16,22 @@ const (
 	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
-	codeStartedView = 10 // latest view hotstuff started
-	codeVotedView   = 11 // latest view hotstuff voted on
+	codeSafetyData   = 10 // safety data for hotstuff state
+	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeRootQuorumCertificate = 12
-	codeSporkID               = 13
-	codeProtocolVersion       = 14
+	codeRootQuorumCertificate      = 12
+	codeSporkID                    = 13
+	codeProtocolVersion            = 14
+	codeEpochCommitSafetyThreshold = 15
+	codeSporkRootBlockHeight       = 16
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
 	codeSealedHeight            = 21 // latest sealed block height
 	codeClusterHeight           = 22 // latest finalized height on cluster
 	codeExecutedBlock           = 23 // latest executed block with max height
-	codeRootHeight              = 24 // the height of the first loaded block
+	codeRootHeight              = 24 // the height of the highest block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 
 	// codes for single entity storage
