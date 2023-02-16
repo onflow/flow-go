@@ -93,6 +93,15 @@ func (logger *ProgramLogger) ProgramLog(message string) error {
 		trace.FVMEnvProgramLog).End()
 
 	if logger.CadenceLoggingEnabled {
+
+		// If cadence logging is enabled (which is usually in the
+		// emulator or emulator based tools),
+		// we log the message to the zerolog logger so that they can be tracked
+		// while stepping through a transaction/script.
+		logger.Logger().
+			Debug().
+			Msgf("Cadence log: %s", message)
+
 		logger.logs = append(logger.logs, message)
 	}
 	return nil
