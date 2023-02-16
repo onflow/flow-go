@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -12,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 // There are some steps to test a Merkle trie implementation:
@@ -168,16 +169,18 @@ type pathAndPayload struct {
 // For a 2-levels tree, there are (4 * 3 * 2 * 1 = 24) possibilities:
 // For instance,
 // adding 4 payloads will create a full tree:
-//       n7
-//      /  \
-//    n5    n6
-//   / \   / \
-//  n1 n2 n3 n4
+//
+//	     n7
+//	    /  \
+//	  n5    n6
+//	 / \   / \
+//	n1 n2 n3 n4
 //
 // adding 2 payloads at [00, 10], will create a tree:
-//      n3
-//		 / \
-// 		n1  n2
+//
+//	     n3
+//			 / \
+//			n1  n2
 func Test_Lookup_AddUntilFull(t *testing.T) {
 	// prepare paths for a 2-levels tree, which can store 4 payloads in total on different paths.
 	paths := getAllPathsAtLevel2()

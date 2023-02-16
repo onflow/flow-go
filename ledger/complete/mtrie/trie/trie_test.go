@@ -1145,9 +1145,9 @@ func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(unprunedTrie, newPaths, newPayloads, true, store)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
-	// TODO: fix it
-	// require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
-	// require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
+
+	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
 }
 
 // TestReadSinglePayload tests reading a single payload of existent/non-existent path for trie of different layouts.
