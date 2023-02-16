@@ -1096,6 +1096,77 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	})
 }
 
+// TestSnapshot_EpochHeightBoundaries tests querying epoch height boundaries in various conditions.
+//   - FirstHeight should be queryable as soon as the epoch's first block is finalized,
+//     otherwise should return protocol.ErrEpochNotStarted
+//   - FinalHeight should be queryable as soon as the next epoch's first block is finalized,
+//     otherwise should return protocol.ErrEpochNotEnded
+func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+
+		epoch1FirstHeight := head.Height
+		t.Run("first epoch - EpochStaking phase", func(t *testing.T) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+
+		// build first epoch (but don't complete it yet)
+		epochBuilder.BuildEpoch()
+
+		t.Run("first epoch - EpochCommitted phase", func(t *testing.T) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first and final height of not started next epoch should be unknown
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			_, err = state.Final().Epochs().Next().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+
+		// complete epoch 1 (enter epoch 2)
+		epochBuilder.CompleteEpoch()
+		epoch1Heights, ok := epochBuilder.EpochHeights(1)
+		require.True(t, ok)
+		epoch1FinalHeight := epoch1Heights.FinalHeight()
+		epoch2FirstHeight := epoch1FinalHeight + 1
+
+		t.Run("second epoch - EpochStaking phase", func(t *testing.T) {
+			// first and final height of completed previous epoch should be known
+			firstHeight, err := state.Final().Epochs().Previous().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FinalHeight, finalHeight)
+
+			// first height of started current epoch should be known
+			firstHeight, err = state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch2FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+	})
+}
+
 // Test querying identities in different epoch phases. During staking phase we
 // should see identities from last epoch and current epoch. After staking phase
 // we should see identities from current epoch and next epoch. Identities from

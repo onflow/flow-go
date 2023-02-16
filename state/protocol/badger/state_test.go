@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -71,13 +70,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
-
-		t.Run("epoch first block height index should be initialized", func(t *testing.T) {
-			var epochFirstHeight uint64
-			err = db.View(operation.RetrieveEpochFirstHeight(counter, &epochFirstHeight))
-			require.NoError(t, err)
-			require.Equal(t, rootSnapshot.Encodable().Head.Height, epochFirstHeight)
-		})
 	})
 }
 
@@ -151,6 +143,87 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	})
 }
 
+// TestBootstrap_EpochHeightBoundaries tests that epoch height indexes are indexed
+// when they are available in the input snapshot.
+func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
+	t.Parallel()
+	// start with a regular post-spork root snapshot
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
+
+	t.Run("root snapshot", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+	})
+
+	t.Run("with next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.BuildEpoch().CompleteEpoch()
+			heights, ok := builder.EpochHeights(1)
+			require.True(t, ok)
+			return state.AtHeight(heights.Committed)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first and final height of not started next epoch should be unknown
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			_, err = state.Final().Epochs().Next().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+		})
+	})
+	t.Run("with previous epoch", func(t *testing.T) {
+		var epoch1FinalHeight uint64
+		var epoch2FirstHeight uint64
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.
+				BuildEpoch().CompleteEpoch(). // build epoch 2
+				BuildEpoch()                  // build epoch 3
+			heights, ok := builder.EpochHeights(2)
+			epoch2FirstHeight = heights.FirstHeight()
+			epoch1FinalHeight = epoch2FirstHeight - 1
+			require.True(t, ok)
+			// return snapshot from within epoch 2 (middle epoch)
+			return state.AtHeight(heights.Setup)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch2FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			// first and final height of completed previous epoch should be known
+			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, firstHeight, epoch1FirstHeight)
+			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			require.NoError(t, err)
+			assert.Equal(t, finalHeight, epoch1FinalHeight)
+		})
+	})
+}
+
 // TestBootstrapNonRoot tests bootstrapping the protocol state from arbitrary states.
 //
 // NOTE: for all these cases, we build a final child block (CHILD). This is
@@ -182,7 +255,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			return state.AtBlockID(block2.ID())
 		})
 
-		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -202,7 +275,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -222,7 +295,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -249,7 +322,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, after, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -263,7 +336,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeIDIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -272,7 +345,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
 		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -288,7 +361,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 			t.Run(fmt.Sprintf("no %s nodes", role), func(t *testing.T) {
 				participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
 				root := unittest.RootSnapshotFixture(participants)
-				bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
+				bootstrap(t, root, func(state *bprotocol.State, err error) {
 					assert.Error(t, err)
 				})
 			})
@@ -301,7 +374,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		participants = append(participants, dupeAddressIdentity)
 
 		root := unittest.RootSnapshotFixture(participants)
-		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -314,7 +387,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		encodable := root.Encodable()
 		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
 		root = inmem.SnapshotFromEncodable(encodable)
-		bootstrap(t, root, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -329,7 +402,7 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -342,7 +415,7 @@ func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
 	encodable.SealingSegment.FirstSeal = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -355,7 +428,7 @@ func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
 	encodable.SealingSegment.ExecutionResults = nil
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -367,7 +440,7 @@ func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
 	encodable.QuorumCertificate.BlockID = unittest.IdentifierFixture()
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
-	bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
 }
@@ -379,7 +452,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -390,7 +463,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -401,7 +474,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		encodable := rootSnapshot.Encodable()
 		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
 
-		bootstrap(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
 		})
 	})
@@ -409,7 +482,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 
 // bootstraps protocol state with the given snapshot and invokes the callback
 // with the result of the constructor
-func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*badger.DB, *bprotocol.State, error)) {
+func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.State, error)) {
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
@@ -417,7 +490,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*badger.DB, 
 	defer db.Close()
 	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
 	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
-	f(db, state, err)
+	f(state, err)
 }
 
 // snapshotAfter bootstraps the protocol state from the root snapshot, applies
@@ -428,7 +501,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*badger.DB, 
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.FollowerState) {
 		snap := f(state)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
@@ -451,7 +524,7 @@ func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.
 // assertSealingSegmentBlocksQueryable bootstraps the state with the given
 // snapshot, then verifies that all sealing segment blocks are queryable.
 func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
-	bootstrap(t, snapshot, func(db *badger.DB, state *bprotocol.State, err error) {
+	bootstrap(t, snapshot, func(state *bprotocol.State, err error) {
 		require.NoError(t, err)
 
 		segment, err := state.Final().SealingSegment()
