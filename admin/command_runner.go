@@ -324,3 +324,7 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 
 	return handleResult, nil
 }
+
+func (r *CommandRunner) GrpcAddress() string {
+	return r.grpcAddress
+}

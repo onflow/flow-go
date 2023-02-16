@@ -961,7 +961,7 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 
 	var trieUpdate *ledger.TrieUpdate
 	if m.GetTrieUpdate() != nil {
-		trieUpdate, err = messageToTrieUpdate(m.GetTrieUpdate())
+		trieUpdate, err = MessageToTrieUpdate(m.GetTrieUpdate())
 		if err != nil {
 			return nil, err
 		}
@@ -1057,7 +1057,7 @@ func messageToTrustedTransaction(m *entities.Transaction, chain flow.Chain) (flo
 	return *t, nil
 }
 
-func messageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
+func MessageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 	rootHash, err := ledger.ToRootHash(m.GetRootHash())
 	if err != nil {
 		return nil, fmt.Errorf("could not convert root hash: %w", err)

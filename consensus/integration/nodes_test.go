@@ -242,8 +242,9 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 	consensusCluster := participantData.Identities()
 	votes, err := run.GenerateRootBlockVotes(root, participantData)
 	require.NoError(t, err)
-	qc, err := run.GenerateRootQC(root, votes, participantData, consensusCluster)
+	qc, invalidVotes, err := run.GenerateRootQC(root, votes, participantData, consensusCluster)
 	require.NoError(t, err)
+	require.Len(t, invalidVotes, 0)
 	return qc
 }
 
