@@ -66,22 +66,6 @@ func (_m *TransactionInfo) LimitAccountStorage() bool {
 	return r0
 }
 
-// SigningAccounts provides a mock function with given fields:
-func (_m *TransactionInfo) SigningAccounts() []common.Address {
-	ret := _m.Called()
-
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
-	}
-
-	return r0
-}
-
 // TransactionFeesEnabled provides a mock function with given fields:
 func (_m *TransactionInfo) TransactionFeesEnabled() bool {
 	ret := _m.Called()

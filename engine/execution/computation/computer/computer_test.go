@@ -407,7 +407,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(
+					flow.EmptyAddress,
+					"no payer address provided")
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
@@ -455,7 +457,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
+					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
+						flow.EmptyAddress,
+						"no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}

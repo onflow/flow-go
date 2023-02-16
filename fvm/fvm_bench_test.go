@@ -304,7 +304,8 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 					if err != nil {
 						tb.Fatal("setup account failed, error decoding events")
 					}
-					addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+					addr = flow.ConvertAddress(
+						data.(cadence.Event).Fields[0].(cadence.Address))
 					break
 				}
 			}
