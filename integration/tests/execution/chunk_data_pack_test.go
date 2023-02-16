@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -89,7 +88,6 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	payloadStorage := unittest.CreateMockPayloadStore()
-	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, ledger.State(pack2.ChunkDataPack.StartState), partial.DefaultPathFinderVersion, payloadStorage)
+	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, ledger.State(pack2.ChunkDataPack.StartState), partial.DefaultPathFinderVersion)
 	require.NoError(gs.T(), err, "error building PSMT")
 }
