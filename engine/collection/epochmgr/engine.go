@@ -180,7 +180,7 @@ func (e *Engine) checkShouldStartLastEpochComponentsOnStartup(engineCtx irrecove
 		Uint64("prev_epoch_cluster_stop_height", prevEpochClusterConsensusStopHeight).
 		Logger()
 
-	if finalizedHeight > prevEpochClusterConsensusStopHeight {
+	if finalizedHeight >= prevEpochClusterConsensusStopHeight {
 		log.Debug().Msg("not re-starting previous epoch cluster consensus on startup - past stop height")
 		return nil
 	}
@@ -260,9 +260,13 @@ func (e *Engine) Done() <-chan struct{} {
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
+	counter, err := epoch.Counter()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch counter: %w", err)
+	}
 	state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub, err := e.factory.Create(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
+		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", counter, err)
 	}
 
 	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub)
