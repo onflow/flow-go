@@ -17,6 +17,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestDisallowListNotificationDistributor tests the disallow list notification distributor by adding two consumers to the
+// notification distributor component and sending a random set of notifications to the notification component. The test
+// verifies that the consumers receive the notifications and that each consumer sees each notification only once.
 func TestDisallowListNotificationDistributor(t *testing.T) {
 	d := distributor.DefaultDisallowListNotificationConsumer(unittest.Logger())
 
