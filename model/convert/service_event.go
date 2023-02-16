@@ -3,6 +3,7 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -218,11 +219,55 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 		}
 		height := cadenceHeight.ToGoValue().(uint64)
 
-		cadenceVersion, is := valStruct.Fields[1].(cadence.String)
+		cadenceVersionStruct, is := valStruct.Fields[1].(cadence.Struct)
 		if !is {
-			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1]", i), valStruct.Fields[1], cadence.String(""))
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1]", i), valStruct.Fields[1], cadence.Struct{})
 		}
-		version := cadenceVersion.ToGoValue().(string)
+		if len(cadenceVersionStruct.Fields) < 4 {
+			return nil, fmt.Errorf("insufficient fields in payload.Fields[0].Values[%d].Fields[1].Fields (%d < 4)", i, len(cadenceVersionStruct.Fields))
+		}
+		cadenceVersionMajor, is := cadenceVersionStruct.Fields[0].(cadence.UInt8)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1].Fields[0]", i), cadenceVersionStruct.Fields[0], cadence.UInt8(0))
+		}
+		versionMajor := cadenceVersionMajor.ToGoValue().(uint8)
+
+		cadenceVersionMinor, is := cadenceVersionStruct.Fields[1].(cadence.UInt8)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1].Fields[1]", i), cadenceVersionStruct.Fields[1], cadence.UInt8(0))
+		}
+		versionMinor := cadenceVersionMinor.ToGoValue().(uint8)
+
+		cadenceVersionPatch, is := cadenceVersionStruct.Fields[2].(cadence.UInt8)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1].Fields[2]", i), cadenceVersionStruct.Fields[2], cadence.UInt8(0))
+		}
+		versionPatch := cadenceVersionPatch.ToGoValue().(uint8)
+
+		cadenceVersionPrereleaseOptional, is := cadenceVersionStruct.Fields[3].(cadence.Optional)
+		if !is {
+			return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1].Fields[3]", i), cadenceVersionStruct.Fields[3], cadence.Optional{})
+		}
+		preRelease := ""
+		if cadenceVersionPrereleaseOptional.Value != nil {
+			cadenceVersionPrerelease, is := cadenceVersionPrereleaseOptional.Value.(cadence.String)
+			if !is {
+				return nil, invalidCadenceTypeError(fmt.Sprintf("payload.Fields[0].Values[%d].Fields[1].Fields[3].Value", i), cadenceVersionPrereleaseOptional.Value, cadence.String(""))
+			}
+
+			prePrereleaseString := cadenceVersionPrerelease.ToGoValue().(string)
+			if prePrereleaseString != "" {
+				preRelease = "-" + prePrereleaseString
+			}
+		}
+
+		version := fmt.Sprintf("%d.%d.%d%s", versionMajor, versionMinor, versionPatch, preRelease)
+
+		//ensure its valid
+		_, err = semver.NewVersion(version)
+		if err != nil {
+			return nil, fmt.Errorf("invalid semver %s: %w", version, err)
+		}
 
 		versionTable.RequiredVersions = append(versionTable.RequiredVersions, flow.VersionControlRequirement{Height: height, Version: version})
 	}

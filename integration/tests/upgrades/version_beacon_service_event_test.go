@@ -25,6 +25,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	major := uint8(0)
 	minor := uint8(3)
 	patch := uint8(7)
+	preRelease := ""
 
 	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
 
@@ -36,8 +37,19 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	versionBufferScript := templates.GenerateGetVersionUpdateBufferScript(env)
 
 	//Contract should be deployed at bootstrap, so we expect this script to succeed, but ignore the return value
-	_, err := s.AccessClient().ExecuteScriptBytes(ctx, versionBufferScript, nil)
+	bufferRaw, err := s.AccessClient().ExecuteScriptBytes(ctx, versionBufferScript, nil)
 	s.Require().NoError(err)
+
+	buffer := uint64(0)
+
+	if cadenceBuffer, is := bufferRaw.(cadence.UInt64); is {
+		buffer = cadenceBuffer.ToGoValue().(uint64)
+	} else {
+		s.Require().Failf("version buffer script returned unknown type", "%t", bufferRaw)
+	}
+
+	// make sure target height is correct
+	height += buffer
 
 	versionTableChangeScript := templates.GenerateAddVersionToTableScript(env)
 
@@ -53,13 +65,11 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		AddAuthorizer(sdk.Address(serviceAddress))
 
 	//args
-	//  height: UInt64,
-	//  newMajor: UInt8,
-	//  newMinor: UInt8,
-	//  newPatch: UInt8,
-
-	err = tx.AddArgument(cadence.NewUInt64(height))
-	s.Require().NoError(err)
+	// newMajor: UInt8,
+	// newMinor: UInt8,
+	// newPatch: UInt8,
+	// newPreRelease: String?,
+	// targetBlockHeight: UInt64
 
 	err = tx.AddArgument(cadence.NewUInt8(major))
 	s.Require().NoError(err)
@@ -70,11 +80,20 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	err = tx.AddArgument(cadence.NewUInt8(patch))
 	s.Require().NoError(err)
 
+	preReleaseCadenceString, err := cadence.NewString(preRelease)
+	s.Require().NoError(err)
+	err = tx.AddArgument(preReleaseCadenceString)
+	s.Require().NoError(err)
+
+	err = tx.AddArgument(cadence.NewUInt64(height))
+	s.Require().NoError(err)
+
 	err = s.AccessClient().SignAndSendTransaction(ctx, tx)
 	s.Require().NoError(err)
 
 	txResult, err := s.AccessClient().WaitForSealed(ctx, tx.ID())
 	s.Require().NoError(err)
+	s.Require().Empty(txResult.Error)
 
 	sealed := s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
@@ -82,7 +101,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	s.Require().IsType(&flow.VersionBeacon{}, sealed.ExecutionResult.ServiceEvents[0].Event)
 
 	versionTable := sealed.ExecutionResult.ServiceEvents[0].Event.(*flow.VersionBeacon)
-	s.Require().Equal(uint64(5), versionTable.Sequence)
+	s.Require().Equal(uint64(0), versionTable.Sequence) // this should be first ever emitted
 	s.Require().Len(versionTable.RequiredVersions, 1)
 	s.Require().Equal(height, versionTable.RequiredVersions[0].Height)
 

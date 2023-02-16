@@ -4,8 +4,7 @@ import "golang.org/x/mod/semver"
 
 // VersionControlRequirement describe a single version requirement - height and a corresponding version
 // Height is the first height which must be run by a given Version.
-// Version is semver string. String type is used by golang.org/x/mod/semver, and it must be valid semver identifier,
-// as defined by golang.org/x/mod/semver.isValid version
+// Version is semver string.
 type VersionControlRequirement struct {
 	Height  uint64
 	Version string
