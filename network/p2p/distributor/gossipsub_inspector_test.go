@@ -46,7 +46,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 		count, ok := args.Get(2).(uint64)
 		require.True(t, ok)
 
-		require.Contains(t, tt, distributor.InvalidControlMessageNotification{
+		require.Contains(t, tt, p2p.InvalidControlMessageNotification{
 			PeerID:  peerID,
 			MsgType: msgType,
 			Count:   count,
@@ -72,7 +72,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 		count, ok := args.Get(2).(uint64)
 		require.True(t, ok)
 
-		require.Contains(t, tt, distributor.InvalidControlMessageNotification{
+		require.Contains(t, tt, p2p.InvalidControlMessageNotification{
 			PeerID:  peerID,
 			MsgType: msgType,
 			Count:   count,
@@ -103,16 +103,16 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	unittest.RequireCloseBefore(t, g.Done(), 100*time.Millisecond, "could not stop handler")
 }
 
-func invalidControlMessageNotificationListFixture(t *testing.T, n int) []distributor.InvalidControlMessageNotification {
-	list := make([]distributor.InvalidControlMessageNotification, n)
+func invalidControlMessageNotificationListFixture(t *testing.T, n int) []p2p.InvalidControlMessageNotification {
+	list := make([]p2p.InvalidControlMessageNotification, n)
 	for i := 0; i < n; i++ {
 		list[i] = invalidControlMessageNotificationFixture(t)
 	}
 	return list
 }
 
-func invalidControlMessageNotificationFixture(t *testing.T) distributor.InvalidControlMessageNotification {
-	return distributor.InvalidControlMessageNotification{
+func invalidControlMessageNotificationFixture(t *testing.T) p2p.InvalidControlMessageNotification {
+	return p2p.InvalidControlMessageNotification{
 		PeerID:  p2ptest.PeerIdFixture(t),
 		MsgType: []p2p.ControlMessageType{p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant}[rand.Intn(4)],
 		Count:   rand.Uint64(),

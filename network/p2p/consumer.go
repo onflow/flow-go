@@ -28,6 +28,17 @@ const (
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
 
+// InvalidControlMessageNotification is the notification sent to the consumer when an invalid control message is received.
+// It models the information that is available to the consumer about a misbehaving peer.
+type InvalidControlMessageNotification struct {
+	// PeerID is the ID of the peer that sent the invalid control message.
+	PeerID peer.ID
+	// MsgType is the type of control message that was received.
+	MsgType ControlMessageType
+	// Count is the number of invalid control messages received from the peer that is reported in this notification.
+	Count uint64
+}
+
 // GossipSubRpcInspectorConsumer is the interface for a consumer of inspection result for GossipSub RPC messages.
 // Implementations must:
 //   - be concurrency safe
@@ -38,5 +49,5 @@ type GossipSubRpcInspectorConsumer interface {
 	// The int parameter is the count of invalid messages received from the peer.
 	// Prerequisites:
 	// Implementation must be concurrency safe and non-blocking.
-	OnInvalidControlMessage(peer.ID, ControlMessageType, uint64)
+	OnInvalidControlMessage(InvalidControlMessageNotification)
 }
