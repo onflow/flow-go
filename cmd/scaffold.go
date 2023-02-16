@@ -989,7 +989,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IdentityProvider = disallowListWrapper
 
-		// register the blocklist for dynamic configuration via admin command
+		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
 			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
 		if err != nil {
