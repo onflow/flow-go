@@ -15,10 +15,10 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -38,14 +38,35 @@ const (
 )
 
 type ComputationManager interface {
-	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(
+		ctx context.Context,
+		script []byte,
+		arguments [][]byte,
+		blockHeader *flow.Header,
+		snapshot delta.StorageSnapshot,
+	) (
+		[]byte,
+		error,
+	)
+
 	ComputeBlock(
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		view state.View,
-	) (*execution.ComputationResult, error)
-	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
+		snapshot delta.StorageSnapshot,
+	) (
+		*execution.ComputationResult,
+		error,
+	)
+
+	GetAccount(
+		addr flow.Address,
+		header *flow.Header,
+		snapshot delta.StorageSnapshot,
+	) (
+		*flow.Account,
+		error,
+	)
 }
 
 type ComputationConfig struct {
@@ -162,7 +183,7 @@ func (e *Manager) ExecuteScript(
 	code []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	view state.View,
+	snapshot delta.StorageSnapshot,
 ) ([]byte, error) {
 
 	startedAt := time.Now()
@@ -227,6 +248,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
+		view := delta.NewDeltaView(snapshot)
 		return e.vm.Run(blockCtx, script, view)
 	}()
 	if err != nil {
@@ -262,7 +284,7 @@ func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	view state.View,
+	snapshot delta.StorageSnapshot,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -277,7 +299,7 @@ func (e *Manager) ComputeBlock(
 		ctx,
 		parentBlockExecutionResultID,
 		block,
-		view,
+		snapshot,
 		derivedBlockData)
 	if err != nil {
 		e.log.Error().
@@ -294,16 +316,31 @@ func (e *Manager) ComputeBlock(
 	return result, nil
 }
 
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
+func (e *Manager) GetAccount(
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot delta.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccount(blockCtx, address, view)
+	delta.NewDeltaView(snapshot)
+	account, err := e.vm.GetAccount(
+		blockCtx,
+		address,
+		delta.NewDeltaView(snapshot))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
+		return nil, fmt.Errorf(
+			"failed to get account (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
 	}
 
 	return account, nil
