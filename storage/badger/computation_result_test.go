@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -213,11 +214,21 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 			},
 		},
 		TransactionResultIndex: []int{1, 1, 2, 2},
-		TrieUpdates: []*ledger.TrieUpdate{
-			trieUpdate1,
-			trieUpdate2,
-			trieUpdate3,
-			trieUpdate4,
+		BlockExecutionData: &execution_data.BlockExecutionData{
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				&execution_data.ChunkExecutionData{
+					TrieUpdate: trieUpdate1,
+				},
+				&execution_data.ChunkExecutionData{
+					TrieUpdate: trieUpdate2,
+				},
+				&execution_data.ChunkExecutionData{
+					TrieUpdate: trieUpdate3,
+				},
+				&execution_data.ChunkExecutionData{
+					TrieUpdate: trieUpdate4,
+				},
+			},
 		},
 	}
 }
