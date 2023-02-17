@@ -11,10 +11,10 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_size, const byte x){
+void Fr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_size, const byte x){
     bn_t image;
     bn_new(image);
-    Zr_polynomialImage(image, y, a, a_size, x);
+    Fr_polynomialImage(image, y, a, a_size, x);
     // exports the result
     const int out_size = Fr_BYTES;
     bn_write_bin(out, out_size, image);
@@ -25,7 +25,7 @@ void Zr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_s
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage(bn_t image, ep2_t y, const bn_st *a, const int a_size, const byte x){
+void Fr_polynomialImage(bn_t image, ep2_t y, const bn_st *a, const int a_size, const byte x){
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);

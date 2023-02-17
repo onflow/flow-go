@@ -5,9 +5,12 @@ package crypto
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	_ "errors"
+
+	_ "fmt"
+
+	_ "github.com/onflow/flow-go/crypto/hash"
 )
 
 // BLS multi-signature using BLS12-381 curve
@@ -38,6 +41,7 @@ import "C"
 // used for signatures.
 var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
+/*
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //
 // The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
@@ -92,8 +96,8 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 //   - (nil, error) if an unexpected error occurs
 //   - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	// check for empty list
 	if len(sigs) == 0 {
@@ -139,8 +143,8 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 //   - (nil, blsAggregateEmptyListError) if no keys are provided (input slice is empty)
 //   - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	// check for empty list
 	if len(keys) == 0 {
@@ -157,8 +161,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
-	C.bn_new_wrapper((*C.bn_st)(&sum))
-	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
+	C.Fr_sum_vector((*C.Fr)(&sum), (*C.Fr)(&scalars[0]),
 		(C.int)(len(scalars)))
 	return newPrKeyBLSBLS12381(&sum), nil
 }
@@ -177,8 +180,8 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 //   - (nil, blsAggregateEmptyListError) no keys are provided (input slice is empty)
 //   - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	// check for empty list
 	if len(keys) == 0 {
@@ -200,13 +203,12 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
 	return sumKey, nil
-}
+}*/
 
 // IdentityBLSPublicKey returns an identity public key which corresponds to the point
 // at infinity in G2 (identity element of G2).
+// TODO: return a constant key instead of a newly allocated one
 func IdentityBLSPublicKey() PublicKey {
-	// set BLS context
-	blsInstance.reInit()
 
 	identity := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
@@ -214,6 +216,8 @@ func IdentityBLSPublicKey() PublicKey {
 	identity.isIdentity = true
 	return &identity
 }
+
+/*
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.
 //
@@ -230,8 +234,8 @@ func IdentityBLSPublicKey() PublicKey {
 //   - (nil, notBLSKeyError) if at least one input key is not of type BLS BLS12-381
 //   - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	aggPKBLS, ok := aggKey.(*pubKeyBLSBLS12381)
 	if !ok {
@@ -330,8 +334,8 @@ func VerifyBLSSignatureOneMessage(
 func VerifyBLSSignatureManyMessages(
 	pks []PublicKey, s Signature, messages [][]byte, kmac []hash.Hasher,
 ) (bool, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	// check signature length
 	if len(s) != signatureLengthBLSBLS12381 {
@@ -479,8 +483,8 @@ func VerifyBLSSignatureManyMessages(
 func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
-	// set BLS context
-	blsInstance.reInit()
+
+
 
 	// empty list check
 	if len(pks) == 0 {
@@ -545,6 +549,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	return verifBool, nil
 }
+*/
 
 // blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
 // is empty or nil and thereby represents an invalid input.

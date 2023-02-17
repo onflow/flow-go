@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 // #cgo CFLAGS:
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "dkg_include.h"
@@ -34,7 +35,7 @@ import (
 // from the protocol, and the overall key is taking into account
 // all chunks from qualified dealers.
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Fr, where r is the group order of G1/G2
 // Public keys are in G2.
 
 // Joint Feldman protocol, with complaint mechanism, implements DKGState
@@ -202,7 +203,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current participant
-	x := newPrKeyBLSBLS12381(jointx)
+	x := newPrKeyBLSBLS12381(&jointx)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(jointPublicKey)
@@ -303,8 +304,8 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 
 	// sum up x
 	var jointx scalar
-	C.bn_new_wrapper((*C.bn_st)(&jointx))
-	C.bn_sum_vector((*C.bn_st)(&jointx), (*C.bn_st)(&qualifiedx[0]),
+	C.bn_new_wrapper((*C.Fr)(&jointx))
+	C.Fr_sum_vector((*C.Fr)(&jointx), (*C.Fr)(&qualifiedx[0]),
 		(C.int)(qualified))
 	// sum up Y
 	var jointPublicKey pointG2
@@ -338,4 +339,4 @@ func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2
 		}
 	}
 	return qualifiedx, qualifiedPubKey, qualifiedy
-}
+}*/

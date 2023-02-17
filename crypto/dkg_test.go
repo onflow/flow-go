@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 import (
 	"fmt"
 	mrand "math/rand"
@@ -833,4 +834,4 @@ func TestDKGTransitionErrors(t *testing.T) {
 			assert.True(t, IsDKGInvalidStateTransitionError(err))
 		}
 	})
-}
+}*/

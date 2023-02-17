@@ -5,7 +5,7 @@ package crypto
 
 // #cgo CFLAGS:
 // #include "bls_thresholdsign_include.h"
-import "C"
+/*import "C"
 
 import (
 	"fmt"
@@ -412,8 +412,8 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 		signers = append(signers, index)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
+
+
 
 	// Lagrange Interpolate at point 0
 	result := C.G1_lagrangeInterpolateAtZero(
@@ -456,8 +456,8 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 // are considered to reconstruct the signature.
 func BLSReconstructThresholdSignature(size int, threshold int,
 	shares []Signature, signers []int) (Signature, error) {
-	// set BLS settings
-	blsInstance.reInit()
+
+
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, invalidInputsErrorf(
@@ -558,8 +558,8 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 			threshold)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
+
+
 
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
@@ -570,7 +570,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	if err := seedRelic(seed); err != nil {
 		return nil, nil, nil, fmt.Errorf("seeding relic failed: %w", err)
 	}
-	// Generate a polynomial P in Zr[X] of degree t
+	// Generate a polynomial P in Fr[X] of degree t
 	a := make([]scalar, threshold+1)
 	randZrStar(&a[0]) // non-identity key
 	if threshold > 0 {
@@ -581,10 +581,10 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
-		C.Zr_polynomialImage(
-			(*C.bn_st)(&x[i-1]),
+		C.Fr_polynomialImage(
+			(*C.Fr)(&x[i-1]),
 			(*C.ep2_st)(&y[i-1]),
-			(*C.bn_st)(&a[0]), (C.int)(len(a)),
+			(*C.Fr)(&a[0]), (C.int)(len(a)),
 			(C.uint8_t)(i),
 		)
 	}
@@ -604,4 +604,4 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	// are sampled uniformly at random. The probability of
 	// generating an identity key is therefore negligible.
 	return skShares, pkShares, pkGroup, nil
-}
+}*/

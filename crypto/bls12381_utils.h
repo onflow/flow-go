@@ -17,16 +17,18 @@
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)
 #define BYTES_TO_DIGITS(x) ((x+7)>>3)
+#define DIGITS_TO_BYTES(x) ((x)<<3)
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
 #define SEC_BITS  128
 #define Fp_BITS   381
-#define Fr_BITS   255
-#define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
 #define Fp2_BYTES (2*Fp_BYTES)
 #define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
-#define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
+#define Fp_BYTES  DIGITS_TO_BYTES(Fp_DIGITS) // BLST implements Fp as a limb array
+#define Fr_BITS   255
+#define Fr_DIGITS BITS_TO_DIGITS(Fr_BITS)
+#define Fr_BYTES  DIGITS_TO_BYTES(Fr_DIGITS) // BLST implements Fr as a limb array
 
 #define G1_BYTES (2*Fp_BYTES)
 #define G2_BYTES (2*Fp2_BYTES)
@@ -76,11 +78,18 @@ typedef struct prec_ {
     fp_t r;   // Montgomery multiplication constant
 } prec_st;
 
+// TODO: to delete when Relic is removed
+bn_st* Fr_blst_to_relic(const Fr* x);
+
 // BLS based SPoCK
 int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
 void     map_to_G1(ep_t, const byte*, const int);
+
+// Fr utilities
+bool_t Fr_is_zero(const Fr* a);
+bool_t Fr_is_equal(const Fr* a, const Fr* b);
 
 // Utility functions
 int      get_valid();
@@ -96,18 +105,22 @@ int      ep_read_bin_compact(ep_t, const byte *, const int);
 void     ep_write_bin_compact(byte *, const ep_t,  const int);
 int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
 void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
-int      bn_read_Zr_bin(bn_t, const uint8_t *, int );
+BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
+BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
 
-void     ep_mult_gen_bench(ep_t, const bn_t);
-void     ep_mult_generic_bench(ep_t, const bn_t);
-void     ep_mult(ep_t, const ep_t, const bn_t);
-void     ep2_mult_gen(ep2_t, const bn_t);
 
-void     bn_randZr(bn_t);
-void     bn_randZr_star(bn_t);
-void     bn_map_to_Zr_star(bn_t, const uint8_t*, int);
 
-void     bn_sum_vector(bn_t, const bn_st*, const int);
+void     ep_mult_gen_bench(ep_t, const Fr*);
+void     ep_mult_generic_bench(ep_t, const Fr*);
+void     ep_mult(ep_t, const ep_t, const Fr*);
+void     ep2_mult_gen(ep2_t, const Fr*);
+void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo); 
+
+void     bn_randZr(Fr*);
+void     bn_randZr_star(Fr*);
+void     bn_map_to_Zr_star(Fr*, const uint8_t*, int);
+
+void     Fr_sum_vector(Fr*, const Fr*, const int);
 void     ep_sum_vector(ep_t, ep_st*, const int);
 void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
@@ -116,7 +129,7 @@ void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 // membership checks
 int      check_membership_G1(const ep_t);
 int      check_membership_G2(const ep2_t);
-int      check_membership_Zr_star(const bn_t);
+int      check_membership_Fr_star(const bn_t);
 
 int      simple_subgroup_check_G1(const ep_t);
 int      simple_subgroup_check_G2(const ep2_t);

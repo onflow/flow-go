@@ -21,7 +21,7 @@ int get_sk_len() {
 
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
-int check_membership_Zr_star(const bn_t a){
+int check_membership_Fr_star(const bn_t a){
     if (bn_cmp(a, &core_get()->ep_r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) {
         return INVALID; 
     }
@@ -68,9 +68,10 @@ int check_membership_G2(const ep2_t p){
 }
 
 // Computes a BLS signature from a G1 point 
-static void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
+static void bls_sign_ep(byte* s, const Fr* sk, const ep_t h) {
     ep_t p;
     ep_new(p);
+
     // s = h^sk
     ep_mult(p, h, sk);
     ep_write_bin_compact(s, p, SIGNATURE_LEN);
@@ -78,7 +79,7 @@ static void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
 }
 
 // Computes a BLS signature from a hash
-void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
+void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
     ep_t h;
     ep_new(h);
     // hash to G1

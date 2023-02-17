@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 import (
 	"crypto/rand"
 	"fmt"
@@ -615,3 +616,4 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 	}
 	b.StopTimer()
 }
+*/

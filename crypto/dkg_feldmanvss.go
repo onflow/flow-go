@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 // #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
@@ -21,7 +22,7 @@ import (
 // partcipants including itself. The particpants validate their shares
 // using a public verifiaction vector shared by the .
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Fr, where r is the group order of G1/G2
 // Public keys are in G2.
 
 // feldman VSS protocol, implements DKGState
@@ -30,7 +31,7 @@ type feldmanVSSstate struct {
 	*dkgCommon
 	// participant  index
 	dealerIndex index
-	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
+	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Fr[X], the vector size is (t+1)
 	// a_0 is the group private key
 	a []scalar
 	// Public vector of the group, the vector size is (t+1)
@@ -77,12 +78,12 @@ func NewFeldmanVSS(size int, threshold int, myIndex int,
 
 func (s *feldmanVSSstate) init() {
 	// set the bls context
-	blsInstance.reInit()
+
 	s.running = false
 	s.y = nil
 	s.xReceived = false
 	s.vAReceived = false
-	C.bn_new_wrapper((*C.bn_st)(&s.x))
+	C.bn_new_wrapper((*C.Fr)(&s.x))
 }
 
 // Start triggers the protocol start for the current participant.
@@ -264,7 +265,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
 
-	// Generate a polyomial P in Zr[X] of degree t
+	// Generate a polyomial P in Fr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
@@ -273,7 +274,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	generatorScalarMultG2(&s.vA[0], &s.a[0])
 	if s.threshold > 0 {
 		for i := 1; i < s.threshold; i++ {
-			C.bn_new_wrapper((*C.bn_st)(&s.a[i]))
+			C.bn_new_wrapper((*C.Fr)(&s.a[i]))
 			randZr(&s.a[i])
 			generatorScalarMultG2(&s.vA[i], &s.a[i])
 		}
@@ -288,7 +289,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		if i-1 == s.myIndex {
 			xdata := make([]byte, shareSize)
 			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
-			C.bn_read_bin((*C.bn_st)(&s.x),
+			C.bn_read_bin((*C.Fr)(&s.x),
 				(*C.uchar)(&xdata[0]),
 				PrKeyLenBLSBLS12381,
 			)
@@ -350,7 +351,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	// read the participant private share
-	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
+	if C.Fr_read_bytes((*C.Fr)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
 	) != valid {
@@ -405,14 +406,14 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// zrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
+// zrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Fr
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
 func zrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
-	C.Zr_polynomialImage_export((*C.uchar)(&dest[0]),
+	C.Fr_polynomialImage_export((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
-		(*C.bn_st)(&a[0]), (C.int)(len(a)),
+		(*C.Fr)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
 }
@@ -441,7 +442,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	return C.verifyshare((*C.bn_st)(&s.x),
+	return C.verifyshare((*C.Fr)(&s.x),
 		(*C.ep2_st)(&s.y[s.myIndex])) == 1
 }
 
@@ -455,3 +456,4 @@ func (s *feldmanVSSstate) computePublicKeys() {
 		(*C.ep2_st)(&s.vA[0]), (C.int)(len(s.vA)),
 	)
 }
+*/

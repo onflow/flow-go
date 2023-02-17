@@ -8,6 +8,16 @@
 #include "bls_include.h"
 #include "assert.h"
 
+// TODO: temp utility function to delete
+bn_st* Fr_blst_to_relic(const Fr* x) {
+    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
+    byte* data = (byte*)malloc(Fr_BYTES);
+    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
+    bn_read_bin(out, data, Fr_BYTES);
+    free(data);
+    return out;
+}
+
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
 // return macro values to the upper Go Layer
@@ -120,33 +130,37 @@ void seed_relic(byte* seed, int len) {
 }
 
 // Exponentiation of a generic point p in G1
-void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
+void ep_mult(ep_t res, const ep_t p, const Fr *expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2 
-    ep_mul_lwnaf(res, p, expo);
+    ep_mul_lwnaf(res, p, tmp_expo);
 }
 
 // Exponentiation of generator g1 in G1
 // These two function are here for bench purposes only
-void ep_mult_gen_bench(ep_t res, const bn_t expo) {
+void ep_mult_gen_bench(ep_t res, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
-    ep_mul_gen(res, (bn_st *)expo);
+    ep_mul_gen(res, tmp_expo);
 }
 
-void ep_mult_generic_bench(ep_t res, const bn_t expo) {
+void ep_mult_generic_bench(ep_t res, const Fr* expo) {
     // generic point multiplication
     ep_mult(res, &core_get()->ep_g, expo);
 }
 
 // Exponentiation of a generic point p in G2
-void ep2_mult(ep2_t res, ep2_t p, bn_t expo) {
+void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2
-    ep2_mul_lwnaf(res, p, expo);
+    ep2_mul_lwnaf(res, p, tmp_expo);
 }
 
-// Exponentiation of fixed g2 in G2
-void ep2_mult_gen(ep2_t res, const bn_t expo) {
+// Exponentiation of generator g2 in G2
+void ep2_mult_gen(ep2_t res, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
-    g2_mul_gen(res, (bn_st*)expo);
+    g2_mul_gen(res, (bn_st*)tmp_expo);
 }
 
 // DEBUG printing functions 
@@ -183,7 +197,7 @@ void ep2_print_(char* s, ep2_st* p) {
 }
 
 // generates a random number less than the order r
-void bn_randZr_star(bn_t x) {
+void bn_randZr_star(Fr* x) {
     // reduce the modular reduction bias
     const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
     byte seed[seed_len];
@@ -192,33 +206,16 @@ void bn_randZr_star(bn_t x) {
 }
 
 // generates a random number less than the order r
-void bn_randZr(bn_t x) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    // reduce the modular reduction bias
-    bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
-    bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
-    bn_mod(x, x, r);
-    bn_free(r);
+void bn_randZr(Fr* x) {
+    // TODO: SEC_BITS bias reduction
 }
 
-// reads a scalar from an array and maps it to Zr
+// reads a scalar from an array and maps it to Fr
 // the resulting scalar is in the range 0 < a < r
 // len must be less than BITS_TO_BYTES(RLC_BN_BITS)
-void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
-    bn_t tmp;
-    bn_new(tmp);
-    bn_new_size(tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(tmp, bin, len);
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_sub_dig(r,r,1);
-    bn_mod_basic(a,tmp,r);
-    bn_add_dig(a,a,1);
-    bn_free(r);
-    bn_free(tmp);
+void bn_map_to_Zr_star(Fr* a, const uint8_t* bin, int len) {
+    // TODO:
+    // a = bin % (r-1)  + 1 
 }
 
 // returns the sign of y.
@@ -523,26 +520,50 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-// reads a scalar in a and checks it is a valid Zr element (a < r)
-// returns RLC_OK if the scalar is valid and RLC_ERR otherwise.
-int bn_read_Zr_bin(bn_t a, const uint8_t *bin, int len) {
-    if (len!=Fr_BYTES) {
-        return RLC_ERR;
+bool_t Fr_is_zero(const Fr* a) {
+    return bytes_are_zero((const byte*)a, Fr_BYTES);
+}
+
+bool_t Fr_is_equal(const Fr* a, const Fr* b) {
+    return vec_is_equal(a, b, Fr_BYTES);
+}
+
+// reads a scalar in `a` and checks it is a valid Fr element (a < r).
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr
+//    - v if the scalar is valid 
+BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    if (len != Fr_BYTES) {
+        return BLST_BAD_ENCODING;
     }
-    bn_read_bin(a, bin, Fr_BYTES);
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    if (bn_cmp(a, r) == RLC_LT) {
-        return RLC_OK;
+    if (!check_mod_256(bin, BLS12_381_r)) { // check_mod_256 compares byte[] against a vec256!
+        return BLST_BAD_SCALAR;
     }
-    return RLC_ERR;
+    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
+    return BLST_SUCCESS;
+}
+
+// reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
+// returns
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
+//    - BLST_SUCCESS if the scalar is valid 
+BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    int ret = Fr_read_bytes(a, bin, len);
+    if (ret != BLST_SUCCESS) {
+        return ret;
+    }
+    // check if a=0
+    if (Fr_is_zero(a)) {
+        return BLST_BAD_SCALAR;
+    }
+    return BLST_SUCCESS;
 }
 
 // computes the sum of the array elements x and writes the sum in jointx
-// the sum is computed in Zr
-void bn_sum_vector(bn_t jointx, const bn_st* x, const int len) {
-    bn_t r;
+// the sum is computed in Fr
+void Fr_sum_vector(Fr* jointx, const Fr* x, const int len) {
+    /*bn_t r;
     bn_new(r); 
     g2_get_ord(r);
     bn_set_dig(jointx, 0);
@@ -552,7 +573,7 @@ void bn_sum_vector(bn_t jointx, const bn_st* x, const int len) {
         if (bn_cmp(jointx, r) == RLC_GT) 
             bn_sub(jointx, jointx, r);
     }
-    bn_free(r);
+    bn_free(r);*/
 }
 
 // computes the sum of the G2 array elements y and writes the sum in jointy

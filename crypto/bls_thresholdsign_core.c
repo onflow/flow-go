@@ -9,7 +9,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_t res, const int i, const uint8_t* s
     bn_t r, r_2;
     bn_new(r);
     g2_get_ord(r);
-    // (r-2) is needed to compute the inverse in Zr
+    // (r-2) is needed to compute the inverse in Fr
     // using little Fermat theorem
     bn_new(r_2);
     bn_sub_dig(r_2, r, 2);

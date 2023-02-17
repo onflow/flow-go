@@ -1,5 +1,6 @@
 package crypto
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -22,7 +23,7 @@ import (
 // Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
 // of the threshold signature scheme using the output keys.
 //
-// Private keys are scalar in Zr, where r is the group order of G1/G2.
+// Private keys are scalar in Fr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
 const (
@@ -234,4 +235,4 @@ type DKGProcessor interface {
 	// do so, the protocol can be broken.
 	// log describes the misbehavior.
 	FlagMisbehavior(participant int, log string)
-}
+}*/
