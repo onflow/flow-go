@@ -45,6 +45,7 @@ type facadeEnvironment struct {
 	*ContractReader
 	ContractUpdater
 	*Programs
+	*InterpreterSharedStateHandler
 
 	accounts Accounts
 	txnState *state.TransactionState
@@ -132,6 +133,7 @@ func newFacadeEnvironment(
 			txnState,
 			accounts,
 			derivedTxnData),
+		InterpreterSharedStateHandler: NewInterpreterSharedStateHandler(),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -288,6 +290,7 @@ func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.AccountFreezer.Reset()
+	env.InterpreterSharedStateHandler.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.
@@ -297,12 +300,4 @@ func (facadeEnvironment) ResourceOwnerChanged(
 	common.Address,
 	common.Address,
 ) {
-}
-
-func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.SharedState) {
-	// NO-OP
-}
-
-func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
-	return nil
 }
