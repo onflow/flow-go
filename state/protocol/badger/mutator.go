@@ -127,7 +127,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	}
 
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, last)
+	err = m.insert(ctx, candidate, certifyingQC, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -167,7 +167,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	}
 
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, lastSeal)
+	err = m.insert(ctx, candidate, nil, lastSeal)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -420,7 +420,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 // dbUpdates contains other database operations which must be applied atomically
 // with inserting the block.
-func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
+func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
 	defer span.End()
@@ -428,6 +428,16 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	blockID := candidate.ID()
 	parentID := candidate.Header.ParentID
 	latestSealID := last.ID()
+
+	if certifyingQC != nil {
+		// sanity check if certifyingQC actually certifies candidate block
+		if certifyingQC.View != candidate.Header.View {
+			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+		}
+		if certifyingQC.BlockID != blockID {
+			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+		}
+	}
 
 	parent, err := m.headers.ByBlockID(parentID)
 	if err != nil {
@@ -440,6 +450,10 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
+	qc := candidate.Header.QuorumCertificate()
+	_, err = m.qcs.ByBlockID(qc.BlockID)
+	qcAlreadyInserted := err == nil
+
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
 	// to the seal index and initializing its children index.
@@ -450,10 +464,18 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
-		qc := candidate.Header.QuorumCertificate()
-		err = m.qcs.StoreTx(qc)(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not store qc: %w", err)
+		if !qcAlreadyInserted {
+			err = m.qcs.StoreTx(qc)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store incorporated qc: %w", err)
+			}
+		}
+
+		if certifyingQC != nil {
+			err = m.qcs.StoreTx(certifyingQC)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store certifying qc: %w", err)
+			}
 		}
 
 		// index the latest sealed block in this fork
@@ -484,7 +506,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 
 	// trigger BlockProcessable for parent blocks above root height
 	if parent.Height > m.rootHeight {
-		m.consumer.BlockProcessable(parent, nil)
+		m.consumer.BlockProcessable(parent, qc)
+	}
+
+	if certifyingQC != nil {
+		// trigger BlockProcessable for candidate block if it's certified
+		m.consumer.BlockProcessable(candidate.Header, certifyingQC)
 	}
 
 	return nil
