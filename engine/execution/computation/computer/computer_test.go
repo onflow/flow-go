@@ -407,7 +407,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(
+					flow.EmptyAddress,
+					"no payer address provided")
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
@@ -455,7 +457,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
+					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
+						flow.EmptyAddress,
+						"no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
@@ -935,9 +939,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return ledger.Get(id)
-	})
+	view := delta.NewDeltaView(ledger)
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 
@@ -1074,7 +1076,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
