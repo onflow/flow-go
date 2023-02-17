@@ -21,4 +21,4 @@ jobs:
           fetch-depth: 0
 
       - name: Run sync
-        run: sh sync-from-public-flow-go.sh
+        run: sh tools/repo_sync/sync-from-public-flow-go.sh
