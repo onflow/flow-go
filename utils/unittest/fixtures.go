@@ -1704,6 +1704,14 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 	return &qc
 }
 
+func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
+	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+		qc.View = header.View
+		qc.BlockID = header.ID()
+	})
+	return qc
+}
+
 func QuorumCertificatesFixtures(n uint, opts ...func(*flow.QuorumCertificate)) []*flow.QuorumCertificate {
 	qcs := make([]*flow.QuorumCertificate, 0, n)
 	for i := 0; i < int(n); i++ {

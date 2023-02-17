@@ -124,7 +124,7 @@ func TestExtendValid(t *testing.T) {
 
 		t.Run("BlockProcessable event should be emitted when any child of block1 is inserted", func(t *testing.T) {
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			consumer.On("BlockProcessable", block1.Header).Once()
+			consumer.On("BlockProcessable", block1.Header, mock.Anything).Once()
 			err := fullState.Extend(context.Background(), block2)
 			require.NoError(t, err)
 		})
@@ -595,7 +595,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	// create a event consumer to test epoch transition events
 	consumer := mockprotocol.NewConsumer(t)
 	consumer.On("BlockFinalized", mock.Anything)
-	consumer.On("BlockProcessable", mock.Anything)
+	consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -1505,7 +1505,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
-		protoEventsMock.On("BlockProcessable", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
@@ -1563,7 +1563,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
-		protoEventsMock.On("BlockProcessable", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
@@ -1663,7 +1663,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
-		protoEventsMock.On("BlockProcessable", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
 		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
@@ -1755,7 +1755,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
-		consumer.On("BlockProcessable", mock.Anything)
+		consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 
@@ -1821,7 +1821,7 @@ func TestHeaderExtendValid(t *testing.T) {
 		extend := unittest.BlockWithParentFixture(head)
 		extend.SetPayload(flow.EmptyPayload())
 
-		err = state.Extend(context.Background(), extend)
+		err = state.ExtendCertified(context.Background(), extend, unittest.CertifyBlock(extend.Header))
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -1841,7 +1841,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err := state.Extend(context.Background(), &extend)
+		err := state.ExtendCertified(context.Background(), &extend, unittest.CertifyBlock(extend.Header))
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1860,8 +1860,6 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
 
 		// create another block that points to the previous block `extend` as parent
 		// but has _same_ height as parent. This violates the condition that a child's
@@ -1870,7 +1868,10 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.Height = block1.Header.Height
 
-		err = state.Extend(context.Background(), block2)
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -1892,7 +1893,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = head.Height + 2
 
-		err = state.Extend(context.Background(), block)
+		err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 		require.Error(t, err)
 	})
 }
@@ -1908,7 +1909,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		// second block is a sibling to the finalized block
 		// The Follower should reject this block as an outdated chain extension
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block1)
+		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 		require.NoError(t, err)
 
 		err = state.Finalize(context.Background(), block1.ID())
@@ -1916,7 +1917,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block2)
+		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.Error(t, err)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
@@ -1936,12 +1937,11 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err := state.Extend(context.Background(), block2)
-		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block3)
+
+		err := state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
 		require.NoError(t, err)
 
 		// create seals for block2 and block3
@@ -1960,7 +1960,11 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			Seals:      []*flow.Seal{seal3, seal2},
 			Guarantees: nil,
 		})
-		err = state.Extend(context.Background(), block4)
+
+		err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block4, unittest.CertifyBlock(block4.Header))
 		require.NoError(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
@@ -2083,19 +2087,16 @@ func TestSealed(t *testing.T) {
 
 		// block 1 will be sealed
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block1.ID())
-		require.NoError(t, err)
 
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
 		// block 2 contains receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-		err = state.Extend(context.Background(), block2)
+
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
 		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block2.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		// block 3 contains seal for block 1
@@ -2103,7 +2104,13 @@ func TestSealed(t *testing.T) {
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal1},
 		})
-		err = state.Extend(context.Background(), block3)
+
+		err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), block2.ID())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block3, unittest.CertifyBlock(block3.Header))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
@@ -2147,7 +2154,7 @@ func TestCacheAtomicity(t *testing.T) {
 
 			// storing the block to database, which supposed to be atomic updates to headers and index,
 			// both to badger database and the cache.
-			err = state.Extend(context.Background(), block)
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 			require.NoError(t, err)
 			wg.Wait()
 		})

@@ -114,13 +114,18 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
-	blockID := candidate.ID()
-	// sanity check if certifyingQC actually certifies candidate block
-	if certifyingQC.View != candidate.Header.View {
-		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
-	}
-	if certifyingQC.BlockID != blockID {
-		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+	// TODO: this is a temporary if statement since follower engine doesn't deliver QCs yet. Once the implementation is complete
+	// there are no cases where certifyingQC can be nil.
+	if certifyingQC != nil {
+		blockID := candidate.ID()
+
+		// sanity check if certifyingQC actually certifies candidate block
+		if certifyingQC.View != candidate.Header.View {
+			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+		}
+		if certifyingQC.BlockID != blockID {
+			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+		}
 	}
 
 	// check if the block header is a valid extension of the finalized state

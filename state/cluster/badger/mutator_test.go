@@ -41,7 +41,7 @@ type MutatorSuite struct {
 	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
-	protoState   protocol.ParticipantState
+	protoState   protocol.FollowerState
 	protoGenesis *flow.Header
 
 	state cluster.MutableState
@@ -361,7 +361,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 		next := unittest.BlockWithParentFixture(parent)
 		next.Payload.Guarantees = nil
 		next.SetPayload(*next.Payload)
-		err := suite.protoState.Extend(context.Background(), next)
+		err := suite.protoState.ExtendCertified(context.Background(), next, unittest.CertifyBlock(next.Header))
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)

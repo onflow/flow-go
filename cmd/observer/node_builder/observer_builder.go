@@ -166,7 +166,7 @@ type ObserverServiceBuilder struct {
 
 	// components
 	LibP2PNode              p2p.LibP2PNode
-	FollowerState           stateprotocol.ParticipantState
+	FollowerState           stateprotocol.FollowerState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor

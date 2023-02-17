@@ -740,7 +740,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
-		MutableState:        followerState,
+		FollowerState:       followerState,
 		IngestionEngine:     ingestionEngine,
 		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
