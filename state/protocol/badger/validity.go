@@ -3,6 +3,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+
 	"github.com/onflow/flow-go/state"
 
 	"github.com/coreos/go-semver/semver"
