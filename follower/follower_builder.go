@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
@@ -109,10 +110,11 @@ type FollowerServiceBuilder struct {
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
-	Committee               hotstuff.Committee
+	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
+	Validator               hotstuff.Validator
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -171,7 +173,7 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 
 func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 		builder.SyncCore = syncCore
 
 		return err
@@ -181,14 +183,15 @@ func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
 }
 
 func (builder *FollowerServiceBuilder) buildCommittee() *FollowerServiceBuilder {
-	builder.Module("committee", func(node *cmd.NodeConfig) error {
+	builder.Component("committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize consensus committee's membership state
-		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+		node.ProtocolEvents.AddConsumer(committee)
 		builder.Committee = committee
 
-		return err
+		return committee, err
 	})
 
 	return builder
@@ -214,6 +217,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
 			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
@@ -246,6 +250,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FollowerState,
 			conCache,
 			builder.FollowerCore,
+			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
 			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
@@ -469,7 +474,8 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
@@ -704,9 +710,10 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
+	validators ...network.MessageValidator,
+) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		builder.Logger,
 		libp2pNode,
 		nodeID,
@@ -716,7 +723,10 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...))
-
+		middleware.WithMessageValidators(validators...),
+		// use default identifier provider
+	)
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }

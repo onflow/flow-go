@@ -127,18 +127,14 @@ func randZrStar(x *scalar) {
 	//C.bn_randZr_star((*C.Fr)(x))
 }
 
-// mapToZrStar reads a scalar from a slice of bytes and maps it to Fr
-// the resulting scalar is in the range 0 < k < r
-func mapToZrStar(x *scalar, src []byte) error {
-	if len(src) > maxScalarSize {
-		return invalidInputsErrorf(
-			"input slice length must be less than %d",
-			maxScalarSize)
-	}
-	C.bn_map_to_Zr_star((*C.Fr)(x),
+// mapToZr reads a scalar from a slice of bytes and maps it to Zr.
+// The resulting scalar `k` satisfies 0 <= k < r.
+// It returns true if scalar is zero and false otherwise.
+func mapToZr(x *scalar, src []byte) bool {
+	isZero := C.bn_map_to_Zr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return nil
+	return isZero == valid
 }
 
 // writeScalar writes a G2 point in a slice of bytes

@@ -367,13 +367,14 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                 []NodeConfig
-	ConsensusFollowers    []ConsensusFollowerConfig
-	Name                  string
-	NClusters             uint
-	ViewsInDKGPhase       uint64
-	ViewsInStakingAuction uint64
-	ViewsInEpoch          uint64
+	Nodes                      []NodeConfig
+	ConsensusFollowers         []ConsensusFollowerConfig
+	Name                       string
+	NClusters                  uint
+	ViewsInDKGPhase            uint64
+	ViewsInStakingAuction      uint64
+	ViewsInEpoch               uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
@@ -395,14 +396,15 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch, safetyThreshold uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: viewsInStakingAuction,
-		ViewsInDKGPhase:       viewsInDKGPhase,
-		ViewsInEpoch:          viewsInEpoch,
+		Nodes:                      nodes,
+		Name:                       name,
+		NClusters:                  1, // default to 1 cluster
+		ViewsInStakingAuction:      viewsInStakingAuction,
+		ViewsInDKGPhase:            viewsInDKGPhase,
+		ViewsInEpoch:               viewsInEpoch,
+		EpochCommitSafetyThreshold: safetyThreshold,
 	}
 
 	for _, apply := range opts {
@@ -427,6 +429,12 @@ func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
+	}
+}
+
+func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.EpochCommitSafetyThreshold = threshold
 	}
 }
 
@@ -578,9 +586,15 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
-// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
-func integrationBootstrapDir() (string, error) {
-	return os.MkdirTemp(TmpRoot, integrationBootstrap)
+// tempDir creates a temporary directory at /tmp/flow-integration-bootstrap
+func tempDir(t *testing.T) string {
+	dir, err := os.MkdirTemp(TmpRoot, integrationBootstrap)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
+	})
+	return dir
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
@@ -609,8 +623,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	})
 
 	// create a temporary directory to store all bootstrapping files
-	bootstrapDir, err := integrationBootstrapDir()
-	require.Nil(t, err)
+	bootstrapDir := tempDir(t)
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
@@ -813,7 +826,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	}()
 
 	// Setup directories
-	tmpdir := t.TempDir()
+	tmpdir := tempDir(t)
 
 	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
 	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -921,7 +934,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
-	tmpdir := t.TempDir()
+	tmpdir := tempDir(t)
 
 	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
@@ -980,7 +993,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
-			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
@@ -1296,9 +1308,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
+	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
 		return nil, err
+	}
+
+	if len(invalidVotesErr) > 0 {
+		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
 	// generate root blocks for each collector cluster
@@ -1394,7 +1410,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}

@@ -32,8 +32,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
 	programA := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressA: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressA: {},
 		},
 	}
 
@@ -42,9 +42,9 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programBLoc := common.AddressLocation{Address: cAddressB, Name: "B"}
 	programB := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressA: {},
-			cAddressB: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressA: {},
+			addressB: {},
 		},
 	}
 
@@ -53,8 +53,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programDLoc := common.AddressLocation{Address: cAddressD, Name: "D"}
 	programD := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressD: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressD: {},
 		},
 	}
 
@@ -63,12 +63,12 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programCLoc := common.AddressLocation{Address: cAddressC, Name: "C"}
 	programC := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
+		Dependencies: map[flow.Address]struct{}{
 			// C indirectly depends on A trough B
-			cAddressA: {},
-			cAddressB: {},
-			cAddressC: {},
-			cAddressD: {},
+			addressA: {},
+			addressB: {},
+			addressC: {},
+			addressD: {},
 		},
 	}
 
@@ -95,8 +95,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator A invalidates all but D", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressA,
+			FrozenAccounts: []flow.Address{
+				addressA,
 			},
 		}.ProgramInvalidator()
 
@@ -109,8 +109,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator D invalidates D, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressD,
+			FrozenAccounts: []flow.Address{
+				addressD,
 			},
 		}.ProgramInvalidator()
 
@@ -123,8 +123,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator B invalidates B, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressB,
+			FrozenAccounts: []flow.Address{
+				addressB,
 			},
 		}.ProgramInvalidator()
 
@@ -139,7 +139,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressA,
+					Address: addressA,
 					Name:    "A",
 				},
 			},
@@ -156,7 +156,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressC,
+					Address: addressC,
 					Name:    "C",
 				},
 			},
@@ -173,7 +173,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressD,
+					Address: addressD,
 					Name:    "D",
 				},
 			},
@@ -264,11 +264,11 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 	ctx.TxBody = &flow.TransactionBody{}
 
-	checkForUpdates := func(owner string, key string, expected bool) {
+	checkForUpdates := func(id flow.RegisterID, expected bool) {
 		view := utils.NewSimpleView()
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
-		err := txnState.Set(owner, key, flow.RegisterValue("blah"), false)
+		err := txnState.Set(id, flow.RegisterValue("blah"))
 		require.NoError(t, err)
 
 		env := environment.NewTransactionEnvironment(
@@ -282,24 +282,18 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	}
 
 	for registerId := range view.Ledger.RegisterTouches {
-		checkForUpdates(registerId.Owner, registerId.Key, true)
-		checkForUpdates("other owner", registerId.Key, false)
+		checkForUpdates(registerId, true)
+		checkForUpdates(
+			flow.NewRegisterID("other owner", registerId.Key),
+			false)
 	}
 
-	stabIndex := "$12345678"
-	require.True(t, state.IsSlabIndex(stabIndex))
+	owner := string(ctx.Chain.ServiceAddress().Bytes())
+	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
+	require.True(t, stabIndexKey.IsSlabIndex())
 
-	checkForUpdates(
-		string(ctx.Chain.ServiceAddress().Bytes()),
-		stabIndex,
-		true)
-
-	checkForUpdates(
-		string(ctx.Chain.ServiceAddress().Bytes()),
-		"other keys",
-		false)
-
-	checkForUpdates("other owner", stabIndex, false)
-
-	checkForUpdates("other owner", "other key", false)
+	checkForUpdates(stabIndexKey, true)
+	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
+	checkForUpdates(flow.NewRegisterID("other owner", stabIndexKey.Key), false)
+	checkForUpdates(flow.NewRegisterID("other owner", "other key"), false)
 }

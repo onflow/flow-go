@@ -23,7 +23,10 @@ func AddressSliceToCadenceValue(addresses []common.Address) cadence.Value {
 	return cadence.NewArray(adds)
 }
 
-func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address, ok bool) {
+func CadenceValueToAddressSlice(value cadence.Value) (
+	addresses []flow.Address,
+	ok bool,
+) {
 
 	// cast to array
 	v, ok := value.(cadence.Array)
@@ -37,7 +40,7 @@ func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address
 		if !ok {
 			return nil, false
 		}
-		addresses = append(addresses, common.Address(a))
+		addresses = append(addresses, flow.ConvertAddress(a))
 	}
 	return addresses, true
 }

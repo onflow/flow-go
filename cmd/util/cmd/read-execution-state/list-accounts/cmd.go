@@ -75,28 +75,31 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+	ldg := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		func(id flow.RegisterID) (flow.RegisterValue, error) {
 
-		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, key))
-		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot convert key to path")
-		}
+			ledgerKey := executionState.RegisterIDToKey(id)
+			path, err := pathfinder.KeyToPath(
+				ledgerKey,
+				complete.DefaultPathFinderVersion)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("cannot convert key to path")
+			}
 
-		read := &ledger.TrieRead{
-			RootHash: ledger.RootHash(stateCommitment),
-			Paths: []ledger.Path{
-				path,
-			},
-		}
+			read := &ledger.TrieRead{
+				RootHash: ledger.RootHash(stateCommitment),
+				Paths: []ledger.Path{
+					path,
+				},
+			}
 
-		values, err := forest.Read(read)
-		if err != nil {
-			return nil, err
-		}
+			values, err := forest.Read(read)
+			if err != nil {
+				return nil, err
+			}
 
-		return values[0], nil
-	})
+			return values[0], nil
+		}))
 
 	txnState := state.NewTransactionState(ldg, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)

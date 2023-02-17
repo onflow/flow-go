@@ -147,7 +147,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Str("chain_id", parent.ChainID.String()).
 		Uint64("final_ref_height", refChainFinalizedHeight).
 		Logger()
-
 	log.Debug().Msg("building new cluster block")
 
 	// TODO (ramtin): enable this again

@@ -166,7 +166,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	b.SetParallelism(1)

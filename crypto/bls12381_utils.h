@@ -118,6 +118,7 @@ void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo);
 
 void     bn_randZr(Fr*);
 void     bn_randZr_star(Fr*);
+int      bn_map_to_Zr(Fr*, const uint8_t*, int);
 void     bn_map_to_Zr_star(Fr*, const uint8_t*, int);
 
 void     Fr_sum_vector(Fr*, const Fr*, const int);

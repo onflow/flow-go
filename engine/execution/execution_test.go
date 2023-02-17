@@ -101,7 +101,7 @@ func TestExecutionFlow(t *testing.T) {
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
 	// signed by the only collector
-	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	})
 
-	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
 	// the default signer indices is 2 bytes, but in this test cases
 	// we need 1 byte
 	child.Header.ParentVoterIndices = voterIndices
@@ -262,7 +262,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -329,7 +329,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -543,16 +543,14 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	genesis, err := exeNode.State.AtHeight(0).Head()
 	require.NoError(t, err)
 
-	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
-	voterIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
+	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block.Header.View = 42
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 
-	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
 	child.Header.ParentVoterIndices = voterIndices
 
 	actualCalls := atomic.Uint64{}
