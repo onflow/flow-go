@@ -114,6 +114,15 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
+	blockID := candidate.ID()
+	// sanity check if certifyingQC actually certifies candidate block
+	if certifyingQC.View != candidate.Header.View {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+	}
+	if certifyingQC.BlockID != blockID {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+	}
+
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
@@ -428,16 +437,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	blockID := candidate.ID()
 	parentID := candidate.Header.ParentID
 	latestSealID := last.ID()
-
-	if certifyingQC != nil {
-		// sanity check if certifyingQC actually certifies candidate block
-		if certifyingQC.View != candidate.Header.View {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
-		}
-		if certifyingQC.BlockID != blockID {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
-		}
-	}
 
 	parent, err := m.headers.ByBlockID(parentID)
 	if err != nil {
