@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
@@ -54,7 +55,7 @@ func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 }
 
 func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
+	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
@@ -146,35 +147,35 @@ func (v *RemoteView) DropDelta() {
 	v.Delta = make(map[string]flow.RegisterValue)
 }
 
-func (v *RemoteView) Set(owner, key string, value flow.RegisterValue) error {
-	v.Delta[owner+"~"+key] = value
+func (v *RemoteView) Set(id flow.RegisterID, value flow.RegisterValue) error {
+	v.Delta[id.Owner+"~"+id.Key] = value
 	return nil
 }
 
-func (v *RemoteView) Get(owner, key string) (flow.RegisterValue, error) {
+func (v *RemoteView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 
 	// first check the delta
-	value, found := v.Delta[owner+"~"+key]
+	value, found := v.Delta[id.Owner+"~"+id.Key]
 	if found {
 		return value, nil
 	}
 
 	// then check the read cache
-	value, found = v.Cache.Get(owner, key)
+	value, found = v.Cache.Get(id.Owner, id.Key)
 	if found {
 		return value, nil
 	}
 
 	// then call the parent (if exist)
 	if v.Parent != nil {
-		return v.Parent.Get(owner, key)
+		return v.Parent.Get(id)
 	}
 
 	// last use the grpc api the
 	req := &execution.GetRegisterAtBlockIDRequest{
 		BlockId:       []byte(v.BlockID),
-		RegisterOwner: []byte(owner),
-		RegisterKey:   []byte(key),
+		RegisterOwner: []byte(id.Owner),
+		RegisterKey:   []byte(id.Key),
 	}
 
 	// TODO use a proper context for timeouts
@@ -183,28 +184,23 @@ func (v *RemoteView) Get(owner, key string) (flow.RegisterValue, error) {
 		return nil, err
 	}
 
-	v.Cache.Set(owner, key, resp.Value)
+	v.Cache.Set(id.Owner, id.Key, resp.Value)
 
 	// append value to the file cache
 
 	return resp.Value, nil
 }
 
-// returns all the registers that has been touched
-func (v *RemoteView) AllRegisters() []flow.RegisterID {
+// returns all the register ids that has been updated
+func (v *RemoteView) UpdatedRegisterIDs() []flow.RegisterID {
+	panic("Not implemented yet")
+}
+
+// returns all the register ids that has been touched
+func (v *RemoteView) AllRegisterIDs() []flow.RegisterID {
 	panic("Not implemented yet")
 }
 
 func (v *RemoteView) UpdatedRegisters() flow.RegisterEntries {
 	panic("Not implemented yet")
-}
-
-func (v *RemoteView) Touch(owner, key string) error {
-	// no-op for now
-	return nil
-}
-
-func (v *RemoteView) Delete(owner, key string) error {
-	v.Delta[owner+"~"+key] = nil
-	return nil
 }

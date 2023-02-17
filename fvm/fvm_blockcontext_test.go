@@ -1571,7 +1571,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
-		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+		address := flow.ConvertAddress(
+			data.(cadence.Event).Fields[0].(cadence.Address))
 
 		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
@@ -1661,7 +1662,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x8872445cb397f6d2), num)
+		require.Equal(t, uint64(0xde226d5af92d269), num)
 	})
 }
 
@@ -1697,7 +1698,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
-	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+	address := flow.ConvertAddress(
+		data.(cadence.Event).Fields[0].(cadence.Address))
 
 	assert.Equal(t, flow.HexToAddress("05"), address)
 }

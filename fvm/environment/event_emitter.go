@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -41,8 +42,9 @@ type EventEmitter interface {
 	// OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
 
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
+	Events() flow.EventsList
+	ServiceEvents() flow.EventsList
+	ConvertedServiceEvents() flow.ServiceEventList
 
 	Reset()
 }
@@ -70,12 +72,16 @@ func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error 
 		event)
 }
 
-func (emitter ParseRestrictedEventEmitter) Events() []flow.Event {
+func (emitter ParseRestrictedEventEmitter) Events() flow.EventsList {
 	return emitter.impl.Events()
 }
 
-func (emitter ParseRestrictedEventEmitter) ServiceEvents() []flow.Event {
+func (emitter ParseRestrictedEventEmitter) ServiceEvents() flow.EventsList {
 	return emitter.impl.ServiceEvents()
+}
+
+func (emitter ParseRestrictedEventEmitter) ConvertedServiceEvents() flow.ServiceEventList {
+	return emitter.impl.ConvertedServiceEvents()
 }
 
 func (emitter ParseRestrictedEventEmitter) Reset() {
@@ -92,12 +98,16 @@ func (NoEventEmitter) EmitEvent(event cadence.Event) error {
 	return nil
 }
 
-func (NoEventEmitter) Events() []flow.Event {
-	return []flow.Event{}
+func (NoEventEmitter) Events() flow.EventsList {
+	return flow.EventsList{}
 }
 
-func (NoEventEmitter) ServiceEvents() []flow.Event {
-	return []flow.Event{}
+func (NoEventEmitter) ServiceEvents() flow.EventsList {
+	return flow.EventsList{}
+}
+
+func (NoEventEmitter) ConvertedServiceEvents() flow.ServiceEventList {
+	return flow.ServiceEventList{}
 }
 
 func (NoEventEmitter) Reset() {
@@ -181,7 +191,11 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 			return fmt.Errorf("unable to check service event: %w", err)
 		}
 		if ok {
-			eventEmitError := emitter.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+			eventEmitError := emitter.eventCollection.AppendServiceEvent(
+				emitter.chain,
+				flowEvent,
+				payloadSize)
+
 			// skip limit if payer is service account
 			if !isServiceAccount && eventEmitError != nil {
 				return eventEmitError
@@ -200,31 +214,37 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	return nil
 }
 
-func (emitter *eventEmitter) Events() []flow.Event {
+func (emitter *eventEmitter) Events() flow.EventsList {
 	return emitter.eventCollection.events
 }
 
-func (emitter *eventEmitter) ServiceEvents() []flow.Event {
+func (emitter *eventEmitter) ServiceEvents() flow.EventsList {
 	return emitter.eventCollection.serviceEvents
 }
 
+func (emitter *eventEmitter) ConvertedServiceEvents() flow.ServiceEventList {
+	return emitter.eventCollection.convertedServiceEvents
+}
+
 type EventCollection struct {
-	events        flow.EventsList
-	serviceEvents flow.EventsList
-	eventCounter  uint32
-	meter         Meter
+	events                 flow.EventsList
+	serviceEvents          flow.EventsList
+	convertedServiceEvents flow.ServiceEventList
+	eventCounter           uint32
+	meter                  Meter
 }
 
 func NewEventCollection(meter Meter) *EventCollection {
 	return &EventCollection{
-		events:        make([]flow.Event, 0, 10),
-		serviceEvents: make([]flow.Event, 0, 10),
-		eventCounter:  uint32(0),
-		meter:         meter,
+		events:                 make(flow.EventsList, 0, 10),
+		serviceEvents:          make(flow.EventsList, 0, 10),
+		convertedServiceEvents: make(flow.ServiceEventList, 0, 10),
+		eventCounter:           uint32(0),
+		meter:                  meter,
 	}
 }
 
-func (collection *EventCollection) Events() []flow.Event {
+func (collection *EventCollection) Events() flow.EventsList {
 	return collection.events
 }
 
@@ -234,15 +254,28 @@ func (collection *EventCollection) AppendEvent(event flow.Event, size uint64) er
 	return collection.meter.MeterEmittedEvent(size)
 }
 
-func (collection *EventCollection) ServiceEvents() []flow.Event {
+func (collection *EventCollection) ServiceEvents() flow.EventsList {
 	return collection.serviceEvents
 }
 
+func (collection *EventCollection) ConvertedServiceEvents() flow.ServiceEventList {
+	return collection.convertedServiceEvents
+}
+
 func (collection *EventCollection) AppendServiceEvent(
+	chain flow.Chain,
 	event flow.Event,
 	size uint64,
 ) error {
+	convertedEvent, err := convert.ServiceEvent(chain.ChainID(), event)
+	if err != nil {
+		return fmt.Errorf("could not convert service event: %w", err)
+	}
+
 	collection.serviceEvents = append(collection.serviceEvents, event)
+	collection.convertedServiceEvents = append(
+		collection.convertedServiceEvents,
+		*convertedEvent)
 	collection.eventCounter++
 	return collection.meter.MeterEmittedEvent(size)
 }

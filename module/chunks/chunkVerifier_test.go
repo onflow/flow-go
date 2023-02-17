@@ -52,6 +52,7 @@ var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
 var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
+var epochCommitServiceEvent, _ = convert.ServiceEvent(testChain, epochCommitEvent)
 
 var serviceEventsList = []flow.ServiceEvent{
 	*epochSetupServiceEvent,
@@ -360,15 +361,18 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error
 		return fmt.Errorf("invokable is not a transaction")
 	}
 
+	id0 := flow.NewRegisterID("00", "")
+	id5 := flow.NewRegisterID("05", "")
+
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		// add updates to the ledger
-		_ = led.Set("00", "", []byte{'F'})
+		_ = led.Set(id0, []byte{'F'})
 		tx.Logs = []string{"log1", "log2"}
 		tx.Events = eventsList
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set("05", "", []byte{'B'})
+		_ = led.Set(id5, []byte{'B'})
 		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
 		tx.Events = append(eventsList, flow.Event{
@@ -379,9 +383,9 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error
 			Payload:          []byte{88},
 		})
 	default:
-		_, _ = led.Get("00", "")
-		_, _ = led.Get("05", "")
-		_ = led.Set("05", "", []byte{'B'})
+		_, _ = led.Get(id0)
+		_, _ = led.Get(id5)
+		_ = led.Set(id5, []byte{'B'})
 		tx.Logs = []string{"log1", "log2"}
 		tx.Events = eventsList
 	}
@@ -401,12 +405,15 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 		return fmt.Errorf("invokable is not a transaction")
 	}
 
-	tx.ServiceEvents = []flow.Event{epochSetupEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochSetupServiceEvent}
+
+	id0 := flow.NewRegisterID("00", "")
+	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	_, _ = led.Get("00", "")
-	_, _ = led.Get("05", "")
-	_ = led.Set("05", "", []byte{'B'})
+	_, _ = led.Get(id0)
+	_, _ = led.Get(id5)
+	_ = led.Set(id5, []byte{'B'})
 	tx.Logs = []string{"log1", "log2"}
 
 	return nil
@@ -424,7 +431,7 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 		return fmt.Errorf("invokable is not a transaction")
 	}
 	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	tx.ServiceEvents = []flow.Event{epochCommitEvent}
+	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochCommitServiceEvent}
 
 	return nil
 }

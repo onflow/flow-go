@@ -284,6 +284,22 @@ func (_m *Environment) ComputationUsed() uint64 {
 	return r0
 }
 
+// ConvertedServiceEvents provides a mock function with given fields:
+func (_m *Environment) ConvertedServiceEvents() flow.ServiceEventList {
+	ret := _m.Called()
+
+	var r0 flow.ServiceEventList
+	if rf, ok := ret.Get(0).(func() flow.ServiceEventList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.ServiceEventList)
+		}
+	}
+
+	return r0
+}
+
 // CreateAccount provides a mock function with given fields: payer
 func (_m *Environment) CreateAccount(payer common.Address) (common.Address, error) {
 	ret := _m.Called(payer)
@@ -368,15 +384,15 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 }
 
 // Events provides a mock function with given fields:
-func (_m *Environment) Events() []flow.Event {
+func (_m *Environment) Events() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -407,15 +423,15 @@ func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, er
 }
 
 // FrozenAccounts provides a mock function with given fields:
-func (_m *Environment) FrozenAccounts() []common.Address {
+func (_m *Environment) FrozenAccounts() []flow.Address {
 	ret := _m.Called()
 
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
+	var r0 []flow.Address
+	if rf, ok := ret.Get(0).(func() []flow.Address); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
+			r0 = ret.Get(0).([]flow.Address)
 		}
 	}
 
@@ -1047,15 +1063,15 @@ func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int
 }
 
 // ServiceEvents provides a mock function with given fields:
-func (_m *Environment) ServiceEvents() []flow.Event {
+func (_m *Environment) ServiceEvents() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -1104,22 +1120,6 @@ func (_m *Environment) SetValue(owner []byte, key []byte, value []byte) error {
 		r0 = rf(owner, key, value)
 	} else {
 		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SigningAccounts provides a mock function with given fields:
-func (_m *Environment) SigningAccounts() []common.Address {
-	ret := _m.Called()
-
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
 	}
 
 	return r0

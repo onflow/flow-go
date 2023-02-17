@@ -46,8 +46,13 @@ func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	require.Equal(suite.T(), stateA, stateB)
 
 	// computes ids of system chunk for result A and B
-	systemChunkAId := receiptA.ExecutionResult.Chunks[0].ID()
-	systemChunkBId := receiptB.ExecutionResult.Chunks[0].ID()
+	systemChunkA := receiptA.ExecutionResult.Chunks[0]
+	systemChunkAId := systemChunkA.ID()
+	suite.T().Logf("system chunk for blockA: %v\n", *systemChunkA)
+
+	systemChunkB := receiptB.ExecutionResult.Chunks[0]
+	systemChunkBId := systemChunkB.ID()
+	suite.T().Logf("system chunk for blockB: %v\n", *systemChunkB)
 
 	// requires that system chunk Id of execution results be different
 	require.NotEqual(suite.T(), systemChunkAId, systemChunkBId)

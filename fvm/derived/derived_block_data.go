@@ -7,13 +7,14 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// ProgramDependencies are the locations of the programs this program depends on.
-type ProgramDependencies map[common.Address]struct{}
+// ProgramDependencies are the programs' addresses used by this program.
+type ProgramDependencies map[flow.Address]struct{}
 
 // AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(address common.Address) {
+func (d ProgramDependencies) AddDependency(address flow.Address) {
 	d[address] = struct{}{}
 }
 
@@ -149,6 +150,13 @@ func (block *DerivedBlockData) GetProgramForTestingOnly(
 	addressLocation common.AddressLocation,
 ) *invalidatableEntry[*Program] {
 	return block.programs.GetForTestingOnly(addressLocation)
+}
+
+// CachedPrograms returns the number of programs cached.
+// Note: this should only be called after calling commit, otherwise
+// the count will contain invalidated entries.
+func (block *DerivedBlockData) CachedPrograms() int {
+	return len(block.programs.items)
 }
 
 func (transaction *DerivedTransactionData) GetProgram(

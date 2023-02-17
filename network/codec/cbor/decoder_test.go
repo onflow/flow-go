@@ -94,10 +94,10 @@ func TestDecoder_Decode(t *testing.T) {
 		// in this test, only the first byte is set since there should be an error after reading
 		// the invalid code
 		datas := [][]byte{
-			{codec.CodeMin - 1}, // code < min
-			{codec.CodeMin},     // code == min
-			{codec.CodeMax},     // code == max
-			{codec.CodeMax + 1}, // code > max
+			{codec.CodeMin.Uint8() - 1}, // code < min
+			{codec.CodeMin.Uint8()},     // code == min
+			{codec.CodeMax.Uint8()},     // code == max
+			{codec.CodeMax.Uint8() + 1}, // code > max
 		}
 
 		for i := range datas {
@@ -117,7 +117,7 @@ func TestDecoder_Decode(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		err := cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeBlockProposal})
+		err := cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeBlockProposal.Uint8()})
 		require.NoError(t, err)
 
 		decoded, err := c.NewDecoder(&buf).Decode()
@@ -130,7 +130,7 @@ func TestDecoder_Decode(t *testing.T) {
 
 		// first encode the message to bytes with an incorrect type
 		var data bytes.Buffer
-		_ = data.WriteByte(codec.CodeCollectionGuarantee)
+		_ = data.WriteByte(codec.CodeCollectionGuarantee.Uint8())
 		encoder := cborcodec.EncMode.NewEncoder(&data)
 		err := encoder.Encode(blockProposal)
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestDecoder_Decode(t *testing.T) {
 
 		// first encode the message to bytes
 		var data bytes.Buffer
-		_ = data.WriteByte(codec.CodeBlockProposal)
+		_ = data.WriteByte(codec.CodeBlockProposal.Uint8())
 		encoder := cborcodec.EncMode.NewEncoder(&data)
 		err := encoder.Encode(blockProposal)
 		require.NoError(t, err)

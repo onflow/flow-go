@@ -16,19 +16,19 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// readSubscriptionCB the callback called when a new message is received on the read subscription
-type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID)
+// ReadSubscriptionCallBackFunction the callback called when a new message is received on the read subscription
+type ReadSubscriptionCallBackFunction func(msg *message.Message, peerID peer.ID)
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
 // the context of the subscription is cancelled.
 type readSubscription struct {
 	log      zerolog.Logger
 	sub      p2p.Subscription
-	callback readSubscriptionCB
+	callback ReadSubscriptionCallBackFunction
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(sub p2p.Subscription, callback readSubscriptionCB, log zerolog.Logger) *readSubscription {
+func newReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *readSubscription {
 	r := readSubscription{
 		log:      log.With().Str("channel", sub.Topic()).Logger(),
 		sub:      sub,
@@ -77,6 +77,6 @@ func (r *readSubscription) receiveLoop(ctx context.Context) {
 		}
 
 		// call the callback
-		r.callback(validatorData.Message, validatorData.DecodedMsgPayload, validatorData.From)
+		r.callback(validatorData.Message, validatorData.From)
 	}
 }

@@ -5,10 +5,11 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ContractUpdateKey struct {
-	Address common.Address
+	Address flow.Address
 	Name    string
 }
 
@@ -19,7 +20,7 @@ type ContractUpdate struct {
 
 type DerivedDataInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
-	FrozenAccounts     []common.Address
+	FrozenAccounts     []flow.Address
 
 	MeterParamOverridesUpdated bool
 }
@@ -38,12 +39,10 @@ func NewDerivedDataInvalidator(
 }
 
 func meterParamOverridesUpdated(env *facadeEnvironment) bool {
-	// TODO(patrick): expose lighter weight api to list updated ids only
-	updatedRegisters := env.txnState.UpdatedRegisters()
-
 	serviceAccount := string(env.chain.ServiceAddress().Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
-	for _, registerId := range updatedRegisters.IDs() {
+
+	for _, registerId := range env.txnState.UpdatedRegisterIDs() {
 		// The meter param override values are stored in the service account.
 		if registerId.Owner != serviceAccount {
 			continue
@@ -61,8 +60,7 @@ func meterParamOverridesUpdated(env *facadeEnvironment) bool {
 		//
 		// The meter param overrides use storageDomain as input, so any
 		// changes to it must also invalidate the values.
-		if registerId.Key == storageDomain ||
-			state.IsSlabIndex(registerId.Key) {
+		if registerId.Key == storageDomain || registerId.IsSlabIndex() {
 			return true
 		}
 	}
