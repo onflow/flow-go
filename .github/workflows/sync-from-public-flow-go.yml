@@ -5,6 +5,8 @@ on:
     # run every 12 hours, Mon-Fri
     - cron:  "0 0,12 * * 1-5"
   workflow_dispatch:
+    branches:
+      - master-private
 
 # GH_TOKEN needed to enable GitHub CLI commands
 env:
