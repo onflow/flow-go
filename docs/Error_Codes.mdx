@@ -1,239 +1,315 @@
-##Error Codes
+## Error Codes
 List of error codes returned from failing transactions and scripts. The error code has an accompanied error message that usually gives more clarification. This list is meant to give more information and helpful hints.
 
 ### 1006
-variable name: **ErrCodeInvalidProposalSignatureError**
-example: 
+**ErrCodeInvalidProposalSignatureError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1007
-variable name: **ErrCodeInvalidProposalSeqNumberError**
-example: 
+**ErrCodeInvalidProposalSeqNumberError**
+
+Example: 
 ```[Error Code: 1007] invalid proposal key: public key 0 on account xxx has sequence number xxx, but given xxx```
-description:
+
+Description:
 
 
 ### 1008
-variable name: **ErrCodeInvalidPayloadSignatureError**
-example: 
+**ErrCodeInvalidPayloadSignatureError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 
 ### 1009
-variable name: **ErrCodeInvalidEnvelopeSignatureError**
-example: 
+**ErrCodeInvalidEnvelopeSignatureError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 
 ### 1051
-variable name: **ErrCodeValueError**
-example: 
+**ErrCodeValueError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1052
-variable name: **ErrCodeInvalidArgumentError**
-example: 
+**ErrCodeInvalidArgumentError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1053
-variable name: **ErrCodeInvalidAddressError**
-example: 
+**ErrCodeInvalidAddressError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1054
-variable name: **ErrCodeInvalidLocationError**
-example: 
+**ErrCodeInvalidLocationError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1055
-variable name: **ErrCodeAccountAuthorizationError**
-example: 
+**ErrCodeAccountAuthorizationError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1056
-variable name: **ErrCodeOperationAuthorizationError**
-example: 
+**ErrCodeOperationAuthorizationError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1057
-variable name: **ErrCodeOperationNotSupportedError**
-example: 
+**ErrCodeOperationNotSupportedError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1101
-variable name: **ErrCodeCadenceRunTimeError**
-example: 
+**ErrCodeCadenceRunTimeError**
+
+Example: 
 ```[Error Code: 1101] cadence runtime error Execution failed:
 error: internal error: [Error Code: 1101] cadence runtime error Execution failed:
 error: pre-condition failed: Amount withdrawn must be less than or equal than the balance of the Vault
 ```
-description:
+
+Description:
 
 ### 1103
-variable name: **ErrCodeStorageCapacityExceeded**
-example: 
+**ErrCodeStorageCapacityExceeded**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1105
-variable name: **ErrCodeEventLimitExceededError**
-example: 
+**ErrCodeEventLimitExceededError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1106
-variable name: **ErrCodeLedgerInteractionLimitExceededError**
-example: 
+**ErrCodeLedgerInteractionLimitExceededError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1107
-variable name: **ErrCodeStateKeySizeLimitError**
-example: 
+**ErrCodeStateKeySizeLimitError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1108
-variable name: **ErrCodeStateValueSizeLimitError**
-example: 
+**ErrCodeStateValueSizeLimitError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1109
-variable name: **ErrCodeTransactionFeeDeductionFailedError**
-example: 
+**ErrCodeTransactionFeeDeductionFailedError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1110
-variable name: **ErrCodeComputationLimitExceededError**
-example: 
+**ErrCodeComputationLimitExceededError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1111
-variable name: **ErrCodeMemoryLimitExceededError**
-example: 
+**ErrCodeMemoryLimitExceededError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1112
-variable name: **ErrCodeCouldNotDecodeExecutionParameterFromState**
-example: 
+**ErrCodeCouldNotDecodeExecutionParameterFromState**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1114
-variable name: **ErrCodeScriptExecutionCancelledError**
-example: 
+**ErrCodeScriptExecutionCancelledError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1113
-variable name: **ErrCodeScriptExecutionTimedOutError**
-example: 
+**ErrCodeScriptExecutionTimedOutError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1115
-variable name: **ErrCodeEventEncodingError**
-example: 
+**ErrCodeEventEncodingError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1116
-variable name: **ErrCodeInvalidInternalStateAccessError**
-example: 
+**ErrCodeInvalidInternalStateAccessError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1201
-variable name: **ErrCodeAccountNotFoundError**
-example: 
+**ErrCodeAccountNotFoundError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1202
-variable name: **ErrCodeAccountPublicKeyNotFoundError**
-example: 
+**ErrCodeAccountPublicKeyNotFoundError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1203
-variable name: **ErrCodeAccountAlreadyExistsError**
-example: 
+**ErrCodeAccountAlreadyExistsError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1204
-variable name: **ErrCodeFrozenAccountError**
-example: 
+**ErrCodeFrozenAccountError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1206
-variable name: **ErrCodeAccountPublicKeyLimitError**
-example: 
+**ErrCodeAccountPublicKeyLimitError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 1251
-variable name: **ErrCodeContractNotFoundError**
-example: 
+**ErrCodeContractNotFoundError**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 2000
-variable name: **FailureCodeUnknownFailure**
-example: 
+**FailureCodeUnknownFailure**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 2001
-variable name: **FailureCodeEncodingFailure**
-example: 
+**FailureCodeEncodingFailure**
+
+Example: 
 ```...```
-description:
+
+Description:
 
 ### 2002
-variable name: **FailureCodeLedgerFailure**
-example:
+**FailureCodeLedgerFailure**
+
+Example:
 ```...```
-description:
+
+Description:
 
 ### 2003
-variable name: **FailureCodeStateMergeFailure**
-example:
+**FailureCodeStateMergeFailure**
+
+Example:
 ```...```
-description:
+
+Description:
 
 ### 2004
-variable name: **FailureCodeBlockFinderFailure**
-example:
+**FailureCodeBlockFinderFailure**
+
+Example:
 ```...```
-description:
+
+Description:
   
 ### 2006
-variable name: **FailureCodeParseRestrictedModeInvalidAccessFailure**
-example:
+**FailureCodeParseRestrictedModeInvalidAccessFailure**
+
+Example:
 ```...```
-description:
+
+Description:
 
 ### 2007
-variable name: **FailureCodePayerBalanceCheckFailure**
-example:
+**FailureCodePayerBalanceCheckFailure**
+
+Example:
 ```...```
-description:
+
+Description:
 
 
 
