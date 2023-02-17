@@ -22,7 +22,8 @@ Description:
 **ErrCodeInvalidPayloadSignatureError**
 
 Example: 
-```...```
+```[Error Code: 1008] invalid payload signature: public key 0 on account xxx does not have a valid signature: signature is not valid
+```
 
 Description:
 
@@ -31,7 +32,8 @@ Description:
 **ErrCodeInvalidEnvelopeSignatureError**
 
 Example: 
-```...```
+```[Error Code: 1009] invalid envelope key: public key 1 on account xxx does not have a valid signature: signature is not valid
+```
 
 Description:
 
@@ -40,7 +42,8 @@ Description:
 **ErrCodeValueError**
 
 Example: 
-```...```
+```[Error Code: 1051] invalid value (xxx): invalid encoded public key value: rlp: expected input list for flow.runtimeAccountPublicKeyWrapper...
+```
 
 Description:
 
@@ -48,7 +51,8 @@ Description:
 **ErrCodeInvalidArgumentError**
 
 Example: 
-```...```
+```[Error Code: 1052] transaction arguments are invalid: (argument is not json decodable: failed to decode value: runtime error: slice bounds out of range [:2] with length 0)
+```
 
 Description:
 
@@ -64,7 +68,8 @@ Description:
 **ErrCodeInvalidLocationError**
 
 Example: 
-```...```
+```[Error Code: 1054] location (../contracts/FungibleToken.cdc) is not a valid location: expecting an AddressLocation, but other location types are passed
+--> ../contracts/FungibleToken.cdc```
 
 Description:
 
@@ -72,7 +77,7 @@ Description:
 **ErrCodeAccountAuthorizationError**
 
 Example: 
-```...```
+```[Error Code: 1055] authorization failed for account e85d442d61a611d8: payer account does not have sufficient signatures (1 < 1000)```
 
 Description:
 
@@ -80,7 +85,8 @@ Description:
 **ErrCodeOperationAuthorizationError**
 
 Example: 
-```...```
+```[Error Code: 1056] (RemoveContract) is not authorized: removing contracts requires authorization from specific accounts
+goroutine 5688834491 [running]:```
 
 Description:
 
@@ -107,7 +113,8 @@ Description:
 **ErrCodeStorageCapacityExceeded**
 
 Example: 
-```...```
+```[Error Code: 1103] The account with address (xxx) uses 96559611 bytes of storage which is over its capacity (96554500 bytes). Capacity can be increased by adding FLOW tokens to the account.
+```
 
 Description:
 
@@ -115,7 +122,7 @@ Description:
 **ErrCodeEventLimitExceededError**
 
 Example: 
-```...```
+```[Error Code: 1105] total event byte size (256200) exceeds limit (256000)```
 
 Description:
 
@@ -123,7 +130,7 @@ Description:
 **ErrCodeLedgerInteractionLimitExceededError**
 
 Example: 
-```...```
+```[Error Code: 1106] max interaction with storage has exceeded the limit (used: 20276498 bytes, limit 20000000 bytes)```
 
 Description:
 
@@ -147,7 +154,8 @@ Description:
 **ErrCodeTransactionFeeDeductionFailedError**
 
 Example: 
-```...```
+```[Error Code: 1109] failed to deduct 0 transaction fees from 14af75b8c487333c: Execution failed:
+  --> f919ee77447b7497.FlowFees:97:24```
 
 Description:
 
@@ -155,7 +163,7 @@ Description:
 **ErrCodeComputationLimitExceededError**
 
 Example: 
-```...```
+```[Error Code: 1110] computation exceeds limit (100)```
 
 Description:
 
@@ -211,7 +219,7 @@ Description:
 **ErrCodeAccountNotFoundError**
 
 Example: 
-```...```
+```[Error Code: 1201] account not found for address xxx```
 
 Description:
 
@@ -219,7 +227,7 @@ Description:
 **ErrCodeAccountPublicKeyNotFoundError**
 
 Example: 
-```...```
+```[Error Code: 1202] account public key not found for address xxx and key index 3```
 
 Description:
 
