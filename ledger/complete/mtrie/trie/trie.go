@@ -549,7 +549,7 @@ func update(
 			compactLeaf = currentNode
 		} else {
 
-			// check if the parent node path is among the updated paths
+			// check if the current node path is among the updated paths
 			found := false
 			leafHash := currentNode.ExpandedLeafHash()
 
@@ -585,7 +585,7 @@ func update(
 				}
 			}
 			if !found {
-				// if the parent node carries a path not included in the input path, then the parent node
+				// if the current node carries a path not included in the input path, then the current node
 				// represents a compact leaf that needs to be carried down the recursion.
 				compactLeaf = currentNode
 			}
