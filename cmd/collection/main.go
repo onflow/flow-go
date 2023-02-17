@@ -74,7 +74,7 @@ func main() {
 		startupTime                       time.Time
 
 		mainConsensusCommittee  *committees.Consensus
-		followerState           protocol.ParticipantState
+		followerState           protocol.FollowerState
 		ingestConf              = ingest.DefaultConfig()
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
