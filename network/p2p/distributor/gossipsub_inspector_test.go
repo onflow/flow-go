@@ -37,24 +37,14 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c1Done.Add(len(tt))
 	c1Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
 	c1.On("OnInvalidControlMessage", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		peerID, ok := args.Get(0).(peer.ID)
+		notification, ok := args.Get(0).(p2p.InvalidControlMessageNotification)
 		require.True(t, ok)
 
-		msgType, ok := args.Get(1).(p2p.ControlMessageType)
-		require.True(t, ok)
-
-		count, ok := args.Get(2).(uint64)
-		require.True(t, ok)
-
-		require.Contains(t, tt, p2p.InvalidControlMessageNotification{
-			PeerID:  peerID,
-			MsgType: msgType,
-			Count:   count,
-		})
+		require.Contains(t, tt, notification)
 
 		// ensure consumer see each peer once
-		require.False(t, c1Seen.Has(peerID))
-		c1Seen.Add(peerID, struct{}{})
+		require.False(t, c1Seen.Has(notification.PeerID))
+		c1Seen.Add(notification.PeerID, struct{}{})
 
 		c1Done.Done()
 	}).Return()
@@ -62,24 +52,14 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c2Done := sync.WaitGroup{}
 	c2Done.Add(len(tt))
 	c2Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
-	c2.On("OnInvalidControlMessage", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		peerID, ok := args.Get(0).(peer.ID)
+	c2.On("OnInvalidControlMessage", mock.Anything).Run(func(args mock.Arguments) {
+		notification, ok := args.Get(0).(p2p.InvalidControlMessageNotification)
 		require.True(t, ok)
 
-		msgType, ok := args.Get(1).(p2p.ControlMessageType)
-		require.True(t, ok)
-
-		count, ok := args.Get(2).(uint64)
-		require.True(t, ok)
-
-		require.Contains(t, tt, p2p.InvalidControlMessageNotification{
-			PeerID:  peerID,
-			MsgType: msgType,
-			Count:   count,
-		})
+		require.Contains(t, tt, notification)
 		// ensure consumer see each peer once
-		require.False(t, c2Seen.Has(peerID))
-		c2Seen.Add(peerID, struct{}{})
+		require.False(t, c2Seen.Has(notification.PeerID))
+		c2Seen.Add(notification.PeerID, struct{}{})
 
 		c2Done.Done()
 	}).Return()
@@ -93,7 +73,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			g.OnInvalidControlMessage(tt[i].PeerID, tt[i].MsgType, tt[i].Count)
+			g.OnInvalidControlMessage(tt[i])
 		}(i)
 	}
 
