@@ -29,8 +29,8 @@ const (
 	numOfUnauthorizedEvents = 10
 )
 
-// TopicValidatorAttackOrchestrator represents an insecure.AttackOrchestrator track incoming unauthorized messages and authorized messages received by victim nodes.
-type TopicValidatorAttackOrchestrator struct {
+// AttackOrchestrator represents an insecure.AttackOrchestrator track incoming unauthorized messages and authorized messages received by victim nodes.
+type AttackOrchestrator struct {
 	*bft.BaseOrchestrator
 	unauthorizedEventsReceived []flow.Identifier
 	authorizedEventsReceived   []flow.Identifier
@@ -43,10 +43,10 @@ type TopicValidatorAttackOrchestrator struct {
 	victimVN                   flow.Identifier
 }
 
-var _ insecure.AttackOrchestrator = &TopicValidatorAttackOrchestrator{}
+var _ insecure.AttackOrchestrator = &AttackOrchestrator{}
 
-func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN, victimEN, victimVN flow.Identifier) *TopicValidatorAttackOrchestrator {
-	orchestrator := &TopicValidatorAttackOrchestrator{
+func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN, victimEN, victimVN flow.Identifier) *AttackOrchestrator {
+	orchestrator := &AttackOrchestrator{
 		BaseOrchestrator: &bft.BaseOrchestrator{
 			T:      t,
 			Logger: logger.With().Str("component", "bft-test-orchestrator").Logger(),
@@ -71,7 +71,7 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerAN, attackerEN
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
 // This handler will track any unauthorized messages that are expected to be blocked at the topic validator.
 // It also tracks all the authorized messages that are expected to be delivered to the node.
-func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
+func (o *AttackOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	lg := o.Logger.With().
 		Hex("origin_id", logging.ID(event.OriginID)).
 		Str("channel", event.Channel.String()).
@@ -103,7 +103,7 @@ func (o *TopicValidatorAttackOrchestrator) HandleIngressEvent(event *insecure.In
 }
 
 // sendUnauthorizedMsgs publishes a few combinations of unauthorized messages from the corrupted AN to the corrupted EN.
-func (o *TopicValidatorAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
+func (o *AttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for _, event := range o.unauthorizedEvents {
 		err := o.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
@@ -111,7 +111,7 @@ func (o *TopicValidatorAttackOrchestrator) sendUnauthorizedMsgs(t *testing.T) {
 }
 
 // sendAuthorizedMsgs sends a number of authorized messages.
-func (o *TopicValidatorAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
+func (o *AttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for _, event := range o.authorizedEvents {
 		err := o.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
@@ -119,7 +119,7 @@ func (o *TopicValidatorAttackOrchestrator) sendAuthorizedMsgs(t *testing.T) {
 }
 
 // initUnauthorizedEvents returns combinations of unauthorized messages and channels.
-func (o *TopicValidatorAttackOrchestrator) initUnauthorizedEvents() {
+func (o *AttackOrchestrator) initUnauthorizedEvents() {
 	// message sent by unauthorized sender, AN is not authorized to publish block proposals
 	o.initUnauthorizedMsgByRoleEvents(numOfUnauthorizedEvents)
 
@@ -135,7 +135,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedEvents() {
 }
 
 // initAuthorizedEvents returns combinations of unauthorized messages and channels.
-func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
+func (o *AttackOrchestrator) initAuthorizedEvents() {
 	channel := channels.RequestChunks
 	for i := uint64(0); i < numOfAuthorizedEvents; i++ {
 		chunkDataReq := &messages.ChunkDataRequest{
@@ -159,7 +159,7 @@ func (o *TopicValidatorAttackOrchestrator) initAuthorizedEvents() {
 
 // initUnauthorizedMsgByRoleEvents sets n number of events where the sender is unauthorized to
 // send the FlowProtocolEvent. In this case AN's are not authorized to send block proposals.
-func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int) {
+func (o *AttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int) {
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
 		unauthorizedProposal := unittest.ProposalFixture()
@@ -179,7 +179,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgByRoleEvents(n int
 
 // initUnauthorizedMsgOnChannelEvents sets n number of events where the message is not
 // authorized to be sent on the event channel.
-func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n int) {
+func (o *AttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n int) {
 	channel := channels.PushReceipts
 	for i := 0; i < n; i++ {
 		syncReq := &messages.SyncRequest{
@@ -202,7 +202,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedMsgOnChannelEvents(n 
 
 // initUnauthorizedUnicastOnChannelEvents sets n number of events where the message is not
 // authorized to be sent via insecure.Protocol_UNICAST on the event channel.
-func (o *TopicValidatorAttackOrchestrator) initUnauthorizedUnicastOnChannelEvents(n int) {
+func (o *AttackOrchestrator) initUnauthorizedUnicastOnChannelEvents(n int) {
 	channel := channels.SyncCommittee
 	for i := 0; i < n; i++ {
 		syncReq := &messages.SyncRequest{
@@ -225,7 +225,7 @@ func (o *TopicValidatorAttackOrchestrator) initUnauthorizedUnicastOnChannelEvent
 
 // initUnauthorizedPublishOnChannelEvents sets n number of events where the message is not
 // authorized to be sent via insecure.Protocol_PUBLISH on the event channel.
-func (o *TopicValidatorAttackOrchestrator) initUnauthorizedPublishOnChannelEvents(n int) {
+func (o *AttackOrchestrator) initUnauthorizedPublishOnChannelEvents(n int) {
 	channel := channels.ProvideChunks
 	for i := 0; i < n; i++ {
 		chunkDataResponse := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
