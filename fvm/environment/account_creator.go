@@ -231,12 +231,12 @@ func (creator *accountCreator) createBasicAccount(
 ) {
 	flowAddress, err := creator.NextAddress()
 	if err != nil {
-		return flow.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	err = creator.accounts.Create(publicKeys, flowAddress)
 	if err != nil {
-		return flow.Address{}, fmt.Errorf("create account failed: %w", err)
+		return flow.EmptyAddress, fmt.Errorf("create account failed: %w", err)
 	}
 
 	return flowAddress, nil

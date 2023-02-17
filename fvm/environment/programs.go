@@ -190,7 +190,7 @@ func (programs *Programs) GetProgram(
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.Address(addressLocation.Address)
+		address := flow.ConvertAddress(addressLocation.Address)
 
 		freezeError := programs.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
@@ -288,7 +288,7 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	dependencies := make(derived.ProgramDependencies, 1)
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(loc.Address)
+	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,

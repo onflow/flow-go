@@ -9,9 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// GetRegisterFunc is a function that returns the value for a register.
-type GetRegisterFunc func(id flow.RegisterID) (flow.RegisterValue, error)
-
 // A View is a read-only view into a ledger stored in an underlying data source.
 //
 // A ledger view records writes to a delta that can be used to update the
@@ -26,7 +23,8 @@ type View struct {
 	spockSecret       []byte
 	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
-	readFunc          GetRegisterFunc
+
+	storage StorageSnapshot
 }
 
 type Snapshot struct {
@@ -46,34 +44,28 @@ type SpockSnapshot struct {
 	SpockSecret []byte
 }
 
-func AlwaysEmptyGetRegisterFunc(
-	id flow.RegisterID,
-) (
-	flow.RegisterValue,
-	error,
-) {
-	return nil, nil
-}
-
 // TODO(patrick): rm after updating emulator.
 func NewView(
 	readFunc func(owner string, key string) (flow.RegisterValue, error),
 ) *View {
-	return NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return readFunc(id.Owner, id.Key)
-	})
+	return NewDeltaView(
+		ReadFuncStorageSnapshot{
+			ReadFunc: func(id flow.RegisterID) (flow.RegisterValue, error) {
+				return readFunc(id.Owner, id.Key)
+			},
+		})
 }
 
 // NewDeltaView instantiates a new ledger view with the provided read function.
-func NewDeltaView(readFunc GetRegisterFunc) *View {
-	if readFunc == nil {
-		readFunc = AlwaysEmptyGetRegisterFunc
+func NewDeltaView(storage StorageSnapshot) *View {
+	if storage == nil {
+		storage = EmptyStorageSnapshot{}
 	}
 	return &View{
 		delta:             NewDelta(),
 		spockSecretLock:   &sync.Mutex{},
 		regTouchSet:       make(map[flow.RegisterID]struct{}),
-		readFunc:          readFunc,
+		storage:           storage,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
 }
@@ -129,7 +121,7 @@ func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (v *View) NewChild() state.View {
-	return NewDeltaView(v.Peek)
+	return NewDeltaView(NewPeekerStorageSnapshot(v))
 }
 
 func (v *View) DropDelta() {
@@ -159,7 +151,7 @@ func (v *View) Get(registerID flow.RegisterID) (flow.RegisterValue, error) {
 
 	value, exists := v.delta.Get(registerID)
 	if !exists {
-		value, err = v.readFunc(registerID)
+		value, err = v.storage.Get(registerID)
 		if err != nil {
 			return nil, fmt.Errorf("get register failed: %w", err)
 		}
@@ -184,7 +176,7 @@ func (v *View) Peek(id flow.RegisterID) (flow.RegisterValue, error) {
 		return value, nil
 	}
 
-	return v.readFunc(id)
+	return v.storage.Get(id)
 }
 
 // Set sets a register value in this view.
@@ -271,10 +263,4 @@ func (v *View) SpockSecret() []byte {
 	}
 	v.spockSecretLock.Unlock()
 	return v.spockSecret
-}
-
-// Detach detaches view from parent, by setting readFunc to
-// default, empty one
-func (v *View) Detach() {
-	v.readFunc = AlwaysEmptyGetRegisterFunc
 }

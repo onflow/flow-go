@@ -272,7 +272,8 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(tb, err)
 
-		address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+		address = flow.ConvertAddress(
+			data.(cadence.Event).Fields[0].(cadence.Address))
 
 		// ==== Transfer tokens to new account ====
 		txBody = transferTokensTx(chain).

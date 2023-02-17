@@ -172,41 +172,63 @@ func RegisterEntriesToKeysValues(
 	return keys, values
 }
 
-func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+// TODO(patrick): revisit caching.  readCache needs to be mutex guarded for
+// parallel execution.
+type LedgerStorageSnapshot struct {
+	ledger     ledger.Ledger
+	commitment flow.StateCommitment
 
-	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
+	readCache map[flow.RegisterID]flow.RegisterValue
+}
 
-	return func(regID flow.RegisterID) (flow.RegisterValue, error) {
-		if value, ok := readCache[regID]; ok {
-			return value.Value, nil
-		}
-
-		query, err := makeSingleValueQuery(commitment, regID)
-
-		if err != nil {
-			return nil, fmt.Errorf("cannot create ledger query: %w", err)
-		}
-
-		value, err := ldg.GetSingleValue(query)
-
-		if err != nil {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", regID, commitment, err)
-		}
-
-		// Prevent caching of value with len zero
-		if len(value) == 0 {
-			return nil, nil
-		}
-
-		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
-
-		return value, nil
+func NewLedgerStorageSnapshot(
+	ldg ledger.Ledger,
+	commitment flow.StateCommitment,
+) delta.StorageSnapshot {
+	return &LedgerStorageSnapshot{
+		ledger:     ldg,
+		commitment: commitment,
+		readCache:  make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
+func (storage *LedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	if value, ok := storage.readCache[id]; ok {
+		return value, nil
+	}
+
+	query, err := makeSingleValueQuery(storage.commitment, id)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create ledger query: %w", err)
+	}
+
+	value, err := storage.ledger.GetSingleValue(query)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error getting register (%s) value at %x: %w",
+			id,
+			storage.commitment,
+			err)
+	}
+
+	// Prevent caching of value with len zero
+	if len(value) == 0 {
+		return nil, nil
+	}
+
+	// don't cache value with len zero
+	storage.readCache[id] = value
+
+	return value, nil
+}
+
 func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewDeltaView(LedgerGetRegister(s.ls, commitment))
+	return delta.NewDeltaView(NewLedgerStorageSnapshot(s.ls, commitment))
 }
 
 type RegisterUpdatesHolder interface {
