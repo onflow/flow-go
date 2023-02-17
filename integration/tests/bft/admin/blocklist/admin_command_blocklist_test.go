@@ -38,6 +38,8 @@ func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	time.Sleep(500 * time.Millisecond)
 
 	// send unauthorized messages and sleep for 3 seconds to allow all requests to be processed
+	// in normal situations if the node is not block listed, these messages would be considered
+	// legit and hence would be delivered to the recipients.
 	a.Orchestrator.sendExpectedBlockedMsgs(a.T())
 	time.Sleep(3 * time.Second)
 
