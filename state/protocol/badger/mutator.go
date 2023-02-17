@@ -434,6 +434,10 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 // dbUpdates contains other database operations which must be applied atomically
 // with inserting the block.
+// Caller is responsible for ensuring block validity.
+// If insert is called from Extend(by consensus participant) then certifyingQC will be nil but the block payload will be validated.
+// If insert is called from ExtendCertified(by consensus follower) then certifyingQC must be not nil which proves payload validity.
+// No errors are expected during normal operations.
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
