@@ -271,7 +271,8 @@ func CreateAccountsWithSimpleAddresses(
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}
-				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				addr = flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
 		}

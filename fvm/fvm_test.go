@@ -980,7 +980,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
-			address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address := flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -2038,7 +2039,8 @@ func TestInteractionLimit(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address = flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).

@@ -104,15 +104,14 @@ func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.
 //
+// The seed minimum length is 32 bytes and it should have enough entropy.
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have enough entropy and should be sampled uniformly at random.
 //
 // The function returns:
 //   - (false, invalidInputsErrors) if the signing algorithm is not supported or
-//
-// if the seed length is not valid (too short or too long)
+//     if the seed length is not valid (less than 32 bytes or larger than 256 bytes)
 //   - (false, error) if an unexpected error occurs
-//   - (sk, nil) otherwise
+//   - (sk, nil) if key generation was successful
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {

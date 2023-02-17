@@ -9,37 +9,19 @@ import (
 	"strings"
 )
 
+// AddressLength is the size of an account address in bytes.
+// (n) is the size of an account address in bits.
+const AddressLength = (linearCodeN + 7) >> 3
+
 // Address represents the 8 byte address of an account.
 type Address [AddressLength]byte
 
-type AddressGenerator interface {
-	NextAddress() (Address, error)
-	CurrentAddress() Address
-	Bytes() []byte
-	AddressCount() uint64 // returns the total number of addresses that have been generated so far
-}
-
-type MonotonicAddressGenerator struct {
-	index uint64
-}
-
-// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
-type linearCodeAddressGenerator struct {
-	chainCodeWord uint64
-	index         uint64
-}
-
-const (
-	// AddressLength is the size of an account address in bytes.
-	// (n) is the size of an account address in bits.
-	AddressLength = (linearCodeN + 7) >> 3
-	// addressIndexLength is the size of an account address state in bytes.
-	// (k) is the size of an account address in bits.
-	addressIndexLength = (linearCodeK + 7) >> 3
-)
-
 // EmptyAddress is the default value of a variable of type Address
-var EmptyAddress = Address{}
+var EmptyAddress = BytesToAddress(nil)
+
+func ConvertAddress(b [AddressLength]byte) Address {
+	return Address(b)
+}
 
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
@@ -105,6 +87,12 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// uint64 converts an address into a uint64
+func (a Address) uint64() uint64 {
+	v := binary.BigEndian.Uint64(a[:])
+	return v
+}
+
 // modified from binary.bigEndian.uint64
 func uint48(b []byte) uint64 {
 	_ = b[5] // bounds check hint to compiler;
@@ -123,10 +111,31 @@ func putUint48(b []byte, v uint64) {
 	b[5] = byte(v)
 }
 
+// addressIndexLength is the size of an account address state in bytes.
+// (k) is the size of an account address in bits.
+const addressIndexLength = (linearCodeK + 7) >> 3
+
 func indexToBytes(index uint64) []byte {
 	indexBytes := make([]byte, addressIndexLength)
 	putUint48(indexBytes, index)
 	return indexBytes
+}
+
+type AddressGenerator interface {
+	NextAddress() (Address, error)
+	CurrentAddress() Address
+	Bytes() []byte
+	AddressCount() uint64 // returns the total number of addresses that have been generated so far
+}
+
+type MonotonicAddressGenerator struct {
+	index uint64
+}
+
+// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
+type linearCodeAddressGenerator struct {
+	chainCodeWord uint64
+	index         uint64
 }
 
 // Bytes converts an address index into a slice of bytes
@@ -216,12 +225,6 @@ func uint64ToAddress(v uint64) Address {
 	var b [AddressLength]byte
 	binary.BigEndian.PutUint64(b[:], v)
 	return Address(b)
-}
-
-// uint64 converts an address into a uint64
-func (a *Address) uint64() uint64 {
-	v := binary.BigEndian.Uint64(a[:])
-	return v
 }
 
 const (

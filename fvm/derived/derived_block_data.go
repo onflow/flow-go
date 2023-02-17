@@ -7,13 +7,14 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// ProgramDependencies are the locations of the programs this program depends on.
-type ProgramDependencies map[common.Address]struct{}
+// ProgramDependencies are the programs' addresses used by this program.
+type ProgramDependencies map[flow.Address]struct{}
 
 // AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(address common.Address) {
+func (d ProgramDependencies) AddDependency(address flow.Address) {
 	d[address] = struct{}{}
 }
 

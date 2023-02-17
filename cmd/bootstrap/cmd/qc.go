@@ -20,7 +20,13 @@ func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalN
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}
 
-	qc, err := run.GenerateRootQC(block, votes, participantData, identities)
+	qc, invalidVotesErr, err := run.GenerateRootQC(block, votes, participantData, identities)
+	if len(invalidVotesErr) > 0 {
+		for _, err := range invalidVotesErr {
+			log.Warn().Err(err).Msg("invalid vote")
+		}
+	}
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating root QC failed")
 	}

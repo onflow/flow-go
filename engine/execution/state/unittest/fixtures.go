@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -35,6 +36,10 @@ func ComputationResultForBlockFixture(
 	spockHashes := make([]crypto.Signature, numChunks)
 	chunks := make([]*flow.Chunk, 0, numChunks)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0, numChunks)
+	chunkExecutionDatas := make(
+		[]*execution_data.ChunkExecutionData,
+		0,
+		numChunks)
 	for i := 0; i < numChunks; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
@@ -64,6 +69,14 @@ func ComputationResultForBlockFixture(
 				*completeBlock.StartState,
 				proofs[i],
 				collection))
+
+		chunkExecutionDatas = append(
+			chunkExecutionDatas,
+			&execution_data.ChunkExecutionData{
+				Collection: collection,
+				Events:     nil,
+				TrieUpdate: nil,
+			})
 	}
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
@@ -77,5 +90,9 @@ func ComputationResultForBlockFixture(
 		Chunks:                 chunks,
 		ChunkDataPacks:         chunkDataPacks,
 		EndState:               *completeBlock.StartState,
+		BlockExecutionData: &execution_data.BlockExecutionData{
+			BlockID:             completeBlock.ID(),
+			ChunkExecutionDatas: chunkExecutionDatas,
+		},
 	}
 }
