@@ -14,6 +14,7 @@ package crypto
 // #include "bls12381_utils.h"
 import "C"
 import (
+	"crypto/rand"
 	"errors"
 )
 
@@ -22,6 +23,9 @@ import (
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.Fr
+
+// BLS12-381 related lengths
+var frBytesLen = int(C.get_Fr_BYTES())
 
 // TODO: For now scalars are represented as field elements Fr since all scalars
 // are less than r - check if distinguishing two types in necessary
@@ -117,33 +121,47 @@ func (p *pointG2) isInfinity() bool {
 	return C.ep2_is_infty((*C.ep2_st)(p)) == 1
 }
 
-// returns a random number in Fr
-func randZr(x *scalar) {
-	//C.bn_randZr((*C.Fr)(x))
+// returns a random element of Fr in input pointer
+func randZr(x *scalar) error {
+	bytes := make([]byte, frBytesLen+securityBits/8)
+	_, err := rand.Read(bytes) // checking one output is enough
+	if err != nil {
+		return errors.New("internal rng failed")
+	}
+	_ = mapToZr(x, bytes)
+	return nil
 }
 
-// returns a random non-zero number in Fr
-func randZrStar(x *scalar) {
-	//C.bn_randZr_star((*C.Fr)(x))
+// writes a random element of Fr* in input pointer
+func randZrStar(x *scalar) error {
+	bytes := make([]byte, frBytesLen+securityBits/8)
+	isZero := true
+	for isZero {
+		_, err := rand.Read(bytes) // checking one output is enough
+		if err != nil {
+			return errors.New("internal rng failed")
+		}
+		isZero = mapToZr(x, bytes)
+	}
+	return nil
 }
 
 // mapToZr reads a scalar from a slice of bytes and maps it to Zr.
-// The resulting scalar `k` satisfies 0 <= k < r.
+// The resulting element `k` therefore satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
 func mapToZr(x *scalar, src []byte) bool {
-	isZero := C.bn_map_to_Zr((*C.Fr)(x),
+	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return isZero == valid
+	if isZero {
+		return true
+	}
+	return false
 }
 
 // writeScalar writes a G2 point in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
-	/*C.bn_write_bin((*C.uchar)(&dest[0]),
-		(C.int)(prKeyLengthBLSBLS12381),
-		(*C.Fr)(x),
-	)*/
-	// TODO: to fill
+	C.Fr_write_bytes((*C.uchar)(&dest[0]), (*C.Fr)(x))
 }
 
 // writePointG2 writes a G2 point in a slice of bytes

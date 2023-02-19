@@ -8,7 +8,7 @@
 #include "relic.h"
 #include "bls12381_utils.h"
 
-// Signature, Public key and Private key lengths 
+// Signature, Public key and Private key lengths
 #define FULL_SIGNATURE_LEN  G1_BYTES
 #define FULL_PK_LEN         G2_BYTES
 #define SIGNATURE_LEN       (FULL_SIGNATURE_LEN/(G1_SERIALIZATION+1))

@@ -81,6 +81,10 @@ typedef struct prec_ {
 // TODO: to delete when Relic is removed
 bn_st* Fr_blst_to_relic(const Fr* x);
 
+int      get_valid();
+int      get_invalid();
+int      get_Fr_BYTES();
+
 // BLS based SPoCK
 int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
@@ -88,25 +92,24 @@ int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 void     map_to_G1(ep_t, const byte*, const int);
 
 // Fr utilities
-bool_t Fr_is_zero(const Fr* a);
-bool_t Fr_is_equal(const Fr* a, const Fr* b);
+bool_t      Fr_is_zero(const Fr* a);
+bool_t      Fr_is_equal(const Fr* a, const Fr* b);
+BLST_ERROR  Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
+BLST_ERROR  Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
+void        Fr_write_bytes(uint8_t *bin, const Fr* a);
+bool        map_bytes_to_Fr(Fr*, const uint8_t*, int);
 
 // Utility functions
-int      get_valid();
-int      get_invalid();
-void     bn_new_wrapper(bn_t a);
-
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
 void     precomputed_data_set(const prec_st* p);
 void     seed_relic(byte*, int);
 
-int      ep_read_bin_compact(ep_t, const byte *, const int);
-void     ep_write_bin_compact(byte *, const ep_t,  const int);
-int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
-void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
-BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
-BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
+int         ep_read_bin_compact(ep_t, const byte *, const int);
+void        ep_write_bin_compact(byte *, const ep_t,  const int);
+int         ep2_read_bin_compact(ep2_t, const byte *,  const int);
+void        ep2_write_bin_compact(byte *, const ep2_t,  const int);
+
 
 
 
@@ -115,11 +118,6 @@ void     ep_mult_generic_bench(ep_t, const Fr*);
 void     ep_mult(ep_t, const ep_t, const Fr*);
 void     ep2_mult_gen(ep2_t, const Fr*);
 void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo); 
-
-void     bn_randZr(Fr*);
-void     bn_randZr_star(Fr*);
-int      bn_map_to_Zr(Fr*, const uint8_t*, int);
-void     bn_map_to_Zr_star(Fr*, const uint8_t*, int);
 
 void     Fr_sum_vector(Fr*, const Fr*, const int);
 void     ep_sum_vector(ep_t, ep_st*, const int);
@@ -147,6 +145,7 @@ void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
+void     Fr_print_(char*, Fr*);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);

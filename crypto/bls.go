@@ -61,7 +61,7 @@ const (
 	//
 	// SignatureLenBLSBLS12381 is the size of G1 elements
 	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
-	PrKeyLenBLSBLS12381     = 32
+	PrKeyLenBLSBLS12381     = 32                                // equal to frBytesLen
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
 	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 
@@ -271,7 +271,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	// L is the OKM length
 	// L = ceil((3 * ceil(log2(r))) / 16) which makes L (security_bits/8)-larger than r size
-	okmLength := (3 * PrKeyLenBLSBLS12381) / 2
+	okmLength := (3 * frBytesLen) / 2
 
 	// HKDF secret = IKM || I2OSP(0, 1)
 	secret := make([]byte, len(ikm)+1)
@@ -320,6 +320,7 @@ func BLSInvalidSignature() Signature {
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.
+// Decoding assumes a bytes big endian format.
 // It checks the scalar is non-zero and is less than the group order.
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	sk := newPrKeyBLSBLS12381(nil)

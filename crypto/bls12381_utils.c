@@ -29,8 +29,8 @@ int get_invalid() {
     return INVALID;
 }
 
-void bn_new_wrapper(bn_t a) {
-    bn_new(a);
+int get_Fr_BYTES() {
+    return Fr_BYTES;
 }
 
 // global variable of the pre-computed data
@@ -171,7 +171,15 @@ void bytes_print_(char* s, byte* data, int len) {
     printf("\n");
 }
 
-// DEBUG printing functions 
+void Fr_print_(char* s, Fr* a) {
+    printf("[%s]:\n", s);
+    limb_t* p = (limb_t*)(a) + Fr_DIGITS;
+    for (int i=0; i<Fr_DIGITS; i++) 
+        printf("%16llx", *(--p));
+    printf("\n");
+}
+ 
+
 void fp_print_(char* s, fp_st a) {
     char* str = malloc(sizeof(char) * fp_size_str(a, 16));
     fp_write_str(str, 100, a, 16);
@@ -196,58 +204,11 @@ void ep2_print_(char* s, ep2_st* p) {
     g2_print(p);
 }
 
-// generates a random number less than the order r
-void bn_randZr_star(Fr* x) {
-    // reduce the modular reduction bias
-    const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
-    byte seed[seed_len];
-    rand_bytes(seed, seed_len);
-    bn_map_to_Zr_star(x, seed, seed_len);
-    rand_bytes(seed, seed_len); // overwrite seed
-}
-
-// generates a random number less than the order r
-void bn_randZr(Fr* x) {
-    // reduce the modular reduction bias
-    /*bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
-    bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
-    bn_mod(x, x, &core_get()->ep_r);*/
-}
-
-// Reads a scalar from an array and maps it to Zr.
-// The resulting scalar `a` satisfies 0 <= a < r.
-// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS).
-// It returns VALID if scalar is zero and INVALID otherwise
-int bn_map_to_Zr(Fr* a, const uint8_t* bin, int len) {
-    /*bn_t tmp;
-    bn_new(tmp);
-    bn_new_size(tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(tmp, bin, len);
-    bn_mod(a, tmp, &core_get()->ep_r);
-    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
-    bn_free(tmp);
-    if (bn_cmp_dig(a, 0) == RLC_EQ) {
-        return VALID;
-    }
-    return INVALID;*/
-}
-
-// Reads a scalar from an array and maps it to Zr*.
-// The resulting scalar `a` satisfies 0 < a < r.
-// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS)
-void bn_map_to_Zr_star(Fr* a, const uint8_t* bin, int len) {
-    /*bn_t tmp;
-    bn_new(tmp);
-    bn_new_size(tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(tmp, bin, len);
-    bn_t r_1;
-    bn_new(r_1); 
-    bn_sub_dig(r_1, &core_get()->ep_r, 1);
-    bn_mod_basic(a,tmp,r_1);
-    bn_add_dig(a,a,1);
-    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
-    bn_free(tmp);
-    bn_free(r_1);*/
+// Reads a scalar from an array and maps it to Fr.
+// It returns true if scalar is zero and false otherwise.
+bool map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+    vec256_from_be_bytes((limb_t*)a, bin, len);
+    return Fr_is_zero(a);
 }
 
 // returns the sign of y.
@@ -561,6 +522,8 @@ bool_t Fr_is_equal(const Fr* a, const Fr* b) {
 }
 
 // reads a scalar in `a` and checks it is a valid Fr element (a < r).
+// input bytes are big endian.
+// returns:
 //    - BLST_BAD_ENCODING if the length is invalid
 //    - BLST_BAD_SCALAR if the scalar isn't in Fr
 //    - v if the scalar is valid 
@@ -568,15 +531,19 @@ BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
     if (len != Fr_BYTES) {
         return BLST_BAD_ENCODING;
     }
-    if (!check_mod_256(bin, BLS12_381_r)) { // check_mod_256 compares byte[] against a vec256!
+    pow256 tmp;
+    pow256_from_be_bytes(tmp, bin);
+    if (!check_mod_256(tmp, BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
         return BLST_BAD_SCALAR;
     }
+    vec_zero(tmp, Fr_BYTES);
     limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
     return BLST_SUCCESS;
 }
 
 // reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
-// returns
+// input bytes are big endian.
+// returns:
 //    - BLST_BAD_ENCODING if the length is invalid
 //    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
 //    - BLST_SUCCESS if the scalar is valid 
@@ -590,6 +557,11 @@ BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
         return BLST_BAD_SCALAR;
     }
     return BLST_SUCCESS;
+}
+
+// write Fr element `a` in big endian bytes.
+void Fr_write_bytes(uint8_t *bin, const Fr* a) {
+    be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
 }
 
 // computes the sum of the array elements x and writes the sum in jointx

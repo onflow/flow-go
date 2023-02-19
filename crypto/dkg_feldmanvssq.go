@@ -625,7 +625,6 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
-		C.bn_new_wrapper((*C.Fr)(&s.complaints[complainer].answer))
 		if C.Fr_read_bytes((*C.Fr)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
@@ -649,7 +648,6 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		C.bn_new_wrapper((*C.Fr)(&c.answer))
 		if C.Fr_read_bytes((*C.Fr)(&c.answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,

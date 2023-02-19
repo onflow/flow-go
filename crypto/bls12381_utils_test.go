@@ -54,7 +54,7 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 	_, _ = rand.Read(seed)
 	_ = seedRelic(seed)
 	var expo scalar
-	randZr(&expo) // TODO: upadate
+	randZr(&expo)
 
 	// G1 generator multiplication
 	b.Run("G1 gen", func(b *testing.B) {
