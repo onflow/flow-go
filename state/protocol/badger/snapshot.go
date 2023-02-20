@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -54,30 +53,6 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not retrieve quorum certificate for (%x): %w", s.blockID, err)
 	}
 	return qc, nil
-}
-
-// validChild returns a child of the snapshot head. Any valid child may be returned.
-// Subsequent calls are not guaranteed to return the same child.
-// Since blocks are fully validated before insertion to the state, all stored child
-// blocks are valid and may be returned.
-//
-// Error returns:
-//   - state.NoChildBlockError if no valid child exists.
-func (s *Snapshot) validChild() (*flow.Header, error) {
-
-	var childIDs flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up children: %w", err)
-	}
-
-	if len(childIDs) == 0 {
-		return nil, state.NewNoChildBlockErrorf("block (id=%x) has no children stored in the protocol state", s.blockID)
-	}
-
-	// get the header of the first child
-	child, err := s.state.headers.ByBlockID(childIDs[0])
-	return child, err
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
