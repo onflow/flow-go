@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -849,20 +850,20 @@ func TestQuorumCertificate(t *testing.T) {
 	require.NoError(t, err)
 
 	// should not be able to get QC or random beacon seed from a block with no children
-	t.Run("no children", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	t.Run("no QC available", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
-			err := state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
+			err := state.Extend(context.Background(), block1)
 			require.Nil(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
-			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			_, err = state.AtBlockID(block1.ID()).RandomSource()
-			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 
@@ -887,21 +888,19 @@ func TestQuorumCertificate(t *testing.T) {
 			block1.SetPayload(flow.EmptyPayload())
 			certifyingQC := unittest.CertifyBlock(block1.Header)
 			err := state.ExtendCertified(context.Background(), block1, certifyingQC)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
-			// TODO: this test will be fixed when proper implementation of Snapshot will be updated
-			// TODO: https://github.com/dapperlabs/flow-go/issues/6484
-			//// should be able to get QC/seed
-			//qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
-			//assert.Nil(t, err)
-			//// should have signatures from valid child (block 2)
-			//assert.Equal(t, certifyingQC.SignerIndices, qc.SignerIndices)
-			//assert.Equal(t, certifyingQC.SigData, qc.SigData)
-			//// should have view matching block1 view
-			//assert.Equal(t, block1.Header.View, qc.View)
-			//
-			//_, err = state.AtBlockID(block1.ID()).RandomSource()
-			//require.Nil(t, err)
+			// should be able to get QC/seed
+			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
+			assert.NoError(t, err)
+			// should have signatures from valid child (block 2)
+			assert.Equal(t, certifyingQC.SignerIndices, qc.SignerIndices)
+			assert.Equal(t, certifyingQC.SigData, qc.SigData)
+			// should have view matching block1 view
+			assert.Equal(t, block1.Header.View, qc.View)
+
+			_, err = state.AtBlockID(block1.ID()).RandomSource()
+			require.NoError(t, err)
 		})
 	})
 }

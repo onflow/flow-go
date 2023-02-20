@@ -56,3 +56,15 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 		require.Equal(t, qc, actual)
 	})
 }
+
+// TestQuorumCertificates_ByBlockID that ByBlockID returns correct sentinel error if no QC for given block ID has been found
+func TestQuorumCertificates_ByBlockID(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewQuorumCertificates(metrics, db, 10)
+
+		actual, err := store.ByBlockID(unittest.IdentifierFixture())
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.Nil(t, actual)
+	})
+}

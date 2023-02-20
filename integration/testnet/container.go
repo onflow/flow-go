@@ -370,6 +370,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	guarantees := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
 	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := storage.NewBlocks(db, headers, payloads)
+	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
 	statuses := storage.NewEpochStatuses(metrics, db)
@@ -381,6 +382,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		seals,
 		results,
 		blocks,
+		qcs,
 		setups,
 		commits,
 		statuses,

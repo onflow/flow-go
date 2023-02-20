@@ -86,10 +86,10 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.protoGenesis = genesis.Header
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, qcs, tracer, consumer, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 }
 

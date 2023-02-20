@@ -36,7 +36,9 @@ type Snapshot interface {
 
 	// QuorumCertificate returns a valid quorum certificate for the header at
 	// this snapshot, if one exists.
-	// TODO document error returns
+	// Expected error returns:
+	// * storage.ErrNotFound is returned if the QC is unknown.
+	// All other errors should be treated as exceptions.
 	QuorumCertificate() (*flow.QuorumCertificate, error)
 
 	// Identities returns a list of identities at the selected point of the
@@ -102,11 +104,9 @@ type Snapshot interface {
 
 	// RandomSource returns the source of randomness derived from the Head block.
 	// NOTE: not to be confused with the epoch source of randomness!
-	// Error returns:
-	//  * NoValidChildBlockError indicates that no valid child block is known
-	//    (which contains the block's source of randomness)
-	//  * unexpected errors should be considered symptoms of internal bugs
-	// TODO document error returns
+	// Expected error returns:
+	// * storage.ErrNotFound is returned if the QC is unknown.
+	// All other errors should be treated as exceptions.
 	RandomSource() ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.

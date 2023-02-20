@@ -233,20 +233,22 @@ func CompleteStateFixture(
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
+	state, err := badgerstate.Bootstrap(
+		metric,
+		db,
+		s.Headers,
+		s.Seals,
+		s.Results,
+		s.Blocks,
+		s.QuorumCertificates,
+		s.Setups,
+		s.EpochCommits,
+		s.Statuses,
+		rootSnapshot,
+	)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(
-		state,
-		s.Index,
-		s.Payloads,
-		s.QuorumCertificates,
-		tracer,
-		consumer,
-		util.MockBlockTimer(),
-		util.MockReceiptValidator(),
-		util.MockSealValidator(s.Seals),
-	)
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -540,15 +542,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.ParticipantState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(
-		protoState.State,
-		node.Index,
-		node.Payloads,
-		node.QuorumCertificates,
-		node.Tracer,
-		node.ProtocolEvents,
-		blocktimer.DefaultBlockTimer,
-	)
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus

@@ -37,7 +37,6 @@ type FollowerState struct {
 
 	index      storage.Index
 	payloads   storage.Payloads
-	qcs        storage.QuorumCertificates
 	tracer     module.Tracer
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
@@ -61,7 +60,6 @@ func NewFollowerState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	qcs storage.QuorumCertificates,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
@@ -70,7 +68,6 @@ func NewFollowerState(
 		State:      state,
 		index:      index,
 		payloads:   payloads,
-		qcs:        qcs,
 		tracer:     tracer,
 		consumer:   consumer,
 		blockTimer: blockTimer,
@@ -86,14 +83,13 @@ func NewFullConsensusState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	qcs storage.QuorumCertificates,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*ParticipantState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, qcs, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
