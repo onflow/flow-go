@@ -38,6 +38,7 @@ type FollowerState struct {
 
 	index      storage.Index
 	payloads   storage.Payloads
+	qcs        storage.QuorumCertificates
 	tracer     module.Tracer
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
@@ -57,6 +58,7 @@ func NewFollowerState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	qcs storage.QuorumCertificates,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
@@ -65,6 +67,7 @@ func NewFollowerState(
 		State:      state,
 		index:      index,
 		payloads:   payloads,
+		qcs:        qcs,
 		tracer:     tracer,
 		consumer:   consumer,
 		blockTimer: blockTimer,
@@ -80,13 +83,14 @@ func NewFullConsensusState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	qcs storage.QuorumCertificates,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(state, index, payloads, qcs, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -441,6 +445,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
+		}
+
+		qc := candidate.Header.QuorumCertificate()
+		err = m.qcs.StoreTx(qc)(tx)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not store qc: %w", err)
 		}
 
 		// index the latest sealed block in this fork

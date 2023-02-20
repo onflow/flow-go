@@ -245,6 +245,7 @@ func main() {
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
+				node.Storage.QuorumCertificates,
 				node.Tracer,
 				node.ProtocolEvents,
 				blockTimer,
