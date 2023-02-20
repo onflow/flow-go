@@ -5,7 +5,6 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/storage"
 	"math/rand"
 	"testing"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -844,7 +844,7 @@ func TestQuorumCertificate(t *testing.T) {
 	require.NoError(t, err)
 
 	// should not be able to get QC or random beacon seed from a block with no children
-	t.Run("no qc available", func(t *testing.T) {
+	t.Run("no QC available", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// create a block to query
