@@ -172,25 +172,26 @@ func GenericNodeWithStateFixture(t testing.TB,
 	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
-		Ctx:            ctx,
-		Cancel:         cancel,
-		Errs:           errs,
-		Log:            log,
-		Metrics:        metrics,
-		Tracer:         tracer,
-		PublicDB:       stateFixture.PublicDB,
-		SecretsDB:      stateFixture.SecretsDB,
-		State:          stateFixture.State,
-		Headers:        stateFixture.Storage.Headers,
-		Guarantees:     stateFixture.Storage.Guarantees,
-		Seals:          stateFixture.Storage.Seals,
-		Payloads:       stateFixture.Storage.Payloads,
-		Blocks:         stateFixture.Storage.Blocks,
-		Me:             me,
-		Net:            net,
-		DBDir:          stateFixture.DBDir,
-		ChainID:        chainID,
-		ProtocolEvents: stateFixture.ProtocolEvents,
+		Ctx:                ctx,
+		Cancel:             cancel,
+		Errs:               errs,
+		Log:                log,
+		Metrics:            metrics,
+		Tracer:             tracer,
+		PublicDB:           stateFixture.PublicDB,
+		SecretsDB:          stateFixture.SecretsDB,
+		State:              stateFixture.State,
+		Headers:            stateFixture.Storage.Headers,
+		Guarantees:         stateFixture.Storage.Guarantees,
+		Seals:              stateFixture.Storage.Seals,
+		Payloads:           stateFixture.Storage.Payloads,
+		Blocks:             stateFixture.Storage.Blocks,
+		QuorumCertificates: stateFixture.Storage.QuorumCertificates,
+		Me:                 me,
+		Net:                net,
+		DBDir:              stateFixture.DBDir,
+		ChainID:            chainID,
+		ProtocolEvents:     stateFixture.ProtocolEvents,
 	}
 }
 
@@ -235,8 +236,17 @@ func CompleteStateFixture(
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer,
-		util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
+	mutableState, err := badgerstate.NewFullConsensusState(
+		state,
+		s.Index,
+		s.Payloads,
+		s.QuorumCertificates,
+		tracer,
+		consumer,
+		util.MockBlockTimer(),
+		util.MockReceiptValidator(),
+		util.MockSealValidator(s.Seals),
+	)
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -530,8 +540,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer,
-		node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+	followerState, err := badgerstate.NewFollowerState(
+		protoState.State,
+		node.Index,
+		node.Payloads,
+		node.QuorumCertificates,
+		node.Tracer,
+		node.ProtocolEvents,
+		blocktimer.DefaultBlockTimer,
+	)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
