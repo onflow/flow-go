@@ -233,7 +233,19 @@ func CompleteStateFixture(
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
+	state, err := badgerstate.Bootstrap(
+		metric,
+		db,
+		s.Headers,
+		s.Seals,
+		s.Results,
+		s.Blocks,
+		s.QuorumCertificates,
+		s.Setups,
+		s.EpochCommits,
+		s.Statuses,
+		rootSnapshot,
+	)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(

@@ -62,6 +62,7 @@ func Bootstrap(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -111,7 +112,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = transaction.WithTx(operation.InsertRootQuorumCertificate(qc))(tx)
+		err = qcs.StoreTx(qc)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
