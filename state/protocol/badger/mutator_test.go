@@ -104,8 +104,7 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer, util.MockBlockTimer(),
-			util.MockReceiptValidator(), util.MockSealValidator(seals))
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
 		// insert block1 on top of the root block
@@ -633,8 +632,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(seals)
-		state, err := protocol.NewFullConsensusState(protoState, index, payloads, qcs, tracer, consumer,
-			util.MockBlockTimer(), receiptValidator, sealValidator)
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer, util.MockBlockTimer(), receiptValidator, sealValidator)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
@@ -1796,8 +1794,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer,
-			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
 		require.NoError(t, err)
 
 		err = fullState.Extend(context.Background(), block1)
@@ -2176,8 +2173,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer, blockTimer,
-			util.MockReceiptValidator(), util.MockSealValidator(seals))
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, blockTimer, util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(block.Header)
