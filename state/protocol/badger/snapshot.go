@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
@@ -47,53 +46,13 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 }
 
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
-// header at this snapshot. With the exception of the root block, a valid child
-// block must be which contains the desired QC. The sentinel error
-// state.NoChildBlockError is returned if the the QC is unknown.
-//
-// For root block snapshots, returns the root quorum certificate. For all other
-// blocks, generates a quorum certificate from a valid child, if one exists.
+// header at this snapshot.
+// The sentinel error storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
-
-	// CASE 1: for the root block, return the root QC
-	root, err := s.state.Params().Root()
+	qc, err := s.state.qcs.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, fmt.Errorf("could not retrieve quorum certificate for (%x): %w", s.blockID, err)
 	}
-
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-		return &rootQC, nil
-	}
-
-	// CASE 2: for any other block, generate the root QC from a valid child
-	child, err := s.validChild()
-	if err != nil {
-		return nil, fmt.Errorf("could not get valid child of block %x: %w", s.blockID, err)
-	}
-
-	// sanity check: ensure the child has the snapshot block as parent
-	if child.ParentID != s.blockID {
-		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
-	}
-
-	// retrieve the full header as we need the view for the quorum certificate
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-
-	qc := &flow.QuorumCertificate{
-		View:          head.View,
-		BlockID:       s.blockID,
-		SignerIndices: child.ParentVoterIndices,
-		SigData:       child.ParentVoterSigData,
-	}
-
 	return qc, nil
 }
 
@@ -416,41 +375,19 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 
 // RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
-// * state.NoChildBlockError if no valid child is known
+// * storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) RandomSource() ([]byte, error) {
-
-	// CASE 1: for the root block, generate the seed from the root qc
-	root, err := s.state.Params().Root()
+	qc, err := s.QuorumCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, err
 	}
 
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-
-		seed, err := seed.FromParentQCSignature(rootQC.SigData)
-		if err != nil {
-			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
-		}
-		return seed, nil
-	}
-
-	// CASE 2: for any other block, use any valid child
-	child, err := s.validChild()
+	randomSource, err := seed.FromParentQCSignature(qc.SigData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
+		return nil, fmt.Errorf("could not create seed from QC's signature: %w", err)
 	}
 
-	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
-	}
-
-	return seed, nil
+	return randomSource, nil
 }
 
 func (s *Snapshot) Epochs() protocol.EpochQuery {
