@@ -73,7 +73,13 @@ func (committer *fakeCommitter) CommitView(
 	committer.callCount++
 
 	endState := incStateCommitment(startState)
-	return endState, []byte{byte(committer.callCount)}, nil, nil
+
+	trieUpdate := &ledger.TrieUpdate{}
+	trieUpdate.RootHash[0] = byte(committer.callCount)
+	return endState,
+		[]byte{byte(committer.callCount)},
+		trieUpdate,
+		nil
 }
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -172,12 +178,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			view,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
-		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
-		assert.Len(t, result.Chunks, 1+1)         // +1 system chunk
-		assert.Len(t, result.ChunkDataPacks, 1+1) // +1 system chunk
+		assert.Len(t, result.StateSnapshots, 1+1)      // +1 system chunk
+		assert.Len(t, result.Chunks, 1+1)              // +1 system chunk
+		assert.Len(t, result.ChunkDataPacks, 1+1)      // +1 system chunk
+		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
 
 		require.Equal(t, 2, committer.callCount)
+
+		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
 
 		// regular collection chunk
 		chunk1 := result.Chunks[0]
@@ -202,6 +210,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
 		assert.NotNil(t, chunkDataPack1.Collection)
 
+		chunkExecutionData1 := result.ChunkExecutionDatas[0]
+		assert.Equal(
+			t,
+			chunkDataPack1.Collection,
+			chunkExecutionData1.Collection)
+		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
+		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+
 		// system chunk is special case, but currently also 1 tx
 		chunk2 := result.Chunks[1]
 		assert.Equal(t, block.ID(), chunk2.BlockID)
@@ -225,9 +241,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
 		assert.Nil(t, chunkDataPack2.Collection)
 
+		chunkExecutionData2 := result.ChunkExecutionDatas[1]
+		assert.NotNil(t, chunkExecutionData2.Collection)
+		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
+		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+
 		assert.Equal(t, expectedChunk2EndState, result.EndState)
 
 		assertEventHashesMatch(t, 1+1, result)
+
+		assert.NotEqual(t, flow.ZeroID, result.ExecutionDataID)
 
 		vm.AssertExpectations(t)
 	})
@@ -278,8 +301,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assertEventHashesMatch(t, 1, result)
 
@@ -358,8 +381,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
 	})
@@ -407,7 +430,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(
+					flow.EmptyAddress,
+					"no payer address provided")
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
@@ -455,7 +480,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
+					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
+						flow.EmptyAddress,
+						"no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
@@ -935,9 +962,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return ledger.Get(id)
-	})
+	view := delta.NewDeltaView(ledger)
 	txnState := state.NewTransactionState(view, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)
 
@@ -1074,7 +1099,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
