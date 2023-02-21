@@ -14,13 +14,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog"
-	"github.com/sethvargo/go-retry"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 )
 
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
@@ -132,17 +130,17 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	maxRetries := maxAttempts - 1
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
-	attempts := atomic.NewInt64(0)
+	attempts := 0
 	// retryable func will attempt to create the stream and only retry if dialing the peer is in progress
 	f := func(context.Context) error {
-		attempts.Inc()
+		attempts++
 		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
 		if err != nil {
 			if IsErrDialInProgress(err) {
 				m.logger.Warn().
 					Err(err).
 					Str("peer_id", peerID.String()).
-					Int64("attempt", attempts.Load()).
+					Int("attempt", attempts).
 					Uint64("max_attempts", maxAttempts).
 					Msg("retrying create stream, dial to peer in progress")
 				return retry.RetryableError(err)
@@ -213,12 +211,12 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	// retryable func that will attempt to dial the peer and establish the initial connection
-	dialAttempts := atomic.NewInt64(0)
+	dialAttempts := 0
 	dialPeer := func(context.Context) error {
-		dialAttempts.Inc()
+		dialAttempts++
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", dialAttempts.String(), errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", dialAttempts, errs)
 		default:
 		}
 
@@ -245,7 +243,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			m.logger.Warn().
 				Err(err).
 				Str("peer_id", peerID.String()).
-				Int64("attempt", dialAttempts.Load()).
+				Int("attempt", dialAttempts).
 				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
 			errs = multierror.Append(errs, err)
@@ -255,12 +253,12 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	// retryable func that will attempt to create the stream using the stream factory if connection exists
-	connectAttempts := atomic.NewInt64(0)
+	connectAttempts := 0
 	connectPeer := func(context.Context) error {
-		connectAttempts.Inc()
+		connectAttempts++
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %s, errors: %w)", connectAttempts.String(), errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", connectAttempts, errs)
 		default:
 		}
 
