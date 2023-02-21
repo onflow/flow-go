@@ -472,9 +472,8 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-
 	// all errors returned from storage reads here are unexpected, because all
-	// snapshots reside within a current epoch, which must be queriable
+	// snapshots reside within a current epoch, which must be queryable
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
