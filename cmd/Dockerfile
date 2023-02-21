@@ -21,7 +21,8 @@ ARG VERSION
 
 COPY . .
 
-RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+RUN --mount=type=ssh \
+    --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto_setup_gopath
 
@@ -37,7 +38,8 @@ ARG TAGS="relic,netgo"
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+RUN --mount=type=ssh \
+    --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 GOOS=linux go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
