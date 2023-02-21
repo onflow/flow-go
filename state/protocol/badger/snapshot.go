@@ -611,7 +611,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 // Then, the transition from epoch 1 to 2 has not been committed, because the first block of epoch 2 has not been finalized.
 // In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
 // There are edge-case scenarios, where a different fork could exist (as illustrated below)
-// that still adds additional blocks to Epoch 1. 
+// that still adds additional blocks to Epoch 1.
 //
 //	Epoch 1      Epoch 2
 //	A <- B <---|-- C <- D
@@ -638,8 +638,8 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, final
 		}
 		epochStarted = true
 
-		var currentEpochFirstHeight uint64
-		err = operation.RetrieveEpochFirstHeight(epoch+1, &currentEpochFirstHeight)(tx)
+		var subsequentEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				epochEnded = false
@@ -647,7 +647,7 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, final
 			}
 			return err // unexpected error
 		}
-		finalHeight = currentEpochFirstHeight - 1
+		finalHeight = subsequentEpochFirstHeight - 1
 		epochEnded = true
 
 		return nil
