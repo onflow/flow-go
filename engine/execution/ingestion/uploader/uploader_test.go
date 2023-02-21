@@ -21,7 +21,9 @@ import (
 
 func Test_AsyncUploader(t *testing.T) {
 
-	computationResult := unittest.ComputationResultFixture(nil)
+	computationResult := unittest.ComputationResultFixture(
+		testutils.IdentifierFixture(),
+		nil)
 
 	t.Run("uploads are run in parallel and emit metrics", func(t *testing.T) {
 		wgUploadStarted := sync.WaitGroup{}
