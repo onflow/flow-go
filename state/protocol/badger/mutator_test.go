@@ -331,7 +331,7 @@ func TestExtendMissingParent(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -363,7 +363,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -432,7 +432,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1846,7 +1846,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1869,13 +1869,12 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
-		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1891,7 +1890,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		block.Header.Height = head.Height + 2
 
 		err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
-		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 	})
 }
 
@@ -1915,14 +1914,12 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
-		require.Error(t, err)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1970,6 +1967,33 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 	})
 }
 
+// TestExtendCertifiedInvalidQC checks if ExtendCertified performs a sanity check of certifying QC.
+func TestExtendCertifiedInvalidQC(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		// create child block
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(flow.EmptyPayload())
+
+		t.Run("qc-invalid-view", func(t *testing.T) {
+			certifyingQC := unittest.CertifyBlock(block.Header)
+			certifyingQC.View++ // invalidate block view
+			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			require.Error(t, err)
+			require.False(t, st.IsOutdatedExtensionError(err))
+		})
+		t.Run("qc-invalid-block-id", func(t *testing.T) {
+			certifyingQC := unittest.CertifyBlock(block.Header)
+			certifyingQC.BlockID = unittest.IdentifierFixture() // invalidate blockID
+			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			require.Error(t, err)
+			require.False(t, st.IsOutdatedExtensionError(err))
+		})
+	})
+}
+
 // TestExtendInvalidGuarantee checks if Extend method will reject invalid blocks that contain
 // guarantees with invalid guarantors
 func TestExtendInvalidGuarantee(t *testing.T) {
@@ -1990,7 +2014,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		block := unittest.BlockWithParentFixture(head)
 		payload := flow.EmptyPayload()
 		payload.Guarantees = []*flow.CollectionGuarantee{
-			&flow.CollectionGuarantee{
+			{
 				ChainID:          cluster.ChainID(),
 				ReferenceBlockID: head.ID(),
 				SignerIndices:    validSignerIndices,
@@ -2007,7 +2031,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -2021,7 +2044,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -2043,7 +2065,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -2054,7 +2075,6 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
