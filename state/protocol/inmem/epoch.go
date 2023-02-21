@@ -18,6 +18,8 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
+var _ protocol.Epoch = (*Epoch)(nil)
+
 func (e Epoch) Encodable() EncodableEpoch {
 	return e.enc
 }
@@ -91,6 +93,8 @@ func (e Epoch) FirstHeight() (uint64, error) {
 type Epochs struct {
 	enc EncodableEpochs
 }
+
+var _ protocol.EpochQuery = (*Epochs)(nil)
 
 func (eq Epochs) Previous() protocol.Epoch {
 	if eq.enc.Previous != nil {
@@ -253,8 +257,8 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 // startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
 // to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
 // possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
-// in Epoch N+1, there is no definition of "last block" for Epoch N. 
-// 
+// in Epoch N+1, there is no definition of "last block" for Epoch N.
+//
 // startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
 type startedEpoch struct {
 	committedEpoch
