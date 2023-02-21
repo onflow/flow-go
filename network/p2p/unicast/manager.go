@@ -38,7 +38,7 @@ var (
 type Manager struct {
 	logger                 zerolog.Logger
 	streamFactory          StreamFactory
-	unicasts               []protocols.Protocol
+	protocols              []protocols.Protocol
 	defaultHandler         libp2pnet.StreamHandler
 	sporkId                flow.Identifier
 	connStatus             p2p.PeerConnections
@@ -63,11 +63,11 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	defaultProtocolID := protocols.FlowProtocolID(m.sporkId)
 	m.defaultHandler = defaultHandler
 
-	if len(m.unicasts) > 0 {
+	if len(m.protocols) > 0 {
 		panic("default handler must be set only once before any unicast registration")
 	}
 
-	m.unicasts = []protocols.Protocol{
+	m.protocols = []protocols.Protocol{
 		&PlainStream{
 			protocolId: defaultProtocolID,
 			handler:    defaultHandler,
@@ -80,15 +80,15 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 
 // Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
 // over previously registered ones.
-func (m *Manager) Register(unicast protocols.ProtocolName) error {
-	factory, err := protocols.ToProtocolFactory(unicast)
+func (m *Manager) Register(protocol protocols.ProtocolName) error {
+	factory, err := protocols.ToProtocolFactory(protocol)
 	if err != nil {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
 	u := factory(m.logger, m.sporkId, m.defaultHandler)
 
-	m.unicasts = append(m.unicasts, u)
+	m.protocols = append(m.protocols, u)
 	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler)
 	m.logger.Info().Str("protocol_id", string(u.ProtocolId())).Msg("unicast handler registered")
 
@@ -100,8 +100,8 @@ func (m *Manager) Register(unicast protocols.ProtocolName) error {
 // back to the less preferred one.
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
-	for i := len(m.unicasts) - 1; i >= 0; i-- {
-		s, addrs, err := m.tryCreateStream(ctx, peerID, uint64(maxAttempts), m.unicasts[i])
+	for i := len(m.protocols) - 1; i >= 0; i-- {
+		s, addrs, err := m.tryCreateStream(ctx, peerID, uint64(maxAttempts), m.protocols[i])
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -118,7 +118,7 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 // If no stream can be created after max attempts the error is returned. During stream creation IsErrDialInProgress indicates
 // that no connection to the peer exists yet, in this case we will retry creating the stream with a backoff until a connection
 // is established.
-func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, protocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var err error
 	var s libp2pnet.Stream
 	var addrs []multiaddr.Multiaddr // address on which we dial peerID
@@ -134,7 +134,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	// retryable func will attempt to create the stream and only retry if dialing the peer is in progress
 	f := func(context.Context) error {
 		attempts++
-		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, unicastProtocol)
+		s, addrs, err = m.createStream(ctx, peerID, maxAttempts, protocol)
 		if err != nil {
 			if IsErrDialInProgress(err) {
 				m.logger.Warn().
@@ -159,14 +159,14 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	return s, addrs, nil
 }
 
-// createStream creates a stream to the peerID with the provided unicastProtocol.
-func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	s, addrs, err := m.rawStreamWithProtocol(ctx, unicastProtocol.ProtocolId(), peerID, maxAttempts)
+// createStream creates a stream to the peerID with the provided protocol.
+func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, protocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	s, addrs, err := m.rawStreamWithProtocol(ctx, protocol.ProtocolId(), peerID, maxAttempts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	s, err = unicastProtocol.UpgradeRawStream(s)
+	s, err = protocol.UpgradeRawStream(s)
 	if err != nil {
 		return nil, nil, err
 	}
