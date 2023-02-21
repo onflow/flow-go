@@ -31,9 +31,14 @@ func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
 	require.Equal(a.T(), int64(numOfAuthorizedEvents), a.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, a.Orchestrator.expectedBlockedEventsReceived.Load()))
 
-	// after blocking node a.senderVN we should not receive any messages from that node. We wait for
-	// 500 milliseconds to reduce the small chance of a race condition between the time a node is blocked
-	// and the time the blocked node sends the first unauthorized message
+	// after blocking node a.senderVN we should not receive any messages from that node.
+	// This is an asynchronous process with a number of sub processes involved including not limited to ;
+	// - submitting request to admin server for node to be blocked
+	// - node block list must update
+	// - peer manager needs to prune the connection
+	// - connection gater will start blocking incoming connections
+	//We wait for 500 milliseconds to reduce the small chance of a race condition between the time a node is blocked
+	// and the time the blocked node sends the first unauthorized message.
 	a.blockNode(a.senderVN)
 	time.Sleep(500 * time.Millisecond)
 
@@ -41,6 +46,9 @@ func (a *AdminCommandBlockListTestSuite) TestAdminCommandBlockList() {
 	// in normal situations if the node is not block listed, these messages would be considered
 	// legit and hence would be delivered to the recipients.
 	a.Orchestrator.sendExpectedBlockedMsgs(a.T())
+	// The sleep is unavoidable for the following reasons these messages are sent between 2 running libp2p nodes we don't have any hooks in between
+	// These are messages sent after the node is blocked meaning that these messages are not expected to be delivered to the receiver node,
+	// so we sleep this approximate amount of time to ensure all messages were attempted, processed and dropped.
 	time.Sleep(3 * time.Second)
 
 	// messages sent after the node is block listed are considered unauthorized, we don't expect to receive any of them.
