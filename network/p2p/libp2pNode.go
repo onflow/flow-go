@@ -78,7 +78,7 @@ type LibP2PNode interface {
 
 // PeerConnections subset of funcs related to underlying libp2p host connections.
 type PeerConnections interface {
-	// IsConnected returns true is address is a direct peer of this node else false.
+	// IsConnected returns true if address is a direct peer of this node else false.
 	// Peers are considered not connected if the underlying libp2p host reports the
 	// peers as not connected and there are no connections in the connection list.
 	// The following error returns indicate a bug in the code:

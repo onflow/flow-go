@@ -364,7 +364,7 @@ func (n *Node) RequestPeerUpdate() {
 	}
 }
 
-// IsConnected returns true is address is a direct peer of this node else false.
+// IsConnected returns true if address is a direct peer of this node else false.
 // Peers are considered not connected if the underlying libp2p host reports the
 // peers as not connected and there are no connections in the connection list.
 // error returns:

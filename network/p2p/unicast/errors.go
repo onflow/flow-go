@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// ErrDialInProgress indicates that the libp2p node is currently dialingComplete the peer.
+// ErrDialInProgress indicates that the libp2p node is currently dialing the peer.
 type ErrDialInProgress struct {
 	pid peer.ID
 }
