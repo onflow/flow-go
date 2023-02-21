@@ -21,6 +21,8 @@ ARG VERSION
 
 COPY . .
 
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN echo '[url "ssh://git@github.com/"] insteadOf = https://github.com/' > ~/.gitconfig
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -35,6 +37,8 @@ ARG GOARCH=amd64
 
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
 ARG TAGS="relic,netgo"
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN echo '[url "ssh://git@github.com/"] insteadOf = https://github.com/' > ~/.gitconfig
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
