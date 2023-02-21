@@ -144,14 +144,14 @@ func TestIdentities(t *testing.T) {
 
 		t.Run("no filter", func(t *testing.T) {
 			actual, err := state.Final().Identities(filter.Any)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.ElementsMatch(t, identities, actual)
 		})
 
 		t.Run("single identity", func(t *testing.T) {
 			expected := identities.Sample(1)[0]
 			actual, err := state.Final().Identity(expected.NodeID)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expected, actual)
 		})
 
@@ -165,7 +165,7 @@ func TestIdentities(t *testing.T) {
 			for _, filterfunc := range filters {
 				expected := identities.Filter(filterfunc)
 				actual, err := state.Final().Identities(filterfunc)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.ElementsMatch(t, expected, actual)
 			}
 		})
@@ -857,7 +857,7 @@ func TestQuorumCertificate(t *testing.T) {
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
 			err := state.Extend(context.Background(), block1)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.ErrorIs(t, err, storage.ErrNotFound)
@@ -880,7 +880,7 @@ func TestQuorumCertificate(t *testing.T) {
 	})
 
 	// should be able to get QC and random beacon seed from a certified block
-	t.Run("block-processable", func(t *testing.T) {
+	t.Run("follower-block-processable", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// add a block so we aren't testing against root
@@ -893,14 +893,39 @@ func TestQuorumCertificate(t *testing.T) {
 			// should be able to get QC/seed
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.NoError(t, err)
-			// should have signatures from valid child (block 2)
+
 			assert.Equal(t, certifyingQC.SignerIndices, qc.SignerIndices)
 			assert.Equal(t, certifyingQC.SigData, qc.SigData)
-			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)
 
 			_, err = state.AtBlockID(block1.ID()).RandomSource()
 			require.NoError(t, err)
+		})
+	})
+
+	// should be able to get QC and random beacon seed from a block with child(has to be certified)
+	t.Run("participant-block-processable", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+			// create a block to query
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(flow.EmptyPayload())
+			err := state.Extend(context.Background(), block1)
+			require.NoError(t, err)
+
+			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
+			assert.ErrorIs(t, err, storage.ErrNotFound)
+
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(flow.EmptyPayload())
+			err = state.Extend(context.Background(), block2)
+			require.NoError(t, err)
+
+			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
+			require.NoError(t, err)
+
+			// should have view matching block1 view
+			assert.Equal(t, block1.Header.View, qc.View)
+			assert.Equal(t, block1.ID(), qc.BlockID)
 		})
 	})
 }
@@ -937,7 +962,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					counter, err := state.AtHeight(height).Epochs().Current().Counter()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch1Counter, counter)
 				}
 			})
@@ -945,7 +970,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			t.Run("epoch 2", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					counter, err := state.AtHeight(height).Epochs().Current().Counter()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch2Counter, counter)
 				}
 			})
@@ -965,7 +990,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
 				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
 					counter, err := state.AtHeight(height).Epochs().Next().Counter()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch2Counter, counter)
 				}
 			})
@@ -986,7 +1011,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			t.Run("epoch 2", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					counter, err := state.AtHeight(height).Epochs().Previous().Counter()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch1Counter, counter)
 				}
 			})
@@ -1033,7 +1058,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			t.Run("Current", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch1FirstView, actualFirstView)
 				}
 			})
@@ -1042,7 +1067,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			t.Run("Previous", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Previous().FirstView()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch1FirstView, actualFirstView)
 				}
 			})
@@ -1056,7 +1081,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			t.Run("Next", func(t *testing.T) {
 				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
 					actualFirstView, err := state.AtHeight(height).Epochs().Next().FirstView()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
 				}
 			})
@@ -1065,7 +1090,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			t.Run("Current", func(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
 				}
 			})
@@ -1119,7 +1144,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			require.NoError(t, err)
 			snapshot := state.AtHeight(root.Height)
 			identities, err := snapshot.Identities(filter.Any)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// should have the right number of identities
 			assert.Equal(t, len(epoch1Identities), len(identities))
@@ -1134,11 +1159,11 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 			for _, snapshot := range snapshots {
 				phase, err := snapshot.Phase()
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {
 					identities, err := snapshot.Identities(filter.Any)
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					// should have the right number of identities
 					assert.Equal(t, len(epoch1Identities)+1, len(identities))
@@ -1159,7 +1184,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			// get a snapshot from staking phase of epoch 2
 			snapshot := state.AtHeight(epoch2.Staking)
 			identities, err := snapshot.Identities(filter.Any)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// should have the right number of identities
 			assert.Equal(t, len(epoch2Identities)+1, len(identities))
@@ -1180,11 +1205,11 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 			for _, snapshot := range snapshots {
 				phase, err := snapshot.Phase()
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {
 					identities, err := snapshot.Identities(filter.Any)
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					// should have the right number of identities
 					assert.Equal(t, len(epoch2Identities)+len(epoch3Identities), len(identities))
@@ -1219,7 +1244,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 		actual, err := state.Final().Identities(filter.Any)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, expected, actual)
 	})
 }
