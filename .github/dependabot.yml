@@ -6,4 +6,24 @@ updates:
       interval: 'weekly'
     # raise pull requests against branch that will be merged to public onflow/flow-go
     target-branch: "master-public"
+  - package-ecosystem: 'gomod'
+    directory: '/crypto'
+    schedule:
+      interval: 'weekly'
+    target-branch: "master-public"
+  - package-ecosystem: 'gomod'
+    directory: '/insecure'
+    schedule:
+      interval: 'weekly'
+    target-branch: "master-public"
+  - package-ecosystem: 'gomod'
+    directory: '/integration'
+    schedule:
+      interval: 'weekly'
+    target-branch: "master-public"
+  - package-ecosystem: 'gomod'
+    directory: '/cmd/testclient'
+    schedule:
+      interval: 'weekly'
+    target-branch: "master-public"
 
