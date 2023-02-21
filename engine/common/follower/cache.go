@@ -40,7 +40,7 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 	}
 }
 
-func NewPendingBlocksCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
+func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
 	return &Cache{
 		backend: herocache.NewCache(
 			limit,
