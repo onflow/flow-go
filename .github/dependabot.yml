@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: 'gomod'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    # raise pull requests against branch that will be merged to public onflow/flow-go
+    target-branch: "master-public"
+
