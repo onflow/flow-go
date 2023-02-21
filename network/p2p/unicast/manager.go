@@ -103,7 +103,7 @@ func (m *Manager) Register(unicast protocols.ProtocolName) error {
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
 	for i := len(m.unicasts) - 1; i >= 0; i-- {
-		s, addrs, err := m.tryCreateStream(ctx, peerID, maxAttempts, m.unicasts[i])
+		s, addrs, err := m.tryCreateStream(ctx, peerID, uint64(maxAttempts), m.unicasts[i])
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -120,7 +120,7 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 // If no stream can be created after max attempts the error is returned. During stream creation IsErrDialInProgress indicates
 // that no connection to the peer exists yet, in this case we will retry creating the stream with a backoff until a connection
 // is established.
-func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var err error
 	var s libp2pnet.Stream
 	var addrs []multiaddr.Multiaddr // address on which we dial peerID
@@ -130,7 +130,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 	// when retries == maxAttempts causing 1 more func invocation than expected.
 	maxRetries := maxAttempts - 1
-	backoff = retry.WithMaxRetries(uint64(maxRetries), backoff)
+	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	attempts := atomic.NewInt64(0)
 	// retryable func will attempt to create the stream and only retry if dialing the peer is in progress
@@ -143,7 +143,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 					Err(err).
 					Str("peer_id", peerID.String()).
 					Int64("attempt", attempts.Load()).
-					Int("max_attempts", maxAttempts).
+					Uint64("max_attempts", maxAttempts).
 					Msg("retrying create stream, dial to peer in progress")
 				return retry.RetryableError(err)
 			}
@@ -162,7 +162,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 }
 
 // createStream creates a stream to the peerID with the provided unicastProtocol.
-func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts int, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, unicastProtocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	s, addrs, err := m.rawStreamWithProtocol(ctx, unicastProtocol.ProtocolId(), peerID, maxAttempts)
 	if err != nil {
 		return nil, nil, err
@@ -195,7 +195,7 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts 
 func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
-	maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	maxAttempts uint64) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 
 	// aggregated retryable errors that occur during retries, errs will be returned
 	// if retry context times out or maxAttempts have been made before a successful retry occurs
@@ -210,7 +210,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 	// when retries == maxAttempts causing 1 more func invocation than expected.
 	maxRetries := maxAttempts - 1
-	backoff = retry.WithMaxRetries(uint64(maxRetries), backoff)
+	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	// retryable func that will attempt to dial the peer and establish the initial connection
 	dialAttempts := atomic.NewInt64(0)
@@ -246,7 +246,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 				Err(err).
 				Str("peer_id", peerID.String()).
 				Int64("attempt", dialAttempts.Load()).
-				Int("max_attempts", maxAttempts).
+				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
 			errs = multierror.Append(errs, err)
 			return retry.RetryableError(errs)
