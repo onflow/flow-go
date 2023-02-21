@@ -250,8 +250,12 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
-// startedEpoch is an epoch which has started, but not ended (ie. the current epoch.)
-// It has all the information of a committedEpoch, plus the epoch's first block height.
+// startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
+// to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
+// possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
+// in Epoch N+1, there is no definition of "last block" for Epoch N. 
+// 
+// startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
 type startedEpoch struct {
 	committedEpoch
 	firstHeight uint64
