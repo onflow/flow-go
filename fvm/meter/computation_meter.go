@@ -8,14 +8,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 )
 
-// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/229
-// is merged and integrated.
-const (
-	ComputationKindCreateAccount = 2006
-	ComputationKindGetValue      = 2020
-	ComputationKindSetValue      = 2026
-)
-
 type MeteredComputationIntensities map[common.ComputationKind]uint
 
 var (
