@@ -31,7 +31,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 // key underlying the signer.
 // It returns:
 //   - (signer, nil) if DKG succeeded locally in the epoch of the view, signer is not nil
-//   - (nil, protocol.ErrNextEpochNotCommitted) if no epoch found for given view
+//   - (nil, protocol.ErrNextEpochNotCommitted) if no epoch found for given view // TODO remove
 //   - (nil, DKGFailError) if DKG failed locally in the epoch of the view
 //   - (nil, error) if there is any exception
 func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
