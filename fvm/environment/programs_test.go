@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -109,12 +110,15 @@ func Test_Programs(t *testing.T) {
 
 	mainView := delta.NewDeltaView(nil)
 
-	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
-
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-	accounts := environment.NewAccounts(txnState)
+	accounts := environment.NewAccounts(
+		storage.SerialTransaction{
+			NestedTransaction: state.NewTransactionState(
+				mainView,
+				state.DefaultParameters()),
+		})
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)

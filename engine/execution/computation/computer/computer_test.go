@@ -34,6 +34,7 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/convert/fixtures"
@@ -990,8 +991,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	require.NoError(t, err)
 
 	view := delta.NewDeltaView(ledger)
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	accounts := environment.NewAccounts(txnState)
+	accounts := environment.NewAccounts(testutils.NewSimpleTransaction(view))
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked

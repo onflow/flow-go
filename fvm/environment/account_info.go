@@ -22,12 +22,12 @@ type AccountInfo interface {
 }
 
 type ParseRestrictedAccountInfo struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountInfo
 }
 
 func NewParseRestrictedAccountInfo(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountInfo,
 ) AccountInfo {
 	return ParseRestrictedAccountInfo{

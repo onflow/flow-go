@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -827,10 +828,6 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
-	require.NoError(t, err)
-
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -860,12 +857,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	env := environment.NewScriptEnvironment(
+	txnState := testutils.NewSimpleTransaction(view)
+	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
-		txnState,
-		derivedTxnData)
+		txnState)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

@@ -10,25 +10,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): combine this with storage.testutils.TestStorageSnapshot
-// once #3962 is merged.
-type MapStorageSnapshot map[flow.RegisterID]flow.RegisterValue
-
-func (storage MapStorageSnapshot) Get(
-	id flow.RegisterID,
-) (
-	flow.RegisterValue,
-	error,
-) {
-	return storage[id], nil
-}
-
 // NewStorageSnapshotFromPayload returns an instance of StorageSnapshot with
 // entries loaded from payloads (should only be used for migration)
 func NewStorageSnapshotFromPayload(
 	payloads []ledger.Payload,
-) MapStorageSnapshot {
-	snapshot := make(MapStorageSnapshot, len(payloads))
+) state.MapStorageSnapshot {
+	snapshot := make(state.MapStorageSnapshot, len(payloads))
 	for _, entry := range payloads {
 		key, err := entry.Key()
 		if err != nil {
@@ -55,12 +42,6 @@ type SimpleView struct {
 	// mutate the view's internal state.
 	sync.Mutex
 	base state.View
-}
-
-func NewSimpleView() *SimpleView {
-	return &SimpleView{
-		base: delta.NewDeltaView(nil),
-	}
 }
 
 func NewSimpleViewFromPayloads(payloads []ledger.Payload) *SimpleView {
