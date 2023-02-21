@@ -106,6 +106,9 @@ func NewFullConsensusState(
 // validate the full payload. Payload validity can be proved by a valid quorum certificate.
 // Certifying QC must match candidate block: candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 // NOTE: this function expects that `certifyingQC` has been validated.
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -114,7 +117,6 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	// there are no cases where certifyingQC can be nil.
 	if certifyingQC != nil {
 		blockID := candidate.ID()
-
 		// sanity check if certifyingQC actually certifies candidate block
 		if certifyingQC.View != candidate.Header.View {
 			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
@@ -136,7 +138,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
-	// insert the block and index the last seal for the block
+	// insert the block, certifying QC and index the last seal for the block
 	err = m.insert(ctx, candidate, certifyingQC, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
@@ -147,6 +149,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
@@ -524,6 +529,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 // Finalize marks the specified block as finalized.
 // This method only finalizes one block at a time.
 // Hence, the parent of `blockID` has to be the last finalized block.
+// No errors are expected during normal operations.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 
 	// preliminaries: start tracer and retrieve full block
