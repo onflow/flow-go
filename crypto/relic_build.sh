@@ -21,6 +21,20 @@ CMAKE_PRINT_CC="message ( STATUS \"CC=\$ENV{CC}\" )"
 # Make the cmake run print its interpretation of CC
 echo "$CMAKE_PRINT_CC" >> "${CMAKE_FILE}"
 
+COMP=
+if [ "$SAN","UBSAN" ]; then
+    #OTHER_CFLAGS=" -fsanitize=undefined ";
+    #OTHER_LDFLAGS=" -fsanitize=undefined ";
+    COMP=(-DAUSAN=on)
+else
+if [ "$SAN","ASAN" ]; then
+    #OTHER_CFLAGS=" -fsanitize=address ";
+    #OTHER_LDFLAGS=" -fsanitize=address ";
+    COMP=(-DAUSAN=on)
+fi
+fi
+
+
 # Probe cmake's MakeFile generation and extract the CC version
 CMAKE_TEMP=$(mktemp)
 cmake .. > "$CMAKE_TEMP"
@@ -50,7 +64,7 @@ else
 fi
 
 # Set RELIC config for Flow
-COMP=(-DCFLAGS="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
+COMP+=(-DCFLAGS="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
 RAND=(-DRAND=HASHD -DSEED=)

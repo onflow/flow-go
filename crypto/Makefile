@@ -36,7 +36,7 @@ non_relic_tests:
 
 
 asan:
-	SAN=ASAN ./relic_build.sh
+	SAN=ASAN bash ./build_dependency.sh
 	nm ./relic/build/lib/librelic_s.a | grep asan
 	nm ./relic/build/lib/librelic_s.a | grep ubsan
 ############################################################################################
@@ -60,3 +60,6 @@ docker-build:
 docker-push:
 	docker push gcr.io/dl-flow/golang-cmake:latest 
 	docker push "gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG)"
+
+git:
+	git commit -a; git push
