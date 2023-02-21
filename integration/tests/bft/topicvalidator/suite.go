@@ -18,7 +18,7 @@ type Suite struct {
 	attackerENID flow.Identifier // corrupt attacker EN id
 	victimENID   flow.Identifier // corrupt victim EN id
 	victimVNID   flow.Identifier // corrupt victim VN id
-	Orchestrator *AttackOrchestrator
+	Orchestrator *Orchestrator
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes

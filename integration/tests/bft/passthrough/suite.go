@@ -17,7 +17,7 @@ type Suite struct {
 	exe1ID       flow.Identifier // corrupted execution node 1
 	exe2ID       flow.Identifier // corrupted execution node 2
 	verID        flow.Identifier // corrupted verification node
-	Orchestrator *dummyOrchestrator
+	Orchestrator *orchestrator
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly with the following corrupted nodes:
@@ -62,7 +62,7 @@ func (s *Suite) SetupSuite() {
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.Orchestrator = NewDummyOrchestrator(s.Log)
+			s.Orchestrator = NewDummyOrchestrator(s.T(), s.Log)
 			return s.Orchestrator
 		},
 	)

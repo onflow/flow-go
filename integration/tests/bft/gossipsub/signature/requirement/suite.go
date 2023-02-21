@@ -16,7 +16,7 @@ type Suite struct {
 	attackerVNIDNoSigning   flow.Identifier // corrupt attacker EN id, this node has message signing disabled
 	attackerVNIDWithSigning flow.Identifier // corrupt attacker EN id, this node has message signing enabled
 	victimENID              flow.Identifier // corrupt attacker VN id
-	Orchestrator            *SignatureValidationAttackOrchestrator
+	Orchestrator            *Orchestrator
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes and 1 victim node.

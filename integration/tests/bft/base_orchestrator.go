@@ -10,12 +10,22 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+type OnEgressEvent func(event *insecure.EgressEvent) error
+type OnIngressEvent func(event *insecure.IngressEvent) error
+
 // BaseOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages. This attack orchestrator
-//// simply passes through messages without changes to the orchestrator network.
+// simply passes through messages without changes to the orchestrator network. This orchestrator reduces boilerplate
+// of BFT tests by implementing common logic. Boilerplate can further be reduced by using the OnEgressEvent and OnIngressEvent
+// fields to define callbacks that will be invoked on each event received, this removes the need to redefine the logger and send
+// message logic. Each func can be completely overriden if special functionality is needed.
 type BaseOrchestrator struct {
 	T                   *testing.T
 	Logger              zerolog.Logger
 	OrchestratorNetwork insecure.OrchestratorNetwork
+	// OnEgressEvent callbacks invoked on each egress event received.
+	OnEgressEvent []OnEgressEvent
+	// OnIngressEvent callbacks invoked on each ingress event received.
+	OnIngressEvent []OnIngressEvent
 }
 
 var _ insecure.AttackOrchestrator = &BaseOrchestrator{}
@@ -29,6 +39,14 @@ func (b *BaseOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error 
 		Uint32("target_num", event.TargetNum).
 		Strs("target_ids", logging.IDs(event.TargetIds)).
 		Str("flow_protocol_event", logging.Type(event.FlowProtocolEvent)).Logger()
+
+	for _, f := range b.OnEgressEvent {
+		err := f(event)
+		if err != nil {
+			lg.Error().Err(err).Msg("could not pass through egress event")
+			return err
+		}
+	}
 
 	err := b.OrchestratorNetwork.SendEgress(event)
 	if err != nil {
@@ -48,6 +66,14 @@ func (b *BaseOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 		Str("channel", event.Channel.String()).
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
+	for _, f := range b.OnIngressEvent {
+		err := f(event)
+		if err != nil {
+			lg.Error().Err(err).Msg("could not pass through ingress event")
+			return err
+		}
+	}
 
 	err := b.OrchestratorNetwork.SendIngress(event)
 	if err != nil {

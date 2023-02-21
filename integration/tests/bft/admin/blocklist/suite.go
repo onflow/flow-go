@@ -20,7 +20,7 @@ type Suite struct {
 	bft.BaseSuite
 	senderVN     flow.Identifier // node ID of corrupted node that will send messages in the test. The sender node will be blocked.
 	receiverEN   flow.Identifier // node ID of corrupted node that will receive messages in the test
-	Orchestrator *AdminBlockListAttackOrchestrator
+	Orchestrator *Orchestrator
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes and 1 victim node.
