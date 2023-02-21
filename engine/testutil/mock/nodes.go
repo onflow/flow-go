@@ -192,13 +192,18 @@ type ComputerWrap struct {
 
 func (c *ComputerWrap) ComputeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	view fvmState.View,
 ) (*execution.ComputationResult, error) {
 	if c.OnComputeBlock != nil {
 		c.OnComputeBlock(ctx, block, view)
 	}
-	return c.Manager.ComputeBlock(ctx, block, view)
+	return c.Manager.ComputeBlock(
+		ctx,
+		parentBlockExecutionResultID,
+		block,
+		view)
 }
 
 // ExecutionNode implements a mocked execution node for tests.

@@ -107,10 +107,11 @@ type transaction struct {
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
 	ExecuteBlock(
-		context.Context,
-		*entity.ExecutableBlock,
-		state.View,
-		*derived.DerivedBlockData,
+		ctx context.Context,
+		parentBlockExecutionResultID flow.Identifier,
+		block *entity.ExecutableBlock,
+		view state.View,
+		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -177,6 +178,7 @@ func NewBlockComputer(
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	derivedBlockData *derived.DerivedBlockData,
@@ -186,6 +188,7 @@ func (e *blockComputer) ExecuteBlock(
 ) {
 	results, err := e.executeBlock(
 		ctx,
+		parentBlockExecutionResultID,
 		block,
 		stateView,
 		derivedBlockData)
@@ -277,6 +280,7 @@ func (e *blockComputer) getRootSpanAndCollections(
 
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	derivedBlockData *derived.DerivedBlockData,
@@ -310,6 +314,7 @@ func (e *blockComputer) executeBlock(
 		e.signer,
 		e.executionDataProvider,
 		e.spockHasher,
+		parentBlockExecutionResultID,
 		block,
 		len(collections))
 	defer collector.Stop()

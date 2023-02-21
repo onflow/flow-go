@@ -172,8 +172,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		view := delta.NewDeltaView(nil)
 
+		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		result, err := exe.ExecuteBlock(
 			context.Background(),
+			parentBlockExecutionResultID,
 			block,
 			view,
 			derived.NewEmptyDerivedBlockData())
@@ -248,6 +250,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assert.Equal(t, expectedChunk2EndState, result.EndState)
 
+		assert.Equal(
+			t,
+			parentBlockExecutionResultID,
+			result.ExecutionResult.PreviousResultID)
+
 		assertEventHashesMatch(t, 1+1, result)
 
 		assert.NotEqual(t, flow.ZeroID, result.ExecutionDataID)
@@ -298,7 +305,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		view := delta.NewDeltaView(nil)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
@@ -378,7 +390,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
@@ -445,7 +462,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		view := delta.NewDeltaView(nil)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derivedBlockData)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
@@ -600,7 +622,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		view := delta.NewDeltaView(nil)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
@@ -694,7 +721,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -792,7 +824,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			environment.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			view,
+			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -1003,7 +1040,12 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
+	_, err = exe.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		block,
+		view,
+		derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -1101,7 +1143,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	view := delta.NewDeltaView(ledger)
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view, derived.NewEmptyDerivedBlockData())
+	result, err := exe.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		block,
+		view,
+		derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
 	assert.Len(t, result.TransactionResults, 1)

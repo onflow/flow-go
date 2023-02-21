@@ -260,7 +260,12 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		executableBlock.ID(),
 		executableBlock.ParentID())
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
+	computationResult, err := b.blockComputer.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		b.activeView,
+		derivedBlockData)
 	require.NoError(tb, err)
 
 	b.activeStateCommitment = computationResult.EndState
