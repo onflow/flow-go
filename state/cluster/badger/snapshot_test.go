@@ -55,7 +55,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, _, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())

@@ -407,7 +407,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
+	headers, _, seals, _, _, blocks, _, setups, commits, statuses, results := storutil.StorageLayer(t, db)
 	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 	f(state, err)
 }
