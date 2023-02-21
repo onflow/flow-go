@@ -29,7 +29,7 @@ then
       git checkout $relic_version
    )
    # build relic
-   bash relic_build.sh
+   bash SAN=${SAN} relic_build.sh
 else 
    { echo "couldn't find relic directory"; exit 1; }
 fi

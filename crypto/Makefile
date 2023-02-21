@@ -34,6 +34,11 @@ non_relic_tests:
 	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
 	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
 
+
+asan:
+	SAN=ASAN ./relic_build.sh
+	nm ./relic/build/lib/librelic_s.a | grep asan
+	nm ./relic/build/lib/librelic_s.a | grep ubsan
 ############################################################################################
 # CAUTION: DO NOT MODIFY THIS TARGET! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
