@@ -150,7 +150,11 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2) // 1 collection + 1 system chunk
@@ -284,7 +288,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			Block:      block1,
 			StartState: unittest.StateCommitmentPointerFixture(),
 		}
-		_, err := engine.ComputeBlock(context.Background(), executableBlock, block1View)
+		_, err := engine.ComputeBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			executableBlock,
+			block1View)
 		require.NoError(t, err)
 	})
 
@@ -462,7 +470,11 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
 	}
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		view)
 	require.NoError(t, err)
 
 	for _, txResult := range returnedComputationResult.TransactionResults {

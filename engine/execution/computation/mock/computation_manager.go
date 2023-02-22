@@ -20,13 +20,13 @@ type ComputationManager struct {
 	mock.Mock
 }
 
-// ComputeBlock provides a mock function with given fields: ctx, block, view
-func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.ExecutableBlock, view state.View) (*execution.ComputationResult, error) {
-	ret := _m.Called(ctx, block, view)
+// ComputeBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, view
+func (_m *ComputationManager) ComputeBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, view state.View) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, parentBlockExecutionResultID, block, view)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View) *execution.ComputationResult); ok {
-		r0 = rf(ctx, block, view)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View) *execution.ComputationResult); ok {
+		r0 = rf(ctx, parentBlockExecutionResultID, block, view)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -34,8 +34,8 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.Ex
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View) error); ok {
-		r1 = rf(ctx, block, view)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View) error); ok {
+		r1 = rf(ctx, parentBlockExecutionResultID, block, view)
 	} else {
 		r1 = ret.Error(1)
 	}

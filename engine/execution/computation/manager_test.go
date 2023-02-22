@@ -152,7 +152,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
@@ -182,10 +186,12 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	computationResult := unittest2.ComputationResultFixture([][]flow.Identifier{
-		{unittest.IdentifierFixture()},
-		{unittest.IdentifierFixture()},
-	})
+	computationResult := unittest2.ComputationResultFixture(
+		unittest.IdentifierFixture(),
+		[][]flow.Identifier{
+			{unittest.IdentifierFixture()},
+			{unittest.IdentifierFixture()},
+		})
 
 	blockComputer := &FakeBlockComputer{
 		computationResult: computationResult,
@@ -207,7 +213,11 @@ func TestComputeBlock_Uploader(t *testing.T) {
 			flow.StateCommitment(ledger.InitialState())))
 	blockView := view.NewChild()
 
-	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
+	_, err = manager.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		computationResult.ExecutableBlock,
+		blockView)
 	require.NoError(t, err)
 }
 
@@ -502,7 +512,16 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(
+	context.Context,
+	flow.Identifier,
+	*entity.ExecutableBlock,
+	state.View,
+	*derived.DerivedBlockData,
+) (
+	*execution.ComputationResult,
+	error,
+) {
 	return f.computationResult, nil
 }
 
@@ -704,7 +723,11 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	eventEncoder.enabled = true
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk

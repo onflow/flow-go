@@ -41,6 +41,7 @@ type ComputationManager interface {
 	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
+		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
 		view state.View,
 	) (*execution.ComputationResult, error)
@@ -259,6 +260,7 @@ func (e *Manager) ExecuteScript(
 
 func (e *Manager) ComputeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	view state.View,
 ) (*execution.ComputationResult, error) {
@@ -271,7 +273,12 @@ func (e *Manager) ComputeBlock(
 		block.ID(),
 		block.ParentID())
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, derivedBlockData)
+	result, err := e.blockComputer.ExecuteBlock(
+		ctx,
+		parentBlockExecutionResultID,
+		block,
+		view,
+		derivedBlockData)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).

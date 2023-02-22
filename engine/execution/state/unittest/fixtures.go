@@ -14,15 +14,21 @@ func StateInteractionsFixture() *delta.SpockSnapshot {
 	return delta.NewDeltaView(nil).Interactions()
 }
 
-func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
+func ComputationResultFixture(
+	parentBlockExecutionResultID flow.Identifier,
+	collectionsSignerIDs [][]flow.Identifier,
+) *execution.ComputationResult {
 	block := unittest.ExecutableBlockFixture(collectionsSignerIDs)
 	startState := unittest.StateCommitmentFixture()
 	block.StartState = &startState
 
-	return ComputationResultForBlockFixture(block)
+	return ComputationResultForBlockFixture(
+		parentBlockExecutionResultID,
+		block)
 }
 
 func ComputationResultForBlockFixture(
+	parentBlockExecutionResultID flow.Identifier,
 	completeBlock *entity.ExecutableBlock,
 ) *execution.ComputationResult {
 	collections := completeBlock.Collections()
@@ -94,5 +100,11 @@ func ComputationResultForBlockFixture(
 			BlockID:             completeBlock.ID(),
 			ChunkExecutionDatas: chunkExecutionDatas,
 		},
+		ExecutionResult: flow.NewExecutionResult(
+			parentBlockExecutionResultID,
+			completeBlock.ID(),
+			chunks,
+			nil,
+			flow.ZeroID),
 	}
 }

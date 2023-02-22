@@ -64,6 +64,8 @@ type resultCollector struct {
 
 	executionDataProvider *provider.Provider
 
+	parentBlockExecutionResultID flow.Identifier
+
 	result *execution.ComputationResult
 }
 
@@ -75,22 +77,24 @@ func newResultCollector(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	spockHasher hash.Hasher,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numCollections int,
 ) *resultCollector {
 	collector := &resultCollector{
-		tracer:                  tracer,
-		blockSpan:               blockSpan,
-		metrics:                 metrics,
-		committer:               committer,
-		committerInputChan:      make(chan collectionResult, numCollections),
-		committerDoneChan:       make(chan struct{}),
-		signer:                  signer,
-		spockHasher:             spockHasher,
-		snapshotHasherInputChan: make(chan collectionResult, numCollections),
-		snapshotHasherDoneChan:  make(chan struct{}),
-		executionDataProvider:   executionDataProvider,
-		result:                  execution.NewEmptyComputationResult(block),
+		tracer:                       tracer,
+		blockSpan:                    blockSpan,
+		metrics:                      metrics,
+		committer:                    committer,
+		committerInputChan:           make(chan collectionResult, numCollections),
+		committerDoneChan:            make(chan struct{}),
+		signer:                       signer,
+		spockHasher:                  spockHasher,
+		snapshotHasherInputChan:      make(chan collectionResult, numCollections),
+		snapshotHasherDoneChan:       make(chan struct{}),
+		executionDataProvider:        executionDataProvider,
+		parentBlockExecutionResultID: parentBlockExecutionResultID,
+		result:                       execution.NewEmptyComputationResult(block),
 	}
 
 	go collector.runCollectionCommitter()
@@ -288,5 +292,11 @@ func (collector *resultCollector) Finalize(
 
 	collector.result.ExecutionDataID = executionDataID
 
+	collector.result.ExecutionResult = flow.NewExecutionResult(
+		collector.parentBlockExecutionResultID,
+		collector.result.ExecutableBlock.ID(),
+		collector.result.Chunks,
+		collector.result.ConvertedServiceEvents,
+		collector.result.ExecutionDataID)
 	return collector.result, nil
 }
