@@ -219,37 +219,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", dialAttempts, errs)
 		default:
 		}
-
-		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
-		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
-		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
-		// immediately without backing off and fail-fast.
-		// Hence, explicitly cancel the dial back off (if any) and try connecting again
-
-		// cancel the dial back off (if any), since we want to connect immediately
-		dialAddr = m.streamFactory.DialAddress(peerID)
-		m.streamFactory.ClearBackoff(peerID)
-		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
-		if err != nil {
-			// if the connection was rejected due to invalid node id, skip the re-attempt
-			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-				return fmt.Errorf("invalid node id: %w", err)
-			}
-
-			// if the connection was rejected due to allowlisting, skip the re-attempt
-			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
-			}
-			m.logger.Warn().
-				Err(err).
-				Str("peer_id", peerID.String()).
-				Int("attempt", dialAttempts).
-				Uint64("max_attempts", maxAttempts).
-				Msg("retrying peer dialing")
-			errs = multierror.Append(errs, err)
-			return retry.RetryableError(errs)
-		}
-		return nil
+		return m.dialPeer(ctx, peerID, dialAddr)
 	}
 
 	// retryable func that will attempt to create the stream using the stream factory if connection exists
@@ -304,6 +274,36 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	return s, dialAddr, nil
+}
+
+// dialPeer attempts to dial the peerID on the provided dialAddr.
+// This func returns a retryable error if err returned when connection is made is retryable.
+func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialAddr []multiaddr.Multiaddr) error {
+	// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
+	// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
+	// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
+	// immediately without backing off and fail-fast.
+	// Hence, explicitly cancel the dial back off (if any) and try connecting again
+
+	// cancel the dial back off (if any), since we want to connect immediately
+	dialAddr = m.streamFactory.DialAddress(peerID)
+	m.streamFactory.ClearBackoff(peerID)
+	err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
+	if err != nil {
+		// if the connection was rejected due to invalid node id, skip the re-attempt
+		if strings.Contains(err.Error(), "failed to negotiate security protocol") {
+			return fmt.Errorf("invalid node id: %w", err)
+		}
+
+		// if the connection was rejected due to allowlisting, skip the re-attempt
+		if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
+			return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+		}
+
+		return retry.RetryableError(err)
+	}
+
+	return nil
 }
 
 // dialingInProgress sets the value for peerID key in our map if it does not already exist.
