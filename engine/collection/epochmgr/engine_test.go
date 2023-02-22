@@ -341,6 +341,28 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForPreviousEpoch() {
 	suite.Assert().Len(suite.components, 1)
 }
 
+// TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch tests starting the engine
+// shortly after an epoch transition. The finalized boundary is near enough the epoch
+// boundary that we should start the previous epoch cluster consensus. However, we are
+// not approved for the current epoch -> we should only start *current* epoch components.
+func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
+	suite.phase = flow.EpochPhaseStaking
+	// transition epochs, so that a Previous epoch is queryable
+	suite.TransitionEpoch()
+	prevEpoch := suite.epochs[suite.counter-1]
+	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
+	prevEpochFinalHeight := uint64(100)
+	prevEpoch.On("FinalHeight").Return(prevEpochFinalHeight, nil)
+	suite.header.Height = 101
+	suite.heights.On("OnHeight", prevEpochFinalHeight+flow.DefaultTransactionExpiry+1, mock.Anything)
+	suite.MockAsUnauthorizedNode(suite.counter)
+
+	suite.StartEngine()
+	// only previous epoch components should have been started
+	suite.AssertEpochStarted(suite.counter - 1)
+	suite.Assert().Len(suite.components, 1)
+}
+
 // TestStartAsUnauthorizedNode test that when a collection node joins the network
 // at an epoch boundary, they must start running during the EpochSetup phase in the
 // epoch before they become an authorized member so they submit their cluster QC vote.
