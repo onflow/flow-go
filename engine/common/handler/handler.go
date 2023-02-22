@@ -37,8 +37,8 @@ type AsyncEventHandler struct {
 func NewAsyncEventHandler(
 	log zerolog.Logger,
 	store engine.MessageStore,
-	workerCount uint) *AsyncEventHandler {
-
+	workerCount uint,
+) *AsyncEventHandler {
 	h := &AsyncEventHandler{
 		log:   log.With().Str("component", "async_event_handler").Logger(),
 		store: store,
