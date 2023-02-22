@@ -14,12 +14,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/rs/zerolog"
-	"github.com/sethvargo/go-retry"
 )
 
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
