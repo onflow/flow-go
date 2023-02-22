@@ -298,7 +298,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialAddr []multi
 	if err != nil {
 		// if the connection was rejected due to invalid node id, skip the re-attempt
 		if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-			return fmt.Errorf("invalid node id: %w", err)
+			return fmt.Errorf("failed to dial remote peer: %w", err)
 		}
 
 		// if the connection was rejected due to allowlisting, skip the re-attempt
