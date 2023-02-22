@@ -71,23 +71,24 @@ type GenericNode struct {
 	Cancel context.CancelFunc
 	Errs   <-chan error
 
-	Log            zerolog.Logger
-	Metrics        *metrics.NoopCollector
-	Tracer         module.Tracer
-	PublicDB       *badger.DB
-	SecretsDB      *badger.DB
-	Headers        storage.Headers
-	Guarantees     storage.Guarantees
-	Seals          storage.Seals
-	Payloads       storage.Payloads
-	Blocks         storage.Blocks
-	State          protocol.MutableState
-	Index          storage.Index
-	Me             module.Local
-	Net            *stub.Network
-	DBDir          string
-	ChainID        flow.ChainID
-	ProtocolEvents *events.Distributor
+	Log                zerolog.Logger
+	Metrics            *metrics.NoopCollector
+	Tracer             module.Tracer
+	PublicDB           *badger.DB
+	SecretsDB          *badger.DB
+	Headers            storage.Headers
+	Guarantees         storage.Guarantees
+	Seals              storage.Seals
+	Payloads           storage.Payloads
+	Blocks             storage.Blocks
+	QuorumCertificates storage.QuorumCertificates
+	State              protocol.MutableState
+	Index              storage.Index
+	Me                 module.Local
+	Net                *stub.Network
+	DBDir              string
+	ChainID            flow.ChainID
+	ProtocolEvents     *events.Distributor
 }
 
 func (g *GenericNode) Done() {
@@ -191,13 +192,18 @@ type ComputerWrap struct {
 
 func (c *ComputerWrap) ComputeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	view fvmState.View,
 ) (*execution.ComputationResult, error) {
 	if c.OnComputeBlock != nil {
 		c.OnComputeBlock(ctx, block, view)
 	}
-	return c.Manager.ComputeBlock(ctx, block, view)
+	return c.Manager.ComputeBlock(
+		ctx,
+		parentBlockExecutionResultID,
+		block,
+		view)
 }
 
 // ExecutionNode implements a mocked execution node for tests.

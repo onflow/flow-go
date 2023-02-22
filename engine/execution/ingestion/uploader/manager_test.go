@@ -27,11 +27,13 @@ func TestManagerSetEnabled(t *testing.T) {
 }
 
 func TestManagerUploadsWithAllUploaders(t *testing.T) {
-	result := executionUnittest.ComputationResultFixture([][]flow.Identifier{
-		{flow.ZeroID},
-		{flow.ZeroID},
-		{flow.ZeroID},
-	})
+	result := executionUnittest.ComputationResultFixture(
+		flow.ZeroID,
+		[][]flow.Identifier{
+			{flow.ZeroID},
+			{flow.ZeroID},
+			{flow.ZeroID},
+		})
 
 	t.Run("uploads with no errors", func(t *testing.T) {
 		uploader1 := mock.NewUploader(t)

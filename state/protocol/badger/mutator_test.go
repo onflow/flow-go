@@ -90,7 +90,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -104,7 +104,7 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockBlockTimer(),
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer, util.MockBlockTimer(),
 			util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
@@ -628,12 +628,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(seals)
-		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer,
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, qcs, tracer, consumer,
 			util.MockBlockTimer(), receiptValidator, sealValidator)
 		require.NoError(t, err)
 
@@ -1749,7 +1749,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -1796,7 +1796,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer,
 			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
 		require.NoError(t, err)
 
@@ -2158,7 +2158,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -2176,7 +2176,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, blockTimer,
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, qcs, tracer, consumer, blockTimer,
 			util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
