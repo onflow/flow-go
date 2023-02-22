@@ -151,7 +151,6 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // past the final block of the cluster's epoch.
 // No errors are expected during normal operation.
 func (e *Engine) checkShouldStartLastEpochComponentsOnStartup(engineCtx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
-
 	finalHeader, err := finalSnapshot.Head()
 	if err != nil {
 		return fmt.Errorf("[unexpected] could not get finalized header: %w", err)
