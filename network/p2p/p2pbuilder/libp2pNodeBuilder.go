@@ -106,7 +106,7 @@ type NodeBuilder interface {
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetUnicastManagerOptions(createStreamRetryInterval time.Duration) NodeBuilder
+	SetStreamCreationUpdateInterval(createStreamRetryInterval time.Duration) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
@@ -250,7 +250,7 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, c
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetUnicastManagerOptions(createStreamRetryInterval time.Duration) NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetStreamCreationUpdateInterval(createStreamRetryInterval time.Duration) NodeBuilder {
 	builder.createStreamRetryInterval = createStreamRetryInterval
 	return builder
 }
@@ -498,7 +498,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
-		SetUnicastManagerOptions(uniCfg.StreamRetryInterval).
+		SetStreamCreationUpdateInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
