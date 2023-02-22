@@ -127,6 +127,7 @@ type Epoch interface {
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	// * protocol.ErrClusterNotFound - if no cluster has the given index (index > len(clusters))
 	Cluster(index uint) (Cluster, error)
 
 	// ClusterByChainID returns the detailed cluster information for the cluster with
@@ -135,8 +136,8 @@ type Epoch interface {
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
-	// * protocol.ErrClusterNotFound if cluster is not found by the given chainID
+	// * protocol.ErrNextEpochNotCommitted - if epoch has not been committed yet
+	// * protocol.ErrClusterNotFound - if cluster is not found by the given chainID
 	ClusterByChainID(chainID flow.ChainID) (Cluster, error)
 
 	// DKG returns the result of the distributed key generation procedure.
