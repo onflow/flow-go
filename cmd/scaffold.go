@@ -342,6 +342,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
+	uniCfg := &p2pbuilder.UnicastConfig{
+		StreamRetryInterval:    fnb.UnicastCreateStreamRetryDelay,
+		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
+	}
+
+	connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+		InterceptPeerDialFilters: connGaterPeerDialFilters,
+		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
+	}
+
+	peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+		ConnectionPruning: fnb.NetworkConnectionPruning,
+		UpdateInterval:    fnb.PeerUpdateInterval,
+	}
+
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
@@ -358,14 +373,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Resolver,
 			fnb.PeerScoringEnabled,
 			fnb.BaseConfig.NodeRole,
-			connGaterPeerDialFilters,
-			connGaterInterceptSecureFilters,
+			connGaterCfg,
+			peerManagerCfg,
 			// run peer manager with the specified interval and let it also prune connections
-			fnb.NetworkConnectionPruning,
-			fnb.PeerUpdateInterval,
-			fnb.UnicastCreateStreamRetryDelay,
 			fnb.LibP2PResourceManagerConfig,
-			fnb.UnicastRateLimiterDistributor,
+			uniCfg,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()

@@ -3,8 +3,6 @@ package corruptlibp2p
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
@@ -17,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -32,11 +29,9 @@ func NewCorruptLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval,
-	createStreamRetryDelay time.Duration,
+	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
+	peerManagerCfg *p2pbuilder.PeerManagerConfig,
+	uniCfg *p2pbuilder.UnicastConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -55,14 +50,11 @@ func NewCorruptLibP2PNodeFactory(
 			metrics,
 			resolver,
 			role,
-			onInterceptPeerDialFilters,
-			onInterceptSecuredFilters,
 			peerScoringEnabled,
-			connectionPruning,
-			updateInterval,
-			createStreamRetryDelay,
+			connGaterCfg,
+			peerManagerCfg,
 			p2pbuilder.DefaultResourceManagerConfig(),
-			ratelimit.NewUnicastRateLimiterDistributor())
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

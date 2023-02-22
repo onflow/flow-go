@@ -67,12 +67,10 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval,
-	createStreamRetryInterval time.Duration,
+	connGaterCfg *ConnectionGaterConfig,
+	peerManagerCfg *PeerManagerConfig,
 	rCfg *ResourceManagerConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
+	uniCfg *UnicastConfig,
 ) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -83,14 +81,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			metrics,
 			resolver,
 			role,
-			onInterceptPeerDialFilters,
-			onInterceptSecuredFilters,
 			peerScoringEnabled,
-			connectionPruning,
-			updateInterval,
-			createStreamRetryInterval,
+			connGaterCfg,
+			peerManagerCfg,
 			rCfg,
-			unicastRateLimiterDistributor)
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -475,13 +470,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	peerScoringEnabled bool,
-	connectionPruning bool,
-	updateInterval,
-	createStreamRetryInterval time.Duration,
+	connGaterCfg *ConnectionGaterConfig,
+	peerManagerCfg *PeerManagerConfig,
 	rCfg *ResourceManagerConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) (NodeBuilder, error) {
+	uniCfg *UnicastConfig) (NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -494,8 +487,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 
 	connGater := connection.NewConnGater(log,
 		idProvider,
-		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)))
+		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
@@ -504,10 +497,10 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
-		SetPeerManagerOptions(connectionPruning, updateInterval).
-		SetUnicastManagerOptions(createStreamRetryInterval).
+		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
+		SetUnicastManagerOptions(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(unicastRateLimiterDistributor)
+		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if peerScoringEnabled {
 		builder.EnableGossipSubPeerScoring(idProvider)
