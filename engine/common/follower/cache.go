@@ -77,6 +77,11 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	// has to be certified by definition
 	certifiedBatch = batch[:len(batch)-1]
 
+	if len(batch) > 1 {
+		// set certifyingQC, QC from last block certifies complete batch
+		certifyingQC = batch[len(batch)-1].Header.QuorumCertificate()
+	}
+
 	c.lock.Lock()
 	// check for message equivocation, report any if detected
 	for _, block := range batch {
@@ -97,7 +102,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	if parent, ok := c.backend.ByID(firstBlock.Header.ParentID); ok {
 		// parent found, it can be certified by the batch, we need to include it to the certified blocks
 		certifiedBatch = append([]*flow.Block{parent.(*flow.Block)}, certifiedBatch...)
-		// set certifyingQC, QC from last block in batch certifies all batch
+		// set certifyingQC, QC from last block certifies complete batch
 		certifyingQC = batch[len(batch)-1].Header.QuorumCertificate()
 	}
 
