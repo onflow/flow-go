@@ -107,50 +107,64 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// (2) Retrieve protocol state as of latest finalized block. We use this state
 	// to catch up on events, whose execution was missed during crash-restart.
 	finalSnapshot := e.state.Final()
-	currentEpoch := finalSnapshot.Epochs().Current()
-	currentEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
-	}
 
 	// (3) check if we should attempt to vote after startup
-	err = e.checkShouldVoteOnStartup(finalSnapshot)
+	err := e.checkShouldVoteOnStartup(finalSnapshot)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not vote on startup: %w", err))
 	}
 
 	// (4) start epoch-scoped components:
 	// (a) set up epoch-scoped epoch managed by this engine for the current epoch
-	components, err := e.createEpochComponents(currentEpoch)
+	err = e.checkShouldStartCurrentEpochComponentsOnStartup(ctx, finalSnapshot)
 	if err != nil {
-		if errors.Is(err, ErrNotAuthorizedForEpoch) {
-			// don't set up consensus components if we aren't authorized in current epoch
-			e.log.Info().Msg("node is not authorized for current epoch - skipping initializing cluster consensus")
-			return
-		}
-		ctx.Throw(fmt.Errorf("could not create epoch components: %w", err))
-	}
-	err = e.startEpochComponents(ctx, currentEpochCounter, components)
-	if err != nil {
-		// all failures to start epoch components are critical
-		ctx.Throw(fmt.Errorf("could not start epoch components: %w", err))
+		ctx.Throw(fmt.Errorf("could not check or start current epoch components: %w", err))
 	}
 
 	// (b) set up epoch-scoped epoch components for the previous epoch
-	err = e.checkShouldStartLastEpochComponentsOnStartup(ctx, finalSnapshot)
+	err = e.checkShouldStartPreviousEpochComponentsOnStartup(ctx, finalSnapshot)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not check or start previous epoch components: %w", err))
 	}
 }
 
-// checkShouldStartLastEpochComponentsOnStartup checks whether we should re-instantiate
+// checkShouldStartCurrentEpochComponentsOnStartup checks whether we should instantiate
+// consensus components for the current epoch upon startup, and if so, starts them.
+// We always start current epoch consensus components, unless this node is not an
+// authorized participant in the current epoch.
+// No errors are expected during normal operation.
+func (e *Engine) checkShouldStartCurrentEpochComponentsOnStartup(ctx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
+	currentEpoch := finalSnapshot.Epochs().Current()
+	currentEpochCounter, err := currentEpoch.Counter()
+	if err != nil {
+		return fmt.Errorf("could not get epoch counter: %w", err)
+	}
+
+	components, err := e.createEpochComponents(currentEpoch)
+	if err != nil {
+		if errors.Is(err, ErrNotAuthorizedForEpoch) {
+			// don't set up consensus components if we aren't authorized in current epoch
+			e.log.Info().Msg("node is not authorized for current epoch - skipping initializing cluster consensus")
+			return nil
+		}
+		return fmt.Errorf("could not create epoch components: %w", err)
+	}
+	err = e.startEpochComponents(ctx, currentEpochCounter, components)
+	if err != nil {
+		// all failures to start epoch components are critical
+		return fmt.Errorf("could not start epoch components: %w", err)
+	}
+	return nil
+}
+
+// checkShouldStartPreviousEpochComponentsOnStartup checks whether we should re-instantiate
 // consensus components for the previous epoch upon startup, and if so, starts them.
 // One cluster is responsible for a portion of transactions with reference blocks
 // with one epoch. Since transactions may use reference blocks up to flow.DefaultTransactionExpiry
 // many heights old, clusters don't shut down until this many blocks have been finalized
 // past the final block of the cluster's epoch.
 // No errors are expected during normal operation.
-func (e *Engine) checkShouldStartLastEpochComponentsOnStartup(engineCtx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
+func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
 
 	finalHeader, err := finalSnapshot.Head()
 	if err != nil {
