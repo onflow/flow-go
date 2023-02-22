@@ -368,7 +368,7 @@ func (n *Node) RequestPeerUpdate() {
 // Peers are considered not connected if the underlying libp2p host reports the
 // peers as not connected and there are no connections in the connection list.
 // error returns:
-//   - network.ErrUnexpectedConnectionStatus if the underlying libp2p host reports connectedness as NotConnected but the connections list
+//   - network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
 //     to the peer is not empty. This indicates a bug within libp2p.
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID)

@@ -189,7 +189,7 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts 
 //     the peer is already in progress the caller needs to wait until it is completed, a peer should be dialed only once.
 //
 // Unexpected errors during normal operations:
-//   - network.ErrUnexpectedConnectionStatus indicates bug in libpp2p when checking IsConnected status of peer.
+//   - network.ErrIllegalConnectionState indicates bug in libpp2p when checking IsConnected status of peer.
 func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,

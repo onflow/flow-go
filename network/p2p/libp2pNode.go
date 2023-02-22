@@ -82,7 +82,7 @@ type PeerConnections interface {
 	// Peers are considered not connected if the underlying libp2p host reports the
 	// peers as not connected and there are no connections in the connection list.
 	// The following error returns indicate a bug in the code:
-	//  * network.ErrUnexpectedConnectionStatus if the underlying libp2p host reports connectedness as NotConnected but the connections list
+	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
 	// 	  to the peer is not empty. This indicates a bug within libp2p.
 	IsConnected(peerID peer.ID) (bool, error)
 }
