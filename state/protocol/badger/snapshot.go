@@ -491,18 +491,10 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-
-	var epoch protocol.Epoch
 	if epochStarted {
-		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
-	} else {
-		epoch, err = inmem.NewCommittedEpoch(setup, commit)
+		return inmem.NewStartedEpoch(setup, commit, firstHeight)
 	}
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
-	}
-	return epoch
+	return inmem.NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch, if it is available.
@@ -529,12 +521,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
-		epoch, err := inmem.NewSetupEpoch(nextSetup)
-		if err != nil {
-			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
-		}
-		return epoch
+		return inmem.NewSetupEpoch(nextSetup)
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
@@ -543,12 +530,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
 		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
-	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
-	}
-	return epoch
+	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -584,18 +566,10 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	var epoch protocol.Epoch
 	if epochEnded {
-		epoch, err = inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
-	} else {
-		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
+		return inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
 	}
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
-	}
-
-	return epoch
+	return inmem.NewStartedEpoch(setup, commit, firstHeight)
 }
 
 // retrieveEpochHeightBounds retrieves the height bounds for an epoch.

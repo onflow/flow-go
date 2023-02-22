@@ -302,11 +302,7 @@ func SnapshotFromBootstrapStateWithParams(
 			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
 		}
 	}
-	current, err := NewStartedEpoch(setup, commit, root.Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert epoch: %w", err)
-	}
-	encodable, err := FromEpoch(current)
+	encodable, err := FromEpoch(NewStartedEpoch(setup, commit, root.Header.Height))
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
 	}

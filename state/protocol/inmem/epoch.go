@@ -302,28 +302,28 @@ func (e *endedEpoch) FinalHeight() (uint64, error) {
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
 // No errors are expected during normal operations.
-func NewSetupEpoch(setupEvent *flow.EpochSetup) (protocol.Epoch, error) {
+func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.Epoch {
 	return &setupEpoch{
 		setupEvent: setupEvent,
-	}, nil
+	}
 }
 
 // NewCommittedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events.
 // No errors are expected during normal operations.
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (protocol.Epoch, error) {
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) protocol.Epoch {
 	return &committedEpoch{
 		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
-	}, nil
+	}
 }
 
 // NewStartedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events, and the epoch's first block height.
 // No errors are expected during normal operations.
-func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) (protocol.Epoch, error) {
+func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
 	return &startedEpoch{
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
@@ -332,13 +332,13 @@ func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit,
 			commitEvent: commitEvent,
 		},
 		firstHeight: firstHeight,
-	}, nil
+	}
 }
 
 // NewEndedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events, and the epoch's final block height.
 // No errors are expected during normal operations.
-func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) (protocol.Epoch, error) {
+func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
 	return &endedEpoch{
 		startedEpoch: startedEpoch{
 			committedEpoch: committedEpoch{
@@ -350,5 +350,5 @@ func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, f
 			firstHeight: firstHeight,
 		},
 		finalHeight: finalHeight,
-	}, nil
+	}
 }
