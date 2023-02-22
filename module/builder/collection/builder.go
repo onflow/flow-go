@@ -42,10 +42,9 @@ type Builder struct {
 
 // TODO: #6435
 //   - pass in epoch (minimally counter, preferably cluster chain ID as well)
-//   - check candidate reference blocks by view (cheap, but need to get whole header each time - cheap if header in cache)
+//   - check candidate reference blocks by view (need to get whole header each time - cheap if header in cache)
 //   - if outside view boundary, look up first+final block height of epoch (can cache both)
 func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, opts ...Opt) (*Builder, error) {
-
 	b := Builder{
 		db:             db,
 		tracer:         tracer,

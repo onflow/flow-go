@@ -129,7 +129,6 @@ func (suite *Suite) MockFactoryCreate(arg any) {
 }
 
 func (suite *Suite) SetupTest() {
-
 	suite.log = unittest.Logger()
 	suite.me = mockmodule.NewLocal(suite.T())
 	suite.state = protocol.NewState(suite.T())
@@ -282,7 +281,7 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 }
 
-// TestStartAfterEpochBoundary tests starting the engine shortly after an epoch transition.
+// TestStartAfterEpochBoundary_WithinTxExpiry tests starting the engine shortly after an epoch transition.
 // When the finalized height is within the first tx_expiry blocks of the new epoch
 // the engine should restart the previous epoch cluster consensus.
 func (suite *Suite) TestStartAfterEpochBoundary_WithinTxExpiry() {
@@ -302,7 +301,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_WithinTxExpiry() {
 	suite.AssertEpochStarted(suite.counter)
 }
 
-// TestStartAfterEpochBoundary tests starting the engine shortly after an epoch transition.
+// TestStartAfterEpochBoundary_BeyondTxExpiry tests starting the engine shortly after an epoch transition.
 // When the finalized height is beyond the first tx_expiry blocks of the new epoch
 // the engine should NOT restart the previous epoch cluster consensus.
 func (suite *Suite) TestStartAfterEpochBoundary_BeyondTxExpiry() {
