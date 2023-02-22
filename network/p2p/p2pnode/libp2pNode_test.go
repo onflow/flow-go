@@ -263,8 +263,7 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 		sporkId,
 		"test_create_stream",
 		nodeCount,
-		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithPreferredUnicasts(nil))
+		p2ptest.WithDefaultResourceManager())
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)

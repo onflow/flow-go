@@ -98,7 +98,7 @@ func NodeFixture(
 		}).
 		SetResourceManager(parameters.ResourceManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
-		SetUnicastManagerOptions(parameters.CreateStreamRetryDelay)
+		SetStreamCreationUpdateInterval(parameters.CreateStreamRetryDelay)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)

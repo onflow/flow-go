@@ -872,7 +872,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					dht.BootstrapPeers(pis...),
 				)
 			}).
-			SetUnicastManagerOptions(builder.UnicastCreateStreamRetryDelay).
+			SetStreamCreationUpdateInterval(builder.UnicastCreateStreamRetryDelay).
 			Build()
 
 		if err != nil {
