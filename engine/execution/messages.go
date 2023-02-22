@@ -34,6 +34,7 @@ type ComputationResult struct {
 	EndState               flow.StateCommitment
 
 	*execution_data.BlockExecutionData
+	*flow.ExecutionResult
 }
 
 func NewEmptyComputationResult(

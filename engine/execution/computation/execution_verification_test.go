@@ -715,6 +715,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	computationResult, err := blockComputer.ExecuteBlock(
 		context.Background(),
+		unittest.IdentifierFixture(),
 		executableBlock,
 		view,
 		derived.NewEmptyDerivedBlockData())

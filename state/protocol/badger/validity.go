@@ -86,14 +86,6 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// there should be no nodes with zero weight
-	// TODO: we might want to remove the following as we generally want to allow nodes with zero weight in the protocol state.
-	for _, participant := range setup.Participants {
-		if participant.Weight == 0 {
-			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
-		}
-	}
-
 	// the participants must be listed in canonical order
 	if !setup.Participants.Sorted(order.Canonical) {
 		return fmt.Errorf("participants are not canonically ordered")

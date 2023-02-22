@@ -10,6 +10,8 @@ import (
 
 	execution "github.com/onflow/flow-go/engine/execution"
 
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	state "github.com/onflow/flow-go/fvm/state"
@@ -20,13 +22,13 @@ type BlockComputer struct {
 	mock.Mock
 }
 
-// ExecuteBlock provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *BlockComputer) ExecuteBlock(_a0 context.Context, _a1 *entity.ExecutableBlock, _a2 state.View, _a3 *derived.DerivedBlockData) (*execution.ComputationResult, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// ExecuteBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, view, derivedBlockData
+func (_m *BlockComputer) ExecuteBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, view state.View, derivedBlockData *derived.DerivedBlockData) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) *execution.ComputationResult); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) *execution.ComputationResult); ok {
+		r0 = rf(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -34,8 +36,8 @@ func (_m *BlockComputer) ExecuteBlock(_a0 context.Context, _a1 *entity.Executabl
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) error); ok {
+		r1 = rf(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
 	} else {
 		r1 = ret.Error(1)
 	}
