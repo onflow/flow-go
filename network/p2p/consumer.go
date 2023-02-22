@@ -11,7 +11,7 @@ import (
 //   - be concurrency safe
 //   - be non-blocking
 type DisallowListConsumer interface {
-	// OnNodeBlockListUpdate notifications whenever the node block list is updated.
+	// OnNodeDisallowListUpdate notifications whenever the node block list is updated.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
