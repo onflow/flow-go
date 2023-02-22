@@ -251,22 +251,22 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 	isConnected, err := m.connStatus.IsConnected(peerID)
 	if err != nil {
-		return nil, nil, err
+		return nil, dialAddr, err
 	}
 
 	// check connection status and attempt to dial the peer if dialing is not in progress
 	if !isConnected {
 		// return error if we can't start dialing
 		if m.dialingInProgress(peerID) {
-			return nil, nil, NewDialInProgressErr(peerID)
+			return nil, dialAddr, NewDialInProgressErr(peerID)
 		}
 		defer m.dialingComplete(peerID)
 		err = retry.Do(ctx, backoff, dialPeer)
 		if err != nil {
 			if dialAttempts == maxAttempts {
-				return nil, nil, fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
+				return nil, dialAddr, fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
 			}
-			return nil, nil, err
+			return nil, dialAddr, err
 		}
 	}
 
@@ -274,9 +274,9 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	err = retry.Do(ctx, backoff, connectPeer)
 	if err != nil {
 		if connectAttempts == maxAttempts {
-			return nil, nil, fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
+			return nil, dialAddr, fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
 		}
-		return nil, nil, err
+		return nil, dialAddr, err
 	}
 
 	return s, dialAddr, nil
