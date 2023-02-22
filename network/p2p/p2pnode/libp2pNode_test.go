@@ -360,7 +360,8 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		_, err := sender.CreateStream(ctx, receiver.Host().ID())
 		require.Error(t, err)
 	}()
-	wg.Wait()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
 
 	// we expect a single routine to start attempting to dial thus the number of retries
 	// before failure should be at most p2pnode.MaxConnectAttempt

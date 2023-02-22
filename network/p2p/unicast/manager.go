@@ -241,6 +241,13 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 				return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
 
+			m.logger.Warn().
+				Err(err).
+				Str("peer_id", peerID.String()).
+				Uint64("attempt", dialAttempts).
+				Uint64("max_attempts", maxAttempts).
+				Msg("retrying peer dialing")
+
 			return retry.RetryableError(err)
 		}
 
