@@ -261,7 +261,7 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 
 	nodes, ids := p2ptest.NodesFixture(t,
 		sporkId,
-		"test_create_stream",
+		"test_create_stream_single_pairwise_connection",
 		nodeCount,
 		p2ptest.WithDefaultResourceManager())
 
