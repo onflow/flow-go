@@ -472,9 +472,8 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-
 	// all errors returned from storage reads here are unexpected, because all
-	// snapshots reside within a current epoch, which must be queriable
+	// snapshots reside within a current epoch, which must be queryable
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
@@ -492,18 +491,10 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-
-	var epoch protocol.Epoch
 	if epochStarted {
-		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
-	} else {
-		epoch, err = inmem.NewCommittedEpoch(setup, commit)
+		return inmem.NewStartedEpoch(setup, commit, firstHeight)
 	}
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
-	}
-	return epoch
+	return inmem.NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch, if it is available.
@@ -530,12 +521,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
-		epoch, err := inmem.NewSetupEpoch(nextSetup)
-		if err != nil {
-			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
-		}
-		return epoch
+		return inmem.NewSetupEpoch(nextSetup)
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
@@ -544,12 +530,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
 		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
-	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
-	}
-	return epoch
+	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -585,32 +566,32 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	var epoch protocol.Epoch
 	if epochEnded {
-		epoch, err = inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
-	} else {
-		epoch, err = inmem.NewStartedEpoch(setup, commit, firstHeight)
+		return inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
 	}
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
-	}
-
-	return epoch
+	return inmem.NewStartedEpoch(setup, commit, firstHeight)
 }
 
 // retrieveEpochHeightBounds retrieves the height bounds for an epoch.
 // Height bounds are NOT fork-aware, and are only determined upon finalization.
 //
 // Since the protocol state's API is fork-aware, we may be querying an
-// un-finalized block - see below for an example of this behaviour:
+// un-finalized block, as in the following example:
 //
 //	Epoch 1    Epoch 2
 //	A <- B <-|- C <- D
 //
 // Suppose block B is the latest finalized block and we have queried block D.
-// Then, epoch 1 has not yet ended, because the first block of epoch 2 has not been finalized.
+// Then, the transition from epoch 1 to 2 has not been committed, because the first block of epoch 2 has not been finalized.
 // In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
+// There are edge-case scenarios, where a different fork could exist (as illustrated below)
+// that still adds additional blocks to Epoch 1.
+//
+//	Epoch 1      Epoch 2
+//	A <- B <---|-- C <- D
+//	     ^
+//	     ╰ X <-|- X <- Y <- Z
+//
 // Returns:
 //   - (0, 0, false, false, nil) if epoch is not started
 //   - (firstHeight, 0, true, false, nil) if epoch is started but not ended
@@ -631,8 +612,8 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, final
 		}
 		epochStarted = true
 
-		var currentEpochFirstHeight uint64
-		err = operation.RetrieveEpochFirstHeight(epoch+1, &currentEpochFirstHeight)(tx)
+		var subsequentEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				epochEnded = false
@@ -640,7 +621,7 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, final
 			}
 			return err // unexpected error
 		}
-		finalHeight = currentEpochFirstHeight - 1
+		finalHeight = subsequentEpochFirstHeight - 1
 		epochEnded = true
 
 		return nil

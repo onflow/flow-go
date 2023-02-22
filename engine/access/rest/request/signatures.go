@@ -15,8 +15,7 @@ func (s *TransactionSignature) Parse(
 	rawKeyIndex string,
 	rawSignature string,
 ) error {
-	var address Address
-	err := address.Parse(rawAddress)
+	address, err := ParseAddress(rawAddress)
 	if err != nil {
 		return err
 	}
@@ -33,7 +32,7 @@ func (s *TransactionSignature) Parse(
 	}
 
 	*s = TransactionSignature(flow.TransactionSignature{
-		Address:   address.Flow(),
+		Address:   address,
 		KeyIndex:  keyIndex,
 		Signature: signature,
 	})
