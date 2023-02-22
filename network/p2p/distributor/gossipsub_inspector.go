@@ -116,7 +116,7 @@ func (g *GossipSubInspectorNotification) processQueuedNotifications(_ flow.Ident
 
 	switch notification := notification.(type) {
 	case p2p.InvalidControlMessageNotification:
-		for _, notifier := range consumers {
+		for _, consumer := range consumers {
 			notifier.OnInvalidControlMessage(notification)
 		}
 	default:
