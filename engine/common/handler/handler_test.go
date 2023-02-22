@@ -104,12 +104,21 @@ func testAsyncEventHandlerWithMultipleConcurrentEvents(t *testing.T, idFactory f
 	unittest.RequireCloseBefore(t, h.Done(), 100*time.Millisecond, "could not stop handler")
 }
 
+// TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier tests the async event handler with multiple events
+// with distinct origin identifiers. It submits multiple events to the handler and checks if each event is processed by
+// the handler exactly once.
 func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testing.T) {
 	testAsyncEventHandlerWithMultipleConcurrentEvents(t, func() flow.Identifier {
 		return unittest.IdentifierFixture()
 	})
 }
 
+// TestAsyncEventHandler_MultipleConcurrentEvents_IdenticalIdentifier tests the async event handler with multiple events
+// with identical origin identifiers. It submits multiple events to the handler and checks if each event is processed by
+// the handler exactly once.
+// This test is to ensure that the async event handler does not rely on the origin identifier for processing events and
+// can process events with identical origin identifiers concurrently without any issues. In other words, the async event
+// handler should be able to process events concurrently even if the origin identifier is not unique.
 func TestAsyncEventHandler_MultipleConcurrentEvents_IdenticalIdentifier(t *testing.T) {
 	testAsyncEventHandlerWithMultipleConcurrentEvents(t, func() flow.Identifier {
 		return flow.ZeroID
