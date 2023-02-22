@@ -211,7 +211,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	// retryable func that will attempt to dial the peer and establish the initial connection
-	dialAttempts := 0
+	dialAttempts := uint64(0)
 	dialPeer := func(context.Context) error {
 		dialAttempts++
 		select {
@@ -223,7 +223,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	// retryable func that will attempt to create the stream using the stream factory if connection exists
-	connectAttempts := 0
+	connectAttempts := uint64(0)
 	connectPeer := func(context.Context) error {
 		connectAttempts++
 		select {
@@ -263,6 +263,9 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		defer m.dialingComplete(peerID)
 		err = retry.Do(ctx, backoff, dialPeer)
 		if err != nil {
+			if dialAttempts == maxAttempts {
+				return nil, nil, fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
+			}
 			return nil, nil, err
 		}
 	}
@@ -270,6 +273,9 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	// at this point dialing should have completed we are already connected we can attempt to create the stream
 	err = retry.Do(ctx, backoff, connectPeer)
 	if err != nil {
+		if connectAttempts == maxAttempts {
+			return nil, nil, fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
+		}
 		return nil, nil, err
 	}
 
