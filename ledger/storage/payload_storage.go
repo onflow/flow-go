@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/vfs"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
@@ -68,10 +67,8 @@ func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
 // TODO: replace with flags to specify the location
 func CreatePayloadStorage() *PayloadStorage {
 	pebbleOptions := PebleStorageOptions{
-		Options: &pebble.Options{
-			FS: vfs.NewMem(),
-		},
-		dirname: "/data/payloads",
+		Options: &pebble.Options{},
+		dirname: "/var/flow/data/payloads",
 	}
 
 	store, err := NewPebbleStorage(pebbleOptions)

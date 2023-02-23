@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 
@@ -17,77 +18,76 @@ import (
 // reads all the leaf nodes from the checkpoint file, and store them into the given
 // storage store.
 func ImportLeafNodesFromCheckpoint(dir string, fileName string, logger *zerolog.Logger, store ledger.PayloadStorage) error {
+	logger.Info().Msgf("start reading checkpoint file at %v/%v", dir, fileName)
+
 	leafNodes, err := wal.ReadLeafNodesFromCheckpointV6(dir, fileName, logger)
 	if err != nil {
 		return fmt.Errorf("could not read tries: %w", err)
 	}
 
-	logProgress := util.LogProgress("importing leaf nodes to storage", len(leafNodes), logger)
-	batchSize := 10
+	logger.Info().Msgf("start importing %v payloads to storage", len(leafNodes))
+
+	// creating jobs for batch importing
+	logCreatingJobs := util.LogProgress("creating jobs to store leaf nodes to storage", len(leafNodes), logger)
+	batchSize := 1000
+
+	jobs := make(chan []ledger.LeafNode, len(leafNodes)/batchSize+1)
+
 	batch := make([]ledger.LeafNode, 0, batchSize)
+	nBatch := 0
+
 	for i, leafNode := range leafNodes {
-		logProgress(i)
+		logCreatingJobs(i)
 		batch = append(batch, *leafNode)
 		if len(batch) >= batchSize {
-			err := store.Add(batch)
-			if err != nil {
-				return fmt.Errorf("could not store leaf nodes: %w", err)
-			}
+			jobs <- batch
+			nBatch++
+			batch = make([]ledger.LeafNode, 0, batchSize)
 		}
 	}
 
 	if len(batch) > 0 {
-		err := store.Add(batch)
-		if err != nil {
-			return fmt.Errorf("could not store leaf nodes: %w", err)
-		}
+		jobs <- batch
+		nBatch++
 	}
 
+	nWorker := 10
+	results := make(chan error)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create nWorker number of workers to import
+	for w := 0; w < nWorker; w++ {
+		go func() {
+			for batch := range jobs {
+				err := store.Add(batch)
+				results <- err
+				if err != nil {
+					cancel()
+					return
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+			}
+		}()
+	}
+
+	logImporting := util.LogProgressWithThreshold(1, "importing leaf nodes to storage", nBatch, logger)
+	// waiting for the results
+	for i := 0; i < nBatch; i++ {
+		logImporting(i)
+		err := <-results
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
-
-// func importLeafNodesConcurrently(jobs <-chan *ledger.LeafNode, logger *zerolog.Logger, store ledger.Storage) error {
-//  results := make(chan error)
-//
-//  nWorker := 10
-//
-//  ctx, cancel := context.WithCancel(context.Background())
-//  defer cancel()
-//
-//  // create nWorker number of workers
-//  for w := 0; w < nWorker; w++ {
-//      go func() {
-//          scratch := make([]byte, 1024*4)
-//          for leafNode := range jobs {
-//              err := storeLeafNode(store, leafNode, scratch)
-//              results <- err
-//
-//              if err != nil {
-//                  cancel()
-//                  return
-//              }
-//
-//              select {
-//              case <-ctx.Done():
-//                  return
-//              default:
-//              }
-//          }
-//      }()
-//  }
-//
-//  logProgress := util.LogProgress("importing leaf nodes to storage", len(leafNodes), logger)
-//  // waiting for results
-//  for i := 0; i < len(leafNodes); i++ {
-//      logProgress(i)
-//      err := <-results
-//      if err != nil {
-//          return err
-//      }
-//  }
-//
-//  return nil
-// }
 
 const (
 	encHeightSize        = 2

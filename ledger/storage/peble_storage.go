@@ -146,7 +146,9 @@ func (p *pebleStorage) SetMul(keys []hash.Hash, values [][]byte) error {
 	p.rw.Lock()
 	defer p.rw.Unlock()
 
-	return b.Commit(pebble.Sync)
+	err := b.Commit(pebble.Sync)
+
+	return err
 }
 
 // Close implements io.Closer
