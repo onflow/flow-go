@@ -359,10 +359,6 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
 
-	pInfo, err := utils.PeerAddressInfo(id2)
-	require.NoError(t, err)
-	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// attempt to create two concurrent streams
