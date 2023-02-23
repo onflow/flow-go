@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
@@ -312,6 +313,20 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 
 	sporkID := unittest.IdentifierFixture()
 
+	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
+	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
+	m := mockmodule.NewNetworkMetrics(t)
+	m.On("OnDialPeer", mock.Anything, 3, "failed").Once()
+	m.On("OnCreateStream", mock.Anything, mock.Anything, "failed").Twice().Run(func(args mock.Arguments) {
+		attempts := args.Get(1).(int)
+		// we expect OnCreateStream to be called twice. Once in each separate call to CreateStream. The first call that initializes
+		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
+		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
+		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
+		// we expect attempts to be 3. Thus we only expect this method to be called twice with either 1 or 3 attempts.
+		require.False(t, attempts != 1 && attempts != 3, fmt.Sprintf("expected either 1 or 3 attempts got %d", attempts))
+	})
+
 	sender, id1 := p2ptest.NodeFixture(
 		t,
 		sporkID,
@@ -324,7 +339,8 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		// the func fails fast before the first routine can finish the peer dialing retries
 		// this prevents us from making another call to dial peer
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
-		p2ptest.WithLogger(logger))
+		p2ptest.WithLogger(logger),
+		p2ptest.WithMetricsCollector(m))
 
 	receiver, id2 := p2ptest.NodeFixture(
 		t,
@@ -343,7 +359,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
 
-	pInfo, err := utils.PeerAddressInfo(id1)
+	pInfo, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
 	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 

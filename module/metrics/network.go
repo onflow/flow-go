@@ -21,6 +21,7 @@ const (
 )
 
 type NetworkCollector struct {
+	*UnicastManagerCollector
 	*LibP2PResourceManagerMetrics
 	*GossipSubMetrics
 	outboundMessageSize          *prometheus.HistogramVec

@@ -99,6 +99,16 @@ func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
+// OnCreateStream provides a mock function with given fields: duration, attempts, result
+func (_m *LibP2PMetrics) OnCreateStream(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
+}
+
+// OnCreateStreamToPeer provides a mock function with given fields: duration, attempts, result
+func (_m *LibP2PMetrics) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
+}
+
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *LibP2PMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -117,6 +127,11 @@ func (_m *LibP2PMetrics) OnDNSCacheMiss() {
 // OnDNSLookupRequestDropped provides a mock function with given fields:
 func (_m *LibP2PMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
+}
+
+// OnDialPeer provides a mock function with given fields: duration, attempts, result
+func (_m *LibP2PMetrics) OnDialPeer(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
 }
 
 // OnGraftReceived provides a mock function with given fields: count

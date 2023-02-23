@@ -129,6 +129,16 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
+// OnCreateStream provides a mock function with given fields: duration, attempts, result
+func (_m *NetworkMetrics) OnCreateStream(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
+}
+
+// OnCreateStreamToPeer provides a mock function with given fields: duration, attempts, result
+func (_m *NetworkMetrics) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
+}
+
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *NetworkMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -147,6 +157,11 @@ func (_m *NetworkMetrics) OnDNSCacheMiss() {
 // OnDNSLookupRequestDropped provides a mock function with given fields:
 func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
+}
+
+// OnDialPeer provides a mock function with given fields: duration, attempts, result
+func (_m *NetworkMetrics) OnDialPeer(duration time.Duration, attempts int, result string) {
+	_m.Called(duration, attempts, result)
 }
 
 // OnGraftReceived provides a mock function with given fields: count

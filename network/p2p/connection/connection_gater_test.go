@@ -118,7 +118,7 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus))
 
-	node2Metrics := mockmodule.NewLibP2PMetrics(t)
+	node2Metrics := mockmodule.NewNetworkMetrics(t)
 	// libp2p native resource manager metrics:
 	// we expect exactly 1 connection to be established from node1 to node2 (inbound for node 2).
 	node2Metrics.On("AllowConn", network.DirInbound, true).Return().Once()
@@ -180,7 +180,7 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		t.Name(),
 		p2ptest.WithRole(flow.RoleConsensus))
 
-	node2Metrics := mockmodule.NewLibP2PMetrics(t)
+	node2Metrics := mockmodule.NewNetworkMetrics(t)
 	node2Metrics.On("AllowConn", network.DirInbound, true).Return()
 	node2, node2Id := p2ptest.NodeFixture(
 		t,

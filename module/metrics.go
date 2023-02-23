@@ -81,12 +81,24 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
+// UnicastManagerMetrics unicast manager metrics.
+type UnicastManagerMetrics interface {
+	// OnCreateStream tracks the overall time it takes to create a stream successfully and the number of retry attempts.
+	OnCreateStream(duration time.Duration, attempts int, result string)
+	// OnDialPeer tracks the time it takes to dial a peer during stream creation and the number of retry attempts.
+	OnDialPeer(duration time.Duration, attempts int, result string)
+	// OnCreateStreamToPeer tracks the time it takes to create a stream on the available open connection during stream
+	// creation and the number of retry attempts.
+	OnCreateStreamToPeer(duration time.Duration, attempts int, result string)
+}
+
 type LibP2PMetrics interface {
 	GossipSubRouterMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
+	UnicastManagerMetrics
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

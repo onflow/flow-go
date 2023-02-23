@@ -166,7 +166,7 @@ type NodeFixtureParameters struct {
 	ConnManager            connmgr.ConnManager
 	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
 	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
-	Metrics                module.LibP2PMetrics
+	Metrics                module.NetworkMetrics
 	ResourceManager        network.ResourceManager
 	CreateStreamRetryDelay time.Duration
 }
@@ -252,7 +252,7 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	}
 }
 
-func WithMetricsCollector(metrics module.LibP2PMetrics) NodeFixtureParameterOption {
+func WithMetricsCollector(metrics module.NetworkMetrics) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Metrics = metrics
 	}

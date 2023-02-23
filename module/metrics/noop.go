@@ -236,6 +236,9 @@ func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                  
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
 func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 }
+func (nc *NoopCollector) OnCreateStream(duration time.Duration, attempts int, result string)       {}
+func (nc *NoopCollector) OnDialPeer(duration time.Duration, attempts int, result string)           {}
+func (nc *NoopCollector) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

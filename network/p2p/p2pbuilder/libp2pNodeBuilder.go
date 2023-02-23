@@ -334,7 +334,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	node := builder.createNode(builder.logger, h, pCache, peerManager)
 
-	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID, builder.createStreamRetryInterval, node)
+	unicastManager := unicast.NewUnicastManager(builder.logger,
+		unicast.NewLibP2PStreamFactory(h),
+		builder.sporkID,
+		builder.createStreamRetryInterval,
+		node,
+		builder.metrics)
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().

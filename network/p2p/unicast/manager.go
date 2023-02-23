@@ -18,6 +18,7 @@ import (
 	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -29,6 +30,9 @@ const (
 	// DefaultRetryDelay is the default initial delay used in the exponential backoff create stream retries while
 	// waiting for dialing to peer to be complete
 	DefaultRetryDelay = 1 * time.Second
+
+	failed  = "failed"
+	success = "success"
 )
 
 var (
@@ -45,9 +49,16 @@ type Manager struct {
 	connStatus             p2p.PeerConnections
 	peerDialing            sync.Map
 	createStreamRetryDelay time.Duration
+	metrics                module.UnicastManagerMetrics
 }
 
-func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier, createStreamRetryDelay time.Duration, connStatus p2p.PeerConnections) *Manager {
+func NewUnicastManager(logger zerolog.Logger,
+	streamFactory StreamFactory,
+	sporkId flow.Identifier,
+	createStreamRetryDelay time.Duration,
+	connStatus p2p.PeerConnections,
+	metrics module.UnicastManagerMetrics,
+) *Manager {
 	return &Manager{
 		logger:                 logger.With().Str("module", "unicast-manager").Logger(),
 		streamFactory:          streamFactory,
@@ -55,6 +66,7 @@ func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, spork
 		connStatus:             connStatus,
 		peerDialing:            sync.Map{},
 		createStreamRetryDelay: createStreamRetryDelay,
+		metrics:                metrics,
 	}
 }
 
@@ -151,12 +163,15 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 		return nil
 	}
-
+	start := time.Now()
 	err = retry.Do(ctx, backoff, f)
+	duration := time.Since(start)
 	if err != nil {
+		m.metrics.OnCreateStream(duration, attempts, failed)
 		return nil, nil, err
 	}
 
+	m.metrics.OnCreateStream(duration, attempts, success)
 	return s, addrs, nil
 }
 
@@ -212,7 +227,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	// retryable func that will attempt to dial the peer and establish the initial connection
-	dialAttempts := uint64(0)
+	dialAttempts := 0
 	dialPeer := func(context.Context) error {
 		dialAttempts++
 		select {
@@ -244,7 +259,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			m.logger.Warn().
 				Err(err).
 				Str("peer_id", peerID.String()).
-				Uint64("attempt", dialAttempts).
+				Int("attempt", dialAttempts).
 				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
 
@@ -255,12 +270,12 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	}
 
 	// retryable func that will attempt to create the stream using the stream factory if connection exists
-	connectAttempts := uint64(0)
-	connectPeer := func(context.Context) error {
-		connectAttempts++
+	createStreamAttempts := 0
+	createStream := func(context.Context) error {
+		createStreamAttempts++
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", connectAttempts, errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", createStreamAttempts, errs)
 		default:
 		}
 
@@ -293,24 +308,34 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			return nil, dialAddr, NewDialInProgressErr(peerID)
 		}
 		defer m.dialingComplete(peerID)
+
+		start := time.Now()
 		err = retry.Do(ctx, backoff, dialPeer)
+		duration := time.Since(start)
 		if err != nil {
-			if dialAttempts == maxAttempts {
-				return nil, dialAddr, fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
+			if uint64(dialAttempts) == maxAttempts {
+				err = fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
 			}
+			m.metrics.OnDialPeer(duration, dialAttempts, failed)
 			return nil, dialAddr, err
 		}
+
+		m.metrics.OnDialPeer(duration, dialAttempts, success)
 	}
 
-	// at this point dialing should have completed we are already connected we can attempt to create the stream
-	err = retry.Do(ctx, backoff, connectPeer)
+	// at this point dialing should have completed, we are already connected we can attempt to create the stream
+	start := time.Now()
+	err = retry.Do(ctx, backoff, createStream)
+	duration := time.Since(start)
 	if err != nil {
-		if connectAttempts == maxAttempts {
-			return nil, dialAddr, fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
+		if uint64(createStreamAttempts) == maxAttempts {
+			err = fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
 		}
+		m.metrics.OnCreateStreamToPeer(duration, createStreamAttempts, failed)
 		return nil, dialAddr, err
 	}
 
+	m.metrics.OnCreateStreamToPeer(duration, createStreamAttempts, success)
 	return s, dialAddr, nil
 }
 
