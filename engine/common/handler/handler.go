@@ -141,8 +141,8 @@ func (a *AsyncEventDistributor[T]) distributeEvents(ctx irrecoverable.SignalerCo
 func (a *AsyncEventDistributor[T]) distributeEvent(event T) {
 	a.consumerLock.RLock()
 	defer a.consumerLock.RUnlock()
-	for _, processor := range a.consumers {
-		processor.ConsumeEvent(event)
+	for _, consumer := range a.consumers {
+		consumer.ConsumeEvent(event)
 	}
 }
 

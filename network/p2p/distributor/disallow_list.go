@@ -21,8 +21,9 @@ const (
 	DefaultDisallowListNotificationQueueCacheSize = 100
 )
 
-// DisallowListNotificationConsumer subscribes to changes in the NodeBlocklistWrapper block list.
-type DisallowListNotificationConsumer struct {
+// DisallowListUpdateNotificationDistributor is a component that distributes disallow list updates to registered consumers in a
+// non-blocking manner.
+type DisallowListUpdateNotificationDistributor struct {
 	component.Component
 	cm *component.ComponentManager
 
@@ -30,19 +31,19 @@ type DisallowListNotificationConsumer struct {
 	logger  zerolog.Logger
 }
 
-// DisallowListUpdateNotificationProcessor is an adapter that allows the DisallowListNotificationConsumer to be used as an
+// DisallowListUpdateNotificationConsumer is an adapter that allows the DisallowListUpdateNotificationDistributor to be used as an
 // EventConsumer.
-type DisallowListUpdateNotificationProcessor struct {
+type DisallowListUpdateNotificationConsumer struct {
 	consumer p2p.DisallowListConsumer
 }
 
-func (d *DisallowListUpdateNotificationProcessor) ConsumeEvent(msg DisallowListUpdateNotification) {
+func (d *DisallowListUpdateNotificationConsumer) ConsumeEvent(msg DisallowListUpdateNotification) {
 	d.consumer.OnNodeDisallowListUpdate(msg.DisallowList)
 }
 
-var _ p2p.DisallowListConsumer = (*DisallowListNotificationConsumer)(nil)
+var _ p2p.DisallowListConsumer = (*DisallowListUpdateNotificationDistributor)(nil)
 
-func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListNotificationConsumer {
+func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListUpdateNotificationDistributor {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultDisallowListNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -56,7 +57,7 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 	return NewDisallowListConsumer(logger, store)
 }
 
-func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
+func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListUpdateNotificationDistributor {
 	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
 	h := handler.NewAsyncEventDistributor[DisallowListUpdateNotification](
@@ -64,7 +65,7 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 		store,
 		disallowListDistributorWorkerCount)
 
-	d := &DisallowListNotificationConsumer{
+	d := &DisallowListUpdateNotificationDistributor{
 		logger:  lg,
 		handler: h,
 	}
@@ -94,13 +95,13 @@ type DisallowListUpdateNotification struct {
 
 // AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
 // method when the node disallow list is updated.
-func (d *DisallowListNotificationConsumer) AddConsumer(consumer p2p.DisallowListConsumer) {
-	d.handler.RegisterConsumer(&DisallowListUpdateNotificationProcessor{consumer: consumer})
+func (d *DisallowListUpdateNotificationDistributor) AddConsumer(consumer p2p.DisallowListConsumer) {
+	d.handler.RegisterConsumer(&DisallowListUpdateNotificationConsumer{consumer: consumer})
 }
 
 // OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the handler to be
 // processed asynchronously.
-func (d *DisallowListNotificationConsumer) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
+func (d *DisallowListUpdateNotificationDistributor) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
 	err := d.handler.Submit(DisallowListUpdateNotification{
 		DisallowList: disallowList,
 	})

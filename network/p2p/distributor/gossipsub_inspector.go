@@ -19,9 +19,9 @@ const (
 	defaultGossipSubInspectorNotificationQueueWorkerCount = 1
 )
 
-// GossipSubInspectorNotification is a component that distributes gossipsub rpc inspector notifications to
-// registered consumers.
-type GossipSubInspectorNotification struct {
+// GossipSubInspectorNotificationDistributor is a component that distributes gossipsub rpc inspector notifications to
+// registered consumers in a non-blocking manner.
+type GossipSubInspectorNotificationDistributor struct {
 	component.Component
 	cm     *component.ComponentManager
 	logger zerolog.Logger
@@ -30,22 +30,22 @@ type GossipSubInspectorNotification struct {
 	handler *handler.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
 }
 
-// GossipSubInspectorNotificationProcessor is an adapter that allows the GossipSubInspectorNotification to be used as an
+// GossipSubInspectorNotificationConsumer is an adapter that allows the GossipSubInspectorNotificationDistributor to be used as an
 // EventConsumer.
-type GossipSubInspectorNotificationProcessor struct {
+type GossipSubInspectorNotificationConsumer struct {
 	consumer p2p.GossipSubRpcInspectorConsumer
 }
 
-// ProcessEvent processes the gossipsub rpc inspector notification. It will be called by the async event handler.
+// ConsumeEvent processes the gossipsub rpc inspector notification. It will be called by the AsyncEventHandler.
 // It will call the consumer's OnInvalidControlMessage method.
-func (g *GossipSubInspectorNotificationProcessor) ConsumeEvent(msg p2p.InvalidControlMessageNotification) {
+func (g *GossipSubInspectorNotificationConsumer) ConsumeEvent(msg p2p.InvalidControlMessageNotification) {
 	g.consumer.OnInvalidControlMessage(msg)
 }
 
-var _ p2p.GossipSubRpcInspectorConsumer = (*GossipSubInspectorNotification)(nil)
+var _ p2p.GossipSubRpcInspectorConsumer = (*GossipSubInspectorNotificationDistributor)(nil)
 
-// DefaultGossipSubInspectorNotification returns a new GossipSubInspectorNotification component with the default configuration.
-func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *GossipSubInspectorNotification {
+// DefaultGossipSubInspectorNotification returns a new GossipSubInspectorNotificationDistributor component with the default configuration.
+func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *GossipSubInspectorNotificationDistributor {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultGossipSubInspectorNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -59,9 +59,9 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 	return NewGossipSubInspectorNotification(logger, store)
 }
 
-// NewGossipSubInspectorNotification returns a new GossipSubInspectorNotification component.
+// NewGossipSubInspectorNotification returns a new GossipSubInspectorNotificationDistributor component.
 // It takes a message store to store the notifications in memory and process them asynchronously.
-func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
+func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotificationDistributor {
 	lg := log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger()
 
 	h := handler.NewAsyncEventDistributor[p2p.InvalidControlMessageNotification](
@@ -69,7 +69,7 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 		store,
 		defaultGossipSubInspectorNotificationQueueWorkerCount)
 
-	g := &GossipSubInspectorNotification{
+	g := &GossipSubInspectorNotificationDistributor{
 		logger:  lg,
 		handler: h,
 	}
@@ -96,7 +96,7 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 // Flow protocol specifications.
 // Prerequisites:
 // Implementation must be concurrency safe and non-blocking.
-func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2p.InvalidControlMessageNotification) {
+func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(notification p2p.InvalidControlMessageNotification) {
 	// we submit notification event to the handler to be processed by the worker.
 	// the origin id is set to flow.ZeroID because the notification update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
@@ -106,8 +106,8 @@ func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2
 	}
 }
 
-// AddConsumer adds a consumer to the GossipSubInspectorNotification. The consumer will be called when a new
+// AddConsumer adds a consumer to the GossipSubInspectorNotificationDistributor. The consumer will be called when a new
 // notification is received. The consumer must be concurrency safe.
-func (g *GossipSubInspectorNotification) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
-	g.handler.RegisterConsumer(&GossipSubInspectorNotificationProcessor{consumer: consumer})
+func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
+	g.handler.RegisterConsumer(&GossipSubInspectorNotificationConsumer{consumer: consumer})
 }
