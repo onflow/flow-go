@@ -94,7 +94,7 @@ func (d *DisallowListNotificationConsumer) OnNodeDisallowListUpdate(disallowList
 	// we submit the disallow list update event to the handler to be processed by the worker.
 	// the origin id is set to flow.ZeroID because the disallow list update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
-	err := d.handler.Submit(flow.ZeroID, DisallowListUpdateNotification{
+	err := d.handler.Submit(DisallowListUpdateNotification{
 		DisallowList: disallowList,
 	})
 

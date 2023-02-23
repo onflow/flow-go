@@ -92,7 +92,7 @@ func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2
 	// we submit notification event to the handler to be processed by the worker.
 	// the origin id is set to flow.ZeroID because the notification update event is not associated with a specific node.
 	// the distributor discards the origin id upon processing it.
-	err := g.handler.Submit(flow.ZeroID, notification)
+	err := g.handler.Submit(notification)
 	if err != nil {
 		g.logger.Fatal().Err(err).Msg("failed to submit invalid control message event to handler")
 	}

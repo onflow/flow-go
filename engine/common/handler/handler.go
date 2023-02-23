@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -11,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+var ErrSubmissionFailed = errors.New("could not submit event")
 
 // EventProcessorFunc is a function that processes an event. It is used by the AsyncEventHandler to process events.
 // The first argument is the identifier of the event's origin, and the second argument is the event itself.
@@ -25,9 +28,9 @@ type AsyncEventHandler struct {
 	cm *component.ComponentManager
 
 	log       zerolog.Logger
-	handler   *engine.MessageHandler
 	store     engine.MessageStore
 	processor EventProcessorFunc
+	notifier  engine.Notifier
 }
 
 // NewAsyncEventHandler creates a new AsyncEventHandler.
@@ -40,14 +43,9 @@ func NewAsyncEventHandler(
 	workerCount uint) *AsyncEventHandler {
 
 	h := &AsyncEventHandler{
-		log:   log.With().Str("component", "async_event_handler").Logger(),
-		store: store,
-		handler: engine.NewMessageHandler(log, engine.NewNotifier(), engine.Pattern{
-			Match: func(message *engine.Message) bool {
-				return true
-			},
-			Store: store,
-		}),
+		log:      log.With().Str("component", "async_event_handler").Logger(),
+		store:    store,
+		notifier: engine.NewNotifier(),
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -78,7 +76,7 @@ func (a *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext
 		case <-ctx.Done():
 			a.log.Debug().Msg("processing event worker terminated")
 			return
-		case <-a.handler.GetNotifier():
+		case <-a.notifier.Channel():
 			a.processEvents(ctx)
 		}
 	}
@@ -107,10 +105,11 @@ func (a *AsyncEventHandler) processEvents(ctx irrecoverable.SignalerContext) {
 }
 
 // Submit is the main entry point for the event handler. It receives an event, and asynchronously queues it for processing.
-// On a happy path it returns nil. Any returned error is unexpected and indicates a bug in the code.
+// On a happy path it returns nil. It returns ErrSubmissionFailed if the event could not be queued up for processing, e.g.,
+// due to the message store being full.
 // It is safe to call Submit concurrently.
 // It is safe to call Submit after Shutdown.
-func (a *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) error {
+func (a *AsyncEventHandler) Submit(event interface{}) error {
 	select {
 	case <-a.cm.ShutdownSignal():
 		a.log.Warn().Msg("received event after shutdown")
@@ -118,10 +117,14 @@ func (a *AsyncEventHandler) Submit(originId flow.Identifier, event interface{}) 
 	default:
 	}
 
-	err := a.handler.Process(originId, event)
-	if err != nil {
-		return fmt.Errorf("unexpected error while processing event: %w", err)
+	ok := a.store.Put(&engine.Message{
+		Payload: event,
+	})
+
+	if !ok {
+		return ErrSubmissionFailed
 	}
 
+	a.notifier.Notify()
 	return nil
 }
