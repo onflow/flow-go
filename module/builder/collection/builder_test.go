@@ -261,7 +261,6 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	suite.Require().NoError(err)
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
 	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
-	unittest.QuorumCertificateFixture()
 	err = suite.protoState.ExtendCertified(context.Background(), unfinalizedReferenceBlock,
 		unittest.CertifyBlock(unfinalizedReferenceBlock.Header))
 	suite.Require().NoError(err)
