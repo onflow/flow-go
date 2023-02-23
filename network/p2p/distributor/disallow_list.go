@@ -29,7 +29,7 @@ type DisallowListNotificationConsumer struct {
 	cm *component.ComponentManager
 
 	consumers []p2p.DisallowListConsumer
-	handler   *handler.AsyncEventHandler
+	handler   *handler.AsyncEventHandler[DisallowListUpdateNotification]
 	logger    zerolog.Logger
 	lock      sync.RWMutex
 }
@@ -105,17 +105,13 @@ func (d *DisallowListNotificationConsumer) OnNodeDisallowListUpdate(disallowList
 	}
 }
 
-func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(_ flow.Identifier, notification interface{}) {
+func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(notification DisallowListUpdateNotification) {
 	var consumers []p2p.DisallowListConsumer
 	d.lock.RLock()
 	consumers = d.consumers
 	d.lock.RUnlock()
 
-	n, ok := notification.(DisallowListUpdateNotification)
-	if !ok {
-		d.logger.Fatal().Msgf("unknown notification type: %T", notification)
-	}
 	for _, consumer := range consumers {
-		consumer.OnNodeDisallowListUpdate(n.DisallowList)
+		consumer.OnNodeDisallowListUpdate(notification.DisallowList)
 	}
 }

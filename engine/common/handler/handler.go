@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
@@ -19,17 +18,17 @@ var ErrSubmissionFailed = errors.New("could not submit event")
 // The first argument is the identifier of the event's origin, and the second argument is the event itself.
 // The function is expected to be concurrency safe.
 // Processing an event is the last step in the event's lifecycle within the AsyncEventHandler.
-type EventProcessorFunc func(flow.Identifier, interface{})
+type EventProcessorFunc[T any] func(T)
 
 // AsyncEventHandler is a component that asynchronously handles events, i.e., concurrency safe and non-blocking.
 // It queues up the events and spawns a number of workers to process the events.
-type AsyncEventHandler struct {
+type AsyncEventHandler[T any] struct {
 	component.Component
 	cm *component.ComponentManager
 
 	log       zerolog.Logger
 	store     engine.MessageStore
-	processor EventProcessorFunc
+	processor EventProcessorFunc[T]
 	notifier  engine.Notifier
 }
 
@@ -37,13 +36,13 @@ type AsyncEventHandler struct {
 // The first argument is the logger to be used by the AsyncEventHandler.
 // The second argument is the message store to be used by the AsyncEventHandler for temporarily storing events till they are processed.
 // The third argument is the number of workers to be spawned by the AsyncEventHandler to pick up events from the message store and process them.
-func NewAsyncEventHandler(
+func NewAsyncEventHandler[T any](
 	log zerolog.Logger,
 	store engine.MessageStore,
-	processorFn EventProcessorFunc,
+	processorFn EventProcessorFunc[T],
 	workerCount uint,
-) *AsyncEventHandler {
-	h := &AsyncEventHandler{
+) *AsyncEventHandler[T] {
+	h := &AsyncEventHandler[T]{
 		log:       log.With().Str("component", "async_event_handler").Logger(),
 		store:     store,
 		notifier:  engine.NewNotifier(),
@@ -65,14 +64,14 @@ func NewAsyncEventHandler(
 	return h
 }
 
-func (a *AsyncEventHandler) RegisterProcessor(processor EventProcessorFunc) {
+func (a *AsyncEventHandler[T]) RegisterProcessor(processor EventProcessorFunc[T]) {
 	a.processor = processor
 }
 
 // processEventWorker is a worker that is spawned by the AsyncEventHandler to process events.
 // The worker is blocked on the handler's notifier channel, and wakes up whenever a new event is received.
 // On waking up, the worker keeps processing events till the message store is empty.
-func (a *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext) {
+func (a *AsyncEventHandler[T]) processEventWorker(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -85,7 +84,7 @@ func (a *AsyncEventHandler) processEventWorker(ctx irrecoverable.SignalerContext
 }
 
 // processEvents is part of the worker's logic. It keeps processing events till the message store is empty.
-func (a *AsyncEventHandler) processEvents(ctx irrecoverable.SignalerContext) {
+func (a *AsyncEventHandler[T]) processEvents(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,11 +95,15 @@ func (a *AsyncEventHandler) processEvents(ctx irrecoverable.SignalerContext) {
 				a.log.Trace().Msg("no more events to process, returning")
 				return
 			}
+			event, ok := msg.Payload.(T)
+			if !ok {
+				a.log.Fatal().Msgf("invalid event type expected: %T", msg.Payload)
+			}
 			lg := a.log.With().
 				Hex("origin_id", logging.ID(msg.OriginID)).
 				Str("payload", fmt.Sprintf("%v", msg.Payload)).Logger()
 			lg.Trace().Msg("processing event")
-			a.processor(msg.OriginID, msg.Payload)
+			a.processor(event)
 			lg.Trace().Msg("event processed")
 		}
 	}
@@ -111,7 +114,7 @@ func (a *AsyncEventHandler) processEvents(ctx irrecoverable.SignalerContext) {
 // due to the message store being full.
 // It is safe to call Submit concurrently.
 // It is safe to call Submit after Shutdown.
-func (a *AsyncEventHandler) Submit(event interface{}) error {
+func (a *AsyncEventHandler[T]) Submit(event T) error {
 	select {
 	case <-a.cm.ShutdownSignal():
 		a.log.Warn().Msg("received event after shutdown")

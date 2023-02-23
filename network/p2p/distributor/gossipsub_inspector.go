@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/handler"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -31,7 +30,7 @@ type GossipSubInspectorNotification struct {
 	logger zerolog.Logger
 
 	// handler is the async event handler that will process the notifications asynchronously.
-	handler *handler.AsyncEventHandler
+	handler *handler.AsyncEventHandler[p2p.InvalidControlMessageNotification]
 
 	// notifiers is a list of consumers that will be notified when a new notification is received.
 	notifiers []p2p.GossipSubRpcInspectorConsumer
@@ -61,7 +60,7 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 		logger: log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),
 	}
 
-	h := handler.NewAsyncEventHandler(
+	h := handler.NewAsyncEventHandler[p2p.InvalidControlMessageNotification](
 		log,
 		store,
 		g.processQueuedNotifications,
@@ -111,17 +110,13 @@ func (g *GossipSubInspectorNotification) AddConsumer(consumer p2p.GossipSubRpcIn
 }
 
 // processQueuedNotifications processes the queued notifications. It is called by the handler worker.
-func (g *GossipSubInspectorNotification) processQueuedNotifications(_ flow.Identifier, notification interface{}) {
+func (g *GossipSubInspectorNotification) processQueuedNotifications(notification p2p.InvalidControlMessageNotification) {
 	var consumers []p2p.GossipSubRpcInspectorConsumer
 	g.lock.RLock()
 	consumers = g.notifiers
 	g.lock.RUnlock()
 
-	n, ok := notification.(p2p.InvalidControlMessageNotification)
-	if !ok {
-		g.logger.Fatal().Msgf("invalid notification type: %T", notification)
-	}
 	for _, consumer := range consumers {
-		consumer.OnInvalidControlMessage(n)
+		consumer.OnInvalidControlMessage(notification)
 	}
 }

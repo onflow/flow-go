@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/handler"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -24,8 +23,7 @@ func TestAsyncEventHandler_SingleEvent(t *testing.T) {
 
 	q := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	eventProcessed := make(chan struct{})
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
-		require.Equal(t, originId, originId)
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
 		require.Equal(t, event, event)
 		close(eventProcessed)
 	}, 2)
@@ -53,7 +51,9 @@ func TestAsyncEventHandler_SubmissionError(t *testing.T) {
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
 
 	blockingChannel := make(chan struct{})
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
+	firstEventArrived := make(chan struct{})
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
+		close(firstEventArrived)
 		// we block the processor to make sure that the queue is eventually full.
 		<-blockingChannel
 	}, 1)
@@ -65,17 +65,27 @@ func TestAsyncEventHandler_SubmissionError(t *testing.T) {
 
 	unittest.RequireCloseBefore(t, h.Ready(), 100*time.Millisecond, "could not start handler")
 
-	for i := 0; i < size+1; i++ {
+	// first event should be submitted successfully
+	require.NoError(t, h.Submit("first-event-ever"))
+
+	// wait for the first event to be picked by the single worker
+	unittest.RequireCloseBefore(t, firstEventArrived, 100*time.Millisecond, "first event not processed")
+
+	// now the worker is blocked, we submit the rest of the events so that the queue is full
+	for i := 0; i < size; i++ {
 		event := fmt.Sprintf("test-event-%d", i)
-		require.NoError(t, h.Submit(event), i)
-		require.ErrorIs(t, h.Submit(event), handler.ErrSubmissionFailed) // duplicate event should be rejected
+		require.NoError(t, h.Submit(event))
+		// we also check that re-submitting the same event fails as duplicate event already is in the queue
+		require.ErrorIs(t, h.Submit(event), handler.ErrSubmissionFailed)
 	}
-	// the queue is full, so the next submission should fail
+
+	// now the queue is full, so the next submission should fail
 	require.ErrorIs(t, h.Submit("test-event"), handler.ErrSubmissionFailed)
 
 	close(blockingChannel)
 	cancel()
 	unittest.RequireCloseBefore(t, h.Done(), 100*time.Millisecond, "could not stop handler")
+
 }
 
 // TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier tests the async event handler with multiple events
@@ -85,12 +95,10 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 	size := 10
 	workers := uint(5)
 
-	tc := make([]struct {
-		event interface{}
-	}, 10)
+	tc := make([]string, size)
 
 	for i := 0; i < size; i++ {
-		tc[i].event = fmt.Sprintf("test-event-%d", i)
+		tc[i] = fmt.Sprintf("test-event-%d", i)
 	}
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
@@ -98,17 +106,13 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 	allEventsProcessed := sync.WaitGroup{}
 	allEventsProcessed.Add(size)
 
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
 		// check if the event is in the test case
-		require.Contains(t, tc, struct {
-			event interface{}
-		}{
-			event: event,
-		})
+		require.Contains(t, tc, event)
 
 		// check if the event is processed only once
-		require.False(t, processedEvents.Has(event.(string)))
-		processedEvents.Add(event.(string), struct{}{})
+		require.False(t, processedEvents.Has(event))
+		processedEvents.Add(event, struct{}{})
 
 		allEventsProcessed.Done()
 	}, workers)
@@ -122,7 +126,7 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 
 	for i := 0; i < size; i++ {
 		go func(i int) {
-			require.NoError(t, h.Submit(tc[i].event))
+			require.NoError(t, h.Submit(tc[i]))
 		}(i)
 	}
 

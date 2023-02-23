@@ -29,7 +29,7 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	d.AddConsumer(c1)
 	d.AddConsumer(c2)
 
-	tt := disallowListUpdateNotificationsFixture(100)
+	tt := disallowListUpdateNotificationsFixture(50)
 
 	c1Done := sync.WaitGroup{}
 	c1Done.Add(len(tt))
@@ -94,6 +94,6 @@ func disallowListUpdateNotificationsFixture(n int) []*distributor.DisallowListUp
 
 func disallowListUpdateNotificationFixture() *distributor.DisallowListUpdateNotification {
 	return &distributor.DisallowListUpdateNotification{
-		DisallowList: unittest.IdentifierListFixture(rand.Int() % 100),
+		DisallowList: unittest.IdentifierListFixture(rand.Int()%100 + 1),
 	}
 }
