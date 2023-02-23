@@ -1,19 +1,17 @@
 package migrate
 
 import (
-	"github.com/rs/zerolog"
+	"path/filepath"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/storage"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/ledger/storage/importer"
 )
 
 var (
-	flagCheckpointDir string
+	flagCheckpoint string
 )
 
 var Cmd = &cobra.Command{
@@ -23,16 +21,21 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVar(&flagCheckpointDir, "checkpoint-dir", "",
-		"Directory to load checkpoint files from")
-	_ = Cmd.MarkFlagRequired("checkpoint-dir")
+	Cmd.Flags().StringVar(&flagCheckpoint, "checkpoint", "",
+		"checkpoint file to read")
+	_ = Cmd.MarkFlagRequired("checkpoint")
 }
 
 func run(*cobra.Command, []string) {
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, flagCheckpointDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot create WAL")
-	}
+	dir, file := filepath.Split(flagCheckpoint)
+	log.Info().Msgf("importing payloads from checkpoint file: %v", flagCheckpoint)
+
 	payloadStorage := storage.CreatePayloadStorage()
 
+	err := importer.ImportLeafNodesFromCheckpoint(dir, file, &log.Logger, payloadStorage)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not import leaf nodes from checkpoint file")
+	}
+
+	log.Info().Msg("all payloads from checkpoint file has been successfully imported")
 }
