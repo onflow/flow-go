@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
@@ -705,11 +704,6 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		prov)
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(
-		state.NewLedgerStorageSnapshot(
-			ledger,
-			initialCommit))
-
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
@@ -717,7 +711,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		view,
+		state.NewLedgerStorageSnapshot(
+			ledger,
+			initialCommit),
 		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
 
