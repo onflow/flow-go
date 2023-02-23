@@ -123,7 +123,7 @@ func TestAsyncEventDistributor_MultipleConcurrentEvents(t *testing.T) {
 	allEventsDistributed := sync.WaitGroup{}
 	allEventsDistributed.Add(size)
 
-	distributor := &mockConsumer{
+	consumer := &mockConsumer{
 		consumeFn: func(event string) {
 			// check if the event is in the test case
 			require.Contains(t, tc, event)
@@ -136,7 +136,7 @@ func TestAsyncEventDistributor_MultipleConcurrentEvents(t *testing.T) {
 		},
 	}
 	h := distributor.NewAsyncEventDistributor[string](unittest.Logger(), q, workers)
-	h.RegisterConsumer(distributor)
+	h.RegisterConsumer(consumer)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
