@@ -40,12 +40,14 @@ type AsyncEventHandler struct {
 func NewAsyncEventHandler(
 	log zerolog.Logger,
 	store engine.MessageStore,
+	processorFn EventProcessorFunc,
 	workerCount uint,
 ) *AsyncEventHandler {
 	h := &AsyncEventHandler{
-		log:      log.With().Str("component", "async_event_handler").Logger(),
-		store:    store,
-		notifier: engine.NewNotifier(),
+		log:       log.With().Str("component", "async_event_handler").Logger(),
+		store:     store,
+		notifier:  engine.NewNotifier(),
+		processor: processorFn,
 	}
 
 	cm := component.NewComponentManagerBuilder()

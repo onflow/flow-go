@@ -51,15 +51,17 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 }
 
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
-	h := handler.NewAsyncEventHandler(logger, store, disallowListDistributorWorkerCount)
-
 	d := &DisallowListNotificationConsumer{
 		consumers: make([]p2p.DisallowListConsumer, 0),
-		handler:   h,
 		logger:    logger.With().Str("component", "node_disallow_distributor").Logger(),
 	}
 
-	h.RegisterProcessor(d.ProcessQueuedNotifications)
+	h := handler.NewAsyncEventHandler(
+		logger,
+		store,
+		d.ProcessQueuedNotifications,
+		disallowListDistributorWorkerCount)
+	d.handler = h
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

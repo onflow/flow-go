@@ -23,13 +23,12 @@ func TestAsyncEventHandler_SingleEvent(t *testing.T) {
 	event := "test-event"
 
 	q := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, 2)
 	eventProcessed := make(chan struct{})
-	h.RegisterProcessor(func(originId flow.Identifier, event interface{}) {
+	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
 		require.Equal(t, originId, originId)
 		require.Equal(t, event, event)
 		close(eventProcessed)
-	})
+	}, 2)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -52,12 +51,12 @@ func TestAsyncEventHandler_SubmissionError(t *testing.T) {
 	size := 5
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, 1)
+
 	blockingChannel := make(chan struct{})
-	h.RegisterProcessor(func(originId flow.Identifier, event interface{}) {
+	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
 		// we block the processor to make sure that the queue is eventually full.
 		<-blockingChannel
-	})
+	}, 1)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -95,12 +94,11 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 	}
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
-	h := handler.NewAsyncEventHandler(unittest.Logger(), q, workers)
-
 	processedEvents := unittest.NewProtectedMap[string, struct{}]()
 	allEventsProcessed := sync.WaitGroup{}
 	allEventsProcessed.Add(size)
-	h.RegisterProcessor(func(originId flow.Identifier, event interface{}) {
+
+	h := handler.NewAsyncEventHandler(unittest.Logger(), q, func(originId flow.Identifier, event interface{}) {
 		// check if the event is in the test case
 		require.Contains(t, tc, struct {
 			event interface{}
@@ -113,7 +111,7 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 		processedEvents.Add(event.(string), struct{}{})
 
 		allEventsProcessed.Done()
-	})
+	}, workers)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()

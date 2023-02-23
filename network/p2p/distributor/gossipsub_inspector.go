@@ -57,13 +57,16 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 // NewGossipSubInspectorNotification returns a new GossipSubInspectorNotification component.
 // It takes a message store to store the notifications in memory and process them asynchronously.
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
-	h := handler.NewAsyncEventHandler(log, store, defaultGossipSubInspectorNotificationQueueWorkerCount)
 	g := &GossipSubInspectorNotification{
-		handler: h,
-		logger:  log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),
+		logger: log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),
 	}
 
-	g.handler.RegisterProcessor(g.processQueuedNotifications)
+	h := handler.NewAsyncEventHandler(
+		log,
+		store,
+		g.processQueuedNotifications,
+		defaultGossipSubInspectorNotificationQueueWorkerCount)
+	g.handler = h
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
