@@ -3,12 +3,12 @@ package corruptlibp2p
 import (
 	"context"
 	"fmt"
+
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
-
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
