@@ -108,7 +108,6 @@ func NewFullConsensusState(
 // NOTE: this function expects that `certifyingQC` has been validated.
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -129,7 +128,12 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header not compliant with chain state: %w", err)
+		if state.IsOutdatedExtensionError(err) {
+			return fmt.Errorf("candidate block is an outdated extension: %w", err)
+		}
+		// since we have a QC for this block, it cannot be an invalid extension
+		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
+			candidate.ID(), certifyingQC.ID(), err.Error())
 	}
 
 	// find the last seal at the parent block
@@ -192,6 +196,8 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 
 // headerExtend verifies the validity of the block header (excluding verification of the
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
@@ -460,8 +466,8 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	qc := candidate.Header.QuorumCertificate()
-	_, err = m.qcs.ByBlockID(qc.BlockID)
-	qcAlreadyInserted := err == nil
+
+	var events []func()
 
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
@@ -473,10 +479,17 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
-		if !qcAlreadyInserted {
-			err = m.qcs.StoreTx(qc)(tx)
-			if err != nil {
+		err = m.qcs.StoreTx(qc)(tx)
+		if err != nil {
+			if !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store incorporated qc: %w", err)
+			}
+		} else {
+			// trigger BlockProcessable for parent blocks above root height
+			if parent.Height > m.rootHeight {
+				events = append(events, func() {
+					m.consumer.BlockProcessable(parent, qc)
+				})
 			}
 		}
 
@@ -485,6 +498,11 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			if err != nil {
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
+
+			// trigger BlockProcessable for candidate block if it's certified
+			events = append(events, func() {
+				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
+			})
 		}
 
 		// index the latest sealed block in this fork
@@ -509,18 +527,10 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 
 		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("could not execute state extension: %w", err)
-	}
 
-	// trigger BlockProcessable for parent blocks above root height
-	if parent.Height > m.rootHeight {
-		m.consumer.BlockProcessable(parent, qc)
-	}
-
-	if certifyingQC != nil {
-		// trigger BlockProcessable for candidate block if it's certified
-		m.consumer.BlockProcessable(candidate.Header, certifyingQC)
+	// execute scheduled events
+	for _, event := range events {
+		event()
 	}
 
 	return nil

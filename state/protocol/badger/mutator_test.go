@@ -1840,7 +1840,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 		err := state.ExtendCertified(context.Background(), &extend, unittest.CertifyBlock(extend.Header))
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -1869,7 +1869,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
-		require.True(t, st.IsInvalidExtensionError(err))
+		require.False(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
 		var sealID flow.Identifier
@@ -1890,7 +1890,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		block.Header.Height = head.Height + 2
 
 		err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
-		require.True(t, st.IsInvalidExtensionError(err))
+		require.False(t, st.IsInvalidExtensionError(err))
 	})
 }
 

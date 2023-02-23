@@ -40,7 +40,7 @@ type State interface {
 // FollowerState is a mutable protocol state used by nodes following main consensus (ie. non-consensus nodes).
 // All blocks must have a certifying QC when being added to the state to guarantee they are valid,
 // so there is a one-block lag between block production and incorporation into the FollowerState.
-// However, since all blocks are certified upon insertion, they are immediately processable by other components. 
+// However, since all blocks are certified upon insertion, they are immediately processable by other components.
 type FollowerState interface {
 	State
 	// ExtendCertified introduces the block with the given ID into the persistent
@@ -52,7 +52,6 @@ type FollowerState interface {
 	// QC cannot be nil and must certify candidate block (candidate.View == qc.View && candidate.BlockID == qc.BlockID)
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-	//  * state.InvalidExtensionError if the candidate block is invalid
 	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
 
 	// Finalize finalizes the block with the given hash.
