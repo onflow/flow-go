@@ -64,10 +64,6 @@ func NewAsyncEventHandler[T any](
 	return h
 }
 
-func (a *AsyncEventHandler[T]) RegisterProcessor(processor EventProcessorFunc[T]) {
-	a.processor = processor
-}
-
 // processEventWorker is a worker that is spawned by the AsyncEventHandler to process events.
 // The worker is blocked on the handler's notifier channel, and wakes up whenever a new event is received.
 // On waking up, the worker keeps processing events till the message store is empty.
