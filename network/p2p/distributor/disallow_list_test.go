@@ -81,7 +81,7 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	unittest.RequireReturnsBefore(t, c1Done.Wait, 1*time.Second, "events are not received by consumer 1")
 	unittest.RequireReturnsBefore(t, c2Done.Wait, 1*time.Second, "events are not received by consumer 2")
 	cancel()
-	unittest.RequireCloseBefore(t, d.Done(), 100*time.Millisecond, "could not stop handler")
+	unittest.RequireCloseBefore(t, d.Done(), 100*time.Millisecond, "could not stop distributor")
 }
 
 func disallowListUpdateNotificationsFixture(n int) []*distributor.DisallowListUpdateNotification {

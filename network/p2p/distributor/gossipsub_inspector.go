@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/distributor"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -25,8 +26,8 @@ type GossipSubInspectorNotificationDistributor struct {
 	cm     *component.ComponentManager
 	logger zerolog.Logger
 
-	// handler is the async event handler that will process the notifications asynchronously.
-	handler *distributor.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
+	// AsyncEventDistributor that will distribute the notifications asynchronously.
+	asyncDistributor *distributor.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
 }
 
 // GossipSubInspectorNotificationConsumer is an adapter that allows the GossipSubInspectorNotificationDistributor to be used as an
@@ -35,7 +36,7 @@ type GossipSubInspectorNotificationConsumer struct {
 	consumer p2p.GossipSubRpcInspectorConsumer
 }
 
-// ConsumeEvent processes the gossipsub rpc inspector notification. It will be called by the AsyncEventHandler.
+// ConsumeEvent processes the gossipsub rpc inspector notification. It will be called by the AsyncEventDistributor.
 // It will call the consumer's OnInvalidControlMessage method.
 func (g *GossipSubInspectorNotificationConsumer) ConsumeEvent(msg p2p.InvalidControlMessageNotification) {
 	g.consumer.OnInvalidControlMessage(msg)
@@ -69,8 +70,8 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 		defaultGossipSubInspectorNotificationQueueWorkerCount)
 
 	g := &GossipSubInspectorNotificationDistributor{
-		logger:  lg,
-		handler: h,
+		logger:           lg,
+		asyncDistributor: h,
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -96,17 +97,14 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 // Prerequisites:
 // Implementation must be concurrency safe and non-blocking.
 func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(notification p2p.InvalidControlMessageNotification) {
-	// we submit notification event to the handler to be processed by the worker.
-	// the origin id is set to flow.ZeroID because the notification update event is not associated with a specific node.
-	// the distributor discards the origin id upon processing it.
-	err := g.handler.Submit(notification)
+	err := g.asyncDistributor.Submit(notification)
 	if err != nil {
-		g.logger.Fatal().Err(err).Msg("failed to submit invalid control message event to handler")
+		g.logger.Fatal().Err(err).Msg("failed to submit invalid control message event to distributor")
 	}
 }
 
 // AddConsumer adds a consumer to the GossipSubInspectorNotificationDistributor. The consumer will be called when a new
 // notification is received. The consumer must be concurrency safe.
 func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
-	g.handler.RegisterConsumer(&GossipSubInspectorNotificationConsumer{consumer: consumer})
+	g.asyncDistributor.RegisterConsumer(&GossipSubInspectorNotificationConsumer{consumer: consumer})
 }

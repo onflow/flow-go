@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/distributor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -24,10 +25,11 @@ const (
 // non-blocking manner.
 type DisallowListUpdateNotificationDistributor struct {
 	component.Component
-	cm *component.ComponentManager
+	cm     *component.ComponentManager
+	logger zerolog.Logger
 
-	handler *distributor.AsyncEventDistributor[DisallowListUpdateNotification]
-	logger  zerolog.Logger
+	// AsyncEventDistributor that will distribute the notifications asynchronously.
+	asyncDistributor *distributor.AsyncEventDistributor[DisallowListUpdateNotification]
 }
 
 // DisallowListUpdateNotificationConsumer is an adapter that allows the DisallowListUpdateNotificationDistributor to be used as an
@@ -65,8 +67,8 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 		disallowListDistributorWorkerCount)
 
 	d := &DisallowListUpdateNotificationDistributor{
-		logger:  lg,
-		handler: h,
+		logger:           lg,
+		asyncDistributor: h,
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -87,7 +89,7 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 	return d
 }
 
-// DisallowListUpdateNotification is the event that is submitted to the handler when the disallow list is updated.
+// DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
 type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList
 }
@@ -95,17 +97,17 @@ type DisallowListUpdateNotification struct {
 // AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
 // method when the node disallow list is updated.
 func (d *DisallowListUpdateNotificationDistributor) AddConsumer(consumer p2p.DisallowListConsumer) {
-	d.handler.RegisterConsumer(&DisallowListUpdateNotificationConsumer{consumer: consumer})
+	d.asyncDistributor.RegisterConsumer(&DisallowListUpdateNotificationConsumer{consumer: consumer})
 }
 
-// OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the handler to be
+// OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the distributor to be
 // processed asynchronously.
 func (d *DisallowListUpdateNotificationDistributor) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
-	err := d.handler.Submit(DisallowListUpdateNotification{
+	err := d.asyncDistributor.Submit(DisallowListUpdateNotification{
 		DisallowList: disallowList,
 	})
 
 	if err != nil {
-		d.logger.Fatal().Err(err).Msg("failed to submit disallow list update event to handler")
+		d.logger.Fatal().Err(err).Msg("failed to submit disallow list update event to distributor")
 	}
 }

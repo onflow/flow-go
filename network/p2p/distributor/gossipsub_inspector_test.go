@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGossipSubInspectorNotification tests the gossip sub inspector notification by adding two consumers to the
+// TestGossipSubInspectorNotification tests the GossipSub inspector notification by adding two consumers to the
 // notification distributor component and sending a random set of notifications to the notification component. The test
 // verifies that the consumers receive the notifications.
 func TestGossipSubInspectorNotification(t *testing.T) {
@@ -80,7 +80,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	unittest.RequireReturnsBefore(t, c1Done.Wait, 1*time.Second, "events are not received by consumer 1")
 	unittest.RequireReturnsBefore(t, c2Done.Wait, 1*time.Second, "events are not received by consumer 2")
 	cancel()
-	unittest.RequireCloseBefore(t, g.Done(), 100*time.Millisecond, "could not stop handler")
+	unittest.RequireCloseBefore(t, g.Done(), 100*time.Millisecond, "could not stop distributor")
 }
 
 func invalidControlMessageNotificationListFixture(t *testing.T, n int) []p2p.InvalidControlMessageNotification {
