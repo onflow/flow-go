@@ -4,7 +4,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/handler"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -27,7 +26,7 @@ type DisallowListUpdateNotificationDistributor struct {
 	component.Component
 	cm *component.ComponentManager
 
-	handler *handler.AsyncEventDistributor[DisallowListUpdateNotification]
+	handler *distributor.AsyncEventDistributor[DisallowListUpdateNotification]
 	logger  zerolog.Logger
 }
 
@@ -60,7 +59,7 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListUpdateNotificationDistributor {
 	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
-	h := handler.NewAsyncEventDistributor[DisallowListUpdateNotification](
+	h := distributor.NewAsyncEventDistributor[DisallowListUpdateNotification](
 		lg,
 		store,
 		disallowListDistributorWorkerCount)

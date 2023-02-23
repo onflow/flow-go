@@ -1,4 +1,4 @@
-package handler_test
+package distributor_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/common/handler"
+	"github.com/onflow/flow-go/engine/common/distributor"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -39,7 +39,7 @@ func TestAsyncEventDistributor_SingleEvent_SingleConsumer(t *testing.T) {
 		},
 	}
 
-	h := handler.NewAsyncEventDistributor[string](unittest.Logger(), q, 2)
+	h := distributor.NewAsyncEventDistributor[string](unittest.Logger(), q, 2)
 	h.RegisterConsumer(cosumer)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -73,7 +73,7 @@ func TestAsyncEventDistributor_SubmissionError(t *testing.T) {
 			<-blockingChannel
 		},
 	}
-	h := handler.NewAsyncEventDistributor[string](unittest.Logger(), q, 1)
+	h := distributor.NewAsyncEventDistributor[string](unittest.Logger(), q, 1)
 	h.RegisterConsumer(consumer)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -94,11 +94,11 @@ func TestAsyncEventDistributor_SubmissionError(t *testing.T) {
 		event := fmt.Sprintf("test-event-%d", i)
 		require.NoError(t, h.Submit(event))
 		// we also check that re-submitting the same event fails as duplicate event already is in the queue
-		require.ErrorIs(t, h.Submit(event), handler.ErrSubmissionFailed)
+		require.ErrorIs(t, h.Submit(event), distributor.ErrSubmissionFailed)
 	}
 
 	// now the queue is full, so the next submission should fail
-	require.ErrorIs(t, h.Submit("test-event"), handler.ErrSubmissionFailed)
+	require.ErrorIs(t, h.Submit("test-event"), distributor.ErrSubmissionFailed)
 
 	close(blockingChannel)
 	cancel()
@@ -135,7 +135,7 @@ func TestAsyncEventDistributor_MultipleConcurrentEvents(t *testing.T) {
 			allEventsDistributed.Done()
 		},
 	}
-	h := handler.NewAsyncEventDistributor[string](unittest.Logger(), q, workers)
+	h := distributor.NewAsyncEventDistributor[string](unittest.Logger(), q, workers)
 	h.RegisterConsumer(distributor)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -197,7 +197,7 @@ func TestNewAsyncEventDistributor_MultipleEvents_MultipleConsumers(t *testing.T)
 		},
 	}
 
-	h := handler.NewAsyncEventDistributor[string](unittest.Logger(), q, 2)
+	h := distributor.NewAsyncEventDistributor[string](unittest.Logger(), q, 2)
 	h.RegisterConsumer(consumer1)
 	h.RegisterConsumer(consumer2)
 

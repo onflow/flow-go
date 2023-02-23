@@ -4,7 +4,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/handler"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -27,7 +26,7 @@ type GossipSubInspectorNotificationDistributor struct {
 	logger zerolog.Logger
 
 	// handler is the async event handler that will process the notifications asynchronously.
-	handler *handler.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
+	handler *distributor.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
 }
 
 // GossipSubInspectorNotificationConsumer is an adapter that allows the GossipSubInspectorNotificationDistributor to be used as an
@@ -64,7 +63,7 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotificationDistributor {
 	lg := log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger()
 
-	h := handler.NewAsyncEventDistributor[p2p.InvalidControlMessageNotification](
+	h := distributor.NewAsyncEventDistributor[p2p.InvalidControlMessageNotification](
 		log,
 		store,
 		defaultGossipSubInspectorNotificationQueueWorkerCount)
