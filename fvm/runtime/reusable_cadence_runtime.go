@@ -55,6 +55,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Type: setAccountFrozenFunctionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredHostFunctionValue(
+			setAccountFrozenFunctionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
 				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 				if !ok {
@@ -83,7 +84,6 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 
 				return interpreter.VoidValue{}
 			},
-			setAccountFrozenFunctionType,
 		),
 	}
 
