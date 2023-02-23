@@ -651,7 +651,10 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		lastExecutedHeight)
 
 	// Force all ENs to pause execution at block height 47183000
-	exeNode.stopControl.SetStopHeight(47183000, false)
+	_, _, err = exeNode.stopControl.SetStopHeight(47183000, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot set stop height: %w", err)
+	}
 
 	return &module.NoopReadyDoneAware{}, nil
 }
