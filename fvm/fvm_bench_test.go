@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -135,7 +134,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
 	derivedChainData      *derived.DerivedChainData
-	activeView            state.View
+	activeSnapshot        delta.StorageSnapshot
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
@@ -226,8 +225,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		prov)
 	require.NoError(tb, err)
 
-	view := delta.NewDeltaView(
-		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
+	snapshot := exeState.NewLedgerStorageSnapshot(ledger, initialCommit)
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)
@@ -237,7 +235,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		blockComputer:         blockComputer,
 		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeView:            view,
+		activeSnapshot:        snapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 		onStopFunc:            onStopFunc,
@@ -264,7 +262,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		b.activeView,
+		b.activeSnapshot,
 		derivedBlockData)
 	require.NoError(tb, err)
 

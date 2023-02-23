@@ -24,8 +24,9 @@ import (
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
-	// NewView creates a new ready-only view at the given state commitment.
-	NewView(flow.StateCommitment) *delta.View
+	// NewStorageSnapshot creates a new ready-only view at the given state
+	// commitment.
+	NewStorageSnapshot(flow.StateCommitment) delta.StorageSnapshot
 
 	GetRegisters(
 		context.Context,
@@ -227,8 +228,10 @@ func (storage *LedgerStorageSnapshot) Get(
 	return value, nil
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewDeltaView(NewLedgerStorageSnapshot(s.ls, commitment))
+func (s *state) NewStorageSnapshot(
+	commitment flow.StateCommitment,
+) delta.StorageSnapshot {
+	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
 type RegisterUpdatesHolder interface {

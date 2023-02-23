@@ -170,14 +170,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewDeltaView(nil)
-
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			parentBlockExecutionResultID,
 			block,
-			view,
+			nil,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1)      // +1 system chunk
@@ -303,13 +301,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
@@ -460,13 +456,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derivedBlockData)
 		assert.NoError(t, err)
 
@@ -620,13 +614,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			prov)
 		require.NoError(t, err)
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
