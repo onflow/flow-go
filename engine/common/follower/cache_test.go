@@ -1,7 +1,10 @@
 package follower
 
 import (
+	"golang.org/x/exp/slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -75,4 +78,46 @@ func (s *CacheSuite) TestAddBatch() {
 	certifiedBatch, certifyingQC := s.cache.AddBlocks(blocks)
 	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
 	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+}
+
+// TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.
+// We use next setup:
+// Number of workers - workers
+// Number of batches submitted by worker - batchesPerWorker
+// Number of blocks in each batch submitted by worker - blocksPerBatch
+// Each worker submits batchesPerWorker*blocksPerBatch blocks
+// In total we will submit workers*batchesPerWorker*blocksPerBatch
+// After submitting all blocks we expect that chain of blocks except last one will get certified.
+func (s *CacheSuite) TestConcurrentAdd() {
+	workers := 5
+	batchesPerWorker := 10
+	blocksPerBatch := 10
+	blocksPerWorker := blocksPerBatch * batchesPerWorker
+	// ChainFixture generates N+1 blocks since it adds a root block
+	blocks, _, _ := unittest.ChainFixture(workers*blocksPerWorker - 1)
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	var certifiedBlocksLock sync.Mutex
+	var allCertifiedBlocks []*flow.Block
+
+	for i := 0; i < workers; i++ {
+		go func(blocks []*flow.Block) {
+			defer wg.Done()
+			for batch := 0; batch < batchesPerWorker; batch++ {
+				certifiedBlocks, _ := s.cache.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
+				certifiedBlocksLock.Lock()
+				allCertifiedBlocks = append(allCertifiedBlocks, certifiedBlocks...)
+				certifiedBlocksLock.Unlock()
+			}
+		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
+	}
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
+
+	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
+	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) bool {
+		return lhs.Header.Height < rhs.Header.Height
+	})
+	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
 }
