@@ -17,19 +17,31 @@ import (
 func TestGenerateRootQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
-	block := unittest.BlockFixture()
-	block.Payload.Guarantees = nil
-	block.Payload.Seals = nil
-	block.Header.Height = 0
-	block.Header.ParentID = flow.ZeroID
-	block.Header.View = 3
-	block.Header.PayloadHash = block.Payload.Hash()
+	block := unittest.GenesisFixture()
 
-	votes, err := GenerateRootBlockVotes(&block, participantData)
+	votes, err := GenerateRootBlockVotes(block, participantData)
 	require.NoError(t, err)
 
-	_, err = GenerateRootQC(&block, votes, participantData, participantData.Identities())
+	_, invalid, err := GenerateRootQC(block, votes, participantData, participantData.Identities())
 	require.NoError(t, err)
+	require.Len(t, invalid, 0) // no invalid votes
+}
+
+func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
+	participantData := createSignerData(t, 10)
+
+	block := unittest.GenesisFixture()
+
+	votes, err := GenerateRootBlockVotes(block, participantData)
+	require.NoError(t, err)
+
+	// make 2 votes invalid
+	votes[0].SigData = unittest.SignatureFixture()   // make invalid signature
+	votes[1].SignerID = unittest.IdentifierFixture() // make invalid signer
+
+	_, invalid, err := GenerateRootQC(block, votes, participantData, participantData.Identities())
+	require.NoError(t, err)
+	require.Len(t, invalid, 2) // 2 invalid votes
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {

@@ -5,10 +5,11 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ContractUpdateKey struct {
-	Address common.Address
+	Address flow.Address
 	Name    string
 }
 
@@ -19,7 +20,7 @@ type ContractUpdate struct {
 
 type DerivedDataInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
-	FrozenAccounts     []common.Address
+	FrozenAccounts     []flow.Address
 
 	MeterParamOverridesUpdated bool
 }

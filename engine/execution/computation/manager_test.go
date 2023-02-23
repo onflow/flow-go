@@ -149,10 +149,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
@@ -182,10 +186,12 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	computationResult := unittest2.ComputationResultFixture([][]flow.Identifier{
-		{unittest.IdentifierFixture()},
-		{unittest.IdentifierFixture()},
-	})
+	computationResult := unittest2.ComputationResultFixture(
+		unittest.IdentifierFixture(),
+		[][]flow.Identifier{
+			{unittest.IdentifierFixture()},
+			{unittest.IdentifierFixture()},
+		})
 
 	blockComputer := &FakeBlockComputer{
 		computationResult: computationResult,
@@ -201,10 +207,17 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	view := delta.NewDeltaView(
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
 	blockView := view.NewChild()
 
-	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
+	_, err = manager.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		computationResult.ExecutableBlock,
+		blockView)
 	require.NoError(t, err)
 }
 
@@ -223,7 +236,7 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	scriptView := view.NewChild()
 
@@ -281,9 +294,10 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return nil, fmt.Errorf("error getting register")
-	})
+	view := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		func(id flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, fmt.Errorf("error getting register")
+		}))
 
 	scriptView := view.NewChild()
 
@@ -498,7 +512,16 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(
+	context.Context,
+	flow.Identifier,
+	*entity.ExecutableBlock,
+	state.View,
+	*derived.DerivedBlockData,
+) (
+	*execution.ComputationResult,
+	error,
+) {
 	return f.computationResult, nil
 }
 
@@ -695,12 +718,16 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		tracer:           trace.NewNoopTracer(),
 	}
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	eventEncoder.enabled = true
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk

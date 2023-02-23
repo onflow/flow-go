@@ -34,7 +34,7 @@ func NewContractReader(
 }
 
 func (reader *ContractReader) GetAccountContractNames(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	[]string,
 	error,
@@ -49,16 +49,16 @@ func (reader *ContractReader) GetAccountContractNames(
 		return nil, fmt.Errorf("get account contract names failed: %w", err)
 	}
 
-	a := flow.Address(address)
+	address := flow.ConvertAddress(runtimeAddress)
 
-	freezeError := reader.accounts.CheckAccountNotFrozen(a)
+	freezeError := reader.accounts.CheckAccountNotFrozen(address)
 	if freezeError != nil {
 		return nil, fmt.Errorf(
 			"get account contract names failed: %w",
 			freezeError)
 	}
 
-	return reader.accounts.GetContractNames(a)
+	return reader.accounts.GetContractNames(address)
 }
 
 func (reader *ContractReader) ResolveLocation(
@@ -94,7 +94,7 @@ func (reader *ContractReader) ResolveLocation(
 	// and no specific identifiers where requested in the import statement,
 	// then fetch all identifiers at this address
 	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
+		address := flow.ConvertAddress(addressLocation.Address)
 
 		err := reader.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
@@ -140,8 +140,9 @@ func (reader *ContractReader) ResolveLocation(
 	return resolvedLocations, nil
 }
 
-func (reader *ContractReader) GetCode(
-	location runtime.Location,
+func (reader *ContractReader) getCode(
+	address flow.Address,
+	contractName string,
 ) (
 	[]byte,
 	error,
@@ -153,21 +154,12 @@ func (reader *ContractReader) GetCode(
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	contractLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		return nil, errors.NewInvalidLocationErrorf(
-			location,
-			"expecting an AddressLocation, but other location types are passed")
-	}
-
-	address := flow.Address(contractLocation.Address)
-
 	err = reader.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	add, err := reader.accounts.GetContract(contractLocation.Name, address)
+	add, err := reader.accounts.GetContract(contractName, address)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -175,27 +167,44 @@ func (reader *ContractReader) GetCode(
 	return add, nil
 }
 
+func (reader *ContractReader) GetCode(
+	location runtime.Location,
+) (
+	[]byte,
+	error,
+) {
+	contractLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return nil, errors.NewInvalidLocationErrorf(
+			location,
+			"expecting an AddressLocation, but other location types are passed")
+	}
+
+	return reader.getCode(
+		flow.ConvertAddress(contractLocation.Address),
+		contractLocation.Name)
+}
+
 func (reader *ContractReader) GetAccountContractCode(
-	address common.Address,
+	runtimeAddress common.Address,
 	name string,
 ) (
-	code []byte,
-	err error,
+	[]byte,
+	error,
 ) {
 	defer reader.tracer.StartChildSpan(
 		trace.FVMEnvGetAccountContractCode).End()
 
-	err = reader.meter.MeterComputation(
+	err := reader.meter.MeterComputation(
 		ComputationKindGetAccountContractCode,
 		1)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
 
-	code, err = reader.GetCode(common.AddressLocation{
-		Address: address,
-		Name:    name,
-	})
+	code, err := reader.getCode(
+		flow.ConvertAddress(runtimeAddress),
+		name)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}

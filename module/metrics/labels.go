@@ -51,6 +51,7 @@ const (
 	ResourceResult                       = "result"
 	ResourceResultApprovals              = "result_approvals"
 	ResourceReceipt                      = "receipt"
+	ResourceQC                           = "qc"
 	ResourceMyReceipt                    = "my_receipt"
 	ResourceCollection                   = "collection"
 	ResourceApproval                     = "approval"

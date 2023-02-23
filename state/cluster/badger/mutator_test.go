@@ -62,7 +62,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
@@ -89,7 +89,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, qcs, tracer, consumer, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 }
 

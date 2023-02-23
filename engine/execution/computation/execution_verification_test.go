@@ -705,13 +705,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		prov)
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(state.LedgerGetRegister(ledger, initialCommit))
+	view := delta.NewDeltaView(
+		state.NewLedgerStorageSnapshot(
+			ledger,
+			initialCommit))
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
 	computationResult, err := blockComputer.ExecuteBlock(
 		context.Background(),
+		unittest.IdentifierFixture(),
 		executableBlock,
 		view,
 		derived.NewEmptyDerivedBlockData())

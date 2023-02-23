@@ -166,7 +166,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	b.SetParallelism(1)
@@ -192,7 +192,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 			b.StartTimer()
 			start := time.Now()
-			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			res, err := engine.ComputeBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				executableBlock,
+				blockView)
 			elapsed += time.Since(start)
 			b.StopTimer()
 

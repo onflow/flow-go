@@ -4,7 +4,8 @@ package mock
 
 import (
 	cadence "github.com/onflow/cadence"
-	common "github.com/onflow/cadence/runtime/common"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -15,15 +16,15 @@ type ContractUpdaterStubs struct {
 }
 
 // GetAuthorizedAccounts provides a mock function with given fields: path
-func (_m *ContractUpdaterStubs) GetAuthorizedAccounts(path cadence.Path) []common.Address {
+func (_m *ContractUpdaterStubs) GetAuthorizedAccounts(path cadence.Path) []flow.Address {
 	ret := _m.Called(path)
 
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func(cadence.Path) []common.Address); ok {
+	var r0 []flow.Address
+	if rf, ok := ret.Get(0).(func(cadence.Path) []flow.Address); ok {
 		r0 = rf(path)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
+			r0 = ret.Get(0).([]flow.Address)
 		}
 	}
 
@@ -59,18 +60,18 @@ func (_m *ContractUpdaterStubs) RestrictedRemovalEnabled() bool {
 }
 
 // UseContractAuditVoucher provides a mock function with given fields: address, code
-func (_m *ContractUpdaterStubs) UseContractAuditVoucher(address common.Address, code []byte) (bool, error) {
+func (_m *ContractUpdaterStubs) UseContractAuditVoucher(address flow.Address, code []byte) (bool, error) {
 	ret := _m.Called(address, code)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(common.Address, []byte) bool); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, []byte) bool); ok {
 		r0 = rf(address, code)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Address, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Address, []byte) error); ok {
 		r1 = rf(address, code)
 	} else {
 		r1 = ret.Error(1)

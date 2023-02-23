@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -146,10 +147,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.stopControl.IsPaused() {
-		if e.uploader.Enabled() {
-			if err := e.uploader.RetryUploads(); err != nil {
-				e.log.Warn().Msg("failed to re-upload all ComputationResults")
-			}
+		if err := e.uploader.RetryUploads(); err != nil {
+			e.log.Warn().Msg("failed to re-upload all ComputationResults")
 		}
 
 		err := e.reloadUnexecutedBlocks()
@@ -597,7 +596,10 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
-func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
+func (e *Engine) executeBlock(
+	ctx context.Context,
+	executableBlock *entity.ExecutableBlock,
+) {
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
@@ -612,23 +614,41 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
+	parentID := executableBlock.Block.Header.ParentID
+	parentErID, err := e.execState.GetExecutionResultID(ctx, parentID)
+	if err != nil {
+		lg.Err(err).
+			Str("parentID", parentID.String()).
+			Msg("could not get execution result ID for parent block")
+		return
+	}
+
 	view := e.execState.NewView(*executableBlock.StartState)
 
-	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
+	computationResult, err := e.computationManager.ComputeBlock(
+		ctx,
+		parentErID,
+		executableBlock,
+		view)
 	if err != nil {
 		lg.Err(err).Msg("error while computing block")
 		return
 	}
 
-	if e.uploader.Enabled() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	defer wg.Wait()
+
+	go func() {
+		defer wg.Done()
 		err := e.uploader.Upload(ctx, computationResult)
 		if err != nil {
 			lg.Err(err).Msg("error while uploading block")
 			// continue processing. uploads should not block execution
 		}
-	}
+	}()
 
-	finalState, receipt, err := e.handleComputationResult(ctx, computationResult)
+	receipt, err := e.saveExecutionResults(ctx, computationResult)
 	if errors.Is(err, storage.ErrDataMismatch) {
 		lg.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
 	}
@@ -666,7 +686,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
 		Hex("start_state", executableBlock.StartState[:]).
-		Hex("final_state", finalState[:]).
+		Hex("final_state", computationResult.EndState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
@@ -683,7 +703,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}
 
-	err = e.onBlockExecuted(executableBlock, finalState)
+	err = e.onBlockExecuted(executableBlock, computationResult.EndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
 	}
@@ -1137,35 +1157,6 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 	return e.computationManager.GetAccount(addr, block, blockView)
 }
 
-func (e *Engine) handleComputationResult(
-	ctx context.Context,
-	result *execution.ComputationResult,
-) (
-	flow.StateCommitment,
-	*flow.ExecutionReceipt,
-	error,
-) {
-	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
-	defer span.End()
-
-	e.log.Debug().
-		Hex("block_id", logging.Entity(result.ExecutableBlock)).
-		Msg("received computation result")
-
-	receipt, err := e.saveExecutionResults(ctx, result)
-	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
-	}
-
-	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
-	if errors.Is(err, flow.ErrNoChunks) {
-		finalState = *result.ExecutableBlock.StartState
-	} else if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
-	}
-	return finalState, receipt, nil
-}
-
 // save the execution result of a block
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
@@ -1177,21 +1168,11 @@ func (e *Engine) saveExecutionResults(
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.End()
 
-	block := result.ExecutableBlock.Block
-	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
-			block.Header.ParentID, err)
-	}
+	e.log.Debug().
+		Hex("block_id", logging.Entity(result.ExecutableBlock)).
+		Msg("received computation result")
 
-	endState := result.EndState
-	chdps := result.ChunkDataPacks
-	executionResult := flow.NewExecutionResult(
-		previousErID,
-		block.ID(),
-		result.Chunks,
-		result.ConvertedServiceEvents,
-		result.ExecutionDataID)
+	executionResult := result.ExecutionResult
 
 	for _, event := range executionResult.ServiceEvents {
 		e.log.Info().
@@ -1211,14 +1192,10 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.SaveExecutionResults(childCtx,
-		block.Header,
-		endState,
-		chdps,
-		executionReceipt,
-		result.Events,
-		result.ServiceEvents,
-		result.TransactionResults)
+	err = e.execState.SaveExecutionResults(
+		childCtx,
+		result,
+		executionReceipt)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1226,7 +1203,7 @@ func (e *Engine) saveExecutionResults(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).
-		Hex("final_state", endState[:]).
+		Hex("final_state", result.EndState[:]).
 		Msg("saved computation results")
 
 	return executionReceipt, nil

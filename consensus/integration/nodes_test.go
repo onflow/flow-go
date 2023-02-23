@@ -242,8 +242,9 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 	consensusCluster := participantData.Identities()
 	votes, err := run.GenerateRootBlockVotes(root, participantData)
 	require.NoError(t, err)
-	qc, err := run.GenerateRootQC(root, votes, participantData, consensusCluster)
+	qc, invalidVotes, err := run.GenerateRootQC(root, votes, participantData, consensusCluster)
 	require.NoError(t, err)
+	require.Len(t, invalidVotes, 0)
 	return qc
 }
 
@@ -370,6 +371,7 @@ func createNode(
 	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
+	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
@@ -381,7 +383,7 @@ func createNode(
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, qcsDB, tracer, consumer,
 		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 

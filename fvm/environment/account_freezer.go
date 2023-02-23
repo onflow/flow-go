@@ -19,7 +19,7 @@ type AccountFreezer interface {
 	// Note that the script variant will return OperationNotSupportedError.
 	SetAccountFrozen(address common.Address, frozen bool) error
 
-	FrozenAccounts() []common.Address
+	FrozenAccounts() []flow.Address
 
 	Reset()
 }
@@ -51,7 +51,7 @@ func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
 		frozen)
 }
 
-func (freezer ParseRestrictedAccountFreezer) FrozenAccounts() []common.Address {
+func (freezer ParseRestrictedAccountFreezer) FrozenAccounts() []flow.Address {
 	return freezer.impl.FrozenAccounts()
 }
 
@@ -61,7 +61,7 @@ func (freezer ParseRestrictedAccountFreezer) Reset() {
 
 type NoAccountFreezer struct{}
 
-func (NoAccountFreezer) FrozenAccounts() []common.Address {
+func (NoAccountFreezer) FrozenAccounts() []flow.Address {
 	return nil
 }
 
@@ -78,7 +78,7 @@ type accountFreezer struct {
 	accounts        Accounts
 	transactionInfo TransactionInfo
 
-	frozenAccounts []common.Address
+	frozenAccounts []flow.Address
 }
 
 func NewAccountFreezer(
@@ -99,21 +99,21 @@ func (freezer *accountFreezer) Reset() {
 	freezer.frozenAccounts = nil
 }
 
-func (freezer *accountFreezer) FrozenAccounts() []common.Address {
+func (freezer *accountFreezer) FrozenAccounts() []flow.Address {
 	return freezer.frozenAccounts
 }
 
 func (freezer *accountFreezer) SetAccountFrozen(
-	address common.Address,
+	runtimeAddress common.Address,
 	frozen bool,
 ) error {
-	flowAddress := flow.Address(address)
+	address := flow.ConvertAddress(runtimeAddress)
 
-	if flowAddress == freezer.serviceAddress {
+	if address == freezer.serviceAddress {
 		return fmt.Errorf(
 			"setting account frozen failed: %w",
 			errors.NewValueErrorf(
-				flowAddress.String(),
+				address.String(),
 				"cannot freeze service account"))
 	}
 
@@ -126,7 +126,7 @@ func (freezer *accountFreezer) SetAccountFrozen(
 					"the service account"))
 	}
 
-	err := freezer.accounts.SetAccountFrozen(flowAddress, frozen)
+	err := freezer.accounts.SetAccountFrozen(address, frozen)
 	if err != nil {
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
