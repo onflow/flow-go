@@ -111,12 +111,11 @@ func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(_ flow.Ide
 	consumers = d.consumers
 	d.lock.RUnlock()
 
-	switch notification := notification.(type) {
-	case DisallowListUpdateNotification:
-		for _, consumer := range consumers {
-			consumer.OnNodeDisallowListUpdate(notification.DisallowList)
-		}
-	default:
+	n, ok := notification.(DisallowListUpdateNotification)
+	if !ok {
 		d.logger.Fatal().Msgf("unknown notification type: %T", notification)
+	}
+	for _, consumer := range consumers {
+		consumer.OnNodeDisallowListUpdate(n.DisallowList)
 	}
 }
