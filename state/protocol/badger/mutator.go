@@ -527,6 +527,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("could not execute state extension: %w", err)
+	}
 
 	// execute scheduled events
 	for _, event := range events {
