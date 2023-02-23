@@ -2,10 +2,10 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
