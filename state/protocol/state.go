@@ -37,6 +37,10 @@ type State interface {
 	AtBlockID(blockID flow.Identifier) Snapshot
 }
 
+// FollowerState is a mutable protocol state used by nodes following main consensus (ie. non-consensus nodes).
+// All blocks must have a certifying QC when being added to the state to guarantee they are valid,
+// so there is a one-block lag between block production and incorporation into the FollowerState.
+// However, since all blocks are certified upon insertion, they are immediately processable by other components. 
 type FollowerState interface {
 	State
 	// ExtendCertified introduces the block with the given ID into the persistent
@@ -61,13 +65,14 @@ type FollowerState interface {
 	Finalize(ctx context.Context, blockID flow.Identifier) error
 }
 
+// ParticipantState is a mutable protocol state used by active consensus participants (consensus nodes).
+// All blocks are validated in full, including payload validation, prior to insertion. Only valid blocks are inserted.
 type ParticipantState interface {
 	FollowerState
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while
 	// still checking that the given block is a valid extension of the protocol state.
-	// Depending on implementation it might be a lighter version that checks only block header.
 	// The candidate block must have passed HotStuff validation before being passed to Extend.
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
