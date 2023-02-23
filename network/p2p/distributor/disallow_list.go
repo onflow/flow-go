@@ -26,17 +26,17 @@ type DisallowListNotificationConsumer struct {
 	component.Component
 	cm *component.ComponentManager
 
-	handler *handler.AsyncEventHandler[DisallowListUpdateNotification]
+	handler *handler.AsyncEventDistributor[DisallowListUpdateNotification]
 	logger  zerolog.Logger
 }
 
 // DisallowListUpdateNotificationProcessor is an adapter that allows the DisallowListNotificationConsumer to be used as an
-// EventProcessor.
+// EventConsumer.
 type DisallowListUpdateNotificationProcessor struct {
 	consumer p2p.DisallowListConsumer
 }
 
-func (d *DisallowListUpdateNotificationProcessor) ProcessEvent(msg DisallowListUpdateNotification) {
+func (d *DisallowListUpdateNotificationProcessor) ConsumeEvent(msg DisallowListUpdateNotification) {
 	d.consumer.OnNodeDisallowListUpdate(msg.DisallowList)
 }
 
@@ -59,7 +59,7 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
 	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
-	h := handler.NewAsyncEventHandler[DisallowListUpdateNotification](
+	h := handler.NewAsyncEventDistributor[DisallowListUpdateNotification](
 		lg,
 		store,
 		disallowListDistributorWorkerCount)
@@ -95,7 +95,7 @@ type DisallowListUpdateNotification struct {
 // AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
 // method when the node disallow list is updated.
 func (d *DisallowListNotificationConsumer) AddConsumer(consumer p2p.DisallowListConsumer) {
-	d.handler.RegisterProcessor(&DisallowListUpdateNotificationProcessor{consumer: consumer})
+	d.handler.RegisterConsumer(&DisallowListUpdateNotificationProcessor{consumer: consumer})
 }
 
 // OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the handler to be

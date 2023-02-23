@@ -27,18 +27,18 @@ type GossipSubInspectorNotification struct {
 	logger zerolog.Logger
 
 	// handler is the async event handler that will process the notifications asynchronously.
-	handler *handler.AsyncEventHandler[p2p.InvalidControlMessageNotification]
+	handler *handler.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
 }
 
 // GossipSubInspectorNotificationProcessor is an adapter that allows the GossipSubInspectorNotification to be used as an
-// EventProcessor.
+// EventConsumer.
 type GossipSubInspectorNotificationProcessor struct {
 	consumer p2p.GossipSubRpcInspectorConsumer
 }
 
 // ProcessEvent processes the gossipsub rpc inspector notification. It will be called by the async event handler.
 // It will call the consumer's OnInvalidControlMessage method.
-func (g *GossipSubInspectorNotificationProcessor) ProcessEvent(msg p2p.InvalidControlMessageNotification) {
+func (g *GossipSubInspectorNotificationProcessor) ConsumeEvent(msg p2p.InvalidControlMessageNotification) {
 	g.consumer.OnInvalidControlMessage(msg)
 }
 
@@ -64,7 +64,7 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
 	lg := log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger()
 
-	h := handler.NewAsyncEventHandler[p2p.InvalidControlMessageNotification](
+	h := handler.NewAsyncEventDistributor[p2p.InvalidControlMessageNotification](
 		log,
 		store,
 		defaultGossipSubInspectorNotificationQueueWorkerCount)
@@ -109,5 +109,5 @@ func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2
 // AddConsumer adds a consumer to the GossipSubInspectorNotification. The consumer will be called when a new
 // notification is received. The consumer must be concurrency safe.
 func (g *GossipSubInspectorNotification) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
-	g.handler.RegisterProcessor(&GossipSubInspectorNotificationProcessor{consumer: consumer})
+	g.handler.RegisterConsumer(&GossipSubInspectorNotificationProcessor{consumer: consumer})
 }
