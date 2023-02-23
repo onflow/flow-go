@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -260,7 +261,7 @@ func (h *HeroCacheCollector) OnKeyRemoved(size uint32) {
 // OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 // This normally happens -- and is expected -- when the cache is full.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity() {
+func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity(flow.Entity) {
 	h.countKeyEjectionDueToFullCapacity.Inc()
 }
 
