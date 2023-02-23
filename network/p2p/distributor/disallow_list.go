@@ -1,8 +1,6 @@
 package distributor
 
 import (
-	"sync"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -28,10 +26,18 @@ type DisallowListNotificationConsumer struct {
 	component.Component
 	cm *component.ComponentManager
 
-	consumers []p2p.DisallowListConsumer
-	handler   *handler.AsyncEventHandler[DisallowListUpdateNotification]
-	logger    zerolog.Logger
-	lock      sync.RWMutex
+	handler *handler.AsyncEventHandler[DisallowListUpdateNotification]
+	logger  zerolog.Logger
+}
+
+// DisallowListUpdateNotificationProcessor is an adapter that allows the DisallowListNotificationConsumer to be used as an
+// EventProcessor.
+type DisallowListUpdateNotificationProcessor struct {
+	consumer p2p.DisallowListConsumer
+}
+
+func (d *DisallowListUpdateNotificationProcessor) ProcessEvent(msg DisallowListUpdateNotification) {
+	d.consumer.OnNodeDisallowListUpdate(msg.DisallowList)
 }
 
 var _ p2p.DisallowListConsumer = (*DisallowListNotificationConsumer)(nil)
@@ -51,17 +57,17 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 }
 
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationConsumer {
-	d := &DisallowListNotificationConsumer{
-		consumers: make([]p2p.DisallowListConsumer, 0),
-		logger:    logger.With().Str("component", "node_disallow_distributor").Logger(),
-	}
+	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
-	h := handler.NewAsyncEventHandler(
-		logger,
+	h := handler.NewAsyncEventHandler[DisallowListUpdateNotification](
+		lg,
 		store,
-		d.ProcessQueuedNotifications,
 		disallowListDistributorWorkerCount)
-	d.handler = h
+
+	d := &DisallowListNotificationConsumer{
+		logger:  lg,
+		handler: h,
+	}
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -86,32 +92,20 @@ type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList
 }
 
+// AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
+// method when the node disallow list is updated.
 func (d *DisallowListNotificationConsumer) AddConsumer(consumer p2p.DisallowListConsumer) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	d.consumers = append(d.consumers, consumer)
+	d.handler.RegisterProcessor(&DisallowListUpdateNotificationProcessor{consumer: consumer})
 }
 
+// OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the handler to be
+// processed asynchronously.
 func (d *DisallowListNotificationConsumer) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
-	// we submit the disallow list update event to the handler to be processed by the worker.
-	// the origin id is set to flow.ZeroID because the disallow list update event is not associated with a specific node.
-	// the distributor discards the origin id upon processing it.
 	err := d.handler.Submit(DisallowListUpdateNotification{
 		DisallowList: disallowList,
 	})
 
 	if err != nil {
 		d.logger.Fatal().Err(err).Msg("failed to submit disallow list update event to handler")
-	}
-}
-
-func (d *DisallowListNotificationConsumer) ProcessQueuedNotifications(notification DisallowListUpdateNotification) {
-	var consumers []p2p.DisallowListConsumer
-	d.lock.RLock()
-	consumers = d.consumers
-	d.lock.RUnlock()
-
-	for _, consumer := range consumers {
-		consumer.OnNodeDisallowListUpdate(notification.DisallowList)
 	}
 }

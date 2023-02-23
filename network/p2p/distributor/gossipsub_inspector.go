@@ -1,8 +1,6 @@
 package distributor
 
 import (
-	"sync"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -26,14 +24,22 @@ const (
 type GossipSubInspectorNotification struct {
 	component.Component
 	cm     *component.ComponentManager
-	lock   sync.RWMutex
 	logger zerolog.Logger
 
 	// handler is the async event handler that will process the notifications asynchronously.
 	handler *handler.AsyncEventHandler[p2p.InvalidControlMessageNotification]
+}
 
-	// notifiers is a list of consumers that will be notified when a new notification is received.
-	notifiers []p2p.GossipSubRpcInspectorConsumer
+// GossipSubInspectorNotificationProcessor is an adapter that allows the GossipSubInspectorNotification to be used as an
+// EventProcessor.
+type GossipSubInspectorNotificationProcessor struct {
+	consumer p2p.GossipSubRpcInspectorConsumer
+}
+
+// ProcessEvent processes the gossipsub rpc inspector notification. It will be called by the async event handler.
+// It will call the consumer's OnInvalidControlMessage method.
+func (g *GossipSubInspectorNotificationProcessor) ProcessEvent(msg p2p.InvalidControlMessageNotification) {
+	g.consumer.OnInvalidControlMessage(msg)
 }
 
 var _ p2p.GossipSubRpcInspectorConsumer = (*GossipSubInspectorNotification)(nil)
@@ -56,16 +62,17 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 // NewGossipSubInspectorNotification returns a new GossipSubInspectorNotification component.
 // It takes a message store to store the notifications in memory and process them asynchronously.
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotification {
-	g := &GossipSubInspectorNotification{
-		logger: log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger(),
-	}
+	lg := log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger()
 
 	h := handler.NewAsyncEventHandler[p2p.InvalidControlMessageNotification](
 		log,
 		store,
-		g.processQueuedNotifications,
 		defaultGossipSubInspectorNotificationQueueWorkerCount)
-	g.handler = h
+
+	g := &GossipSubInspectorNotification{
+		logger:  lg,
+		handler: h,
+	}
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -86,8 +93,7 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 }
 
 // OnInvalidControlMessage is called when a control message is received that is invalid according to the
-// Flow protocol specification.
-// The int parameter is the count of invalid messages received from the peer.
+// Flow protocol specifications.
 // Prerequisites:
 // Implementation must be concurrency safe and non-blocking.
 func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2p.InvalidControlMessageNotification) {
@@ -100,23 +106,8 @@ func (g *GossipSubInspectorNotification) OnInvalidControlMessage(notification p2
 	}
 }
 
-// AddConsumer adds the given gossipsub inspector consumer to the distributor so that it can receive
-// gossipsub rpc inspector notifications.
+// AddConsumer adds a consumer to the GossipSubInspectorNotification. The consumer will be called when a new
+// notification is received. The consumer must be concurrency safe.
 func (g *GossipSubInspectorNotification) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.notifiers = append(g.notifiers, consumer)
-}
-
-// processQueuedNotifications processes the queued notifications. It is called by the handler worker.
-func (g *GossipSubInspectorNotification) processQueuedNotifications(notification p2p.InvalidControlMessageNotification) {
-	var consumers []p2p.GossipSubRpcInspectorConsumer
-	g.lock.RLock()
-	consumers = g.notifiers
-	g.lock.RUnlock()
-
-	for _, consumer := range consumers {
-		consumer.OnInvalidControlMessage(notification)
-	}
+	g.handler.RegisterProcessor(&GossipSubInspectorNotificationProcessor{consumer: consumer})
 }

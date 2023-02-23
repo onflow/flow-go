@@ -16,6 +16,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type mockProcessor struct {
+	processFn func(event string)
+}
+
+func (p *mockProcessor) ProcessEvent(event string) {
+	p.processFn(event)
+}
+
 // TestAsyncEventHandler_SingleEvent tests the async event handler with a single event. It submits an event to the handler
 // and checks if the event is processed by the handler.
 func TestAsyncEventHandler_SingleEvent(t *testing.T) {
@@ -23,10 +31,15 @@ func TestAsyncEventHandler_SingleEvent(t *testing.T) {
 
 	q := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	eventProcessed := make(chan struct{})
-	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
-		require.Equal(t, event, event)
-		close(eventProcessed)
-	}, 2)
+	processor := &mockProcessor{
+		processFn: func(event string) {
+			require.Equal(t, event, event)
+			close(eventProcessed)
+		},
+	}
+
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, 2)
+	h.RegisterProcessor(processor)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -52,11 +65,15 @@ func TestAsyncEventHandler_SubmissionError(t *testing.T) {
 
 	blockingChannel := make(chan struct{})
 	firstEventArrived := make(chan struct{})
-	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
-		close(firstEventArrived)
-		// we block the processor to make sure that the queue is eventually full.
-		<-blockingChannel
-	}, 1)
+	processor := &mockProcessor{
+		processFn: func(event string) {
+			close(firstEventArrived)
+			// we block the processor to make sure that the queue is eventually full.
+			<-blockingChannel
+		},
+	}
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, 1)
+	h.RegisterProcessor(processor)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -106,16 +123,20 @@ func TestAsyncEventHandler_MultipleConcurrentEvents_DistinctIdentifier(t *testin
 	allEventsProcessed := sync.WaitGroup{}
 	allEventsProcessed.Add(size)
 
-	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, func(event string) {
-		// check if the event is in the test case
-		require.Contains(t, tc, event)
+	processor := &mockProcessor{
+		processFn: func(event string) {
+			// check if the event is in the test case
+			require.Contains(t, tc, event)
 
-		// check if the event is processed only once
-		require.False(t, processedEvents.Has(event))
-		processedEvents.Add(event, struct{}{})
+			// check if the event is processed only once
+			require.False(t, processedEvents.Has(event))
+			processedEvents.Add(event, struct{}{})
 
-		allEventsProcessed.Done()
-	}, workers)
+			allEventsProcessed.Done()
+		},
+	}
+	h := handler.NewAsyncEventHandler[string](unittest.Logger(), q, workers)
+	h.RegisterProcessor(processor)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()

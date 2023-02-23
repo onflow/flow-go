@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -14,11 +15,9 @@ import (
 
 var ErrSubmissionFailed = errors.New("could not submit event")
 
-// EventProcessorFunc is a function that processes an event. It is used by the AsyncEventHandler to process events.
-// The first argument is the identifier of the event's origin, and the second argument is the event itself.
-// The function is expected to be concurrency safe.
-// Processing an event is the last step in the event's lifecycle within the AsyncEventHandler.
-type EventProcessorFunc[T any] func(T)
+type EventProcessor[T any] interface {
+	ProcessEvent(event T)
+}
 
 // AsyncEventHandler is a component that asynchronously handles events, i.e., concurrency safe and non-blocking.
 // It queues up the events and spawns a number of workers to process the events.
@@ -26,10 +25,12 @@ type AsyncEventHandler[T any] struct {
 	component.Component
 	cm *component.ComponentManager
 
-	log       zerolog.Logger
-	store     engine.MessageStore
-	processor EventProcessorFunc[T]
-	notifier  engine.Notifier
+	log   zerolog.Logger
+	store engine.MessageStore
+
+	processorsLock sync.RWMutex
+	processors     []EventProcessor[T]
+	notifier       engine.Notifier
 }
 
 // NewAsyncEventHandler creates a new AsyncEventHandler.
@@ -39,14 +40,13 @@ type AsyncEventHandler[T any] struct {
 func NewAsyncEventHandler[T any](
 	log zerolog.Logger,
 	store engine.MessageStore,
-	processorFn EventProcessorFunc[T],
 	workerCount uint,
 ) *AsyncEventHandler[T] {
 	h := &AsyncEventHandler[T]{
-		log:       log.With().Str("component", "async_event_handler").Logger(),
-		store:     store,
-		notifier:  engine.NewNotifier(),
-		processor: processorFn,
+		log:        log.With().Str("component", "async_event_handler").Logger(),
+		store:      store,
+		notifier:   engine.NewNotifier(),
+		processors: make([]EventProcessor[T], 0),
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -62,6 +62,13 @@ func NewAsyncEventHandler[T any](
 	h.Component = h.cm
 
 	return h
+}
+
+func (a *AsyncEventHandler[T]) RegisterProcessor(processor EventProcessor[T]) {
+	a.processorsLock.Lock()
+	defer a.processorsLock.Unlock()
+
+	a.processors = append(a.processors, processor)
 }
 
 // processEventWorker is a worker that is spawned by the AsyncEventHandler to process events.
@@ -99,9 +106,18 @@ func (a *AsyncEventHandler[T]) processEvents(ctx irrecoverable.SignalerContext) 
 				Hex("origin_id", logging.ID(msg.OriginID)).
 				Str("payload", fmt.Sprintf("%v", msg.Payload)).Logger()
 			lg.Trace().Msg("processing event")
-			a.processor(event)
+			a.sendEventToProcessors(event)
 			lg.Trace().Msg("event processed")
 		}
+	}
+}
+
+// sendEventToProcessors sends the event to all registered processors. It is concurrency safe and blocks until all processors have processed the event.
+func (a *AsyncEventHandler[T]) sendEventToProcessors(event T) {
+	a.processorsLock.RLock()
+	defer a.processorsLock.RUnlock()
+	for _, processor := range a.processors {
+		processor.ProcessEvent(event)
 	}
 }
 
