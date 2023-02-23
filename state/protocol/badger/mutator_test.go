@@ -1894,6 +1894,38 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 	})
 }
 
+// TestExtendBlockProcessable tests that BlockProcessable is called correctly and doesn't produce duplicates of same notifications
+// when extending blocks with and without certifying QCs.
+func TestExtendBlockProcessable(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	consumer := mockprotocol.NewConsumer(t)
+	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.ParticipantState) {
+		block := unittest.BlockWithParentFixture(head)
+		child := unittest.BlockWithParentFixture(block.Header)
+		grandChild := unittest.BlockWithParentFixture(child.Header)
+
+		// extend block using certifying QC, expect that BlockProcessable will be emitted once
+		consumer.On("BlockProcessable", block.Header, child.Header.QuorumCertificate()).Once()
+		err := state.ExtendCertified(context.Background(), block, child.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		// extend block without certifying QC, expect that BlockProcessable won't be called
+		err = state.Extend(context.Background(), child)
+		require.NoError(t, err)
+		consumer.AssertNumberOfCalls(t, "BlockProcessable", 1)
+
+		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
+		// One for parent block and second for current block.
+		grandChildCertifyingQC := unittest.CertifyBlock(grandChild.Header)
+		consumer.On("BlockProcessable", child.Header, grandChild.Header.QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", grandChild.Header, grandChildCertifyingQC).Once()
+		err = state.ExtendCertified(context.Background(), grandChild, grandChildCertifyingQC)
+		require.NoError(t, err)
+	})
+}
+
 func TestHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
