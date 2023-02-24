@@ -41,18 +41,28 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 }
 
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
-	return &Cache{
+	distributor := NewDistributor(collector)
+	cache := &Cache{
 		backend: herocache.NewCache(
 			limit,
 			herocache.DefaultOversizeFactor,
 			heropool.RandomEjection,
 			log.With().Str("follower", "cache").Logger(),
-			collector,
+			distributor,
 		),
 		byView:         make(map[uint64]*flow.Block, 0),
 		byParent:       make(map[flow.Identifier]*flow.Block, 0),
 		onEquivocation: onEquivocation,
 	}
+	distributor.AddConsumer(cache.handleEjectedEntity)
+	return cache
+}
+
+// handleEjectedEntity
+func (c *Cache) handleEjectedEntity(entity flow.Entity) {
+	block := entity.(*flow.Block)
+	delete(c.byView, block.Header.View)
+	delete(c.byParent, block.Header.ParentID)
 }
 
 // AddBlocks atomically applies batch of blocks to the cache of pending but not yet certified blocks. Upon insertion cache tries to resolve

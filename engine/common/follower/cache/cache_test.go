@@ -121,3 +121,7 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	})
 	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
 }
+
+func (s *CacheSuite) TestSecondaryIndexCleanup() {
+
+}
