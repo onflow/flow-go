@@ -479,7 +479,7 @@ func createTestBlockAndRun(
 	engine *Manager,
 	parentBlock *flow.Block,
 	col flow.Collection,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 ) (
 	*flow.Block,
 	*execution.ComputationResult,

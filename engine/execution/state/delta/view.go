@@ -24,7 +24,7 @@ type View struct {
 	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
 
-	storage StorageSnapshot
+	storage state.StorageSnapshot
 }
 
 type Snapshot struct {
@@ -49,7 +49,7 @@ func NewView(
 	readFunc func(owner string, key string) (flow.RegisterValue, error),
 ) *View {
 	return NewDeltaView(
-		ReadFuncStorageSnapshot{
+		state.ReadFuncStorageSnapshot{
 			ReadFunc: func(id flow.RegisterID) (flow.RegisterValue, error) {
 				return readFunc(id.Owner, id.Key)
 			},
@@ -57,9 +57,9 @@ func NewView(
 }
 
 // NewDeltaView instantiates a new ledger view with the provided read function.
-func NewDeltaView(storage StorageSnapshot) *View {
+func NewDeltaView(storage state.StorageSnapshot) *View {
 	if storage == nil {
-		storage = EmptyStorageSnapshot{}
+		storage = state.EmptyStorageSnapshot{}
 	}
 	return &View{
 		delta:             NewDelta(),
@@ -121,7 +121,7 @@ func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (v *View) NewChild() state.View {
-	return NewDeltaView(NewPeekerStorageSnapshot(v))
+	return NewDeltaView(state.NewPeekerStorageSnapshot(v))
 }
 
 func (v *View) DropDelta() {
