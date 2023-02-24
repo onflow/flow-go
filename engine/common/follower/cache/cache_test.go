@@ -19,6 +19,8 @@ func TestCache(t *testing.T) {
 	suite.Run(t, new(CacheSuite))
 }
 
+const defaultHeroCacheLimit = 1000
+
 type CacheSuite struct {
 	suite.Suite
 
@@ -29,7 +31,7 @@ type CacheSuite struct {
 func (s *CacheSuite) SetupTest() {
 	collector := metrics.NewNoopCollector()
 	s.onEquivocation = mock.NewOnEquivocation(s.T())
-	s.cache = NewCache(unittest.Logger(), 1000, collector, s.onEquivocation.Execute)
+	s.cache = NewCache(unittest.Logger(), defaultHeroCacheLimit, collector, s.onEquivocation.Execute)
 }
 
 // TestPeek tests if previously added block can be queried by block ID
@@ -122,6 +124,11 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
 }
 
+// TestSecondaryIndexCleanup tests if ejected entities are correctly cleaned up from secondary index
 func (s *CacheSuite) TestSecondaryIndexCleanup() {
-
+	// create blocks more than limit
+	blocks, _, _ := unittest.ChainFixture(2 * defaultHeroCacheLimit)
+	s.cache.AddBlocks(blocks)
+	require.Len(s.T(), s.cache.byView, defaultHeroCacheLimit)
+	require.Len(s.T(), s.cache.byParent, defaultHeroCacheLimit)
 }
