@@ -76,6 +76,153 @@ func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testi
 	require.NoError(t, err)
 }
 
+func TestTxnDerivedDataToValidateTime(t *testing.T) {
+	block := NewEmptyTableWithOffset[string, *string](8)
+	require.Equal(
+		t,
+		LogicalTime(7),
+		block.LatestCommitExecutionTimeForTestingOnly())
+
+	testTxnSnapshotTime := LogicalTime(5)
+
+	testTxn, err := block.NewTableTransaction(testTxnSnapshotTime, 20)
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		testTxnSnapshotTime,
+		testTxn.ToValidateTimeForTestingOnly())
+
+	testTxn.Set("key1", nil, nil)
+	require.Equal(
+		t,
+		testTxnSnapshotTime,
+		testTxn.ToValidateTimeForTestingOnly())
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		LogicalTime(8),
+		testTxn.ToValidateTimeForTestingOnly())
+
+	testSetupTxn, err := block.NewTableTransaction(8, 8)
+	require.NoError(t, err)
+
+	invalidator1 := &testInvalidator{invalidateName: "blah"}
+
+	testSetupTxn.AddInvalidator(invalidator1)
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		LogicalTime(9),
+		testTxn.ToValidateTimeForTestingOnly())
+
+	require.Equal(t, 1, invalidator1.callCount)
+
+	// Multiple transactions committed between validate calls
+
+	testSetupTxn, err = block.NewTableTransaction(6, 9)
+	require.NoError(t, err)
+
+	invalidator2 := &testInvalidator{invalidateName: "blah"}
+
+	testSetupTxn.AddInvalidator(invalidator2)
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	testSetupTxn, err = block.NewTableTransaction(8, 10)
+	require.NoError(t, err)
+
+	invalidator3 := &testInvalidator{invalidateName: "blah"}
+
+	testSetupTxn.AddInvalidator(invalidator3)
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		LogicalTime(11),
+		testTxn.ToValidateTimeForTestingOnly())
+
+	require.Equal(t, 1, invalidator1.callCount)
+	require.Equal(t, 1, invalidator2.callCount)
+	require.Equal(t, 1, invalidator3.callCount)
+
+	// No validate time advancement
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		LogicalTime(11),
+		testTxn.ToValidateTimeForTestingOnly())
+
+	require.Equal(t, 1, invalidator1.callCount)
+	require.Equal(t, 1, invalidator2.callCount)
+	require.Equal(t, 1, invalidator3.callCount)
+
+	// Setting a value derived from snapshot time will reset the validate time
+
+	testTxn.Set("key2", nil, nil)
+	require.Equal(
+		t,
+		testTxnSnapshotTime,
+		testTxn.ToValidateTimeForTestingOnly())
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		LogicalTime(11),
+		testTxn.ToValidateTimeForTestingOnly())
+
+	// callCount = 3 because key1 is validated twice, key2 validated once.
+	require.Equal(t, 3, invalidator1.callCount)
+	require.Equal(t, 3, invalidator2.callCount)
+	require.Equal(t, 3, invalidator3.callCount)
+
+	// validate error does not advance validated time
+
+	testSetupTxn, err = block.NewTableTransaction(11, 11)
+	require.NoError(t, err)
+
+	invalidator4 := &testInvalidator{invalidateName: "blah"}
+
+	testSetupTxn.AddInvalidator(invalidator4)
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	testSetupTxn, err = block.NewTableTransaction(12, 12)
+	require.NoError(t, err)
+
+	invalidator5 := &testInvalidator{invalidateAll: true}
+
+	testSetupTxn.AddInvalidator(invalidator5)
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	for i := 1; i < 10; i++ {
+		err = testTxn.Validate()
+		require.Error(t, err)
+		require.Equal(
+			t,
+			LogicalTime(11),
+			testTxn.ToValidateTimeForTestingOnly())
+
+		require.Equal(t, 3, invalidator1.callCount)
+		require.Equal(t, 3, invalidator2.callCount)
+		require.Equal(t, 3, invalidator3.callCount)
+		require.Equal(t, i, invalidator4.callCount)
+		require.Equal(t, i, invalidator5.callCount)
+	}
+}
+
 func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
 	block := newEmptyTestBlock()
 
@@ -172,7 +319,7 @@ func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
 
 	testSetupTxn1.Set(key, expectedValue, expectedState)
 
-	testSetupTxn1.AddInvalidator(testInvalidator{})
+	testSetupTxn1.AddInvalidator(&testInvalidator{})
 
 	err = testSetupTxn1.Commit()
 	require.NoError(t, err)
@@ -188,7 +335,7 @@ func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
 	validateErr = testTxn.Validate()
 	require.NoError(t, validateErr)
 
-	testSetupTxn2.AddInvalidator(testInvalidator{invalidateAll: true})
+	testSetupTxn2.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	err = testSetupTxn2.Commit()
 	require.NoError(t, err)
@@ -204,7 +351,7 @@ func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
+	testSetupTxn.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -228,7 +375,7 @@ func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T)
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	testSetupTxn.AddInvalidator(testInvalidator{invalidateAll: true})
+	testSetupTxn.AddInvalidator(&testInvalidator{invalidateAll: true})
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
@@ -316,7 +463,7 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedState, actualState)
 
-	testTxn.AddInvalidator(testInvalidator{})
+	testTxn.AddInvalidator(&testInvalidator{})
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -365,7 +512,7 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) 
 	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedState, actualState)
 
-	invalidator := testInvalidator{invalidateAll: true}
+	invalidator := &testInvalidator{invalidateAll: true}
 
 	testTxn.AddInvalidator(invalidator)
 
@@ -481,7 +628,7 @@ func TestTxnDerivedDataCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
-	testTxn.AddInvalidator(testInvalidator{})
+	testTxn.AddInvalidator(&testInvalidator{})
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -525,7 +672,7 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	testTxn, err := block.NewTableTransaction(0, testTxnTime)
 	require.NoError(t, err)
 
-	testSetupTxn1Invalidator := testInvalidator{
+	testSetupTxn1Invalidator := &testInvalidator{
 		invalidateName: "blah",
 	}
 	testSetupTxn1.AddInvalidator(testSetupTxn1Invalidator)
@@ -565,7 +712,7 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	require.Nil(t, actualValue)
 	require.Nil(t, actualState)
 
-	testTxnInvalidator := testInvalidator{invalidateAll: true}
+	testTxnInvalidator := &testInvalidator{invalidateAll: true}
 	testTxn.AddInvalidator(testTxnInvalidator)
 
 	err = testTxn.Commit()
@@ -640,7 +787,7 @@ func TestTxnDerivedDataCommitBadSnapshotReadInvalidator(t *testing.T) {
 	testTxn, err := block.NewSnapshotReadTableTransaction(0, 42)
 	require.NoError(t, err)
 
-	testTxn.AddInvalidator(testInvalidator{invalidateAll: true})
+	testTxn.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "snapshot read can't invalidate")
@@ -703,17 +850,17 @@ func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
 
 	// Actual test.  Invalidate one pre-existing entry and one new entry.
 
-	invalidator1 := testInvalidator{
+	invalidator1 := &testInvalidator{
 		invalidateName: readKey1,
 	}
-	invalidator2 := testInvalidator{
+	invalidator2 := &testInvalidator{
 		invalidateName: writeKey1,
 	}
 	testTxn.AddInvalidator(nil)
 	testTxn.AddInvalidator(invalidator1)
-	testTxn.AddInvalidator(testInvalidator{})
+	testTxn.AddInvalidator(&testInvalidator{})
 	testTxn.AddInvalidator(invalidator2)
-	testTxn.AddInvalidator(testInvalidator{})
+	testTxn.AddInvalidator(&testInvalidator{})
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -766,7 +913,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 	txn, err := parentBlock.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	txn.AddInvalidator(testInvalidator{invalidateAll: true})
+	txn.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	err = txn.Commit()
 	require.NoError(t, err)

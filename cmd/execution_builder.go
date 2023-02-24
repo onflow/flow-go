@@ -520,16 +520,26 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	ctx := context.Background()
 	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+		return nil, fmt.Errorf(
+			"cannot get the latest executed block id: %w",
+			err)
 	}
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
+	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(
+		ctx,
+		blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the state commitment at latest executed block id %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf(
+			"cannot get the state commitment at latest executed block id %s: %w",
+			blockID.String(),
+			err)
 	}
-	blockView := exeNode.executionState.NewView(stateCommit)
+	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.
-	contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
+	contractEpochCounter, err := getContractEpochCounter(
+		exeNode.computationManager.VM(),
+		vmCtx,
+		blockSnapshot)
 	// Failing to fetch the epoch counter from the smart contract is a fatal error.
 	if err != nil {
 		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
@@ -1077,8 +1087,16 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	return nil
 }
 
-// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
-func getContractEpochCounter(vm fvm.VM, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart
+// contract from the snapshot provided.
+func getContractEpochCounter(
+	vm fvm.VM,
+	vmCtx fvm.Context,
+	snapshot delta.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
@@ -1093,7 +1111,7 @@ func getContractEpochCounter(vm fvm.VM, vmCtx fvm.Context, view *delta.View) (ui
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.Run(vmCtx, script, view)
+	err = vm.Run(vmCtx, script, delta.NewDeltaView(snapshot))
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}
