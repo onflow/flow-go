@@ -1,4 +1,4 @@
-package follower
+package cache
 
 import (
 	"sync"

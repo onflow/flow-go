@@ -1,4 +1,4 @@
-package follower
+package cache
 
 import (
 	"golang.org/x/exp/slices"
