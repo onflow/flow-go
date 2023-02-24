@@ -44,6 +44,24 @@ func (s *CacheSuite) TestPeek() {
 	require.Equal(s.T(), actual.ID(), block.ID())
 }
 
+// TestBlocksEquivocation tests that cache tracks blocks equivocation when adding blocks that have the same view
+// but different block ID. Equivocation is a symptom of byzantine actions and needs to be detected and addressed.
+func (s *CacheSuite) TestBlocksEquivocation() {
+	blocks, _, _ := unittest.ChainFixture(10)
+	s.cache.AddBlocks(blocks)
+	// adding same blocks again shouldn't result in any equivocation events
+	s.cache.AddBlocks(blocks)
+
+	equivocatedBlocks, _, _ := unittest.ChainFixture(len(blocks) - 1)
+	// we will skip genesis block as it will be the same
+	for i, block := range equivocatedBlocks[1:] {
+		// update view to be the same as already submitted batch to trigger equivocation
+		block.Header.View = blocks[i].Header.View
+		s.onEquivocation.On("Execute", blocks[i], block).Once()
+	}
+	s.cache.AddBlocks(equivocatedBlocks)
+}
+
 // TestAddBlocksChildCertifiesParent tests a scenario: A <- B[QC_A].
 // First we add A and then B, in two different batches.
 // We expect that A will get certified after adding B.
