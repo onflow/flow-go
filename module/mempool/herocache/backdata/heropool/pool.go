@@ -94,8 +94,8 @@ func (p *Pool) initFreeEntities() {
 // If the pool has an available slot (either empty or by ejection), then the second boolean returned value (ejectionOccurred)
 // determines whether an ejection happened to make one slot free or not. Ejection happens if there is no available
 // slot, and there is an ejection mode set.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (i EIndex, slotAvailable bool, ejectionOccurred bool) {
-	entityIndex, slotAvailable, ejectionHappened := p.sliceIndexForEntity()
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (entityIndex EIndex, slotAvailable bool, ejectedEntity flow.Entity) {
+	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
 	if slotAvailable {
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
@@ -120,7 +120,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.size++
 	}
 
-	return entityIndex, slotAvailable, ejectionHappened
+	return entityIndex, slotAvailable, ejectedEntity
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
@@ -160,28 +160,28 @@ func (p Pool) Head() (flow.Entity, bool) {
 // If the pool has an available slot (either empty or by ejection), then the second boolean returned value
 // (ejectionOccurred) determines whether an ejection happened to make one slot free or not.
 // Ejection happens if there is no available slot, and there is an ejection mode set.
-func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectionOccurred bool) {
+func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedItem flow.Entity) {
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
 		case NoEjection:
 			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
-			return 0, false, false
+			return 0, false, nil
 		case LRUEjection:
 			// LRU ejection
 			// the used head is the oldest entity, so we turn the used head to a free head here.
-			p.invalidateUsedHead()
-			return p.claimFreeHead(), true, true
+			invalidatedEntity := p.invalidateUsedHead()
+			return p.claimFreeHead(), true, invalidatedEntity
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
 			randomIndex := EIndex(rand.Uint32() % p.size)
-			p.invalidateEntityAtIndex(randomIndex)
-			return p.claimFreeHead(), true, true
+			invalidatedEntity := p.invalidateEntityAtIndex(randomIndex)
+			return p.claimFreeHead(), true, invalidatedEntity
 		}
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead(), true, false // returning false for no ejection.
+	return p.claimFreeHead(), true, nil // returning false for no ejection.
 }
 
 // Size returns total number of entities that this list maintains.
@@ -226,11 +226,9 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
-func (p *Pool) invalidateUsedHead() EIndex {
+func (p *Pool) invalidateUsedHead() flow.Entity {
 	headSliceIndex := p.used.head.getSliceIndex()
-	p.invalidateEntityAtIndex(headSliceIndex)
-
-	return headSliceIndex
+	return p.invalidateEntityAtIndex(headSliceIndex)
 }
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
@@ -268,9 +266,11 @@ func (p *Pool) Remove(sliceIndex EIndex) {
 // invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
-func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
-	prev := p.poolEntities[sliceIndex].node.prev
-	next := p.poolEntities[sliceIndex].node.next
+func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
+	poolEntity := p.poolEntities[sliceIndex]
+	prev := poolEntity.node.prev
+	next := poolEntity.node.next
+	invalidatedEntity := poolEntity.entity
 
 	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
 		// links next and prev elements for non-head and non-tail element
@@ -315,6 +315,8 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 
 	// decrements Size
 	p.size--
+
+	return invalidatedEntity
 }
 
 // appendToFreeList appends linked-list node represented by getSliceIndex to tail of free list.

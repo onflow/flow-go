@@ -333,7 +333,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
-		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, derivedBlockData)
+		computationResult, err := bc.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			executableBlock,
+			view,
+			derivedBlockData)
 		require.NoError(t, err)
 		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
 		for _, event := range computationResult.ServiceEvents {
