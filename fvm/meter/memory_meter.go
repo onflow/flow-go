@@ -145,8 +145,8 @@ var (
 		common.MemoryKindFunctionBlock:     25,
 		common.MemoryKindParameter:         25,
 		common.MemoryKindParameterList:     59,
-		common.MemoryKindTypeParameter:     42, // TODO: add actual memory
-		common.MemoryKindTypeParameterList: 42, // TODO: add actual memory
+		common.MemoryKindTypeParameter:     9,
+		common.MemoryKindTypeParameterList: 59,
 		common.MemoryKindTransfer:          1,
 		common.MemoryKindMembers:           276,
 		common.MemoryKindTypeAnnotation:    25,
