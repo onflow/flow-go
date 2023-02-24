@@ -35,13 +35,15 @@ func (s *CacheSuite) SetupTest() {
 	s.cache = NewCache(unittest.Logger(), defaultHeroCacheLimit, collector, s.onEquivocation.Execute)
 }
 
-// TestPeek tests if previously added block can be queried by block ID
+// TestPeek tests if previously added blocks can be queried by block ID.
 func (s *CacheSuite) TestPeek() {
-	block := unittest.BlockFixture()
-	s.cache.AddBlocks([]*flow.Block{&block})
-	actual := s.cache.Peek(block.ID())
-	require.NotNil(s.T(), actual)
-	require.Equal(s.T(), actual.ID(), block.ID())
+	blocks, _, _ := unittest.ChainFixture(10)
+	s.cache.AddBlocks(blocks)
+	for _, block := range blocks {
+		actual := s.cache.Peek(block.ID())
+		require.NotNil(s.T(), actual)
+		require.Equal(s.T(), actual.ID(), block.ID())
+	}
 }
 
 // TestBlocksEquivocation tests that cache tracks blocks equivocation when adding blocks that have the same view
@@ -89,6 +91,27 @@ func (s *CacheSuite) TestChildBeforeParent() {
 	require.NotNil(s.T(), certifyingQC)
 	require.Equal(s.T(), blocks[0].ID(), certifyingQC.BlockID)
 	require.Equal(s.T(), certifiedBatch[0], blocks[0])
+}
+
+// TestBlockInTheMiddle tests a scenario: A <- B[QC_A] <- C[QC_B].
+// We add blocks one by one: C, A, B, we expect that after adding B, we will be able to
+// certify [A, B] with QC_B as certifying QC.
+func (s *CacheSuite) TestBlockInTheMiddle() {
+	blocks, _, _ := unittest.ChainFixture(2)
+	// add C
+	certifiedBlocks, certifiedQC := s.cache.AddBlocks(blocks[2:])
+	require.Empty(s.T(), certifiedBlocks)
+	require.Nil(s.T(), certifiedQC)
+
+	// add A
+	certifiedBlocks, certifiedQC = s.cache.AddBlocks(blocks[:1])
+	require.Empty(s.T(), certifiedBlocks)
+	require.Nil(s.T(), certifiedQC)
+
+	// add B
+	certifiedBlocks, certifiedQC = s.cache.AddBlocks(blocks[1:2])
+	require.Equal(s.T(), blocks[:2], certifiedBlocks)
+	require.Equal(s.T(), blocks[2].Header.QuorumCertificate(), certifiedQC)
 }
 
 // TestAddBatch tests a scenario: B1 <- ... <- BN added in one batch.
