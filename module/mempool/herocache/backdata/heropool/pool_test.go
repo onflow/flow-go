@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -430,7 +431,17 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 	require.False(t, ok)
 	require.Nil(t, e)
 
+	var uniqueEntities map[flow.Identifier]struct{}
+	if ejectionMode != NoEjection {
+		uniqueEntities = make(map[flow.Identifier]struct{})
+		for _, entity := range entitiesToBeAdded {
+			uniqueEntities[entity.ID()] = struct{}{}
+		}
+		require.Equalf(t, len(uniqueEntities), len(entitiesToBeAdded), "entitesToBeAdded must be constructed of unique entities")
+	}
+
 	// adding elements
+	lruEjectedIndex := 0
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
 		entityIndex, slotAvailable, ejectedEntity := pool.Add(e.ID(), e, uint64(i))
@@ -457,6 +468,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				// confirm that ejected entity is the oldest entity
+				require.Equal(t, entitiesToBeAdded[lruEjectedIndex], ejectedEntity)
+				lruEjectedIndex++
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
 				headEntity, headExists := pool.Head()
 				require.True(t, headExists)
@@ -468,6 +482,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				// confirm that ejected entity is from list of entitiesToBeAdded
+				_, ok := uniqueEntities[ejectedEntity.ID()]
+				require.True(t, ok)
 			}
 		}
 
