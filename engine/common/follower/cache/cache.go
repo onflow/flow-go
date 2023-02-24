@@ -96,7 +96,9 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	// check for message equivocation, report any if detected
 	for _, block := range batch {
 		if otherBlock, ok := c.byView[block.Header.View]; ok {
-			equivocatedBlocks = append(equivocatedBlocks, []*flow.Block{otherBlock, block})
+			if otherBlock.ID() != block.ID() {
+				equivocatedBlocks = append(equivocatedBlocks, []*flow.Block{otherBlock, block})
+			}
 		} else {
 			c.byView[block.Header.View] = block
 		}

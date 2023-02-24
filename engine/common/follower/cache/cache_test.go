@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 	"sync"
 	"testing"
@@ -97,12 +98,12 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
 	// ChainFixture generates N+1 blocks since it adds a root block
 	blocks, _, _ := unittest.ChainFixture(workers*blocksPerWorker - 1)
+
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
 	var certifiedBlocksLock sync.Mutex
 	var allCertifiedBlocks []*flow.Block
-
 	for i := 0; i < workers; i++ {
 		go func(blocks []*flow.Block) {
 			defer wg.Done()
@@ -131,4 +132,55 @@ func (s *CacheSuite) TestSecondaryIndexCleanup() {
 	s.cache.AddBlocks(blocks)
 	require.Len(s.T(), s.cache.byView, defaultHeroCacheLimit)
 	require.Len(s.T(), s.cache.byParent, defaultHeroCacheLimit)
+}
+
+// TestAddOverCacheLimit tests a scenario where caller feeds blocks to the cache in concurrent way
+// largely exceeding internal cache capacity leading to ejection of large number of blocks.
+// Expect to eventually certify all possible blocks assuming producer continue to push same blocks over and over again.
+// This test scenario emulates sync engine pushing blocks from other committee members.
+func (s *CacheSuite) TestAddOverCacheLimit() {
+	// create blocks more than limit
+	workers := 10
+	blocksPerWorker := 10
+	s.cache = NewCache(unittest.Logger(), uint32(blocksPerWorker), metrics.NewNoopCollector(), s.onEquivocation.Execute)
+
+	blocks, _, _ := unittest.ChainFixture(blocksPerWorker*workers - 1)
+
+	var uniqueBlocksLock sync.Mutex
+	// AddBlocks can certify same blocks, especially when we push same blocks over and over
+	// use a map to track those. Using a lock to provide concurrency safety.
+	uniqueBlocks := make(map[flow.Identifier]struct{}, 0)
+
+	// all workers will submit blocks unless condition is satisfied
+	// whenever len(uniqueBlocks) == certifiedGoal it means we have certified all available blocks.
+	done := atomic.NewBool(false)
+	certifiedGoal := len(blocks) - 1
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(blocks []*flow.Block) {
+			defer wg.Done()
+			for !done.Load() {
+				// worker submits blocks while condition is not satisfied
+				for _, block := range blocks {
+					// push blocks one by one, pairing with randomness of scheduler
+					// blocks will be delivered chaotically
+					certifiedBlocks, _ := s.cache.AddBlocks([]*flow.Block{block})
+					if len(certifiedBlocks) > 0 {
+						uniqueBlocksLock.Lock()
+						for _, block := range certifiedBlocks {
+							uniqueBlocks[block.ID()] = struct{}{}
+						}
+						if len(uniqueBlocks) == certifiedGoal {
+							done.Store(true)
+						}
+						uniqueBlocksLock.Unlock()
+					}
+				}
+			}
+		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
+	}
+
+	wg.Wait()
 }
