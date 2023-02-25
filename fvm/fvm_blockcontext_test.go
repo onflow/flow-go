@@ -369,7 +369,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, tx.Err)
 	})
 
-	t.Run("account update with checker heavy contract", func(t *testing.T) {
+	t.Run("account update with checker heavy contract (local replay limit)", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
@@ -385,7 +385,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
+		txBody := testutil.DeployLocalReplayLimitedTransaction(accounts[0], chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -404,6 +404,43 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		var parsingCheckingError *runtime.ParsingCheckingError
 		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
 		assert.ErrorContains(t, tx.Err, "program too ambiguous, local replay limit of 64 tokens exceeded")
+	})
+
+	t.Run("account update with checker heavy contract (global replay limit)", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(
+			vm,
+			ledger,
+			derived.NewEmptyDerivedBlockData(),
+			privateKeys,
+			chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployGlobalReplayLimitedTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		var parsingCheckingError *runtime.ParsingCheckingError
+		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
+		assert.ErrorContains(t, tx.Err, "program too ambiguous, global replay limit of 1024 tokens exceeded")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
