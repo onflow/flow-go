@@ -203,13 +203,14 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 		return nil, nil, nil, dkgFailureErrorf("group private key is identity and is therefore invalid")
 	}
 	return x, Y, y, nil
-}
+}*/
 
 const (
 	complaintSize       = 1
 	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
+/*
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 // orig is the message origin index
 //

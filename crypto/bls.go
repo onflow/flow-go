@@ -222,7 +222,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	case valid:
 		return true, nil
 	default:
-		return false, fmt.Errorf("signature verification failed")
+		return false, fmt.Errorf("signature verification failed: code %d", verif)
 	}
 }
 

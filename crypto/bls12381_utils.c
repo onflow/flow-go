@@ -8,16 +8,6 @@
 #include "bls_include.h"
 #include "assert.h"
 
-// TODO: temp utility function to delete
-bn_st* Fr_blst_to_relic(const Fr* x) {
-    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
-    byte* data = (byte*)malloc(Fr_BYTES);
-    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
-    bn_read_bin(out, data, Fr_BYTES);
-    free(data);
-    return out;
-}
-
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
 // return macro values to the upper Go Layer
@@ -31,6 +21,172 @@ int get_invalid() {
 
 int get_Fr_BYTES() {
     return Fr_BYTES;
+}
+
+// Fr utilities
+
+// TODO: temp utility function to delete
+bn_st* Fr_blst_to_relic(const Fr* x) {
+    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
+    byte* data = (byte*)malloc(Fr_BYTES);
+    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
+    bn_read_bin(out, data, Fr_BYTES);
+    free(data);
+    return out;
+}
+
+// returns true if a == 0 and false otherwise
+bool_t Fr_is_zero(const Fr* a) {
+    return bytes_are_zero((const byte*)a, Fr_BYTES);
+}
+
+// returns true if a == b and false otherwise
+bool_t Fr_is_equal(const Fr* a, const Fr* b) {
+    return vec_is_equal(a, b, Fr_BYTES);
+}
+
+// sets `a` to limb `l`
+void Fr_set_limb(Fr* a, const limb_t l){
+    vec_zero((byte*)a + sizeof(limb_t), Fr_BYTES - sizeof(limb_t));
+    *((limb_t*)a) = l;
+}
+
+void Fr_copy(Fr* res, Fr* a) {
+    vec_copy((byte*)res, (byte*)a, Fr_BYTES);
+}
+
+// sets `a` to 0
+void Fr_set_zero(Fr* a){
+    vec_zero((byte*)a, Fr_BYTES);
+}
+
+void Fr_add(Fr *res, const Fr *a, const Fr *b) {
+    add_mod_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r);
+}
+
+void Fr_sub(Fr *res, const Fr *a, const Fr *b) {
+    sub_mod_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r);
+}
+
+void Fr_neg(Fr *res, const Fr *a) {
+    cneg_mod_256((limb_t*)res, (limb_t*)a, 1, BLS12_381_r);
+}
+
+void Fr_mul_montg(Fr *res, const Fr *a, const Fr *b) {
+    mul_mont_sparse_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r, r0);
+}
+
+void Fr_to_montg(Fr *res, const Fr *a) {
+    mul_mont_sparse_256((limb_t*)res, (limb_t*)a, BLS12_381_rRR, BLS12_381_r, r0);
+}
+
+void Fr_from_montg(Fr *res, const Fr *a) {
+    from_mont_256((limb_t*)res, (limb_t*)a, BLS12_381_r, r0);
+}
+
+// result is in Montgomery form
+// res = a^(-1)*R
+void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
+    // copied and modified from BLST code
+    // Copyright Supranational LLC
+    static const vec256 rx2 =   { /* left-aligned value of the modulus */
+        TO_LIMB_T(0xfffffffe00000002), TO_LIMB_T(0xa77b4805fffcb7fd),
+        TO_LIMB_T(0x6673b0101343b00a), TO_LIMB_T(0xe7db4ea6533afa90),
+    };
+    vec512 temp;
+    ct_inverse_mod_256(temp, (limb_t*)a, BLS12_381_r, rx2);
+    redc_mont_256((limb_t*)res, temp, BLS12_381_r, r0);
+}
+
+void Fr_inv_montg_expo(Fr *res, const Fr *a) {
+    // TODO:
+}
+
+// computes the sum of the array elements and writes the sum in jointx
+void Fr_sum_vector(Fr* jointx, const Fr x[], const int len) {
+    Fr_set_zero(jointx);
+    for (int i=0; i<len; i++) {
+        Fr_add(jointx, jointx, &x[i]);
+    }
+}
+
+// reads a scalar in `a` and checks it is a valid Fr element (a < r).
+// input bytes are big endian.
+// returns:
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr
+//    - v if the scalar is valid 
+BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    if (len != Fr_BYTES) {
+        return BLST_BAD_ENCODING;
+    }
+    pow256 tmp;
+    pow256_from_be_bytes(tmp, bin);
+    if (!check_mod_256(tmp, BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
+        return BLST_BAD_SCALAR;
+    }
+    vec_zero(tmp, Fr_BYTES);
+    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
+    return BLST_SUCCESS;
+}
+
+// reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
+// input bytes are big endian.
+// returns:
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
+//    - BLST_SUCCESS if the scalar is valid 
+BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    int ret = Fr_read_bytes(a, bin, len);
+    if (ret != BLST_SUCCESS) {
+        return ret;
+    }
+    // check if a=0
+    if (Fr_is_zero(a)) {
+        return BLST_BAD_SCALAR;
+    }
+    return BLST_SUCCESS;
+}
+
+// write Fr element `a` in big endian bytes.
+void Fr_write_bytes(uint8_t *bin, const Fr* a) {
+    be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
+}
+
+// maps big-endian bytes into an Fr element using modular reduction
+// output is vec256 (also used as Fr)
+static void 
+vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
+{
+    Fr digit, radix;
+    Fr_set_zero(out);
+    Fr_copy(&radix, (Fr*)BLS12_381_rRR); // R^2
+
+    bytes += n;
+    while (n > Fr_BYTES) {
+        limbs_from_be_bytes((limb_t*)&digit, bytes -= Fr_BYTES, Fr_BYTES); // l_i
+        Fr_mul_montg(&digit, &digit, &radix); // l_i * R^i  (i is the loop number starting at 1)
+        Fr_add(out, out, &digit);
+        Fr_mul_montg(&radix, &radix, (Fr*)BLS12_381_rRR); // R^(i+1)
+        n -= Fr_BYTES;
+    }
+    Fr_set_zero(&digit);
+    limbs_from_be_bytes((limb_t*)&digit, bytes -= n, n);
+    Fr_mul_montg(&digit, &digit, &radix);
+    Fr_add(out, out, &digit);
+    // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n
+    // reduce the extra R
+    Fr_from_montg(out, out);
+    // clean up possible sensitive data
+    Fr_set_zero(&digit);
+}
+
+// Reads a scalar from an array and maps it to Fr.
+// It returns true if scalar is zero and false otherwise.
+bool map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+    vec256_from_be_bytes(a, bin, len);
+    //Fr_set_limb(a, 1); TODO: delete
+    return Fr_is_zero(a);
 }
 
 // global variable of the pre-computed data
@@ -160,7 +316,7 @@ void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
 void ep2_mult_gen(ep2_t res, const Fr* expo) {
     bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
-    g2_mul_gen(res, (bn_st*)tmp_expo);
+    g2_mul_gen(res, tmp_expo);
 }
 
 // DEBUG printing functions 
@@ -202,13 +358,6 @@ void ep_print_(char* s, ep_st* p) {
 void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
-}
-
-// Reads a scalar from an array and maps it to Fr.
-// It returns true if scalar is zero and false otherwise.
-bool map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
-    vec256_from_be_bytes((limb_t*)a, bin, len);
-    return Fr_is_zero(a);
 }
 
 // returns the sign of y.
@@ -513,72 +662,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-bool_t Fr_is_zero(const Fr* a) {
-    return bytes_are_zero((const byte*)a, Fr_BYTES);
-}
-
-bool_t Fr_is_equal(const Fr* a, const Fr* b) {
-    return vec_is_equal(a, b, Fr_BYTES);
-}
-
-// reads a scalar in `a` and checks it is a valid Fr element (a < r).
-// input bytes are big endian.
-// returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fr
-//    - v if the scalar is valid 
-BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
-    if (len != Fr_BYTES) {
-        return BLST_BAD_ENCODING;
-    }
-    pow256 tmp;
-    pow256_from_be_bytes(tmp, bin);
-    if (!check_mod_256(tmp, BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
-        return BLST_BAD_SCALAR;
-    }
-    vec_zero(tmp, Fr_BYTES);
-    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
-    return BLST_SUCCESS;
-}
-
-// reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
-// input bytes are big endian.
-// returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
-//    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
-    int ret = Fr_read_bytes(a, bin, len);
-    if (ret != BLST_SUCCESS) {
-        return ret;
-    }
-    // check if a=0
-    if (Fr_is_zero(a)) {
-        return BLST_BAD_SCALAR;
-    }
-    return BLST_SUCCESS;
-}
-
-// write Fr element `a` in big endian bytes.
-void Fr_write_bytes(uint8_t *bin, const Fr* a) {
-    be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
-}
-
-// computes the sum of the array elements x and writes the sum in jointx
-// the sum is computed in Fr
-void Fr_sum_vector(Fr* jointx, const Fr* x, const int len) {
-    /*bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_set_dig(jointx, 0);
-    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
-    for (int i=0; i<len; i++) {
-        bn_add(jointx, jointx, &x[i]);
-        if (bn_cmp(jointx, r) == RLC_GT) 
-            bn_sub(jointx, jointx, r);
-    }
-    bn_free(r);*/
-}
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
 void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){

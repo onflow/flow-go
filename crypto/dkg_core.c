@@ -6,51 +6,37 @@
 #define N_max 250
 #define N_bits_max 8  // log(250)  
 #define T_max  ((N_max-1)/2)
-
+/*
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
 void Fr_polynomialImage_export(byte* out, ep2_t y, const bn_st* a, const int a_size, const byte x){
-    bn_t image;
-    bn_new(image);
-    Fr_polynomialImage(image, y, a, a_size, x);
+    Fr image;
+    Fr_polynomialImage(&image, y, a, a_size, x);
     // exports the result
-    const int out_size = Fr_BYTES;
-    bn_write_bin(out, out_size, image);
-    bn_free(image);
-}
+    Fr_write_bytes(out, &image);
+}*/
 
-// computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
-// r being the order of G1
-// writes P(x) in out and P(x).g2 in y if y is non NULL
-// x being a small integer
-void Fr_polynomialImage(bn_t image, ep2_t y, const bn_st *a, const int a_size, const byte x){
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    
-    // temp variables
-    bn_t acc;
-    bn_new(acc); 
-    bn_new_size(acc, BITS_TO_DIGITS(Fr_BITS+8+1));
-    bn_set_dig(acc, 0);
+// computes P(x) = a_0 + a_1 * x + .. + a_n * x^n  where P is in Fr[X].
+// a_i are all in Fr, `a_size` - 1 is P's degree, x is a small integer less than 255.
+// The function writes P(x) in `image` and P(x).g2 in `y` if `y` is non NULL
+void Fr_polynomialImage(Fr* image, ep2_t y, const Fr* a, const int a_size, const byte x){
+    Fr_set_zero(image); 
+    // convert `x` to Montgomery form
+    Fr xR;
+    Fr_set_limb(&xR, (limb_t)x);
+    Fr_to_montg(&xR, &xR);
 
-    for (int i=a_size-1; i >= 0; i--) {
-        bn_mul_dig(acc, acc, x);
-        // Use basic reduction as it's an 9-bits reduction 
-        // in the worst case (|acc|<|r|+9 )
-        bn_mod_basic(acc, acc, r);
-        bn_add(acc, acc, &a[i]);
+    for (int i = a_size-1; i >= 0; i--) {
+        Fr_mul_montg(image, image, &xR); 
+        Fr_add(image, image, &a[i]); // image is in normal form
     }
-    // export the result
-    bn_mod_basic(image, acc, r);
-
     // compute y = P(x).g2
-    if (y) g2_mul_gen(y, acc);
-
-    bn_free(acc)
-    bn_free(r);
+    if (y) {
+        bn_st* tmp = Fr_blst_to_relic(image);
+        g2_mul_gen(y, tmp);
+    }
 }
 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2

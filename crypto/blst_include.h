@@ -14,7 +14,11 @@
 // these type definitions are used as an abstraction from BLST internal types
 
 // field elements F_r
-typedef struct {limb_t limbs[4];} Fr; // also used as vec256 (little endian limbs)
+// where `r` is the order of G1/G2.
+// F_r elements are represented as big numbers reduced modulo `r`. Big numbers
+// are represented as a little endian vector of limbs.
+// `Fr` is equivalent to type vec256 (used internally by BLST for F_r elements).
+typedef struct {limb_t limbs[4];} Fr;
 // Subroup G1 in E1
 typedef POINTonE1 G1;
 // Subroup G1 in E2
@@ -25,7 +29,5 @@ typedef POINTonE2 G2;
 // and that are not exported in the desired form by BLST
 
 void pow256_from_be_bytes(pow256 ret, const unsigned char a[32]);
-void vec256_from_be_bytes(vec256 out, const unsigned char *bytes, size_t n);
-
 
 #endif

@@ -5,11 +5,7 @@
 
 #include "bls_include.h"
 
-// the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r 
-// (approximately Fr_bits/MAX_IND_BITS)
-#define MAX_IND_LOOPS   32 
-
-int G1_lagrangeInterpolateAtZero(byte*, const byte* , const uint8_t*, const int);
-extern void Fr_polynomialImage(bn_t out, ep2_t y, const bn_st* a, const int a_size, const byte x);
+int G1_lagrangeInterpolateAtZero_serialized(byte*, const byte* , const uint8_t[], const int);
+extern void Fr_polynomialImage(Fr* out, ep2_t y, const Fr* a, const int a_size, const byte x);
 
 #endif

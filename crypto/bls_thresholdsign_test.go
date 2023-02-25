@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 import (
 	"crypto/rand"
 	"fmt"
@@ -22,8 +21,8 @@ func TestBLSThresholdSignature(t *testing.T) {
 	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
 	t.Run("centralized_stateful_keygen", testCentralizedStatefulAPI)
-	t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
-	t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
+	//t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
+	//t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
 }
 
 const thresholdSignatureTag = "random tag"
@@ -315,7 +314,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 // Distributed Threshold Signature stateful api test
 // keys are generated using simple Feldman VSS
-func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
+/*func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
@@ -440,7 +439,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 		// synchronize the main thread to end TS
 		sync.Wait()
 	}
-}
+}*/
 
 // This is a testing function
 // It simulates processing incoming messages by a participant during DKG
@@ -547,7 +546,9 @@ func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		mrand.Seed(time.Now().UnixNano())
+		r := int64(1677308758239641000) //time.Now().UnixNano()
+		mrand.Seed(r)
+		t.Log(r)
 		seed := make([]byte, SeedMinLenDKG)
 		_, err := mrand.Read(seed)
 		require.NoError(t, err)
@@ -606,7 +607,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 	}
 }
 
-func BenchmarkSimpleKeyGen(b *testing.B) {
+/*func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
 	_, _ = rand.Read(seed)
@@ -615,5 +616,6 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)
 	}
 	b.StopTimer()
-}
-*/
+}*/
+
+// TODO: add benchmark for signature reconstruction

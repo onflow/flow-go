@@ -5,7 +5,7 @@ package crypto
 
 // #cgo CFLAGS:
 // #include "bls_thresholdsign_include.h"
-/*import "C"
+import "C"
 
 import (
 	"fmt"
@@ -409,14 +409,11 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	signers := make([]index, 0, len(s.shares))
 	for index, share := range s.shares {
 		shares = append(shares, share...)
-		signers = append(signers, index)
+		signers = append(signers, index+1)
 	}
 
-
-
-
 	// Lagrange Interpolate at point 0
-	result := C.G1_lagrangeInterpolateAtZero(
+	result := C.G1_lagrangeInterpolateAtZero_serialized(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
 		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
@@ -456,8 +453,6 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 // are considered to reconstruct the signature.
 func BLSReconstructThresholdSignature(size int, threshold int,
 	shares []Signature, signers []int) (Signature, error) {
-
-
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, invalidInputsErrorf(
@@ -501,12 +496,12 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 				"%d is a duplicate signer", index(signers[i]))
 		}
 		m[index(signers[i])] = true
-		indexSigners = append(indexSigners, index(signers[i]))
+		indexSigners = append(indexSigners, index(signers[i])+1)
 	}
 
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero(
+	if C.G1_lagrangeInterpolateAtZero_serialized(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
@@ -558,9 +553,6 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 			threshold)
 	}
 
-
-
-
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
 	y := make([]pointG2, size)
@@ -604,4 +596,4 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	// are sampled uniformly at random. The probability of
 	// generating an identity key is therefore negligible.
 	return skShares, pkShares, pkGroup, nil
-}*/
+}

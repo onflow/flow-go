@@ -151,7 +151,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// specific tests for BLS
 
 	//  zero private key
-	/*skBytes := make([]byte, PrKeyLenBLSBLS12381)
+	skBytes := make([]byte, PrKeyLenBLSBLS12381)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
 	require.Error(t, err, "decoding identity private key should fail")
 	assert.True(t, IsInvalidInputsError(err))
@@ -195,7 +195,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 	invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
 	require.NoError(t, err)
 	_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
-	assert.Error(t, err)*/
+	assert.Error(t, err)
 }
 
 // TestBLSEquals tests equal for BLS keys

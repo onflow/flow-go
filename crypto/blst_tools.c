@@ -22,29 +22,3 @@ void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
         *(ret++) = *(b--);
     }
 }
-
-// maps big-endian bytes into an Fr element using modular reduction
-// output is vec256 (also used as Fr)
-void vec256_from_be_bytes(vec256 out, const unsigned char *bytes, size_t n)
-{
-    // TODO: optimize once working
-    vec256 digit, radix;
-    vec_zero(out, Fr_BYTES);
-    vec_copy(radix, BLS12_381_rRR, sizeof(radix));
-
-    bytes += n;
-    while (n > 32) {
-        limbs_from_be_bytes(digit, bytes -= 32, 32);
-        from_mont_256(digit, digit, BLS12_381_r, r0);
-        mul_mont_sparse_256(digit, digit, radix, BLS12_381_r, r0);
-        add_mod_256(out, out, digit, BLS12_381_r);
-        mul_mont_sparse_256(radix, radix, BLS12_381_rRR, BLS12_381_r, r0);
-        n -= 32;
-    }
-    limbs_from_be_bytes(digit, bytes -= n, n);
-    from_mont_256(digit, digit, BLS12_381_r, r0);
-    mul_mont_sparse_256(digit, digit, radix, BLS12_381_r, r0);
-    add_mod_256(out, out, digit, BLS12_381_r);
-
-    vec_zero(digit, sizeof(digit));
-}

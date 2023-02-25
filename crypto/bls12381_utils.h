@@ -94,6 +94,18 @@ void     map_to_G1(ep_t, const byte*, const int);
 // Fr utilities
 bool_t      Fr_is_zero(const Fr* a);
 bool_t      Fr_is_equal(const Fr* a, const Fr* b);
+void        Fr_set_limb(Fr*, const limb_t);
+void        Fr_copy(Fr*, Fr*);
+void        Fr_set_zero(Fr*);
+void        Fr_add(Fr *res, const Fr *a, const Fr *b);
+void        Fr_sub(Fr *res, const Fr *a, const Fr *b);
+void        Fr_neg(Fr *res, const Fr *a);
+void        Fr_sum_vector(Fr*, const Fr x[], const int);
+void        Fr_mul_montg(Fr *res, const Fr *a, const Fr *b);
+void        Fr_to_montg(Fr *res, const Fr *a);
+void        Fr_from_montg(Fr *res, const Fr *a);
+void        Fr_inv_montg_eucl(Fr *res, const Fr *a);
+void        Fr_inv_montg_expo(Fr *res, const Fr *a);
 BLST_ERROR  Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
 BLST_ERROR  Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
 void        Fr_write_bytes(uint8_t *bin, const Fr* a);
@@ -119,7 +131,6 @@ void     ep_mult(ep_t, const ep_t, const Fr*);
 void     ep2_mult_gen(ep2_t, const Fr*);
 void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo); 
 
-void     Fr_sum_vector(Fr*, const Fr*, const int);
 void     ep_sum_vector(ep_t, ep_st*, const int);
 void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
@@ -128,7 +139,6 @@ void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 // membership checks
 int      check_membership_G1(const ep_t);
 int      check_membership_G2(const ep2_t);
-int      check_membership_Fr_star(const bn_t);
 
 int      simple_subgroup_check_G1(const ep_t);
 int      simple_subgroup_check_G2(const ep2_t);

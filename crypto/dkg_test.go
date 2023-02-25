@@ -3,26 +3,26 @@
 
 package crypto
 
-/*
 import (
 	"fmt"
 	mrand "math/rand"
 	"sync"
 	"testing"
-	"time"
+	_ "time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/require"
 )
 
 var gt *testing.T
 
+/*
 func TestDKG(t *testing.T) {
 	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
 	t.Run("JointFeldman", testJointFeldman)
-}
+}*/
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
 // assuming the protocol requires:
@@ -33,6 +33,7 @@ func optimalThreshold(size int) int {
 	return (size - 1) / 2
 }
 
+/*
 // Testing the happy path of Feldman VSS by simulating a network of n participants
 func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -43,7 +44,7 @@ func testFeldmanVSSSimple(t *testing.T) {
 			dkgCommonTest(t, feldmanVSS, n, threshold, happyPath)
 		})
 	}
-}
+}*/
 
 type testCase int
 
@@ -68,7 +69,7 @@ const (
 	invalidSharesComplainTrigger
 	invalidComplaintAnswerBroadcast
 	duplicatedSendAndBroadcast
-)
+) /*
 
 // Testing Feldman VSS with the qualification system by simulating a network of n participants
 func testFeldmanVSSQual(t *testing.T) {
@@ -441,7 +442,7 @@ func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) 
 			}(i)
 		}
 	}
-}
+}*/
 
 // implements DKGProcessor interface
 type testDKGProcessor struct {
@@ -767,7 +768,7 @@ func TestDKGErrorTypes(t *testing.T) {
 		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
 		assert.False(t, IsDKGInvalidStateTransitionError(nil))
 	})
-}
+} /*
 
 func TestDKGTransitionErrors(t *testing.T) {
 	n := 5

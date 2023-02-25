@@ -335,4 +335,12 @@ void map_to_G1(ep_t h, const byte* data, const int len) {
     #elif hashToPoint==RELIC_SSWU
     ep_map_from_field(h, data, len);
     #endif
+
+    /*Fr a, b;
+    Fr_set_limb(&a, 1);
+    Fr_print_("a", &a);
+    Fr_inv_montg_eucl(&b,&a);
+    Fr_print_("b", &b);
+    Fr_from_montg(&b, &b);
+    Fr_print_("b", &b); */  
 }

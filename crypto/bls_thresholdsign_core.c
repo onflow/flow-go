@@ -2,122 +2,154 @@
 
 #include "bls_thresholdsign_include.h"
 
-// Computes the Lagrange coefficient L(i+1) at 0 with regards to the range [signers(0)+1..signers(t)+1]
-// and stores it in res, where t is the degree of the polynomial P
-static void Zr_lagrangeCoefficientAtZero(bn_t res, const int i, const uint8_t* signers, const int len){
-    // r is the order of G1 and G2
-    bn_t r, r_2;
-    bn_new(r);
-    g2_get_ord(r);
-    // (r-2) is needed to compute the inverse in Fr
-    // using little Fermat theorem
-    bn_new(r_2);
-    bn_sub_dig(r_2, r, 2);
-    //#define MOD_METHOD MONTY
-    #define MOD_METHOD BASIC
+// the highest index of a threshold participant
+#define MAX_IND         255
+#define MAX_IND_BITS    8   // equal to ceiling(log_2(MAX_IND))
 
-    #if MOD_METHOD == MONTY   
-    bn_t u;
-    bn_new(u)
-    // Montgomery reduction constant
-    // TODO: hardcode u
-    bn_mod_pre_monty(u, r);
-    #endif
+// Computes the Lagrange coefficient L_i(0) in Fr with regards to the range [indices(0)..indices(t)]
+// and stores it in `res`, where t is the degree of the polynomial P.
+// `len` is equal to `t+1` where `t` is the polynomial degree.
+static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t indices[], const int len){
 
-    // temp buffers
-    bn_t acc, inv, base, numerator;
-    bn_new(inv);
-    bn_new(base);
-    bn_new_size(base, BITS_TO_DIGITS(Fr_BITS))
-    bn_new(acc);
-    bn_new(numerator);
-    bn_new_size(acc, BITS_TO_DIGITS(3*Fr_BITS));
+    // coefficient is computed as N * D^(-1)
+    Fr numerator;  // eventually would represent N*R^k  
+    Fr denominator; // eventually would represent D*R^k 
 
-    // the accumulator of the largarnge coeffiecient 
-    // the sign (sign of acc) is equal to 1 if acc is positive, 0 otherwise
-    bn_set_dig(acc, 1);
-    int sign = 1;
+    // Initialize N and D to Montgomery constant R
+    // TODO: hardcode R and add Fr_copy function
+    Fr_copy(&numerator, (Fr*)BLS12_381_rRR);
+    Fr_copy(&denominator, (Fr*)BLS12_381_rRR);
+    Fr_from_montg(&numerator, &numerator);
+    Fr_from_montg(&denominator, &denominator);
 
-    // loops is the maximum number of loops that takes the accumulator to 
-    // overflow modulo r, mainly the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r
+    // sign of D: 1 for positive and 0 for negative
+    int sign = 1; 
+
+    // the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < 2^64 (approximately 64/MAX_IND_BITS)
+    // this means we can multiply up to (k) indices in a limb (64 bits) without overflowing.
+    #define MAX_IND_LOOPS   64/MAX_IND_BITS
+
+    // choose inversion algorithm used for denominator
+    #define FERMAT_INVERSION 0
+    #define EUCLIDEAN_INVERSION (FERMAT_INVERSION^1)
+
     const int loops = MAX_IND_LOOPS;
     int k,j = 0;
+    Fr tmp;
     while (j<len) {
-        bn_set_dig(base, 1);
-        bn_set_dig(numerator, 1);
-        for (k = j; j < MIN(len, k+loops); j++){
-            if (signers[j]==i) 
+        limb_t limb_numerator = 1;
+        limb_t limb_denominator = 1;
+        for (k = j; j < MIN(len, k+loops); j++){ // batch up to `loops` elements in one limb
+            if (j==i) 
                 continue;
-            if (signers[j]<i) 
+            if (indices[j] < indices[i]) {
                 sign ^= 1;
-            bn_mul_dig(base, base, abs((int)signers[j]-i));
-            bn_mul_dig(numerator, numerator, signers[j]+1);
+                limb_denominator *= indices[i]-indices[j];
+            } else {
+                limb_denominator *= indices[j]-indices[i];
+            }
+            limb_numerator *= indices[j];
         }
-        // compute the inverse using little Fermat theorem
-        bn_mxp_slide(inv, base, r_2, r);
-        #if MOD_METHOD == MONTY 
-        // convert to Montgomery domain
-        bn_mod_monty_conv(inv, inv, r);
-        bn_mod_monty_conv(numerator, numerator, r);
-        bn_mod_monty_conv(acc, acc, r);
-        // multiply
-        bn_mul(acc, acc, inv);
-        bn_mod_monty(acc, acc, r, u);
-        bn_mul(acc, acc, numerator);
-        bn_mod_monty(acc, acc, r, u);
-        bn_mod_monty_back(acc, acc, r);
-        #elif MOD_METHOD == BASIC 
-        bn_mul(acc, acc, inv);
-        bn_mul(acc, acc, numerator);
-        bn_mod_basic(acc, acc, r);
+        // update numerator
+        Fr_set_limb(&tmp, limb_numerator); // L_N
+        #if EUCLIDEAN_INVERSION == 1 
+            // numerator and denominator are both computed in Montgomery form.
+            Fr_to_montg(&tmp, &tmp);  // L_N*R
         #endif
+        Fr_mul_montg(&numerator, &numerator, &tmp); // N*R
+        // update denominator
+        Fr_set_limb(&tmp, limb_denominator); // L_D
+        #if EUCLIDEAN_INVERSION == 1 
+            // keep numertaor and denominator are both computed in Montgomery form.
+            Fr_to_montg(&tmp, &tmp);  // L_D*R
+        #endif
+        Fr_mul_montg(&denominator, &denominator, &tmp); // D*R
+        //printf("%d--%lld--%lld\n", sign, limb_numerator, limb_denominator);
     }
-    if (sign) bn_copy(res, acc);
-    else bn_sub(res, r, acc);
+    if (!sign) {
+        Fr_neg(&denominator, &denominator);
+    }
 
-    // free the temp memory
-    bn_free(r);bn_free(r_1);
-    #if MOD_METHOD == MONTY   
-    bn_free(&u);
+    #if EUCLIDEAN_INVERSION == 1 
+        // at this point, denominator = D*R , numertaor = N*R
+        // inversion  
+        Fr_inv_montg_eucl(&denominator, &denominator); // (DR)^(-1)*R = D^(-1)
+        Fr_mul_montg(res, &numerator, &denominator); // N*D^(-1)     
     #endif
-    bn_free(acc);
-    bn_free(inv);bn_free(base);
-    bn_free(numerator);
+
+    //printf("%d:LI(%d):\n", i, indices[i]);
+    //Fr_print_("res", res);
+
+     #if FERMAT_INVERSION == 1 
+        // at this point, denominator = D*R^c , numertaor = N*R^c  
+        // (c is the nummber of mult_mont, but the exact value isn't relevant)
+        // inversion inv(xR) = x^(-1)R
+        Fr_inv_montg_expo(&denominator, &denominator); // inv(D*R^c) = inv(D*R^(c-1)*R) = D^(-1)*R^(1-c)*R
+        Fr_mul_montg(&numerator, &numerator, &denominator); //N*D^(-1)*R
+        Fr_from_montg(res, &numerator); //N*D^(-1)
+    #endif
 }
 
 
-// Computes the Langrange interpolation at zero LI(0) with regards to the points [signers(1)+1..signers(t+1)+1] 
-// and their images [shares(1)..shares(t+1)], and stores the result in dest
-// len is the polynomial degree 
-int G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* signers, const int len) {
-    // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
-    // powers of x
-    bn_t bn_lagr_coef;
-    bn_new(bn_lagr_coef);
-    bn_new_size(bn_lagr_coef, BITS_TO_BYTES(Fr_BITS));
+// Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the indices [indices(0)..indices(t)] 
+// and their G1 images [shares(0)..shares(t)], and stores the resulting G1 point in `dest`.
+// `len` is equal to `t+1` where `t` is the polynomial degree.
+static void G1_lagrangeInterpolateAtZero(ep_st* dest, const ep_st shares[], const uint8_t indices[], const int len) {
+    // Purpose is to compute Q(0) where Q(x) = A_0 + A_1*x + ... +  A_t*x^t in G1 
+    // where A_i = g1 ^ a_i
+
+    // Q(0) = share_i0 ^ L_i0(0) + share_i1 ^ L_i1(0) + .. + share_it ^ L_it(0)
+    // where L is the Lagrange coefficient
     
     // temp variables
-    ep_t mult, acc, share;
+    ep_t mult;
     ep_new(mult);         
-    ep_new(acc);
-    ep_new(share);
-    ep_set_infty(acc);
+    ep_set_infty(dest);
+
+    Fr fr_lagr_coef;
+    for (int i=0; i < len; i++) {
+        Fr_lagrangeCoefficientAtZero(&fr_lagr_coef, i, indices, len);
+        bn_st* bn_lagr_coef = Fr_blst_to_relic(&fr_lagr_coef);
+        ep_mul_lwnaf(mult, &shares[i], bn_lagr_coef);
+        free(bn_lagr_coef);
+        ep_add_jacob(dest, dest, mult);
+    }
+    // free the temp memory
+    ep_free(mult);
+}
+
+// Computes the Langrange interpolation at zero LI(0) with regards to the indices [indices(0)..indices(t)] 
+// and their G1 concatenated serializations [shares(1)..shares(t+1)], and stores the serialized result in `dest`.
+// `len` is equal to `t+1` where `t` is the polynomial degree.
+int G1_lagrangeInterpolateAtZero_serialized(byte* dest, const byte* shares, const uint8_t indices[], const int len) {
+    int read_ret;
+    // temp variables
+    ep_t res;
+    ep_new(res);
+    ep_st* ep_shares = malloc(sizeof(ep_t) * len);
 
     for (int i=0; i < len; i++) {
-        int read_ret = ep_read_bin_compact(share, &shares[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK)
-            return read_ret;
-        Zr_lagrangeCoefficientAtZero(bn_lagr_coef, signers[i], signers, len);
-        ep_mul_lwnaf(mult, share, bn_lagr_coef);
-        ep_add_jacob(acc, acc, mult);
+        ep_new(ep_shares[i]);
+        read_ret = ep_read_bin_compact(&ep_shares[i], &shares[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (read_ret != RLC_OK) goto out;
+            
     }
-    // export the result
-    ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
+    // G1 interpolation at 0
+    // computes Q(x) = A_0 + A_1*x + ... +  A_t*x^t  in G1,
+    // where A_i = g1 ^ a_i
+    G1_lagrangeInterpolateAtZero(res, ep_shares, indices, len);
 
+    // export the result
+    ep_write_bin_compact(dest, res, SIGNATURE_LEN);
+    read_ret = VALID;
+
+out:
     // free the temp memory
-    ep2_free(acc);
-    ep2_free(mult);
-    ep2_free(share);
-    bn_free(bn_lagr_coef);
-    return VALID;
+    ep_free(res);
+    for (int i=0; i < len; i++) {
+        ep_free(ep_shares[i]);
+    } 
+    free(ep_shares); 
+    return read_ret;
 }
+
