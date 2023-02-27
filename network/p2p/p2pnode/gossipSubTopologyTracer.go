@@ -9,11 +9,15 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 type GossipSubMeshTracer struct {
+	component.ComponentManager
+	component.Component
+
 	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
 	topicMeshMap   map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
 	logger         zerolog.Logger
@@ -26,12 +30,22 @@ type GossipSubMeshTracer struct {
 var _ pubsub.RawTracer = (*GossipSubMeshTracer)(nil)
 
 func NewGossipSubTopologyTracer(logger zerolog.Logger, metrics module.GossipSubLocalMeshMetrics, idProvider module.IdentityProvider) *GossipSubMeshTracer {
-	return &GossipSubMeshTracer{
+	g := &GossipSubMeshTracer{
 		topicMeshMap: make(map[string]map[peer.ID]struct{}),
 		idProvider:   idProvider,
 		metrics:      metrics,
 		logger:       logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
 	}
+
+	g.Component = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			g.logLoop(ctx)
+		}).
+		Build()
+
+	return g
 }
 
 // Graft is called when a peer is added to a topic mesh. The tracer uses this to track the mesh peers.
