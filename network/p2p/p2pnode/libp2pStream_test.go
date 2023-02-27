@@ -340,7 +340,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	pInfo, err := utils.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	maxTimeToWait := p2pnode.MaxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
+	maxTimeToWait := p2pnode.MaxConnectAttempt * unicast.MaxRetryJitter * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition

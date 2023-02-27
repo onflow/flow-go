@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-	MaxConnectAttemptSleepDuration = 5
+	// MaxRetryJitter is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+	MaxRetryJitter = 5
 
 	// DefaultRetryDelay Initial delay between failing to establish a connection with another node and retrying. This delay
 	// increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
@@ -217,8 +217,8 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 
 	// create backoff
 	backoff := retry.NewConstant(1000 * time.Millisecond)
-	// add a MaxConnectAttemptSleepDuration*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
-	backoff = retry.WithJitter(MaxConnectAttemptSleepDuration*time.Millisecond, backoff)
+	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
+	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 	// when retries == maxAttempts causing 1 more func invocation than expected.
 	maxRetries := maxAttempts - 1
