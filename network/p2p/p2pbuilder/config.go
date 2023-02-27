@@ -8,7 +8,9 @@ import (
 
 // UnicastConfig configuration parameters for the unicast manager.
 type UnicastConfig struct {
-	StreamRetryInterval    time.Duration // retry interval for attempts on creating a stream to a remote peer.
+	// StreamRetryInterval is the initial delay between failing to establish a connection with another node and retrying. This
+	// delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
+	StreamRetryInterval    time.Duration
 	RateLimiterDistributor p2p.UnicastRateLimiterDistributor
 }
 
