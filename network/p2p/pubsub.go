@@ -50,6 +50,7 @@ type PubSubAdapterConfig interface {
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
 	WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error)
+	WithTracer(t PubSubTracer)
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
@@ -100,4 +101,8 @@ type SubscriptionFilter interface {
 	// FilterIncomingSubscriptions is invoked for all RPCs containing subscription notifications.
 	// It filters and returns the subscriptions of interest to the current node.
 	FilterIncomingSubscriptions(peer.ID, []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error)
+}
+
+type PubSubTracer interface {
+	pubsub.RawTracer
 }
