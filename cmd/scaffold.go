@@ -212,7 +212,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", defaultConfig.NetworkConfig.UnicastRateLimitDryRun, "disable peer disconnects and connections gating when rate limiting peers")
 
 	// unicast manager options
-	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "backoff delay to use when create stream retry is in progress when peer dialing is in progress")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
