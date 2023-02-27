@@ -368,8 +368,10 @@ func (n *Node) RequestPeerUpdate() {
 // Peers are considered not connected if the underlying libp2p host reports the
 // peers as not connected and there are no connections in the connection list.
 // error returns:
-//   - network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
-//     to the peer is not empty. This indicates a bug within libp2p.
+//  - network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
+//  	to the peer is not empty. This would normally indicate a bug within libp2p. Although the network.ErrIllegalConnectionState a bug in libp2p there is a small chance that this error will be returned due
+// 		to a race condition between the time we check Connectedness and ConnsToPeer. There is a chance that a connection could be established
+// 		after we check Connectedness but right before we check ConnsToPeer.
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID)
 	numOfConns := len(n.host.Network().ConnsToPeer(peerID))
