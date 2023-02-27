@@ -207,8 +207,8 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts 
 func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
-	maxAttempts uint64) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-
+	maxAttempts uint64,
+) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	// aggregated retryable errors that occur during retries, errs will be returned
 	// if retry context times out or maxAttempts have been made before a successful retry occurs
 	var errs error
@@ -216,7 +216,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
 
 	// create backoff
-	backoff := retry.NewConstant(1000 * time.Millisecond)
+	backoff := retry.NewConstant(time.Second)
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt

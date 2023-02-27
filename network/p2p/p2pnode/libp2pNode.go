@@ -422,6 +422,5 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 	if n.uniMgr != nil {
 		n.logger.Fatal().Msg("unicast manager already set")
 	}
-
 	n.uniMgr = uniMgr
 }

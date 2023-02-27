@@ -251,7 +251,7 @@ func TestNode_HasSubscription(t *testing.T) {
 	require.False(t, node.HasSubscription(topic))
 }
 
-// TestCreateStream_SinglePairwiseConnection ensures that despite the number of concurrent streams created from peer -> peer only a single
+// TestCreateStream_SinglePairwiseConnection ensures that despite the number of concurrent streams created from peer -> peer, only a single
 // connection will ever be created between two peers on initial peer dialing and subsequent streams will reuse that connection.
 func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
@@ -319,7 +319,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	m.On("OnPeerDialFailure", mock.Anything, 3).Once()
 	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
 		attempts := args.Get(1).(int)
-		// we expect OnCreateStream to be called twice. Once in each separate call to CreateStream. The first call that initializes
+		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
 		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
 		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
 		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
