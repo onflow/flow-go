@@ -13,19 +13,34 @@ type UnicastManagerMetrics struct {
 	mock.Mock
 }
 
-// OnCreateStream provides a mock function with given fields: duration, attempts, result
-func (_m *UnicastManagerMetrics) OnCreateStream(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
+// OnEstablishStreamFailure provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
-// OnCreateStreamToPeer provides a mock function with given fields: duration, attempts, result
-func (_m *UnicastManagerMetrics) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
+// OnPeerDialFailure provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
-// OnDialPeer provides a mock function with given fields: duration, attempts, result
-func (_m *UnicastManagerMetrics) OnDialPeer(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
+// OnPeerDialed provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnPeerDialed(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamCreated provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnStreamCreated(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamCreationFailure provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamEstablished provides a mock function with given fields: duration, attempts
+func (_m *UnicastManagerMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
 type mockConstructorTestingTNewUnicastManagerMetrics interface {

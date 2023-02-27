@@ -245,9 +245,12 @@ func (nc *NoopCollector) AddInflightRequests(context.Context, httpmetrics.HTTPPr
 func (nc *NoopCollector) AddTotalRequests(context.Context, string, string)                     {}
 func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 }
-func (nc *NoopCollector) OnCreateStream(duration time.Duration, attempts int, result string)       {}
-func (nc *NoopCollector) OnDialPeer(duration time.Duration, attempts int, result string)           {}
-func (nc *NoopCollector) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {}
+func (nc *NoopCollector) OnStreamCreated(duration time.Duration, attempts int)          {}
+func (nc *NoopCollector) OnStreamCreationFailure(duration time.Duration, attempts int)  {}
+func (nc *NoopCollector) OnPeerDialed(duration time.Duration, attempts int)             {}
+func (nc *NoopCollector) OnPeerDialFailure(duration time.Duration, attempts int)        {}
+func (nc *NoopCollector) OnStreamEstablished(duration time.Duration, attempts int)      {}
+func (nc *NoopCollector) OnEstablishStreamFailure(duration time.Duration, attempts int) {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

@@ -129,16 +129,6 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
-// OnCreateStream provides a mock function with given fields: duration, attempts, result
-func (_m *NetworkMetrics) OnCreateStream(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
-}
-
-// OnCreateStreamToPeer provides a mock function with given fields: duration, attempts, result
-func (_m *NetworkMetrics) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
-}
-
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *NetworkMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -159,9 +149,9 @@ func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
-// OnDialPeer provides a mock function with given fields: duration, attempts, result
-func (_m *NetworkMetrics) OnDialPeer(duration time.Duration, attempts int, result string) {
-	_m.Called(duration, attempts, result)
+// OnEstablishStreamFailure provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
 // OnGraftReceived provides a mock function with given fields: count
@@ -194,6 +184,16 @@ func (_m *NetworkMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnPeerDialFailure provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnPeerDialed provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnPeerDialed(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
 // OnPruneReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
@@ -207,6 +207,21 @@ func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
 // OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
 func (_m *NetworkMetrics) OnRateLimitedPeer(pid peer.ID, role string, msgType string, topic string, reason string) {
 	_m.Called(pid, role, msgType, topic, reason)
+}
+
+// OnStreamCreated provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnStreamCreated(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamCreationFailure provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamEstablished provides a mock function with given fields: duration, attempts
+func (_m *NetworkMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense

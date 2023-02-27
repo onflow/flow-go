@@ -20,10 +20,10 @@ type UnicastManagerMetrics struct {
 	dialPeerAttempts *prometheus.HistogramVec
 	// dialPeerDuration tracks the time it takes to dial a peer and establish a connection.
 	dialPeerDuration *prometheus.HistogramVec
-	// createStreamToPeerAttempts tracks the number of retry attempts to create the stream after peer dialing completes and a connection is established.
-	createStreamToPeerAttempts *prometheus.HistogramVec
-	// createStreamToPeerDuration tracks the time it takes to create the stream after peer dialing completes and a connection is established.
-	createStreamToPeerDuration *prometheus.HistogramVec
+	// establishStreamOnConnAttempts tracks the number of retry attempts to create the stream after peer dialing completes and a connection is established.
+	establishStreamOnConnAttempts *prometheus.HistogramVec
+	// establishStreamOnConnDuration tracks the time it takes to create the stream after peer dialing completes and a connection is established.
+	establishStreamOnConnDuration *prometheus.HistogramVec
 
 	prefix string
 }
@@ -40,7 +40,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Name:      uc.prefix + "create_stream_attempts",
 			Help:      "number of retry attempts before stream created successfully",
 			Buckets:   []float64{1, 2, 3},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
 	uc.createStreamDuration = promauto.NewHistogramVec(
@@ -50,7 +50,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Name:      uc.prefix + "create_stream_duration",
 			Help:      "the amount of time it takes to create a stream successfully",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
 	uc.dialPeerAttempts = promauto.NewHistogramVec(
@@ -60,7 +60,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Name:      uc.prefix + "dial_peer_attempts",
 			Help:      "number of retry attempts before a peer is dialed successfully",
 			Buckets:   []float64{1, 2, 3},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
 	uc.dialPeerDuration = promauto.NewHistogramVec(
@@ -70,47 +70,68 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Name:      uc.prefix + "dial_peer_duration",
 			Help:      "the amount of time it takes to dial a peer during stream creation",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
-	uc.createStreamToPeerAttempts = promauto.NewHistogramVec(
+	uc.establishStreamOnConnAttempts = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "create_stream_to_peer_attempts",
 			Help:      "number of retry attempts before a stream is created on the available connection between two peers",
 			Buckets:   []float64{1, 2, 3},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
-	uc.createStreamToPeerDuration = promauto.NewHistogramVec(
+	uc.establishStreamOnConnDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "create_stream_to_peer_duration",
 			Help:      "the amount of time it takes to create a stream on the available connection between two peers",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
-		}, []string{LabelResult},
+		}, []string{LabelSuccess},
 	)
 
 	return uc
 }
 
-// OnCreateStream tracks the overall time it takes to create a stream successfully and the number of retry attempts.
-func (u *UnicastManagerMetrics) OnCreateStream(duration time.Duration, attempts int, result string) {
-	u.createStreamAttempts.WithLabelValues(result).Observe(float64(attempts))
-	u.createStreamDuration.WithLabelValues(result).Observe(duration.Seconds())
+// OnStreamCreated tracks the overall time taken to create a stream successfully and the number of retry attempts.
+func (u *UnicastManagerMetrics) OnStreamCreated(duration time.Duration, attempts int) {
+	u.createStreamAttempts.WithLabelValues("true").Observe(float64(attempts))
+	u.createStreamDuration.WithLabelValues("true").Observe(duration.Seconds())
 }
 
-// OnDialPeer tracks the time it takes to dial a peer during stream creation and the number of retry attempts.
-func (u *UnicastManagerMetrics) OnDialPeer(duration time.Duration, attempts int, result string) {
-	u.dialPeerAttempts.WithLabelValues(result).Observe(float64(attempts))
-	u.dialPeerDuration.WithLabelValues(result).Observe(duration.Seconds())
+// OnStreamCreationFailure tracks the overall time taken and number of retry attempts used when the unicast manager fails to create a stream.
+func (u *UnicastManagerMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
+	u.createStreamAttempts.WithLabelValues("false").Observe(float64(attempts))
+	u.createStreamDuration.WithLabelValues("false").Observe(duration.Seconds())
 }
 
-// OnCreateStreamToPeer tracks the time it takes to create a stream on the available open connection during stream
+// OnPeerDialed tracks the time it takes to dial a peer during stream creation and the number of retry attempts before a peer
+// is dialed successfully.
+func (u *UnicastManagerMetrics) OnPeerDialed(duration time.Duration, attempts int) {
+	u.dialPeerAttempts.WithLabelValues("true").Observe(float64(attempts))
+	u.dialPeerDuration.WithLabelValues("true").Observe(duration.Seconds())
+}
+
+// OnPeerDialFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot dial a peer
+// to establish the initial connection between the two.
+func (u *UnicastManagerMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
+	u.dialPeerAttempts.WithLabelValues("false").Observe(float64(attempts))
+	u.dialPeerDuration.WithLabelValues("false").Observe(duration.Seconds())
+}
+
+// OnStreamEstablished tracks the time it takes to create a stream successfully on the available open connection during stream
 // creation and the number of retry attempts.
-func (u *UnicastManagerMetrics) OnCreateStreamToPeer(duration time.Duration, attempts int, result string) {
-	u.createStreamToPeerAttempts.WithLabelValues(result).Observe(float64(attempts))
-	u.createStreamToPeerDuration.WithLabelValues(result).Observe(duration.Seconds())
+func (u *UnicastManagerMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
+	u.establishStreamOnConnAttempts.WithLabelValues("true").Observe(float64(attempts))
+	u.establishStreamOnConnDuration.WithLabelValues("true").Observe(duration.Seconds())
+}
+
+// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
+// a stream on the open connection between two peers.
+func (u *UnicastManagerMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
+	u.establishStreamOnConnAttempts.WithLabelValues("false").Observe(float64(attempts))
+	u.establishStreamOnConnDuration.WithLabelValues("false").Observe(duration.Seconds())
 }

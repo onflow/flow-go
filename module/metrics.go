@@ -83,13 +83,22 @@ type GossipSubRouterMetrics interface {
 
 // UnicastManagerMetrics unicast manager metrics.
 type UnicastManagerMetrics interface {
-	// OnCreateStream tracks the overall time it takes to create a stream successfully and the number of retry attempts.
-	OnCreateStream(duration time.Duration, attempts int, result string)
-	// OnDialPeer tracks the time it takes to dial a peer during stream creation and the number of retry attempts.
-	OnDialPeer(duration time.Duration, attempts int, result string)
-	// OnCreateStreamToPeer tracks the time it takes to create a stream on the available open connection during stream
+	// OnStreamCreated tracks the overall time it takes to create a stream successfully and the number of retry attempts.
+	OnStreamCreated(duration time.Duration, attempts int)
+	// OnStreamCreationFailure tracks the amount of time taken and number of retry attempts used when the unicast manager fails to create a stream.
+	OnStreamCreationFailure(duration time.Duration, attempts int)
+	// OnPeerDialed tracks the time it takes to dial a peer during stream creation and the number of retry attempts before a peer
+	// is dialed successfully.
+	OnPeerDialed(duration time.Duration, attempts int)
+	// OnPeerDialFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot dial a peer
+	// to establish the initial connection between the two.
+	OnPeerDialFailure(duration time.Duration, attempts int)
+	// OnStreamEstablished tracks the time it takes to create a stream successfully on the available open connection during stream
 	// creation and the number of retry attempts.
-	OnCreateStreamToPeer(duration time.Duration, attempts int, result string)
+	OnStreamEstablished(duration time.Duration, attempts int)
+	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
+	// a stream on the open connection between two peers.
+	OnEstablishStreamFailure(duration time.Duration, attempts int)
 }
 
 type LibP2PMetrics interface {
