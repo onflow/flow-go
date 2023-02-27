@@ -209,8 +209,8 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts 
 func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
-	maxAttempts uint64) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-
+	maxAttempts uint64,
+) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	// aggregated retryable errors that occur during retries, errs will be returned
 	// if retry context times out or maxAttempts have been made before a successful retry occurs
 	var errs error
