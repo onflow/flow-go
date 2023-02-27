@@ -325,22 +325,12 @@ func BLSInvalidSignature() Signature {
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	sk := newPrKeyBLSBLS12381(nil)
 
-	read := C.Fr_star_read_bytes(
-		(*C.Fr)(&sk.scalar),
-		(*C.uchar)(&privateKeyBytes[0]),
-		(C.int)(prKeyLengthBLSBLS12381))
+	err := readScalarFrStar(&sk.scalar, privateKeyBytes)
 
-	switch int(read) {
-	case blst_valid:
-		return sk, nil
-	case blst_bad_encoding:
-		return nil, invalidInputsErrorf("input length must be %d, got %d",
-			prKeyLengthBLSBLS12381, len(privateKeyBytes))
-	case blst_bad_scalar:
-		return nil, invalidInputsErrorf("the private key is not in the correct range for the BLS12-381 curve")
-	default:
-		return nil, invalidInputsErrorf("reading the private key failed")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the private key: %w", err)
 	}
+	return sk, nil
 }
 
 // decodePublicKey decodes a slice of bytes into a public key.

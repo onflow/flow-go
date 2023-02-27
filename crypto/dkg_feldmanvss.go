@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
@@ -287,10 +286,10 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		if i-1 == s.myIndex {
 			xdata := make([]byte, shareSize)
 			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
-			C.bn_read_bin((*C.Fr)(&s.x),
-				(*C.uchar)(&xdata[0]),
-				PrKeyLenBLSBLS12381,
-			)
+			err := readScalarFrStar(&s.x, xdata)
+			if err != nil {
+				return fmt.Errorf("unexpected error when generating the dealer's own share: %w", err)
+			}
 			continue
 		}
 		// the-other-participant shares
@@ -349,13 +348,11 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	// read the participant private share
-	if C.Fr_read_bytes((*C.Fr)(&s.x),
-		(*C.uchar)(&data[0]),
-		PrKeyLenBLSBLS12381,
-	) != valid {
+	err := readScalarFrStar(&s.x, data)
+	if err != nil {
 		s.validKey = false
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("invalid share value %x", data))
+			fmt.Sprintf("invalid share value %x: %s", data, err))
 		return
 	}
 
@@ -454,4 +451,3 @@ func (s *feldmanVSSstate) computePublicKeys() {
 		(*C.ep2_st)(&s.vA[0]), (C.int)(len(s.vA)),
 	)
 }
-*/

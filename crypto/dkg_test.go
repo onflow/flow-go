@@ -8,21 +8,20 @@ import (
 	mrand "math/rand"
 	"sync"
 	"testing"
-	_ "time"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	_ "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 )
 
 var gt *testing.T
 
-/*
 func TestDKG(t *testing.T) {
 	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
-	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
-	t.Run("JointFeldman", testJointFeldman)
-}*/
+	//t.Run("FeldmanVSSQual", testFeldmanVSSQual)
+	//t.Run("JointFeldman", testJointFeldman)
+}
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
 // assuming the protocol requires:
@@ -33,7 +32,6 @@ func optimalThreshold(size int) int {
 	return (size - 1) / 2
 }
 
-/*
 // Testing the happy path of Feldman VSS by simulating a network of n participants
 func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -44,7 +42,7 @@ func testFeldmanVSSSimple(t *testing.T) {
 			dkgCommonTest(t, feldmanVSS, n, threshold, happyPath)
 		})
 	}
-}*/
+}
 
 type testCase int
 
@@ -135,12 +133,12 @@ func testJointFeldman(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, duplicatedMessages)
 	})
 }
-
+*/
 // Supported Key Generation protocols
 const (
 	feldmanVSS = iota
-	feldmanVSSQual
-	jointFeldman
+	/*feldmanVSSQual
+	jointFeldman*/
 )
 
 func newDKG(dkg int, size int, threshold int, myIndex int,
@@ -148,10 +146,10 @@ func newDKG(dkg int, size int, threshold int, myIndex int,
 	switch dkg {
 	case feldmanVSS:
 		return NewFeldmanVSS(size, threshold, myIndex, processor, dealerIndex)
-	case feldmanVSSQual:
+	/*case feldmanVSSQual:
 		return NewFeldmanVSSQual(size, threshold, myIndex, processor, dealerIndex)
 	case jointFeldman:
-		return NewJointFeldman(size, threshold, myIndex, processor)
+		return NewJointFeldman(size, threshold, myIndex, processor)*/
 	default:
 		return nil, fmt.Errorf("non supported protocol")
 	}
@@ -173,11 +171,12 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	// number of dealers in the protocol
 	var dealers int
-	if dkg == jointFeldman {
+	/*if dkg == jointFeldman {
 		dealers = n
 	} else {
 		dealers = 1
-	}
+	}*/
+	dealers = 1
 
 	// create n processors for all participants
 	processors := make([]testDKGProcessor, 0, n)
@@ -349,8 +348,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		assert.Equal(t, expected, processors[i].disqualified)
 	}
 	// check if DKG is successful
-	if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
-		(dkg == feldmanVSSQual && r1 == 1) { // case of a single dealer
+	if false { //(dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
+		//(dkg == feldmanVSSQual && r1 == 1) { // case of a single dealer
 		t.Logf("dkg failed, there are %d disqualified participants\n", r1)
 		// DKG failed, check for final errors
 		for i := r1; i < n; i++ {
@@ -442,7 +441,7 @@ func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) 
 			}(i)
 		}
 	}
-}*/
+}
 
 // implements DKGProcessor interface
 type testDKGProcessor struct {

@@ -159,7 +159,7 @@ func mapToZr(x *scalar, src []byte) bool {
 	return false
 }
 
-// writeScalar writes a G2 point in a slice of bytes
+// writeScalar writes a scalar in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
 	C.Fr_write_bytes((*C.uchar)(&dest[0]), (*C.Fr)(x))
 }
@@ -182,6 +182,28 @@ func writePointG1(dest []byte, a *pointG1) {
 		(*C.ep_st)(a),
 		(C.int)(signatureLengthBLSBLS12381),
 	)
+}
+
+// read an Fr* element from a byte slice
+// and stores it into a `scalar` type element.
+func readScalarFrStar(a *scalar, src []byte) error {
+	read := C.Fr_star_read_bytes(
+		(*C.Fr)(a),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)))
+
+	switch int(read) {
+	case blst_valid:
+		return nil
+	case blst_bad_encoding:
+		return invalidInputsErrorf("input length must be %d, got %d",
+			frBytesLen, len(src))
+	case blst_bad_scalar:
+		return invalidInputsErrorf("scalar is not in the correct range w.r.t the BLS12-381 curve")
+	default:
+		return invalidInputsErrorf("reading the scalar failed")
+	}
+
 }
 
 // readPointG2 reads a G2 point from a slice of bytes

@@ -404,13 +404,11 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		return
 	}
 	// read the participant private share
-	if C.Fr_read_bytes((*C.Fr)(&s.x),
-		(*C.uchar)(&data[0]),
-		PrKeyLenBLSBLS12381,
-	) != valid {
+	err := readScalarFrStar(&s.x, data)
+	if err != nil {
 		s.buildAndBroadcastComplaint()
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("invalid share value %x", data))
+			fmt.Sprintf("invalid share value %x: %s", data, err))
 		return
 	}
 
@@ -626,13 +624,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
-		if C.Fr_read_bytes((*C.Fr)(&s.complaints[complainer].answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&s.complaints[complainer].answer, data[1])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		return
@@ -649,13 +645,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		if C.Fr_read_bytes((*C.Fr)(&c.answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&c.answer, data[1])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		if s.vAReceived {
