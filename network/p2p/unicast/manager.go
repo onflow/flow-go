@@ -27,8 +27,8 @@ import (
 const (
 	MaxConnectAttemptSleepDuration = 5
 
-	// DefaultRetryDelay is the default initial delay used in the exponential backoff create stream retries while
-	// waiting for dialing to peer to be complete
+	// Initial delay between failing to establish a connection with another node and retrying. This delay
+	// increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
 	DefaultRetryDelay = 1 * time.Second
 
 	failed  = "failed"
