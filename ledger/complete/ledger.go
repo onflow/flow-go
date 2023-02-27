@@ -172,29 +172,6 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	return value, nil
 }
 
-// GetSingleValueFromStorage reads value of a single given key at the given state from storage
-func (l *Ledger) GetSingleValueFromStorage(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
-	start := time.Now()
-	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
-	if err != nil {
-		return nil, err
-	}
-	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
-	value, err = l.forest.ReadSingleValue(trieRead, l.payloadStorage)
-	if err != nil {
-		return nil, fmt.Errorf("could not get value: %w", err)
-	}
-
-	l.metrics.ReadValuesNumber(1)
-	readDuration := time.Since(start)
-	l.metrics.ReadDuration(readDuration)
-
-	durationPerValue := time.Duration(readDuration.Nanoseconds()) * time.Nanosecond
-	l.metrics.ReadDurationPerItem(durationPerValue)
-
-	return value, nil
-}
-
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {

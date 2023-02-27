@@ -22,7 +22,7 @@ func NewPayloadStorage(store ledger.Storage) *PayloadStorage {
 func (s *PayloadStorage) Get(hash hash.Hash) (ledger.Path, *ledger.Payload, error) {
 	value, err := s.storage.Get(hash)
 	if err != nil {
-		return ledger.DummyPath, nil, fmt.Errorf("could not get by hash: %w", err)
+		return ledger.DummyPath, nil, fmt.Errorf("could not get payload by hash: %w", err)
 	}
 
 	path, payload, err := DecodePayload(value)
