@@ -546,7 +546,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		r := int64(1677308758239641000) //time.Now().UnixNano()
+		r := time.Now().UnixNano()
 		mrand.Seed(r)
 		t.Log(r)
 		seed := make([]byte, SeedMinLenDKG)
@@ -607,7 +607,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 	}
 }
 
-/*func BenchmarkSimpleKeyGen(b *testing.B) {
+func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
 	_, _ = rand.Read(seed)
@@ -616,6 +616,33 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)
 	}
 	b.StopTimer()
-}*/
+}
 
-// TODO: add benchmark for signature reconstruction
+func BenchmarkSignatureReconstruction(b *testing.B) {
+	n := 60
+	seed := make([]byte, SeedMinLenDKG)
+	_, _ = rand.Read(seed)
+	threshold := 40
+	// generate threshold keys
+	skShares, _, _, err := BLSThresholdKeyGen(n, threshold, seed)
+	require.NoError(b, err)
+	// signature hasher
+	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
+	// generate signature shares
+	signShares := make([]Signature, 0, threshold+1)
+	signers := make([]int, 0, threshold+1)
+	// create (t+1) signatures of the first randomly chosen signers
+	for i := 0; i < threshold+1; i++ {
+		signers = append(signers, i)
+		share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+		require.NoError(b, err)
+		signShares = append(signShares, share)
+	}
+	// reconstruct
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers)
+		require.NoError(b, err)
+	}
+	b.StopTimer()
+}

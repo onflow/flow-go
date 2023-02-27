@@ -10,7 +10,7 @@ extern prec_st* bls_prec;
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
 // and converted to the Mongtomery domain. 
 // Copyright 2019 Riad S. Wahby
-const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS] = {
+const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_LIMBS] = {
     {0x4d18b6f3af00131c, 0x19fa219793fee28c, 0x3f2885f1467f19ae,
      0x23dcea34f2ffb304, 0xd15b58d2ffc00054, 0x0913be200a20bef4,},
     {0x898985385cdbbd8b, 0x3c79e43cc7d966aa, 0x1597e193f4cd233a,
@@ -37,7 +37,7 @@ const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS] = {
      0x464170142a1009eb, 0xb14f01aadb30be2f, 0x18ae6a856f40715d,},
 };
 
-const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
+const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_LIMBS] = {
     {0x2b567ff3e2837267, 0x1d4d9e57b958a767, 0xce028fea04bd7373,
      0xcc31a30a0b6cd3df, 0x7d7b18a682692693, 0x0d300744d42a0310,},
     {0x99c2555fa542493f, 0xfe7f53cc4874f878, 0x5df0608b8f97608a,
@@ -335,12 +335,4 @@ void map_to_G1(ep_t h, const byte* data, const int len) {
     #elif hashToPoint==RELIC_SSWU
     ep_map_from_field(h, data, len);
     #endif
-
-    /*Fr a, b;
-    Fr_set_limb(&a, 1);
-    Fr_print_("a", &a);
-    Fr_inv_montg_eucl(&b,&a);
-    Fr_print_("b", &b);
-    Fr_from_montg(&b, &b);
-    Fr_print_("b", &b); */  
 }

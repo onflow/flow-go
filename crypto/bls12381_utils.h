@@ -15,20 +15,20 @@
 #define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
-#define BITS_TO_DIGITS(x) ((x+63)>>6)
-#define BYTES_TO_DIGITS(x) ((x+7)>>3)
-#define DIGITS_TO_BYTES(x) ((x)<<3)
+#define BITS_TO_LIMBS(x) ((x+63)>>6)
+#define BYTES_TO_LIMBS(x) ((x+7)>>3)
+#define LIMBS_TO_BYTES(x) ((x)<<3)
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
 #define SEC_BITS  128
 #define Fp_BITS   381
 #define Fp2_BYTES (2*Fp_BYTES)
-#define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
-#define Fp_BYTES  DIGITS_TO_BYTES(Fp_DIGITS) // BLST implements Fp as a limb array
+#define Fp_LIMBS  BITS_TO_LIMBS(Fp_BITS)
+#define Fp_BYTES  LIMBS_TO_BYTES(Fp_LIMBS) // BLST implements Fp as a limb array
 #define Fr_BITS   255
-#define Fr_DIGITS BITS_TO_DIGITS(Fr_BITS)
-#define Fr_BYTES  DIGITS_TO_BYTES(Fr_DIGITS) // BLST implements Fr as a limb array
+#define Fr_LIMBS  BITS_TO_LIMBS(Fr_BITS)
+#define Fr_BYTES  LIMBS_TO_BYTES(Fr_LIMBS) // BLST implements Fr as a limb array
 
 #define G1_BYTES (2*Fp_BYTES)
 #define G2_BYTES (2*Fp2_BYTES)
@@ -92,20 +92,23 @@ int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 void     map_to_G1(ep_t, const byte*, const int);
 
 // Fr utilities
+extern const Fr BLS12_381_rR;
 bool_t      Fr_is_zero(const Fr* a);
 bool_t      Fr_is_equal(const Fr* a, const Fr* b);
 void        Fr_set_limb(Fr*, const limb_t);
-void        Fr_copy(Fr*, Fr*);
+void        Fr_copy(Fr*, const Fr*);
 void        Fr_set_zero(Fr*);
 void        Fr_add(Fr *res, const Fr *a, const Fr *b);
 void        Fr_sub(Fr *res, const Fr *a, const Fr *b);
 void        Fr_neg(Fr *res, const Fr *a);
 void        Fr_sum_vector(Fr*, const Fr x[], const int);
 void        Fr_mul_montg(Fr *res, const Fr *a, const Fr *b);
+void        Fr_squ_montg(Fr *res, const Fr *a);
 void        Fr_to_montg(Fr *res, const Fr *a);
 void        Fr_from_montg(Fr *res, const Fr *a);
+void        Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len);
 void        Fr_inv_montg_eucl(Fr *res, const Fr *a);
-void        Fr_inv_montg_expo(Fr *res, const Fr *a);
+void        Fr_inv_exp_montg(Fr *res, const Fr *a);
 BLST_ERROR  Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
 BLST_ERROR  Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
 void        Fr_write_bytes(uint8_t *bin, const Fr* a);

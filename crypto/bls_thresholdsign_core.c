@@ -16,23 +16,16 @@ static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t ind
     Fr denominator; // eventually would represent D*R^k 
 
     // Initialize N and D to Montgomery constant R
-    // TODO: hardcode R and add Fr_copy function
-    Fr_copy(&numerator, (Fr*)BLS12_381_rRR);
-    Fr_copy(&denominator, (Fr*)BLS12_381_rRR);
-    Fr_from_montg(&numerator, &numerator);
-    Fr_from_montg(&denominator, &denominator);
+    // TODO: hardcode R
+    Fr_copy(&numerator, &BLS12_381_rR);
+    Fr_copy(&denominator, &BLS12_381_rR);
 
-    // sign of D: 1 for positive and 0 for negative
-    int sign = 1; 
+    // sign of D: 0 for positive and 1 for negative
+    int sign = 0; 
 
     // the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < 2^64 (approximately 64/MAX_IND_BITS)
     // this means we can multiply up to (k) indices in a limb (64 bits) without overflowing.
     #define MAX_IND_LOOPS   64/MAX_IND_BITS
-
-    // choose inversion algorithm used for denominator
-    #define FERMAT_INVERSION 0
-    #define EUCLIDEAN_INVERSION (FERMAT_INVERSION^1)
-
     const int loops = MAX_IND_LOOPS;
     int k,j = 0;
     Fr tmp;
@@ -50,46 +43,25 @@ static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t ind
             }
             limb_numerator *= indices[j];
         }
+        // numerator and denominator are both computed in Montgomery form.
         // update numerator
         Fr_set_limb(&tmp, limb_numerator); // L_N
-        #if EUCLIDEAN_INVERSION == 1 
-            // numerator and denominator are both computed in Montgomery form.
-            Fr_to_montg(&tmp, &tmp);  // L_N*R
-        #endif
+        Fr_to_montg(&tmp, &tmp);  // L_N*R
         Fr_mul_montg(&numerator, &numerator, &tmp); // N*R
         // update denominator
         Fr_set_limb(&tmp, limb_denominator); // L_D
-        #if EUCLIDEAN_INVERSION == 1 
-            // keep numertaor and denominator are both computed in Montgomery form.
-            Fr_to_montg(&tmp, &tmp);  // L_D*R
-        #endif
+        Fr_to_montg(&tmp, &tmp);  // L_D*R
         Fr_mul_montg(&denominator, &denominator, &tmp); // D*R
-        //printf("%d--%lld--%lld\n", sign, limb_numerator, limb_denominator);
     }
-    if (!sign) {
+    if (sign) {
         Fr_neg(&denominator, &denominator);
     }
 
-    #if EUCLIDEAN_INVERSION == 1 
-        // at this point, denominator = D*R , numertaor = N*R
-        // inversion  
-        Fr_inv_montg_eucl(&denominator, &denominator); // (DR)^(-1)*R = D^(-1)
-        Fr_mul_montg(res, &numerator, &denominator); // N*D^(-1)     
-    #endif
-
-    //printf("%d:LI(%d):\n", i, indices[i]);
-    //Fr_print_("res", res);
-
-     #if FERMAT_INVERSION == 1 
-        // at this point, denominator = D*R^c , numertaor = N*R^c  
-        // (c is the nummber of mult_mont, but the exact value isn't relevant)
-        // inversion inv(xR) = x^(-1)R
-        Fr_inv_montg_expo(&denominator, &denominator); // inv(D*R^c) = inv(D*R^(c-1)*R) = D^(-1)*R^(1-c)*R
-        Fr_mul_montg(&numerator, &numerator, &denominator); //N*D^(-1)*R
-        Fr_from_montg(res, &numerator); //N*D^(-1)
-    #endif
+    // at this point, denominator = D*R , numertaor = N*R
+    // inversion inv(x) = x^(-1)R
+    Fr_inv_montg_eucl(&denominator, &denominator); // (DR)^(-1)*R = D^(-1)
+    Fr_mul_montg(res, &numerator, &denominator); // N*D^(-1)     
 }
-
 
 // Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the indices [indices(0)..indices(t)] 
 // and their G1 images [shares(0)..shares(t)], and stores the resulting G1 point in `dest`.

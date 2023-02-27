@@ -24,10 +24,4 @@ typedef POINTonE1 G1;
 // Subroup G1 in E2
 typedef POINTonE2 G2;
 
-
-// extra functions and tools that are needed by the Flow crypto library 
-// and that are not exported in the desired form by BLST
-
-void pow256_from_be_bytes(pow256 ret, const unsigned char a[32]);
-
 #endif

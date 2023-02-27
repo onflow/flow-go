@@ -24,6 +24,16 @@ int get_Fr_BYTES() {
 }
 
 // Fr utilities
+// Montgomery constant R related to the curve order r
+const Fr BLS12_381_rR = (Fr){  /* (1<<256)%r */
+    TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5),
+    TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
+};
+
+/*0x1824b159acc5056f
+0x998c4fefecbc4ff5
+0x5884b7fa00034802
+0x00000001fffffffe*/
 
 // TODO: temp utility function to delete
 bn_st* Fr_blst_to_relic(const Fr* x) {
@@ -51,7 +61,7 @@ void Fr_set_limb(Fr* a, const limb_t l){
     *((limb_t*)a) = l;
 }
 
-void Fr_copy(Fr* res, Fr* a) {
+void Fr_copy(Fr* res, const Fr* a) {
     vec_copy((byte*)res, (byte*)a, Fr_BYTES);
 }
 
@@ -72,19 +82,26 @@ void Fr_neg(Fr *res, const Fr *a) {
     cneg_mod_256((limb_t*)res, (limb_t*)a, 1, BLS12_381_r);
 }
 
+// res = a*b*R^(-1)
 void Fr_mul_montg(Fr *res, const Fr *a, const Fr *b) {
     mul_mont_sparse_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r, r0);
 }
 
+// res = a^2 * R^(-1)
+void Fr_squ_montg(Fr *res, const Fr *a) {
+    sqr_mont_sparse_256((limb_t*)res, (limb_t*)a, BLS12_381_r, r0);
+}
+
+// res = a*R
 void Fr_to_montg(Fr *res, const Fr *a) {
     mul_mont_sparse_256((limb_t*)res, (limb_t*)a, BLS12_381_rRR, BLS12_381_r, r0);
 }
 
+// res = a*R^(-1)
 void Fr_from_montg(Fr *res, const Fr *a) {
     from_mont_256((limb_t*)res, (limb_t*)a, BLS12_381_r, r0);
 }
 
-// result is in Montgomery form
 // res = a^(-1)*R
 void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
     // copied and modified from BLST code
@@ -98,8 +115,49 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
     redc_mont_256((limb_t*)res, temp, BLS12_381_r, r0);
 }
 
-void Fr_inv_montg_expo(Fr *res, const Fr *a) {
-    // TODO:
+// result is in Montgomery form if base is in montgomery form
+// if base = b*R, res = b^expo * R
+// In general, res = base^expo * R^(-expo+1)
+// `expo` is encoded as a little-endian limb_t table of length `expo_len`.
+void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
+    // mask of the most significant bit
+	const limb_t msb_mask =  (limb_t)1<<((sizeof(limb_t)<<3)-1);
+	limb_t mask = msb_mask;
+	int index = 0;
+
+    expo += expo_len;
+	// Treat most significant zero limbs
+	while((index < expo_len) && (*(--expo) == 0)) {
+		index++;
+    }
+	// Treat the most significant zero bits
+	while((*expo & mask) == 0) {
+		mask >>= 1;
+    }
+	// Treat the first `1` bit
+	Fr_copy(res, base);
+	mask >>= 1;
+	// Scan all limbs of the exponent
+	for ( ; index < expo_len; expo--) {
+		// Scan all bits 
+		for ( ; mask != 0 ; mask >>= 1 ) {
+			// square
+			Fr_squ_montg(res, res);
+			// multiply
+			if (*expo & mask) {
+				Fr_mul_montg(res, res ,base);
+			}
+		}
+		mask = msb_mask;
+        index++;
+	}
+}
+
+void Fr_inv_exp_montg(Fr *res, const Fr *a) {
+    Fr r_2;
+    Fr_copy(&r_2, (Fr*)BLS12_381_r);
+    r_2.limbs[0] -= 2;
+    Fr_exp_montg(res, a, (limb_t*)&r_2, 4);
 }
 
 // computes the sum of the array elements and writes the sum in jointx
@@ -107,6 +165,24 @@ void Fr_sum_vector(Fr* jointx, const Fr x[], const int len) {
     Fr_set_zero(jointx);
     for (int i=0; i<len; i++) {
         Fr_add(jointx, jointx, &x[i]);
+    }
+}
+
+// internal type of BLST `pow256` uses bytes little endian.
+// input is bytes big endian as used by Flow crypto lib external scalars.
+static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
+{
+    unsigned char* b = (unsigned char*)a + Fr_BYTES - 1;
+    if ((uptr_t)ret == (uptr_t)a) { // swap in place
+        for (int i=0; i<Fr_BYTES/2; i++) {
+            unsigned char tmp = *ret;
+            *(ret++) = *b;
+            *(b--) = tmp;
+        }
+        return;
+    }
+    for (int i=0; i<Fr_BYTES; i++) {
+        *(ret++) = *(b--);
     }
 }
 
@@ -195,12 +271,12 @@ prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
 #if (hashToPoint == LOCAL_SSWU)
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
+extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_LIMBS];
+extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_LIMBS];
 #endif
 
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
-extern const uint64_t beta_data[Fp_DIGITS];
+extern const uint64_t beta_data[Fp_LIMBS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
 
@@ -211,7 +287,7 @@ void precomputed_data_set(const prec_st* p) {
 
 // Reads a prime field element from a digit vector in big endian format.
 // There is no conversion to Montgomery domain in this function.
- #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_DIGITS)
+ #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
 
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
@@ -238,7 +314,7 @@ prec_st* init_precomputed_data_BLS12_381() {
 
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_new(&bls_prec->beta);
-    bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
+    bn_read_raw(&bls_prec->beta, beta_data, Fp_LIMBS);
     bn_new(&bls_prec->z2_1_by3);
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
@@ -329,8 +405,8 @@ void bytes_print_(char* s, byte* data, int len) {
 
 void Fr_print_(char* s, Fr* a) {
     printf("[%s]:\n", s);
-    limb_t* p = (limb_t*)(a) + Fr_DIGITS;
-    for (int i=0; i<Fr_DIGITS; i++) 
+    limb_t* p = (limb_t*)(a) + Fr_LIMBS;
+    for (int i=0; i<Fr_LIMBS; i++) 
         printf("%16llx", *(--p));
     printf("\n");
 }
@@ -832,7 +908,7 @@ int simple_subgroup_check_G2(const ep2_t p){
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 // beta such that beta^3 == 1 mod p
 // beta is in the Montgomery form
-const uint64_t beta_data[Fp_DIGITS] = { 
+const uint64_t beta_data[Fp_LIMBS] = { 
     0xcd03c9e48671f071, 0x5dab22461fcda5d2, 0x587042afd3851b95,
     0x8eb60ebe01bacb9e, 0x03f97d6e83d050d2, 0x18f0206554638741,
 };
@@ -849,7 +925,7 @@ int bowe_subgroup_check_G1(const ep_t p){
     if (ep_is_infty(p) == 1) 
         return VALID;
     fp_t b;
-    dv_copy(b, beta_data, Fp_DIGITS); 
+    dv_copy(b, beta_data, Fp_LIMBS); 
     ep_t sigma, sigma2, p_inv;
     ep_new(sigma);
     ep_new(sigma2);

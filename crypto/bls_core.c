@@ -108,13 +108,11 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 
     fp12_t pair;
     fp12_new(&pair);
-    if (core_get()->code != RLC_OK) printf("EUUUUUUUU\n");
     // double pairing with Optimal Ate 
     pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
 
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
-
 
 #elif SINGLE_PAIRING   
     fp12_t pair1, pair2;
