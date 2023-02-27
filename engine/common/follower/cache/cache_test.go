@@ -1,14 +1,14 @@
 package cache
 
 import (
-	"go.uber.org/atomic"
-	"golang.org/x/exp/slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/engine/common/follower/cache/mock"
 	"github.com/onflow/flow-go/model/flow"
