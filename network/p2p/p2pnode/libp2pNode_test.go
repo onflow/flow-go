@@ -319,7 +319,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	m.On("OnDialPeer", mock.Anything, 3, "failed").Once()
 	m.On("OnCreateStream", mock.Anything, mock.Anything, "failed").Twice().Run(func(args mock.Arguments) {
 		attempts := args.Get(1).(int)
-		// we expect OnCreateStream to be called twice. Once in each separate call to CreateStream. The first call that initializes
+		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
 		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
 		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
 		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
