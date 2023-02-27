@@ -603,7 +603,7 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					dht.BootstrapPeers(pis...),
 				)
 			}).
-			SetStreamCreationUpdateInterval(builder.UnicastCreateStreamRetryDelay).
+			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			Build()
 
 		if err != nil {

@@ -431,7 +431,7 @@ func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOpt
 
 func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
-		nb.SetStreamCreationUpdateInterval(delay)
+		nb.SetStreamCreationRetryInterval(delay)
 	}
 }
 
@@ -456,7 +456,7 @@ func generateLibP2PNode(t *testing.T,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
-		SetStreamCreationUpdateInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
 
 	for _, opt := range opts {
 		opt(builder)

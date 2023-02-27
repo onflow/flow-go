@@ -107,7 +107,7 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetResourceManager(testutils.NewResourceManager(t)).
-		SetStreamCreationUpdateInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
 
 	for _, opt := range opts {
 		opt(builder)
