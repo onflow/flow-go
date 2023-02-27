@@ -30,14 +30,16 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // As soon as a valid fork of certified blocks descending from the latest finalized block we pass this information to caller.
 // Internally, the mempool utilizes the LevelledForest.
 type PendingTree struct {
-	forest            *forest.LevelledForest
-	lock              sync.RWMutex
-	lastFinalizedID   flow.Identifier
-	lastFinalizedView uint64
+	forest          *forest.LevelledForest
+	lock            sync.RWMutex
+	lastFinalizedID flow.Identifier
 }
 
-func NewPendingTree() *PendingTree {
-	return &PendingTree{}
+func NewPendingTree(finalized *flow.Header) *PendingTree {
+	return &PendingTree{
+		forest:          forest.NewLevelledForest(finalized.View),
+		lastFinalizedID: finalized.ID(),
+	}
 }
 
 func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flow.QuorumCertificate) ([]CertifiedBlock, error) {
@@ -49,9 +51,10 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flo
 
 	t.lock.Lock()
 
-	parentVertex, found := t.forest.GetVertex(certifiedBlocks[0].Header.ParentID)
 	var connectedToFinalized bool
-	if found {
+	if certifiedBlocks[0].Header.ParentID == t.lastFinalizedID {
+		connectedToFinalized = true
+	} else if parentVertex, found := t.forest.GetVertex(certifiedBlocks[0].Header.ParentID); found {
 		connectedToFinalized = parentVertex.(*PendingBlockVertex).connectedToFinalized
 	}
 
@@ -79,11 +82,13 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flo
 			return nil, fmt.Errorf("failed to store certified block into the tree: %w", err)
 		}
 		t.forest.AddVertex(vertex)
-
-		if connectedToFinalized && i == len(certifiedBlocks)-1 {
-			connectedBlocks = t.updateAndCollectFork(vertex)
-		}
 	}
+
+	if connectedToFinalized {
+		vertex, _ := t.forest.GetVertex(certifiedBlocks[0].ID())
+		connectedBlocks = t.updateAndCollectFork(vertex.(*PendingBlockVertex))
+	}
+
 	t.lock.Unlock()
 	return connectedBlocks, nil
 }
