@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
@@ -553,8 +554,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -585,8 +586,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -608,8 +609,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -679,8 +680,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -713,8 +714,8 @@ func TestBLSMultiSignature(t *testing.T) {
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
 								Values: publicKeys,
-								ArrayType: cadence.VariableSizedArrayType{
-									ElementType: cadence.VariableSizedArrayType{
+								ArrayType: &cadence.VariableSizedArrayType{
+									ElementType: &cadence.VariableSizedArrayType{
 										ElementType: cadence.UInt8Type{},
 									},
 								},
@@ -729,12 +730,12 @@ func TestBLSMultiSignature(t *testing.T) {
 
 				t.Run("empty list", func(t *testing.T) {
 
-					publicKeys := []cadence.Value{}
+					var publicKeys []cadence.Value
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -814,16 +815,16 @@ func TestBLSMultiSignature(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
 						Values: publicKeys,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
+						ArrayType: &cadence.VariableSizedArrayType{
+							ElementType: &cadence.VariableSizedArrayType{
 								ElementType: cadence.UInt8Type{},
 							},
 						},
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
 						Values: signatures,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
+						ArrayType: &cadence.VariableSizedArrayType{
+							ElementType: &cadence.VariableSizedArrayType{
 								ElementType: cadence.UInt8Type{},
 							},
 						},
