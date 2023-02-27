@@ -20,6 +20,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type invalidAccountStatusKeyStorageSnapshot struct{}
+
+func (invalidAccountStatusKeyStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	if id.Key == flow.AccountStatusKey {
+		return nil, fmt.Errorf("error getting register %s", id)
+	}
+	return nil, nil
+}
+
 func createAccount(
 	t *testing.T,
 	vm fvm.VM,
@@ -50,7 +64,8 @@ func createAccount(
 
 	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
-	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+	address := flow.ConvertAddress(
+		data.(cadence.Event).Fields[0].(cadence.Address))
 
 	return address
 }
@@ -267,7 +282,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Remove account from account creator whitelist.
+		// Remove account from account creator allowlist.
 		//
 		// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
 		//
@@ -287,7 +302,7 @@ transaction {
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
-		// Add account to account creator whitelist.
+		// Add account to account creator allowlist.
 		//
 		// Will emit AccountCreatorAdded(accountCreator: accountCreator).
 		//
@@ -370,7 +385,8 @@ func TestCreateAccount(t *testing.T) {
 
 				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
-				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				address := flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
 
 				account, err := vm.GetAccount(ctx, address, view)
 				require.NoError(t, err)
@@ -405,7 +421,8 @@ func TestCreateAccount(t *testing.T) {
 
 					data, err := jsoncdc.Decode(nil, tx.Events[i].Payload)
 					require.NoError(t, err)
-					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+					address := flow.ConvertAddress(
+						data.(cadence.Event).Fields[0].(cadence.Address))
 
 					account, err := vm.GetAccount(ctx, address, view)
 					require.NoError(t, err)
@@ -1310,15 +1327,16 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					if key == state.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
-					}
-					return nil, nil
-				})
+				view := delta.NewDeltaView(
+					invalidAccountStatusKeyStorageSnapshot{})
 
 				err := vm.Run(ctx, script, view)
-				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.AccountStatusKey))
+				require.ErrorContains(
+					t,
+					err,
+					fmt.Sprintf(
+						"error getting register %s",
+						flow.AccountStatusRegisterID(address)))
 			}),
 	)
 
@@ -1518,15 +1536,16 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				newview := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					if key == state.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
-					}
-					return nil, nil
-				})
+				newview := delta.NewDeltaView(
+					invalidAccountStatusKeyStorageSnapshot{})
 
 				err := vm.Run(ctx, script, newview)
-				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.AccountStatusKey))
+				require.ErrorContains(
+					t,
+					err,
+					fmt.Sprintf(
+						"error getting register %s",
+						flow.AccountStatusRegisterID(address)))
 			}),
 	)
 }

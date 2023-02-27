@@ -38,8 +38,9 @@ type TransactionProcedure struct {
 	TxIndex                uint32
 
 	Logs                   []string
-	Events                 []flow.Event
-	ServiceEvents          []flow.Event
+	Events                 flow.EventsList
+	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
 	ComputationUsed        uint64
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64

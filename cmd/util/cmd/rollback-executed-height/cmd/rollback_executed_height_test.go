@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -64,7 +65,10 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NotNil(t, es)
 
 		// prepare data
-		header := unittest.BlockHeaderWithParentFixture(genesis) // make sure the height is higher than genesis
+		executableBlock := unittest.ExecutableBlockFixtureWithParent(
+			nil,
+			genesis) // make sure the height is higher than genesis
+		header := executableBlock.Block.Header
 		executionReceipt := unittest.ExecutionReceiptFixture()
 		executionReceipt.ExecutionResult.BlockID = header.ID()
 		cdp := make([]*flow.ChunkDataPack, 0, len(executionReceipt.ExecutionResult.Chunks))
@@ -81,16 +85,20 @@ func TestReExecuteBlock(t *testing.T) {
 		err = headers.Store(header)
 		require.NoError(t, err)
 
+		computationResult := &execution.ComputationResult{
+			ExecutableBlock:    executableBlock,
+			EndState:           endState,
+			ChunkDataPacks:     cdp,
+			Events:             []flow.EventsList{blockEvents.Events},
+			ServiceEvents:      se.Events,
+			TransactionResults: tes,
+		}
+
 		// save execution results
 		err = es.SaveExecutionResults(
 			context.Background(),
-			header,
-			endState,
-			cdp,
+			computationResult,
 			executionReceipt,
-			[]flow.EventsList{blockEvents.Events},
-			se.Events,
-			tes,
 		)
 
 		require.NoError(t, err)
@@ -155,13 +163,8 @@ func TestReExecuteBlock(t *testing.T) {
 		// re execute result
 		err = es.SaveExecutionResults(
 			context.Background(),
-			header,
-			endState,
-			cdp,
+			computationResult,
 			executionReceipt,
-			[]flow.EventsList{blockEvents.Events},
-			se.Events,
-			tes,
 		)
 
 		require.NoError(t, err)
@@ -216,7 +219,10 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		require.NotNil(t, es)
 
 		// prepare data
-		header := unittest.BlockHeaderWithParentFixture(genesis) // make sure the height is higher than genesis
+		executableBlock := unittest.ExecutableBlockFixtureWithParent(
+			nil,
+			genesis) // make sure the height is higher than genesis
+		header := executableBlock.Block.Header
 		executionReceipt := unittest.ExecutionReceiptFixture()
 		executionReceipt.ExecutionResult.BlockID = header.ID()
 		cdp := make([]*flow.ChunkDataPack, 0, len(executionReceipt.ExecutionResult.Chunks))
@@ -233,16 +239,20 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		err = headers.Store(header)
 		require.NoError(t, err)
 
+		computationResult := &execution.ComputationResult{
+			ExecutableBlock:    executableBlock,
+			EndState:           endState,
+			ChunkDataPacks:     cdp,
+			Events:             []flow.EventsList{blockEvents.Events},
+			ServiceEvents:      se.Events,
+			TransactionResults: tes,
+		}
+
 		// save execution results
 		err = es.SaveExecutionResults(
 			context.Background(),
-			header,
-			endState,
-			cdp,
+			computationResult,
 			executionReceipt,
-			[]flow.EventsList{blockEvents.Events},
-			se.Events,
-			tes,
 		)
 
 		require.NoError(t, err)
@@ -298,16 +308,20 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		endState2, err := executionReceipt2.ExecutionResult.FinalStateCommitment()
 		require.NoError(t, err)
 
+		computationResult2 := &execution.ComputationResult{
+			ExecutableBlock:    executableBlock,
+			EndState:           endState2,
+			ChunkDataPacks:     cdp2,
+			Events:             []flow.EventsList{blockEvents.Events},
+			ServiceEvents:      se.Events,
+			TransactionResults: tes,
+		}
+
 		// re execute result
 		err = es.SaveExecutionResults(
 			context.Background(),
-			header,
-			endState2,
-			cdp2,
+			computationResult2,
 			executionReceipt2,
-			[]flow.EventsList{blockEvents.Events},
-			se.Events,
-			tes,
 		)
 
 		require.NoError(t, err)

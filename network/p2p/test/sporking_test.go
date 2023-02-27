@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -20,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -207,7 +207,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork, topicValidator)
@@ -275,7 +275,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypePubSub)
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	sentData, err := sentMsg.Proto().Marshal()
@@ -308,7 +308,7 @@ func testOneToKMessagingFails(ctx context.Context,
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypePubSub)
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	sentData, err := sentMsg.Proto().Marshal()

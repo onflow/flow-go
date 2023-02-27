@@ -147,7 +147,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
@@ -258,7 +258,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewView(ledger.Get)
+	view := delta.NewDeltaView(ledger)
 
 	var (
 		res *execution.ComputationResult

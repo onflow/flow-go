@@ -21,6 +21,11 @@ func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 
+// ExecutionBlockCachedPrograms provides a mock function with given fields: programs
+func (_m *ExecutionMetrics) ExecutionBlockCachedPrograms(programs int) {
+	_m.Called(programs)
+}
+
 // ExecutionBlockDataUploadFinished provides a mock function with given fields: dur
 func (_m *ExecutionMetrics) ExecutionBlockDataUploadFinished(dur time.Duration) {
 	_m.Called(dur)
@@ -179,6 +184,16 @@ func (_m *ExecutionMetrics) RuntimeTransactionInterpreted(dur time.Duration) {
 // RuntimeTransactionParsed provides a mock function with given fields: dur
 func (_m *ExecutionMetrics) RuntimeTransactionParsed(dur time.Duration) {
 	_m.Called(dur)
+}
+
+// RuntimeTransactionProgramsCacheHit provides a mock function with given fields:
+func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheHit() {
+	_m.Called()
+}
+
+// RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
+func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheMiss() {
+	_m.Called()
 }
 
 // StartBlockReceivedToExecuted provides a mock function with given fields: blockID

@@ -5,7 +5,9 @@ package mock
 import (
 	context "context"
 
+	execution "github.com/onflow/flow-go/engine/execution"
 	delta "github.com/onflow/flow-go/engine/execution/state/delta"
+
 	flow "github.com/onflow/flow-go/model/flow"
 
 	messages "github.com/onflow/flow-go/model/messages"
@@ -239,13 +241,13 @@ func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Ident
 	return r0, r1
 }
 
-// SaveExecutionResults provides a mock function with given fields: ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results
-func (_m *ExecutionState) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
-	ret := _m.Called(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+// SaveExecutionResults provides a mock function with given fields: ctx, result, executionReceipt
+func (_m *ExecutionState) SaveExecutionResults(ctx context.Context, result *execution.ComputationResult, executionReceipt *flow.ExecutionReceipt) error {
+	ret := _m.Called(ctx, result, executionReceipt)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.StateCommitment, []*flow.ChunkDataPack, *flow.ExecutionReceipt, []flow.EventsList, flow.EventsList, []flow.TransactionResult) error); ok {
-		r0 = rf(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.ComputationResult, *flow.ExecutionReceipt) error); ok {
+		r0 = rf(ctx, result, executionReceipt)
 	} else {
 		r0 = ret.Error(0)
 	}

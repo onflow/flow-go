@@ -79,7 +79,8 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
@@ -90,12 +91,11 @@ func (suite *BuilderSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
 
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
@@ -983,7 +983,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-		stateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc)
 
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)

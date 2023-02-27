@@ -1,6 +1,8 @@
 package hash
 
 import (
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"math/rand"
 	"testing"
@@ -160,7 +162,46 @@ func TestHashersAPI(t *testing.T) {
 	}
 }
 
-// TestSHA3 is a specific test of SHA3-256 and SHA3-388.
+// TestSHA2 is a specific test of SHA2-256 and SHA2-384.
+// It compares the hashes of random data of different lengths to
+// the output of standard Go sha2.
+func TestSHA2(t *testing.T) {
+	r := time.Now().UnixNano()
+	rand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
+	t.Run("SHA2_256", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			rand.Read(value)
+			expected := sha256.Sum256(value)
+
+			// test hash computation using the hasher
+			hasher := NewSHA2_256()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+
+			// test hash computation using the light api
+			var res [HashLenSHA2_256]byte
+			ComputeSHA2_256(&res, value)
+			assert.Equal(t, expected[:], res[:])
+		}
+	})
+
+	t.Run("SHA2_384", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			rand.Read(value)
+			expected := sha512.Sum384(value)
+
+			hasher := NewSHA2_384()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+		}
+	})
+}
+
+// TestSHA3 is a specific test of SHA3-256 and SHA3-384.
 // It compares the hashes of random data of different lengths to
 // the output of standard Go sha3.
 func TestSHA3(t *testing.T) {
@@ -224,7 +265,7 @@ func TestKeccak(t *testing.T) {
 // Benchmark of all hashers' ComputeHash function
 func BenchmarkComputeHash(b *testing.B) {
 
-	m := make([]byte, 64)
+	m := make([]byte, 32)
 	rand.Read(m)
 
 	b.Run("SHA2_256", func(b *testing.B) {
@@ -232,6 +273,15 @@ func BenchmarkComputeHash(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			alg := NewSHA2_256()
 			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA2_256_light", func(b *testing.B) {
+		var h [HashLenSHA2_256]byte
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ComputeSHA2_256(&h, m)
 		}
 		b.StopTimer()
 	})

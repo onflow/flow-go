@@ -128,7 +128,7 @@ func NewAccountInfo(
 }
 
 func (info *accountInfo) GetStorageUsed(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -140,7 +140,8 @@ func (info *accountInfo) GetStorageUsed(
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
 
-	value, err := info.accounts.GetStorageUsed(flow.Address(address))
+	value, err := info.accounts.GetStorageUsed(
+		flow.ConvertAddress(runtimeAddress))
 	if err != nil {
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
@@ -157,7 +158,7 @@ func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 }
 
 func (info *accountInfo) GetStorageCapacity(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -169,7 +170,8 @@ func (info *accountInfo) GetStorageCapacity(
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountStorageCapacity(address)
+	result, invokeErr := info.systemContracts.AccountStorageCapacity(
+		runtimeAddress)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -181,7 +183,7 @@ func (info *accountInfo) GetStorageCapacity(
 }
 
 func (info *accountInfo) GetAccountBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -193,7 +195,7 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(address)
+	result, invokeErr := info.systemContracts.AccountBalance(runtimeAddress)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -201,7 +203,7 @@ func (info *accountInfo) GetAccountBalance(
 }
 
 func (info *accountInfo) GetAccountAvailableBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -216,7 +218,8 @@ func (info *accountInfo) GetAccountAvailableBalance(
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountAvailableBalance(address)
+	result, invokeErr := info.systemContracts.AccountAvailableBalance(
+		runtimeAddress)
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
