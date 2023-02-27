@@ -128,10 +128,12 @@ func (t *GossipSubMeshTracer) logPeers() {
 	defer t.topicMeshMu.Unlock()
 
 	for topic := range t.topicMeshMap {
+		shouldWarn := false // whether we should warn about the mesh state
 		lg := t.logger.With().Dur("heartbeat_interval", t.loggerInterval).Str("topic", topic).Logger()
 		for p := range t.topicMeshMap[topic] {
 			id, exists := t.idProvider.ByPeerID(p)
 			if !exists {
+				shouldWarn = true
 				lg = lg.With().
 					Str("peer_id", p.String()).
 					Str("flow_id", "unknown").
@@ -148,6 +150,12 @@ func (t *GossipSubMeshTracer) logPeers() {
 				Logger()
 		}
 
+		if shouldWarn {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("topic mesh peers of local node since last heartbeat")
+			continue
+		}
 		lg.Info().Msg("topic mesh peers of local node since last heartbeat")
 	}
 }
