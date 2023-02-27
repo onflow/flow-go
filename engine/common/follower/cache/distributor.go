@@ -7,6 +7,8 @@ import (
 
 type OnEntityEjected func(ejectedEntity flow.Entity)
 
+// HeroCacheDistributor wraps module.HeroCacheMetrics and allows subscribers to receive events
+// for ejected entries from cache.
 type HeroCacheDistributor struct {
 	module.HeroCacheMetrics
 	consumers []OnEntityEjected

@@ -13,9 +13,10 @@ import (
 
 type OnEquivocation func(first *flow.Block, other *flow.Block)
 
-// Cache stores pending blocks received from other replicas, caches blocks by blockID it also
-// maintains secondary index by view and by parent.
-// Performs resolving of certified blocks when processing incoming batches.
+// Cache stores pending blocks received from other replicas, caches blocks by blockID, it also
+// maintains secondary index by view and by parent. Additional indexes are used to track proposal equivocation(multiple
+// valid proposals for same block) and find blocks not only by parent but also by child.
+// Resolves certified blocks when processing incoming batches.
 // Concurrency safe.
 type Cache struct {
 	backend *herocache.Cache // cache with random ejection
@@ -40,6 +41,8 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 	}
 }
 
+// NewCache creates new instance of Cache, as part of construction process connects ejection event from HeroCache to
+// post-ejection processing logic to perform cleanup of secondary indexes to prevent memory leaks.
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
 	distributor := NewDistributor(collector)
 	cache := &Cache{
@@ -58,7 +61,9 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 	return cache
 }
 
-// handleEjectedEntity
+// handleEjectedEntity performs cleanup of secondary indexes to prevent memory leaks.
+// WARNING: Concurrency safety of this function is guaranteed by s.lock, this callback can be called
+// only in herocache.Cache.Add and we perform this call while s.lock is in locked state.
 func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 	block := entity.(*flow.Block)
 	delete(c.byView, block.Header.View)
@@ -67,6 +72,7 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 
 // AddBlocks atomically applies batch of blocks to the cache of pending but not yet certified blocks. Upon insertion cache tries to resolve
 // incoming blocks to what is stored in the cache.
+// We require that incoming batch is sorted by height and doesn't have skipped blocks.
 // When receiving batch: [first, ..., last], we are only interested in first and last blocks since all other blocks will be certified by definition.
 // Next scenarios are possible:
 // - for first block:
@@ -79,6 +85,7 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 //
 // Note that implementation behaves correctly where len(batch) == 1.
 // If message equivocation was detected it will be reported using a notification.
+// Concurrency safe.
 func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, certifyingQC *flow.QuorumCertificate) {
 	var equivocatedBlocks [][]*flow.Block
 

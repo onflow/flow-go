@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/common/follower/mock"
+	"github.com/onflow/flow-go/engine/common/follower/cache/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -22,6 +22,7 @@ func TestCache(t *testing.T) {
 
 const defaultHeroCacheLimit = 1000
 
+// CacheSuite holds minimal state for testing Cache in different test scenarios.
 type CacheSuite struct {
 	suite.Suite
 
