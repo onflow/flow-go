@@ -99,7 +99,6 @@ var (
 
 		// Cadence Types
 
-		common.MemoryKindCadenceSimpleType:             1,
 		common.MemoryKindCadenceOptionalType:           17,
 		common.MemoryKindCadenceVariableSizedArrayType: 17,
 		common.MemoryKindCadenceConstantSizedArrayType: 25,
@@ -139,17 +138,19 @@ var (
 
 		// AST nodes
 
-		common.MemoryKindProgram:         220,
-		common.MemoryKindIdentifier:      17,
-		common.MemoryKindArgument:        49,
-		common.MemoryKindBlock:           25,
-		common.MemoryKindFunctionBlock:   25,
-		common.MemoryKindParameter:       25,
-		common.MemoryKindParameterList:   59,
-		common.MemoryKindTransfer:        1,
-		common.MemoryKindMembers:         276,
-		common.MemoryKindTypeAnnotation:  25,
-		common.MemoryKindDictionaryEntry: 33,
+		common.MemoryKindProgram:           220,
+		common.MemoryKindIdentifier:        17,
+		common.MemoryKindArgument:          49,
+		common.MemoryKindBlock:             25,
+		common.MemoryKindFunctionBlock:     25,
+		common.MemoryKindParameter:         25,
+		common.MemoryKindParameterList:     59,
+		common.MemoryKindTypeParameter:     9,
+		common.MemoryKindTypeParameterList: 59,
+		common.MemoryKindTransfer:          1,
+		common.MemoryKindMembers:           276,
+		common.MemoryKindTypeAnnotation:    25,
+		common.MemoryKindDictionaryEntry:   33,
 
 		common.MemoryKindFunctionDeclaration:        49,
 		common.MemoryKindCompositeDeclaration:       65,
