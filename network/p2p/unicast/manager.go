@@ -125,9 +125,10 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 }
 
 // tryCreateStream will retry createStream with the configured exponential backoff delay and maxAttempts.
-// If no stream can be created after max attempts the error is returned. During stream creation IsErrDialInProgress indicates
-// that no connection to the peer exists yet, in this case we will retry creating the stream with a backoff until a connection
-// is established.
+// During retries, each error encountered is aggregated in a multierror. If max attempts are made before a
+// stream can be successfully the multierror will be returned. During stream creation when IsErrDialInProgress
+// is encountered during retries this would indicate that no connection to the peer exists yet.
+// In this case we will retry creating the stream with a backoff until a connection is established.
 func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttempts uint64, protocol protocols.Protocol) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var err error
 	var s libp2pnet.Stream
