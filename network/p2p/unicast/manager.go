@@ -218,7 +218,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
 
 	// create backoff
-	backoff := retry.NewConstant(1000 * time.Millisecond)
+	backoff := retry.NewConstant(time.Second)
 	// add a MaxConnectAttemptSleepDuration*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxConnectAttemptSleepDuration*time.Millisecond, backoff)
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
