@@ -20,6 +20,18 @@ type PendingBlockVertex struct {
 	connectedToFinalized bool
 }
 
+// NewVertex creates new vertex while performing a sanity check of data correctness
+func NewVertex(block *flow.Block, qc *flow.QuorumCertificate, connectedToFinalized bool) (*PendingBlockVertex, error) {
+	if block.Header.View != qc.View {
+		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view", block.Header.View, qc.View)
+	}
+	return &PendingBlockVertex{
+		block:                block,
+		qc:                   qc,
+		connectedToFinalized: connectedToFinalized,
+	}, nil
+}
+
 func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.qc.BlockID }
 func (v *PendingBlockVertex) Level() uint64             { return v.qc.View }
 func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
@@ -72,12 +84,11 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flo
 			}
 		}
 
-		vertex := &PendingBlockVertex{
-			block:                block,
-			qc:                   qcs[i],
-			connectedToFinalized: connectedToFinalized,
+		vertex, err := NewVertex(block, qcs[i], connectedToFinalized)
+		if err != nil {
+			return nil, fmt.Errorf("could not create new vertex: %w", err)
 		}
-		err := t.forest.VerifyVertex(vertex)
+		err = t.forest.VerifyVertex(vertex)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store certified block into the tree: %w", err)
 		}
