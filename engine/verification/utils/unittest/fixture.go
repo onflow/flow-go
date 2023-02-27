@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -261,10 +260,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 
 		// create state.View
-		view := delta.NewDeltaView(
-			state.NewLedgerStorageSnapshot(
-				led,
-				startStateCommitment))
+		snapshot := state.NewLedgerStorageSnapshot(
+			led,
+			startStateCommitment)
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
@@ -337,7 +335,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			context.Background(),
 			unittest.IdentifierFixture(),
 			executableBlock,
-			view,
+			snapshot,
 			derivedBlockData)
 		require.NoError(t, err)
 		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
