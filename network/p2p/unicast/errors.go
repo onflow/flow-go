@@ -26,3 +26,24 @@ func IsErrDialInProgress(err error) bool {
 	var e ErrDialInProgress
 	return errors.As(err, &e)
 }
+
+// ErrSecurityProtocolNegotiationFailed indicates security protocol negotiation failed during the stream factory connect attempt.
+type ErrSecurityProtocolNegotiationFailed struct {
+	pid peer.ID
+	err error
+}
+
+func (e ErrSecurityProtocolNegotiationFailed) Error() string {
+	return fmt.Errorf("failed to dial remote peer %s in stream factory invalid node ID: %w", e.pid.String(), e.err).Error()
+}
+
+// NewSecurityProtocolNegotiationErr returns a new ErrSecurityProtocolNegotiationFailed.
+func NewSecurityProtocolNegotiationErr(pid peer.ID, err error) ErrSecurityProtocolNegotiationFailed {
+	return ErrSecurityProtocolNegotiationFailed{pid: pid, err: err}
+}
+
+// IsErrSecurityProtocolNegotiationFailed returns whether an error is ErrSecurityProtocolNegotiationFailed.
+func IsErrSecurityProtocolNegotiationFailed(err error) bool {
+	var e ErrSecurityProtocolNegotiationFailed
+	return errors.As(err, &e)
+}

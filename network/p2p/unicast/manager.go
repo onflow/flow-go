@@ -244,26 +244,19 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		m.streamFactory.ClearBackoff(peerID)
 		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
-			// if the connection was rejected due to invalid node id, skip the re-attempt
-			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-				return fmt.Errorf("failed to dial remote peer: %w", err)
+			// if the connection was rejected due to invalid node id or
+			// if the connection was rejected due to connection gating skip the re-attempt
+			if IsErrSecurityProtocolNegotiationFailed(err) || errors.Is(err, swarm.ErrGaterDisallowedConnection) {
+				return err
 			}
-
-			// if the connection was rejected due to allowlisting, skip the re-attempt
-			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
-			}
-
 			m.logger.Warn().
 				Err(err).
 				Str("peer_id", peerID.String()).
 				Int("attempt", dialAttempts).
 				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
-
 			return retry.RetryableError(err)
 		}
-
 		return nil
 	}
 

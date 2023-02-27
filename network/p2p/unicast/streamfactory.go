@@ -2,6 +2,9 @@ package unicast
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -11,12 +14,19 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+const (
+	protocolNegotiationFailedStr = "failed to negotiate security protocol"
+)
+
 // StreamFactory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
 // it can create libp2p streams with finer granularity.
 type StreamFactory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
 	DialAddress(peer.ID) []multiaddr.Multiaddr
 	ClearBackoff(peer.ID)
+	// Connect connects host to peer with peerID.
+	// Expected errors during normal operations:
+	//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
 	Connect(context.Context, peer.AddrInfo) error
 	NewStream(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)
 }
@@ -43,8 +53,21 @@ func (l *LibP2PStreamFactory) ClearBackoff(p peer.ID) {
 	}
 }
 
-func (l *LibP2PStreamFactory) Connect(ctx context.Context, pid peer.AddrInfo) error {
-	return l.host.Connect(ctx, pid)
+// Connect connects host to peer with peerAddrInfo.
+// Expected errors during normal operations:
+//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
+func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.AddrInfo) error {
+	err := l.host.Connect(ctx, peerAddrInfo)
+	switch {
+	case err == nil:
+		return nil
+	case strings.Contains(err.Error(), protocolNegotiationFailedStr):
+		return NewSecurityProtocolNegotiationErr(peerAddrInfo.ID, err)
+	case errors.Is(err, swarm.ErrGaterDisallowedConnection):
+		return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+	default:
+		return err
+	}
 }
 
 func (l *LibP2PStreamFactory) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
