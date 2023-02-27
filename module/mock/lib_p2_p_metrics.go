@@ -149,6 +149,11 @@ func (_m *LibP2PMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
+func (_m *LibP2PMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+	_m.Called(topic, size)
+}
+
 // OnPruneReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
