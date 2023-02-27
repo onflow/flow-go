@@ -19,15 +19,17 @@ type GossipSubMeshTracer struct {
 	logger         zerolog.Logger
 	idProvider     module.IdentityProvider
 	loggerInterval time.Duration
+	metrics        module.GossipSubLocalMeshMetrics
 	pubsub.RawTracer
 }
 
 var _ pubsub.RawTracer = (*GossipSubMeshTracer)(nil)
 
-func NewGossipSubTopologyTracer(logger zerolog.Logger, idProvider module.IdentityProvider) *GossipSubMeshTracer {
+func NewGossipSubTopologyTracer(logger zerolog.Logger, metrics module.GossipSubLocalMeshMetrics, idProvider module.IdentityProvider) *GossipSubMeshTracer {
 	return &GossipSubMeshTracer{
 		topicMeshMap: make(map[string]map[peer.ID]struct{}),
 		idProvider:   idProvider,
+		metrics:      metrics,
 		logger:       logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
 	}
 }
@@ -53,6 +55,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
+	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -76,6 +79,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
