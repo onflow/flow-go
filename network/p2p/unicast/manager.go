@@ -23,11 +23,11 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
-// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
 const (
+	// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
 	MaxConnectAttemptSleepDuration = 5
 
-	// Initial delay between failing to establish a connection with another node and retrying. This delay
+	// DefaultRetryDelay Initial delay between failing to establish a connection with another node and retrying. This delay
 	// increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
 	DefaultRetryDelay = 1 * time.Second
 )
