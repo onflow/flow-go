@@ -251,7 +251,7 @@ func TestNode_HasSubscription(t *testing.T) {
 	require.False(t, node.HasSubscription(topic))
 }
 
-// TestCreateStream_SinglePairwiseConnection ensures that despite the number of concurrent streams created from peer -> peer only a single
+// TestCreateStream_SinglePairwiseConnection ensures that despite the number of concurrent streams created from peer -> peer, only a single
 // connection will ever be created between two peers on initial peer dialing and subsequent streams will reuse that connection.
 func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
