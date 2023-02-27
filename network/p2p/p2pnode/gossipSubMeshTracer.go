@@ -14,7 +14,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
+// It also logs the mesh peers and updates the local mesh size metric.
 type GossipSubMeshTracer struct {
+	pubsub.RawTracer
 	component.ComponentManager
 	component.Component
 
@@ -24,7 +27,6 @@ type GossipSubMeshTracer struct {
 	idProvider     module.IdentityProvider
 	loggerInterval time.Duration
 	metrics        module.GossipSubLocalMeshMetrics
-	pubsub.RawTracer
 }
 
 var _ pubsub.RawTracer = (*GossipSubMeshTracer)(nil)
