@@ -3,6 +3,7 @@
 package mockp2p
 
 import (
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -25,6 +26,22 @@ func (_m *PubSubTracer) AddPeer(p peer.ID, proto protocol.ID) {
 // DeliverMessage provides a mock function with given fields: msg
 func (_m *PubSubTracer) DeliverMessage(msg *pubsub.Message) {
 	_m.Called(msg)
+}
+
+// Done provides a mock function with given fields:
+func (_m *PubSubTracer) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }
 
 // DropRPC provides a mock function with given fields: rpc, p
@@ -57,6 +74,22 @@ func (_m *PubSubTracer) Prune(p peer.ID, topic string) {
 	_m.Called(p, topic)
 }
 
+// Ready provides a mock function with given fields:
+func (_m *PubSubTracer) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // RecvRPC provides a mock function with given fields: rpc
 func (_m *PubSubTracer) RecvRPC(rpc *pubsub.RPC) {
 	_m.Called(rpc)
@@ -75,6 +108,11 @@ func (_m *PubSubTracer) RemovePeer(p peer.ID) {
 // SendRPC provides a mock function with given fields: rpc, p
 func (_m *PubSubTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
 	_m.Called(rpc, p)
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *PubSubTracer) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }
 
 // ThrottlePeer provides a mock function with given fields: p
