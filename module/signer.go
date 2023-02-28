@@ -12,7 +12,13 @@ var (
 	DKGFailError = errors.New("dkg failed, no DKG private key generated")
 )
 
-// RandomBeaconKeyStore returns the random beacon private key for the given view,
+// RandomBeaconKeyStore provides access to the node's locally computed random beacon for a given epoch.
+// We determine which epoch to use based on the view, each view belongs to exactly one epoch.
+// Beacon keys are only returned once:
+//   - the DKG has completed successfully locally AND
+//   - the DKG has completed successfully globally (EpochCommit event sealed) with a consistent result
+//
+// Therefore keys returned by this module are guaranteed to be safe for use.
 type RandomBeaconKeyStore interface {
 	// ByView returns the node's locally computed beacon private key for the epoch containing the given view.
 	// It returns:

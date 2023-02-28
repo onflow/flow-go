@@ -76,6 +76,7 @@ func (suite *BeaconKeyStore) Test_BeaconKeys_Unsafe() {
 
 	key, err := suite.store.ByView(view)
 	require.ErrorIs(suite.T(), err, module.DKGFailError)
+	_ = key
 }
 
 // ErrVIewForUnknownEpoch
