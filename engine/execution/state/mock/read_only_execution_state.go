@@ -200,16 +200,16 @@ func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
 	return r0
 }
 
-// NewView provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
+// NewStorageSnapshot provides a mock function with given fields: _a0
+func (_m *ReadOnlyExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) delta.StorageSnapshot {
 	ret := _m.Called(_a0)
 
-	var r0 *delta.View
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) *delta.View); ok {
+	var r0 delta.StorageSnapshot
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) delta.StorageSnapshot); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*delta.View)
+			r0 = ret.Get(0).(delta.StorageSnapshot)
 		}
 	}
 

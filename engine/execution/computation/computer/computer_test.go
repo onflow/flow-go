@@ -170,14 +170,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewDeltaView(nil)
-
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			parentBlockExecutionResultID,
 			block,
-			view,
+			nil,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1)      // +1 system chunk
@@ -303,13 +301,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
@@ -460,13 +456,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derivedBlockData)
 		assert.NoError(t, err)
 
@@ -620,13 +614,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			prov)
 		require.NoError(t, err)
 
-		view := delta.NewDeltaView(nil)
-
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			nil,
 			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 
@@ -660,13 +652,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
-				require.NoError(t, err)
-				require.Nil(t, program)
-
-				err = r.Interface.SetProgram(
+				_, err := r.Interface.GetAndSetProgram(
 					contractLocation,
-					contractProgram,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
 				)
 				require.NoError(t, err)
 
@@ -757,22 +747,18 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
+				_, err := r.Interface.GetAndSetProgram(
+					contractLocation,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
+				)
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
 					return nil
 				}
-				if program == nil {
 
-					err = r.Interface.SetProgram(
-						contractLocation,
-						contractProgram,
-					)
-					require.NoError(t, err)
-
-				}
 				return runtime.Error{
 					Err: fmt.Errorf("TX reverted"),
 				}
@@ -874,6 +860,12 @@ type testRuntime struct {
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
+var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) Config() runtime.Config {
+	panic("Config not expected")
+}
+
 func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
 	panic("NewScriptExecutor not expected")
 }
@@ -889,8 +881,6 @@ func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Co
 func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
 	panic("NewContractFunctionExecutor not expected")
 }
-
-var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
 	panic("SetInvalidatedResourceValidationEnabled not expected")
