@@ -19,10 +19,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
@@ -100,7 +102,10 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
+
 	component.Component
+	cm               *component.ComponentManager
+	disallowListSink func(flow.IdentifierList) bool
 }
 
 type MiddlewareOption func(*Middleware)
@@ -151,7 +156,9 @@ func NewMiddleware(
 	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption) *Middleware {
+	disallowListHeroStoreConfig queue.HeroStoreConfig,
+	opts ...MiddlewareOption,
+) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -176,6 +183,12 @@ func NewMiddleware(
 		opt(mw)
 	}
 
+	disallowListWorkerLogic, disallowListSink := worker.NewWorkerPoolBuilder[flow.IdentifierList](
+		queue.NewHeroStore(disallowListHeroStoreConfig.SizeLimit, log, disallowListHeroStoreConfig.Collector),
+		mw.onNodeDisallowListUpdate,
+	).Build()
+	mw.disallowListSink = disallowListSink
+
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
@@ -199,9 +212,12 @@ func NewMiddleware(
 			mw.unicastRateLimiters.Stop()
 			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
 
-		}).Build()
-
+		}).
+		AddWorkers(disallowListWorkerLogic, 1).
+		Build()
 	mw.Component = cm
+	mw.cm = cm
+
 	return mw
 }
 
@@ -348,12 +364,30 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 
 // OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
 func (m *Middleware) OnNodeDisallowListUpdate(blockList flow.IdentifierList) {
+	select {
+	case <-m.cm.ShutdownSignal():
+		m.log.Warn().Msgf("received block list update after shutdown commenced")
+		return
+	default:
+	}
+
 	for _, pid := range m.peerIDs(blockList) {
 		err := m.libP2PNode.RemovePeer(pid)
 		if err != nil {
 			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
 		}
 	}
+}
+
+// onNodeDisallowListUpdate removes all peers in the blocklist from the underlying libp2pnode.
+func (m *Middleware) onNodeDisallowListUpdate(blockList flow.IdentifierList) error {
+	for _, pid := range m.peerIDs(blockList) {
+		err := m.libP2PNode.RemovePeer(pid)
+		if err != nil {
+			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
+		}
+	}
+	return nil
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous

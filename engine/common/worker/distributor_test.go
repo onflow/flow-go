@@ -1,5 +1,7 @@
 package distributor_test
 
+// TODO would need to be adapted to verify that  WorkerPoolBuilder constructs workers that work as expected within a component
+
 import (
 	"context"
 	"fmt"
