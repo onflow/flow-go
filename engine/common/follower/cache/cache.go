@@ -104,6 +104,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 		// set certifyingQC, QC from last block certifies complete batch
 		certifyingQC = batch[len(batch)-1].Header.QuorumCertificate()
 	}
+	lastBlockID := batch[len(batch)-1].ID()
 
 	c.lock.Lock()
 	// check for message equivocation, report any if detected
@@ -132,7 +133,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	}
 
 	// check if there is a block in cache that certifies last block of the batch.
-	if child, ok := c.byParent[lastBlock.ID()]; ok {
+	if child, ok := c.byParent[lastBlockID]; ok {
 		// child found in cache, meaning we can certify last block
 		// no need to store anything since the block is certified and child is already in cache
 		certifiedBatch = append(certifiedBatch, lastBlock)
