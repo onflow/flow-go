@@ -841,8 +841,87 @@ func TestBLSMultiSignature(t *testing.T) {
 		))
 	}
 
+	// This test goes through known edge cases where the lower crypto layer may have
+	// unexpected errors. This is a sanity check that these cases do not lead to
+	// FVM unexpected errors
+	testBLSVerificationEdgeCases := func() {
+		message, cadenceMessage := createMessage("random_message")
+		tag := "random_tag"
+
+		code := []byte(`
+							import Crypto
+
+							pub fun main(
+								publicKey: [UInt8],
+								signature: [UInt8],
+								message:  [UInt8],
+								tag: String,
+							): Bool {
+								let pk: PublicKey = PublicKey(
+										publicKey: publicKey,
+										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
+									)
+								
+								let boo = pk.verify(
+									signature: signature,
+									signedData: message,
+									domainSeparationTag: tag,
+									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
+								return boo
+							}
+							`)
+
+		kmac := msig.NewBLSHasher(string(tag))
+
+		t.Run("Pairing issue with private key equal to 1", newVMTest().run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				derivedBlockData *derived.DerivedBlockData,
+			) {
+				// sk = 1 leads to a pairing edge case
+				skBytes := make([]byte, crypto.PrKeyLenBLSBLS12381)
+				skBytes[crypto.PrKeyLenBLSBLS12381-1] = 1
+				sk := randomSK(t, BLSSignatureAlgorithm)
+				pk := sk.PublicKey()
+				sig, err := sk.Sign(message, kmac)
+				require.NoError(t, err)
+
+				script := fvm.Script(code).WithArguments(
+					jsoncdc.MustEncode(testutil.BytesToCadenceArray(pk.Encode())),
+					jsoncdc.MustEncode(testutil.BytesToCadenceArray(sig)),
+					jsoncdc.MustEncode(cadenceMessage),
+					jsoncdc.MustEncode(cadence.String(tag)),
+				)
+
+				err = vm.Run(ctx, script, view)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			},
+		))
+
+		t.Run("identity public key", newVMTest().run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				derivedBlockData *derived.DerivedBlockData,
+			) {
+				// TODO: add tests for identity public key once the new crypto library is
+				// integrated.
+			},
+		))
+	}
+
 	testVerifyPoP()
 	testKeyAggregation()
 	testBLSSignatureAggregation()
 	testBLSCombinedAggregations()
+	testBLSVerificationEdgeCases()
 }
