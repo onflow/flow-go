@@ -283,7 +283,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, maxAttempts uint
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnPeerDialFailure(duration, dialAttempts)
-		return dialAddr, m.retryFailedError(uint64(dialAttempts), maxAttempts, fmt.Errorf("failed to dial peer"))
+		return dialAddr, m.retryFailedError(uint64(dialAttempts), maxAttempts, fmt.Errorf("failed to dial peer: %w", err))
 	}
 	m.metrics.OnPeerDialed(duration, dialAttempts)
 	return dialAddr, nil
@@ -327,7 +327,7 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnEstablishStreamFailure(duration, attempts)
-		return nil, m.retryFailedError(uint64(attempts), maxAttempts, fmt.Errorf("failed to create a stream to peer"))
+		return nil, m.retryFailedError(uint64(attempts), maxAttempts, fmt.Errorf("failed to create a stream to peer: %w", err))
 	}
 	m.metrics.OnStreamEstablished(duration, attempts)
 	return s, nil
