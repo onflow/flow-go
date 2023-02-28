@@ -77,17 +77,18 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 // `last` are certified by construction (by the QC included in `last`).
 // Next scenarios are possible:
 // - for first block:
-//   - no parent available for first block, we need to cache it since it will be used to certify parent when it's available.
-//   - parent for first block available in cache allowing to certify it, no need to store first block in cache.
+//   - no parent available for first block.
+//   - parent for first block available in cache allowing to certify it, we can certify one extra block(parent).
 //
 // - for last block:
-//   - no child available for last block, we need to cache it since it's not certified yet.
-//   - child for last block available in cache allowing to certify it, no need to store last block in cache.
+//   - no child available for last block, need to wait for child to certify it.
+//   - child for last block available in cache allowing to certify it, we can certify one extra block(child).
 //
+// All blocks from the batch are stored in the cache to provide deduplication.
 // The function returns any new certified chain of blocks created by addition of the batch.
 // Returns `nil, nil` if the input batch has exactly one block and neither its parent nor child is in the cache.
 // Returns `certifiedBatch, certifyingQC` if the input batch has more than one block, and/or if either a child
-// or parent of the batch is in the cache. 
+// or parent of the batch is in the cache.
 // Note that implementation behaves correctly where len(batch) == 1.
 // If message equivocation was detected it will be reported using a notification.
 // Concurrency safe.

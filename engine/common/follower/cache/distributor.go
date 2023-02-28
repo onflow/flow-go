@@ -9,6 +9,7 @@ type OnEntityEjected func(ejectedEntity flow.Entity)
 
 // HeroCacheDistributor wraps module.HeroCacheMetrics and allows subscribers to receive events
 // for ejected entries from cache.
+// This structure is NOT concurrency safe.
 type HeroCacheDistributor struct {
 	module.HeroCacheMetrics
 	consumers []OnEntityEjected
@@ -22,6 +23,8 @@ func NewDistributor(heroCacheMetrics module.HeroCacheMetrics) *HeroCacheDistribu
 	}
 }
 
+// AddConsumer adds subscriber for entity ejected events.
+// Is NOT concurrency safe.
 func (d *HeroCacheDistributor) AddConsumer(consumer OnEntityEjected) {
 	d.consumers = append(d.consumers, consumer)
 }
