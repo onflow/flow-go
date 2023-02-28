@@ -64,8 +64,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -854,7 +854,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		tracer := p2pnode.NewGossipSubMeshTracer(
+		meshTracer := tracer.NewGossipSubMeshTracer(
 			builder.Logger,
 			builder.Metrics.Network,
 			builder.IdentityProvider,
@@ -880,7 +880,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 					dht.BootstrapPeers(pis...),
 				)
 			}).
-			SetGossipSubTracer(tracer).
+			SetGossipSubTracer(meshTracer).
 			Build()
 
 		if err != nil {

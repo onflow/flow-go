@@ -1,8 +1,7 @@
-package p2pnode_test
+package tracer_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -15,8 +14,8 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,15 +29,15 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	lg := unittest.Logger()
 
-	// creates one node with a gossipsub mesh tracer, and the other node without a gossipsub mesh tracer.
-	// we only need one node with a tracer to test the tracer.
-	// tracer logs at 1 second intervals for sake of testing.
-	tracer := p2pnode.NewGossipSubMeshTracer(lg, metrics.NewNoopCollector(), idProvider, 1*time.Second)
+	// creates one node with a gossipsub mesh meshTracer, and the other node without a gossipsub mesh meshTracer.
+	// we only need one node with a meshTracer to test the meshTracer.
+	// meshTracer logs at 1 second intervals for sake of testing.
+	meshTracer := tracer.NewGossipSubMeshTracer(lg, metrics.NewNoopCollector(), idProvider, 1*time.Second)
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
-		p2ptest.WithGossipSubTracer(tracer),
+		p2ptest.WithGossipSubTracer(meshTracer),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
@@ -74,16 +73,26 @@ func TestGossipSubMeshTracer(t *testing.T) {
 			unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
-	// eventually, the tracer should have the other node in its mesh.
+	// eventually, the meshTracer should have the other node in its mesh.
 	assert.Eventually(t, func() bool {
-		if len(tracer.GetMeshPeers(topic.String())) != 0 {
-			fmt.Println("mesh peers", tracer.GetMeshPeers(topic.String()))
-		}
-		for _, peer := range tracer.GetMeshPeers(topic.String()) {
+		for _, peer := range meshTracer.GetMeshPeers(topic.String()) {
 			if peer == otherNode.Host().ID() {
 				return true
 			}
 		}
 		return false
-	}, 5*time.Second, 10*time.Millisecond)
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// otherNode unsubscribes from the topic which triggers sending a PRUNE to the tracerNode.
+	// We expect the tracerNode to remove the otherNode from its mesh.
+	require.NoError(t, otherNode.UnSubscribe(topic))
+	assert.Eventually(t, func() bool {
+		// eventually, the meshTracer should not have the other node in its mesh.
+		for _, peer := range meshTracer.GetMeshPeers(topic.String()) {
+			if peer == otherNode.Host().ID() {
+				return false
+			}
+		}
+		return true
+	}, 2*time.Second, 10*time.Millisecond)
 }

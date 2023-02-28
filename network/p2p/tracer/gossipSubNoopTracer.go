@@ -1,4 +1,4 @@
-package p2pnode
+package tracer
 
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"

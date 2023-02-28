@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -561,8 +562,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		builder.EnableGossipSubPeerScoring(idProvider)
 	}
 
-	tracer := p2pnode.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
-	builder.SetGossipSubTracer(tracer)
+	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	builder.SetGossipSubTracer(meshTracer)
 
 	if role != "ghost" {
 		r, _ := flow.ParseRole(role)

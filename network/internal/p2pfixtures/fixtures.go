@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -101,7 +101,7 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, nodeIds flow.IdentityList, opts ...nodeOpt) p2p.LibP2PNode {
 	idProvider := id.NewFixedIdentityProvider(nodeIds)
 
-	tracer := p2pnode.NewGossipSubMeshTracer(
+	meshTracer := tracer.NewGossipSubMeshTracer(
 		logger,
 		metrics.NewNoopCollector(),
 		idProvider,
@@ -117,7 +117,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetGossipSubTracer(tracer).
+		SetGossipSubTracer(meshTracer).
 		SetResourceManager(testutils.NewResourceManager(t))
 
 	for _, opt := range opts {
