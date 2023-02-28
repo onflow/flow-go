@@ -57,6 +57,10 @@ func (il IdentifierList) Strings() []string {
 	return list
 }
 
+func (il IdentifierList) Fingerprint() Identifier {
+	return MerkleRoot(il...)
+}
+
 func (il IdentifierList) Copy() IdentifierList {
 	cpy := make(IdentifierList, 0, il.Len())
 	return append(cpy, il...)

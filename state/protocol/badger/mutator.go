@@ -553,7 +553,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 	}
 
-	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(header)
+	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(header, currentEpochSetup)
 	if err != nil {
 		return fmt.Errorf("could not check if block is first of epoch: %w", err)
 	}
@@ -570,12 +570,14 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
 
-		epochTransitionMetrics, epochTransitionEvents, err := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
-		if err != nil {
-			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+		if isFirstBlockOfEpoch {
+			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
+			if err != nil {
+				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+			}
+			metrics = append(metrics, epochTransitionMetrics...)
+			events = append(events, epochTransitionEvents...)
 		}
-		metrics = append(metrics, epochTransitionMetrics...)
-		events = append(events, epochTransitionEvents...)
 	}
 
 	// Persist updates in database
@@ -693,48 +695,44 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 }
 
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch.
-// Approach: We retrieve the parent block's epoch information. When this block's
-// view exceeds the parent epoch's final view, this block represents the first
-// block of the next epoch.
+// We accept the EpochSetup event for the current epoch (w.r.t. input block B) which contains
+// the FirstView for the epoch (denoted W). By construction, B.View >= W.
+// Definition: B is the first block of the epoch when B.parent.View < W
 //
+// NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
 // No errors are expected during normal operation.
-func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header) (bool, error) {
-	parentBlocksEpoch := m.AtBlockID(block.ParentID).Epochs().Current()
-	parentEpochFinalView, err := parentBlocksEpoch.FinalView()
-	if err != nil {
-		return false, fmt.Errorf("could not get parent epoch final view: %w", err)
+func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header, currentEpochSetup *flow.EpochSetup) (bool, error) {
+	currentEpochFirstView := currentEpochSetup.FirstView
+	// sanity check: B.View >= W
+	if block.View < currentEpochFirstView {
+		return false, fmt.Errorf("[unexpected] data inconsistency: block (id=%x, view=%d) is below its epoch first view %d", block.ID(), block.View, currentEpochFirstView)
 	}
 
-	if block.View > parentEpochFinalView {
+	parent, err := m.headers.ByBlockID(block.ParentID)
+	if err != nil {
+		return false, fmt.Errorf("[unexpected] could not retrieve parent (id=%s): %v", block.ParentID, err)
+	}
+
+	// check for epoch transition: B.parent.View < W
+	if parent.View < currentEpochFirstView {
 		return true, nil
 	}
 	return false, nil
 }
 
 // epochTransitionMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch.
-//
-// Protocol events and updating metrics should happen when we finalize the _first_
+// and protocol events to emit for blocks which are the first block of a new epoch.
+// Protocol events and updating metrics happen once when we finalize the _first_
 // block of the new Epoch (same convention as for Epoch-Phase-Changes).
 //
-// This function should only be called when epoch fallback *has not already been triggered*.
-// No errors are expected during normal operation.
+// NOTE: This function must only be called when input `block` is the first block
+// of the epoch denoted by `currentEpochSetup`.
 func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *flow.Header, currentEpochSetup *flow.EpochSetup) (
 	metrics []func(),
 	events []func(),
-	err error,
 ) {
 
-	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(block)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not check if finalized block is first of epoch")
-	}
-	if !isFirstBlockOfEpoch {
-		return
-	}
-
 	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
-
 	// set current epoch counter corresponding to new epoch
 	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
 	// set epoch phase - since we are starting a new epoch we begin in the staking phase

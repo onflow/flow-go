@@ -398,7 +398,7 @@ func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
 }
 
 func (il IdentityList) Fingerprint() Identifier {
-	return MerkleRoot(GetIDs(il)...)
+	return GetIDs(il).Fingerprint()
 }
 
 // TotalWeight returns the total weight of all given identities.

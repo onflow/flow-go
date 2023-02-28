@@ -18,6 +18,8 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
+var _ protocol.Epoch = (*Epoch)(nil)
+
 func (e Epoch) Encodable() EncodableEpoch {
 	return e.enc
 }
@@ -91,6 +93,8 @@ func (e Epoch) FirstHeight() (uint64, error) {
 type Epochs struct {
 	enc EncodableEpochs
 }
+
+var _ protocol.EpochQuery = (*Epochs)(nil)
 
 func (eq Epochs) Previous() protocol.Epoch {
 	if eq.enc.Previous != nil {
@@ -198,15 +202,15 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate clustering: %w", err)
 	}
 
-	// TODO: double check ByIndex returns canonical order
 	members, ok := clustering.ByIndex(index)
 	if !ok {
-		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
+		return nil, fmt.Errorf("no cluster with index %d: %w", index, protocol.ErrClusterNotFound)
 	}
 
 	qcs := es.commitEvent.ClusterQCs
 	if uint(len(qcs)) <= index {
-		return nil, fmt.Errorf("no cluster with index %d", index)
+		return nil, fmt.Errorf("internal data inconsistency: cannot get qc at index %d - epoch has %d clusters and %d cluster QCs",
+			index, len(clustering), len(qcs))
 	}
 	rootQCVoteData := qcs[index]
 
@@ -233,6 +237,24 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	return cluster, err
 }
 
+func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+	clustering, err := es.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate clustering: %w", err)
+	}
+
+	for i, cl := range clustering {
+		if cluster.CanonicalClusterID(es.setupEvent.Counter, cl.NodeIDs()) == chainID {
+			cl, err := es.Cluster(uint(i))
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve known existing cluster (idx=%d, id=%s): %v", i, chainID, err)
+			}
+			return cl, nil
+		}
+	}
+	return nil, protocol.ErrClusterNotFound
+}
+
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	// filter initial participants to valid DKG participants
 	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
@@ -250,8 +272,12 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
-// startedEpoch is an epoch which has started, but not ended (ie. the current epoch.)
-// It has all the information of a committedEpoch, plus the epoch's first block height.
+// startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
+// to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
+// possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
+// in Epoch N+1, there is no definition of "last block" for Epoch N.
+//
+// startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
 type startedEpoch struct {
 	committedEpoch
 	firstHeight uint64
@@ -276,41 +302,29 @@ func (e *endedEpoch) FinalHeight() (uint64, error) {
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
 // No errors are expected during normal operations.
-func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
-	convertible := &setupEpoch{
+func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.Epoch {
+	return &setupEpoch{
 		setupEvent: setupEvent,
 	}
-	epoch, err := FromEpoch(convertible)
-	// since we are passing in a concrete service event, no errors are expected
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error constructing setup epoch from service event: %s", err.Error())
-	}
-	return epoch, nil
 }
 
 // NewCommittedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events.
 // No errors are expected during normal operations.
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
-	convertible := &committedEpoch{
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) protocol.Epoch {
+	return &committedEpoch{
 		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
 	}
-	epoch, err := FromEpoch(convertible)
-	// since we are passing in a concrete service event, no errors are expected
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error constructing committed epoch from service events: %s", err.Error())
-	}
-	return epoch, nil
 }
 
 // NewStartedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events, and the epoch's first block height.
 // No errors are expected during normal operations.
-func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) (*Epoch, error) {
-	convertible := &startedEpoch{
+func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
+	return &startedEpoch{
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
@@ -319,19 +333,13 @@ func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit,
 		},
 		firstHeight: firstHeight,
 	}
-	epoch, err := FromEpoch(convertible)
-	// since we are passing in a concrete service event, no errors are expected
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error constructing started epoch from service events: %s", err.Error())
-	}
-	return epoch, nil
 }
 
 // NewEndedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit events, and the epoch's final block height.
 // No errors are expected during normal operations.
-func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) (*Epoch, error) {
-	convertible := &endedEpoch{
+func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
+	return &endedEpoch{
 		startedEpoch: startedEpoch{
 			committedEpoch: committedEpoch{
 				setupEpoch: setupEpoch{
@@ -343,10 +351,4 @@ func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, f
 		},
 		finalHeight: finalHeight,
 	}
-	epoch, err := FromEpoch(convertible)
-	// since we are passing in a concrete service event, no errors are expected
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error constructing ended epoch from service events: %s", err.Error())
-	}
-	return epoch, nil
 }
