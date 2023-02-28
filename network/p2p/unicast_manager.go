@@ -17,9 +17,11 @@ type UnicastManager interface {
 	WithDefaultHandler(defaultHandler libp2pnet.StreamHandler)
 	// Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
 	// over previously registered ones.
+	// All errors returned from this function can be considered benign.
 	Register(unicast protocols.ProtocolName) error
 	// CreateStream tries establishing a libp2p stream to the remote peer id. It tries creating streams in the descending order of preference until
 	// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempts`, and then falls
 	// back to the less preferred one.
+	// All errors returned from this function can be considered benign.
 	CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error)
 }
