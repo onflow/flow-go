@@ -194,7 +194,8 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, maxAttempts 
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
 //
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
-// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
+// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it, the
+// multiaddr is only returned when a peer is initially dialed.
 // Expected errors during normal operations:
 //   - ErrDialInProgress if no connection to the peer exists and there is already a dial in progress to the peer. If a dial to
 //     the peer is already in progress the caller needs to wait until it is completed, a peer should be dialed only once.
@@ -206,24 +207,44 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	peerID peer.ID,
 	maxAttempts uint64,
 ) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+	isConnected, err := m.connStatus.IsConnected(peerID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// check connection status and attempt to dial the peer if dialing is not in progress
+	if !isConnected {
+		// return error if we can't start dialing
+		if m.dialingInProgress(peerID) {
+			return nil, nil, NewDialInProgressErr(peerID)
+		}
+		defer m.dialingComplete(peerID)
+		dialAddr, err := m.dialPeer(ctx, peerID, maxAttempts)
+		if err != nil {
+			return nil, dialAddr, err
+		}
+	}
+
+	// at this point dialing should have completed, we are already connected we can attempt to create the stream
+	s, err := m.rawStream(ctx, peerID, protocolID, maxAttempts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s, nil, nil
+}
+
+// dialPeer dial peer with retries.
+// Expected errors during normal operations:
+//   - ErrMaxRetries if retry attempts are exhausted
+func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, maxAttempts uint64) ([]multiaddr.Multiaddr, error) {
 	// aggregated retryable errors that occur during retries, errs will be returned
 	// if retry context times out or maxAttempts have been made before a successful retry occurs
 	var errs error
-	var s libp2pnet.Stream
-	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
-
-	// create backoff
-	backoff := retry.NewConstant(time.Second)
-	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
-	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
-	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
-	// when retries == maxAttempts causing 1 more func invocation than expected.
-	maxRetries := maxAttempts - 1
-	backoff = retry.WithMaxRetries(maxRetries, backoff)
-
-	// retryable func that will attempt to dial the peer and establish the initial connection
+	var dialAddr []multiaddr.Multiaddr
 	dialAttempts := 0
-	dialPeer := func(context.Context) error {
+	backoff := m.retryBackoff(maxAttempts)
+	f := func(context.Context) error {
 		dialAttempts++
 		select {
 		case <-ctx.Done():
@@ -244,7 +265,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			// if the connection was rejected due to invalid node id or
 			// if the connection was rejected due to connection gating skip the re-attempt
 			if IsErrSecurityProtocolNegotiationFailed(err) || IsErrGaterDisallowedConnection(err) {
-				return err
+				return multierror.Append(errs, err)
 			}
 			m.logger.Warn().
 				Err(err).
@@ -252,18 +273,36 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 				Int("attempt", dialAttempts).
 				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
-			return retry.RetryableError(err)
+			return retry.RetryableError(multierror.Append(errs, err))
 		}
 		return nil
 	}
 
-	// retryable func that will attempt to create the stream using the stream factory if connection exists
-	createStreamAttempts := 0
-	createStream := func(context.Context) error {
-		createStreamAttempts++
+	start := time.Now()
+	err := retry.Do(ctx, backoff, f)
+	duration := time.Since(start)
+	if err != nil {
+		m.metrics.OnPeerDialFailure(duration, dialAttempts)
+		return dialAddr, m.retryFailedError(uint64(dialAttempts), maxAttempts, fmt.Errorf("failed to dial peer"))
+	}
+	m.metrics.OnPeerDialed(duration, dialAttempts)
+	return dialAddr, nil
+}
+
+// rawStream creates a stream to peer with retries.
+// Expected errors during normal operations:
+//   - ErrMaxRetries if retry attempts are exhausted
+func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID protocol.ID, maxAttempts uint64) (libp2pnet.Stream, error) {
+	// aggregated retryable errors that occur during retries, errs will be returned
+	// if retry context times out or maxAttempts have been made before a successful retry occurs
+	var errs error
+	var s libp2pnet.Stream
+	attempts := 0
+	f := func(context.Context) error {
+		attempts++
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", createStreamAttempts, errs)
+			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", attempts, errs)
 		default:
 		}
 
@@ -278,53 +317,41 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 			if IsErrProtocolNotSupported(err) {
 				return err
 			}
-			errs = multierror.Append(errs, err)
-			return retry.RetryableError(errs)
+			return retry.RetryableError(multierror.Append(errs, err))
 		}
 		return nil
 	}
 
-	isConnected, err := m.connStatus.IsConnected(peerID)
-	if err != nil {
-		return nil, dialAddr, err
-	}
-
-	// check connection status and attempt to dial the peer if dialing is not in progress
-	if !isConnected {
-		// return error if we can't start dialing
-		if m.dialingInProgress(peerID) {
-			return nil, dialAddr, NewDialInProgressErr(peerID)
-		}
-		defer m.dialingComplete(peerID)
-
-		start := time.Now()
-		err = retry.Do(ctx, backoff, dialPeer)
-		duration := time.Since(start)
-		if err != nil {
-			if uint64(dialAttempts) == maxAttempts {
-				err = fmt.Errorf("failed to dial peer max attempts reached %d: %w", maxAttempts, err)
-			}
-			m.metrics.OnPeerDialFailure(duration, dialAttempts)
-			return nil, dialAddr, err
-		}
-
-		m.metrics.OnPeerDialed(duration, dialAttempts)
-	}
-
-	// at this point dialing should have completed, we are already connected we can attempt to create the stream
 	start := time.Now()
-	err = retry.Do(ctx, backoff, createStream)
+	err := retry.Do(ctx, m.retryBackoff(maxAttempts), f)
 	duration := time.Since(start)
 	if err != nil {
-		if uint64(createStreamAttempts) == maxAttempts {
-			err = fmt.Errorf("failed to create a stream to peer max attempts reached %d: %w", maxAttempts, err)
-		}
-		m.metrics.OnEstablishStreamFailure(duration, createStreamAttempts)
-		return nil, dialAddr, err
+		m.metrics.OnEstablishStreamFailure(duration, attempts)
+		return nil, m.retryFailedError(uint64(attempts), maxAttempts, fmt.Errorf("failed to create a stream to peer"))
 	}
+	m.metrics.OnStreamEstablished(duration, attempts)
+	return s, nil
+}
 
-	m.metrics.OnStreamEstablished(duration, createStreamAttempts)
-	return s, dialAddr, nil
+// retryBackoff returns an exponential retry with jitter and max attempts.
+func (m *Manager) retryBackoff(maxAttempts uint64) retry.Backoff {
+	// create backoff
+	backoff := retry.NewConstant(time.Second)
+	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
+	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
+	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
+	// when retries == maxAttempts causing 1 more func invocation than expected.
+	maxRetries := maxAttempts - 1
+	backoff = retry.WithMaxRetries(maxRetries, backoff)
+	return backoff
+}
+
+// retryFailedError wraps the given error in a ErrMaxRetries if maxAttempts were made.
+func (m *Manager) retryFailedError(dialAttempts, maxAttempts uint64, err error) error {
+	if dialAttempts == maxAttempts {
+		return NewMaxRetriesErr(dialAttempts, err)
+	}
+	return err
 }
 
 // dialingInProgress sets the value for peerID key in our map if it does not already exist.
