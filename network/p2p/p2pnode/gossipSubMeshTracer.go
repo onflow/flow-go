@@ -47,9 +47,7 @@ func NewGossipSubMeshTracer(
 
 	g.Component = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			g.logLoop(ctx)
+			go g.logLoop(ctx, ready)
 		}).
 		Build()
 
@@ -105,7 +103,9 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
-func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
+func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	ticker := time.NewTicker(t.loggerInterval)
 	defer ticker.Stop()
 
@@ -131,7 +131,7 @@ func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 // Also, note that the mesh peers are also logged reactively when a peer is added or removed from the mesh.
 func (t *GossipSubMeshTracer) logPeers() {
 	t.topicMeshMu.RLock()
-	defer t.topicMeshMu.Unlock()
+	defer t.topicMeshMu.RUnlock()
 
 	for topic := range t.topicMeshMap {
 		shouldWarn := false // whether we should warn about the mesh state
