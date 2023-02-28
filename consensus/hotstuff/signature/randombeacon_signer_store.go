@@ -31,7 +31,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 // It returns:
 //   - (signer, nil) if DKG succeeded locally in the epoch of the view, signer is not nil
 //   - (nil, model.ErrViewForUnknownEpoch) if no epoch found for given view
-//   - (nil, DKGFailError) if DKG failed locally in the epoch of the view
+//   - (nil, ErrDKGFailed) if DKG failed locally in the epoch of the view
 //   - (nil, error) if there is any exception
 func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
 	// fetching the epoch by view, if epoch is found, then DKG must have been completed
@@ -55,7 +55,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 		// A nil key means that we don't have a Random Beacon key for this epoch.
 		if key == nil {
 			return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
-				epoch, view, module.DKGFailError)
+				epoch, view, module.ErrDKGFailed)
 		}
 		return key, nil
 	}
@@ -72,7 +72,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	if !safe {
 		s.privateKeys[epoch] = nil
 		return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
-			epoch, view, module.DKGFailError)
+			epoch, view, module.ErrDKGFailed)
 	}
 
 	// DKG succeeded and a random beacon key is available,

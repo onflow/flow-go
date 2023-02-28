@@ -131,7 +131,7 @@ func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
-		if errors.Is(err, module.DKGFailError) {
+		if errors.Is(err, module.ErrDKGFailed) {
 			return stakingSig, nil
 		}
 		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)

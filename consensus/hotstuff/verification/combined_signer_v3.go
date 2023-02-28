@@ -123,7 +123,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 
 	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
-		if errors.Is(err, module.DKGFailError) {
+		if errors.Is(err, module.ErrDKGFailed) {
 			// if the node failed DKG, then using the staking key to sign the block as a
 			// fallback
 			stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
