@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -29,7 +30,7 @@ type GossipSubMeshTracer struct {
 	metrics        module.GossipSubLocalMeshMetrics
 }
 
-var _ pubsub.RawTracer = (*GossipSubMeshTracer)(nil)
+var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
 func NewGossipSubMeshTracer(
 	logger zerolog.Logger,
