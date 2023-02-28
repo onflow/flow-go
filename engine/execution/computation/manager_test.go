@@ -295,7 +295,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	snapshot := delta.NewReadFuncStorageSnapshot(
+	snapshot := state.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, fmt.Errorf("error getting register")
 		})
@@ -549,7 +549,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 	context.Context,
 	flow.Identifier,
 	*entity.ExecutableBlock,
-	delta.StorageSnapshot,
+	state.StorageSnapshot,
 	*derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
