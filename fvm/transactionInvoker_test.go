@@ -99,6 +99,12 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+var _ runtime.Runtime = &ErrorReturningRuntime{}
+
+func (e *ErrorReturningRuntime) Config() runtime.Config {
+	panic("Config not expected")
+}
+
 func (e *ErrorReturningRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
 	panic("NewScriptExecutor not expected")
 }
@@ -118,8 +124,6 @@ func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) 
 func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
-
-var _ runtime.Runtime = &ErrorReturningRuntime{}
 
 func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	if len(e.TxErrors) == 0 {

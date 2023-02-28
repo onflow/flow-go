@@ -702,7 +702,7 @@ type HeroCacheMetrics interface {
 	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 	// This normally happens -- and is expected -- when the cache is full.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectionDueToFullCapacity()
+	OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)
 
 	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.
