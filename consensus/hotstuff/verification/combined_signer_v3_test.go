@@ -22,12 +22,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Test that when DKG key is available for a view, a signed block can pass the validation
+// Test that when beacon key is available for a view, a signed block can pass the validation
 // the sig is a random beacon sig.
-func TestCombinedSignWithDKGKeyV3(t *testing.T) {
+func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
@@ -40,8 +40,8 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
-	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
+	// there is beacon key for this epoch
+	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(beaconKey, true, nil)
 
 	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
@@ -74,7 +74,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
+	beaconSig, err := beaconKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
@@ -89,12 +89,12 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
-// Test that when DKG key is not available for a view, a signed block can pass the validation
+// Test that when beacon key is not available for a view, a signed block can pass the validation
 // the sig is a staking sig
-func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
+func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
@@ -107,7 +107,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	keys := &storagemock.SafeBeaconKeys{}
-	// there is no DKG key for this epoch
+	// there is no beacon key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
