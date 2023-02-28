@@ -3,7 +3,6 @@ package unicast
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -16,6 +15,7 @@ import (
 
 const (
 	protocolNegotiationFailedStr = "failed to negotiate security protocol"
+	protocolNotSupportedStr      = "protocol not supported"
 )
 
 // StreamFactory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
@@ -28,6 +28,9 @@ type StreamFactory interface {
 	// Expected errors during normal operations:
 	//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
 	Connect(context.Context, peer.AddrInfo) error
+	// NewStream creates a new stream on the libp2p host.
+	// Expected errors during normal operations:
+	//   - ErrProtocolNotSupported this indicates remote node is running on a different spork.
 	NewStream(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)
 }
 
@@ -55,7 +58,7 @@ func (l *LibP2PStreamFactory) ClearBackoff(p peer.ID) {
 
 // Connect connects host to peer with peerAddrInfo.
 // Expected errors during normal operations:
-//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
+//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
 func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.AddrInfo) error {
 	err := l.host.Connect(ctx, peerAddrInfo)
 	switch {
@@ -64,12 +67,22 @@ func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.Add
 	case strings.Contains(err.Error(), protocolNegotiationFailedStr):
 		return NewSecurityProtocolNegotiationErr(peerAddrInfo.ID, err)
 	case errors.Is(err, swarm.ErrGaterDisallowedConnection):
-		return fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+		return NewGaterDisallowedConnectionErr(err)
 	default:
 		return err
 	}
 }
 
+// NewStream creates a new stream on the libp2p host.
+// Expected errors during normal operations:
+//   - ErrProtocolNotSupported this indicates remote node is running on a different spork.
 func (l *LibP2PStreamFactory) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
-	return l.host.NewStream(ctx, p, pids...)
+	s, err := l.host.NewStream(ctx, p, pids...)
+	if err != nil {
+		if strings.Contains(err.Error(), protocolNotSupportedStr) {
+			return nil, NewProtocolNotSupportedErr(p, pids, err)
+		}
+		return nil, err
+	}
+	return s, err
 }

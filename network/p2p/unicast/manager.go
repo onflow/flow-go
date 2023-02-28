@@ -2,9 +2,7 @@ package unicast
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,7 +10,6 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
@@ -246,7 +243,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		if err != nil {
 			// if the connection was rejected due to invalid node id or
 			// if the connection was rejected due to connection gating skip the re-attempt
-			if IsErrSecurityProtocolNegotiationFailed(err) || errors.Is(err, swarm.ErrGaterDisallowedConnection) {
+			if IsErrSecurityProtocolNegotiationFailed(err) || IsErrGaterDisallowedConnection(err) {
 				return err
 			}
 			m.logger.Warn().
@@ -278,8 +275,8 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
-			if strings.Contains(err.Error(), "protocol not supported") {
-				return fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, protocolID)
+			if IsErrProtocolNotSupported(err) {
+				return err
 			}
 			errs = multierror.Append(errs, err)
 			return retry.RetryableError(errs)
