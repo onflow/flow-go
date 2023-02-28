@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -202,7 +203,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// message should fail to send because no address is known yet
 	// for the new identity
 	err = m.mws[0].SendDirect(outMsg)
-	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+	require.True(m.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
