@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // #cgo CFLAGS:
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "dkg_include.h"
@@ -203,7 +202,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current participant
-	x := newPrKeyBLSBLS12381(&jointx)
+	x := newPrKeyBLSBLS12381(jointx)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(jointPublicKey)
@@ -338,4 +337,4 @@ func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2
 		}
 	}
 	return qualifiedx, qualifiedPubKey, qualifiedy
-}*/
+}

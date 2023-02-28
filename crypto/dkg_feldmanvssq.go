@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
@@ -203,14 +202,13 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 		return nil, nil, nil, dkgFailureErrorf("group private key is identity and is therefore invalid")
 	}
 	return x, Y, y, nil
-}*/
+}
 
 const (
 	complaintSize       = 1
 	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
-/*
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 // orig is the message origin index
 //
@@ -624,7 +622,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
-		err := readScalarFrStar(&s.complaints[complainer].answer, data[1])
+		err := readScalarFrStar(&s.complaints[complainer].answer, data[1:])
 		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
@@ -645,7 +643,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		err := readScalarFrStar(&c.answer, data[1])
+		err := readScalarFrStar(&c.answer, data[1:])
 		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
@@ -666,4 +664,4 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			s.x = c.answer
 		}
 	}
-}*/
+}

@@ -21,8 +21,8 @@ func TestBLSThresholdSignature(t *testing.T) {
 	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
 	t.Run("centralized_stateful_keygen", testCentralizedStatefulAPI)
-	//t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
-	//t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
+	t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
+	t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
 }
 
 const thresholdSignatureTag = "random tag"
@@ -314,7 +314,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 // Distributed Threshold Signature stateful api test
 // keys are generated using simple Feldman VSS
-/*func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
+func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
@@ -439,7 +439,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 		// synchronize the main thread to end TS
 		sync.Wait()
 	}
-}*/
+}
 
 // This is a testing function
 // It simulates processing incoming messages by a participant during DKG
