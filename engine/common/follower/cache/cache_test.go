@@ -224,5 +224,5 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 	}
 
-	wg.Wait()
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 }

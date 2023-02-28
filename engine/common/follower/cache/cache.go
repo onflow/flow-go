@@ -14,8 +14,8 @@ import (
 type OnEquivocation func(first *flow.Block, other *flow.Block)
 
 // Cache stores pending blocks received from other replicas, caches blocks by blockID, it also
-// maintains secondary index by view and by parent. Additional indexes are used to track proposal equivocation(multiple
-// valid proposals for same block) and find blocks not only by parent but also by child.
+// maintains secondary index by view and by parent. Additional indexes are used to track proposal equivocation
+// (multiple valid proposals for same block) and find blocks not only by parent but also by child.
 // Resolves certified blocks when processing incoming batches.
 // Concurrency safe.
 type Cache struct {
@@ -50,11 +50,11 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 			limit,
 			herocache.DefaultOversizeFactor,
 			heropool.RandomEjection,
-			log.With().Str("follower", "cache").Logger(),
+			log.With().Str("component", "follower.cache").Logger(),
 			distributor,
 		),
-		byView:         make(map[uint64]*flow.Block, 0),
-		byParent:       make(map[flow.Identifier]*flow.Block, 0),
+		byView:         make(map[uint64]*flow.Block),
+		byParent:       make(map[flow.Identifier]*flow.Block),
 		onEquivocation: onEquivocation,
 	}
 	distributor.AddConsumer(cache.handleEjectedEntity)
@@ -72,8 +72,9 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 
 // AddBlocks atomically applies batch of blocks to the cache of pending but not yet certified blocks. Upon insertion cache tries to resolve
 // incoming blocks to what is stored in the cache.
-// We require that incoming batch is sorted by height and doesn't have skipped blocks.
-// When receiving batch: [first, ..., last], we are only interested in first and last blocks since all other blocks will be certified by definition.
+// We require that incoming batch is sorted in ascending height order and doesn't have skipped blocks.
+// When receiving batch: [first, ..., last], we are only interested in first and last blocks. All blocks before
+// `last` are certified by construction (by the QC included in `last`).
 // Next scenarios are possible:
 // - for first block:
 //   - no parent available for first block, we need to cache it since it will be used to certify parent when it's available.
@@ -83,6 +84,10 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 //   - no child available for last block, we need to cache it since it's not certified yet.
 //   - child for last block available in cache allowing to certify it, no need to store last block in cache.
 //
+// The function returns any new certified chain of blocks created by addition of the batch.
+// Returns `nil, nil` if the input batch has exactly one block and neither its parent nor child is in the cache.
+// Returns `certifiedBatch, certifyingQC` if the input batch has more than one block, and/or if either a child
+// or parent of the batch is in the cache. 
 // Note that implementation behaves correctly where len(batch) == 1.
 // If message equivocation was detected it will be reported using a notification.
 // Concurrency safe.
