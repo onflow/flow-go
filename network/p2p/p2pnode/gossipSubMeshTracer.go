@@ -19,7 +19,6 @@ import (
 // It also logs the mesh peers and updates the local mesh size metric.
 type GossipSubMeshTracer struct {
 	pubsub.RawTracer
-	component.ComponentManager
 	component.Component
 
 	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
