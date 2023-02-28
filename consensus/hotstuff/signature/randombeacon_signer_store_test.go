@@ -75,7 +75,7 @@ func (suite *BeaconKeyStore) Test_BeaconKeys_Unsafe() {
 	suite.beaconKeys.On("RetrieveMyBeaconPrivateKey", epoch).Return(nil, false, nil)
 
 	key, err := suite.store.ByView(view)
-	require.ErrorIs(suite.T(), err, module.ErrDKGFailed)
+	require.ErrorIs(suite.T(), err, module.ErrNoBeaconKeyForEpoch)
 	_ = key
 }
 
