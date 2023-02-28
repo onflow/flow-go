@@ -7,6 +7,8 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+
+	"github.com/onflow/flow-go/module/component"
 )
 
 type ValidationResult int
@@ -104,5 +106,6 @@ type SubscriptionFilter interface {
 }
 
 type PubSubTracer interface {
+	component.Component
 	pubsub.RawTracer
 }

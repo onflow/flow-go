@@ -181,7 +181,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
 	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
-	fnb.flags.BoolVar(&fnb.BaseConfig.PeerScoringEnabled, "peer-scoring-enabled", defaultConfig.PeerScoringEnabled, "enabling peer scoring on pubsub network")
+	fnb.flags.BoolVar(&fnb.BaseConfig.GossipSubConfig.PeerScoring, "peer-scoring-enabled", defaultConfig.GossipSubConfig.PeerScoring, "enabling peer scoring on pubsub network")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
@@ -353,13 +353,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.IdentityProvider,
 			fnb.Metrics.Network,
 			fnb.Resolver,
-			fnb.PeerScoringEnabled,
 			fnb.BaseConfig.NodeRole,
 			connGaterPeerDialFilters,
 			connGaterInterceptSecureFilters,
 			// run peer manager with the specified interval and let it also prune connections
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
+			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
 			fnb.UnicastRateLimiterDistributor,
 		)

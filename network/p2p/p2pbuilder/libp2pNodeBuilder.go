@@ -44,7 +44,25 @@ import (
 const (
 	defaultMemoryLimitRatio     = 0.2 // flow default
 	defaultFileDescriptorsRatio = 0.5 // libp2p default
+
+	// DefaultPeerScoringEnabled is the default value for enabling peer scoring.
+	defaultPeerScoringEnabled = true // enable peer scoring by default on node builder
+
+	// DefaultMeshTracerLoggingInterval is the default interval at which the mesh tracer logs the mesh
+	// topology. This is used for debugging and forensics purposes.
+	// Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
+	// mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
+	// topology as a whole specially when there are no updates to the mesh topology for a long time.
+	defaultMeshTracerLoggingInterval = 1 * time.Minute
 )
+
+// DefaultGossipSubConfig returns the default configuration for the gossipsub protocol.
+func DefaultGossipSubConfig() *GossipSubConfig {
+	return &GossipSubConfig{
+		PeerScoring:          defaultPeerScoringEnabled,
+		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
+	}
+}
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
@@ -65,11 +83,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
-	peerScoringEnabled bool,
 	role string,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
 	connectionPruning bool,
 	updateInterval time.Duration,
+	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
 ) LibP2PFactoryFunc {
@@ -84,9 +102,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			role,
 			onInterceptPeerDialFilters,
 			onInterceptSecuredFilters,
-			peerScoringEnabled,
 			connectionPruning,
 			updateInterval,
+			gossipCfg,
 			rCfg,
 			unicastRateLimiterDistributor)
 
@@ -110,6 +128,7 @@ type NodeBuilder interface {
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
+	SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -121,6 +140,14 @@ type ResourceManagerConfig struct {
 	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
+// GossipSubConfig is the configuration for the GossipSub pubsub implementation.
+type GossipSubConfig struct {
+	// LocalMeshLogInterval is the interval at which the local mesh is logged.
+	LocalMeshLogInterval time.Duration
+	// PeerScoring is whether to enable GossipSub peer scoring.
+	PeerScoring bool
+}
+
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
 	return &ResourceManagerConfig{
 		MemoryLimitRatio:     defaultMemoryLimitRatio,
@@ -129,21 +156,26 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID                     flow.Identifier
-	addr                        string
-	networkKey                  fcrypto.PrivateKey
-	logger                      zerolog.Logger
-	metrics                     module.LibP2PMetrics
-	basicResolver               madns.BasicResolver
-	subscriptionFilter          pubsub.SubscriptionFilter
-	resourceManager             network.ResourceManager
-	resourceManagerCfg          *ResourceManagerConfig
-	connManager                 connmgr.ConnManager
-	connGater                   connmgr.ConnectionGater
-	idProvider                  module.IdentityProvider
-	gossipSubFactory            GossipSubFactoryFunc
-	gossipSubConfigFunc         GossipSubAdapterConfigFunc
-	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
+	sporkID              flow.Identifier
+	addr                 string
+	networkKey           fcrypto.PrivateKey
+	logger               zerolog.Logger
+	metrics              module.LibP2PMetrics
+	basicResolver        madns.BasicResolver
+	subscriptionFilter   pubsub.SubscriptionFilter
+	resourceManager      network.ResourceManager
+	resourceManagerCfg   *ResourceManagerConfig
+	connManager          connmgr.ConnManager
+	connGater            connmgr.ConnectionGater
+	idProvider           module.IdentityProvider
+	gossipSubFactory     GossipSubFactoryFunc
+	gossipSubConfigFunc  GossipSubAdapterConfigFunc
+	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
+
+	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
+	// certain events. Currently, we use it to log and observe the local mesh of the node.
+	gossipSubTracer p2p.PubSubTracer
+
 	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning    bool
 	peerManagerUpdateInterval   time.Duration
@@ -232,6 +264,11 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
 	builder.peerManagerEnablePruning = connectionPruning
 	builder.peerManagerUpdateInterval = updateInterval
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder {
+	builder.gossipSubTracer = tracer
 	return builder
 }
 
@@ -393,7 +430,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				}
 			}
 		}).
-		Build()
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			builder.logger.Debug().Msg("starting libp2p tracer")
+			builder.gossipSubTracer.Start(ctx)
+
+			ready()
+		}).Build()
 
 	node.SetComponentManager(cm)
 
@@ -475,9 +517,9 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	resolver madns.BasicResolver,
 	role string,
 	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
-	peerScoringEnabled bool,
 	connectionPruning bool,
 	updateInterval time.Duration,
+	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) (NodeBuilder, error) {
 
@@ -506,9 +548,12 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(unicastRateLimiterDistributor)
 
-	if peerScoringEnabled {
+	if gossipCfg.PeerScoring {
 		builder.EnableGossipSubPeerScoring(idProvider)
 	}
+
+	tracer := p2pnode.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	builder.SetGossipSubTracer(tracer)
 
 	if role != "ghost" {
 		r, _ := flow.ParseRole(role)

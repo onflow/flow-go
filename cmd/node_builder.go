@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -183,9 +182,8 @@ type NetworkConfig struct {
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning bool
-
-	PeerScoringEnabled              bool // enables peer scoring on pubsub
+	NetworkConnectionPruning        bool
+	GossipSubConfig                 *p2pbuilder.GossipSubConfig
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
 	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
@@ -279,7 +277,7 @@ func DefaultBaseConfig() *BaseConfig {
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
 			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
+			GossipSubConfig:                 p2pbuilder.DefaultGossipSubConfig(),
 			UnicastMessageRateLimit:         0,
 			UnicastBandwidthRateLimit:       0,
 			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,

@@ -31,12 +31,18 @@ type GossipSubMeshTracer struct {
 
 var _ pubsub.RawTracer = (*GossipSubMeshTracer)(nil)
 
-func NewGossipSubTopologyTracer(logger zerolog.Logger, metrics module.GossipSubLocalMeshMetrics, idProvider module.IdentityProvider) *GossipSubMeshTracer {
+func NewGossipSubMeshTracer(
+	logger zerolog.Logger,
+	metrics module.GossipSubLocalMeshMetrics,
+	idProvider module.IdentityProvider,
+	loggerInterval time.Duration) *GossipSubMeshTracer {
+
 	g := &GossipSubMeshTracer{
-		topicMeshMap: make(map[string]map[peer.ID]struct{}),
-		idProvider:   idProvider,
-		metrics:      metrics,
-		logger:       logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
+		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
+		idProvider:     idProvider,
+		metrics:        metrics,
+		logger:         logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
+		loggerInterval: loggerInterval,
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
