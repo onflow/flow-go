@@ -182,7 +182,7 @@ func (executor *scriptExecutor) execute() error {
 		executor.txnState,
 		executor.derivedTxnData)
 	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
+		return fmt.Errorf("error getting meter parameters: %w", err)
 	}
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
@@ -208,8 +208,18 @@ func (executor *scriptExecutor) execute() error {
 	executor.proc.Value = value
 	executor.proc.Logs = executor.env.Logs()
 	executor.proc.Events = executor.env.Events()
-	executor.proc.GasUsed = executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
+
+	computationUsed, err := executor.env.ComputationUsed()
+	if err != nil {
+		return fmt.Errorf("error getting computation used: %w", err)
+	}
+	executor.proc.GasUsed = computationUsed
+
+	memoryUsed, err := executor.env.MemoryUsed()
+	if err != nil {
+		return fmt.Errorf("error getting memory used: %w", err)
+	}
+	executor.proc.MemoryEstimate = memoryUsed
 
 	_, err = executor.txnState.Commit(txnId)
 	return err
