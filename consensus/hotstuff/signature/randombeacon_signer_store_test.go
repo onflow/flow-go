@@ -23,9 +23,6 @@ type BeaconKeyStore struct {
 	epochLookup *mockmodule.EpochLookup
 	beaconKeys  *mockstorage.SafeBeaconKeys
 	store       *EpochAwareRandomBeaconKeyStore
-
-	view  uint64
-	epoch uint64
 }
 
 func TestBeaconKeyStore(t *testing.T) {
