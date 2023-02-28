@@ -2221,7 +2221,7 @@ func TestScriptIterationShouldNotHitsParseRestrictions(t *testing.T) {
 }
 
 func TestAuthAccountCapabilities(t *testing.T) {
-	test := func(t *testing.T, linkingEnabled bool) {
+	test := func(t *testing.T, allowAccountLinking bool) {
 		newVMTest().
 			withBootstrapProcedureOptions().
 			withContextOptions(
@@ -2229,7 +2229,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 					reusableRuntime.NewReusableCadenceRuntimePool(
 						1,
 						runtime.Config{
-							AccountLinkingEnabled: linkingEnabled,
+							AccountLinkingEnabled: true,
 						},
 					),
 				),
@@ -2253,13 +2253,26 @@ func TestAuthAccountCapabilities(t *testing.T) {
 					require.NoError(t, err)
 					account := accounts[0]
 
-					txBody := flow.NewTransactionBody().SetScript([]byte(`
-					   transaction {
-						   prepare(acct: AuthAccount) {
-							   acct.linkAccount(/public/foo)
-						   }
-					   }
-					`)).
+					var pragma string
+					if allowAccountLinking {
+						pragma = "#allowAccountLinking"
+					}
+
+					code := fmt.Sprintf(
+						`
+                          %s
+
+                          transaction {
+                              prepare(acct: AuthAccount) {
+                                  acct.linkAccount(/public/foo)
+                              }
+                          }
+                        `,
+						pragma,
+					)
+
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(code)).
 						AddAuthorizer(account).
 						SetPayer(chain.ServiceAddress()).
 						SetProposalKey(chain.ServiceAddress(), 0, 0)
@@ -2270,7 +2283,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 
 					err = vm.Run(ctx, tx, view)
 					require.NoError(t, err)
-					if linkingEnabled {
+					if allowAccountLinking {
 						require.NoError(t, tx.Err)
 					} else {
 						require.Error(t, tx.Err)
@@ -2279,11 +2292,11 @@ func TestAuthAccountCapabilities(t *testing.T) {
 			)(t)
 	}
 
-	t.Run("linking enabled", func(t *testing.T) {
+	t.Run("account linking allowed", func(t *testing.T) {
 		test(t, true)
 	})
-	t.Run("linking disabled", func(t *testing.T) {
+
+	t.Run("account linking disallowed", func(t *testing.T) {
 		test(t, false)
 	})
-
 }
