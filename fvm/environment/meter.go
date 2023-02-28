@@ -49,14 +49,16 @@ const (
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
-	ComputationUsed() uint64
+	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
-	MemoryEstimate() uint64
+	MemoryUsed() (uint64, error)
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
+
+	InteractionUsed() (uint64, error)
 }
 
 type meterImpl struct {
@@ -80,16 +82,20 @@ func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensi
 	return meter.txnState.ComputationIntensities()
 }
 
-func (meter *meterImpl) ComputationUsed() uint64 {
-	return meter.txnState.TotalComputationUsed()
+func (meter *meterImpl) ComputationUsed() (uint64, error) {
+	return meter.txnState.TotalComputationUsed(), nil
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
 	return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (meter *meterImpl) MemoryEstimate() uint64 {
-	return meter.txnState.TotalMemoryEstimate()
+func (meter *meterImpl) MemoryUsed() (uint64, error) {
+	return meter.txnState.TotalMemoryEstimate(), nil
+}
+
+func (meter *meterImpl) InteractionUsed() (uint64, error) {
+	return meter.txnState.InteractionUsed(), nil
 }
 
 func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
