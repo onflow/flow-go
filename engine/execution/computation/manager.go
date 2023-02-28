@@ -122,16 +122,13 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
-	chainID := vmCtx.Chain.ChainID()
-
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled: params.CadenceTracing,
-					// AccountLinking is enabled everywhere except on mainnet
-					AccountLinkingEnabled: chainID != flow.Mainnet,
+					TracingEnabled:        params.CadenceTracing,
+					AccountLinkingEnabled: true,
 				},
 			),
 		),
