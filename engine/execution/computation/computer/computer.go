@@ -111,7 +111,7 @@ type BlockComputer interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot delta.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
@@ -181,7 +181,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -283,7 +283,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,

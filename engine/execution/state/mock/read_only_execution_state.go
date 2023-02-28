@@ -5,7 +5,7 @@ package mock
 import (
 	context "context"
 
-	delta "github.com/onflow/flow-go/engine/execution/state/delta"
+	fvmstate "github.com/onflow/flow-go/fvm/state"
 	flow "github.com/onflow/flow-go/model/flow"
 
 	messages "github.com/onflow/flow-go/model/messages"
@@ -201,15 +201,15 @@ func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
 }
 
 // NewStorageSnapshot provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) delta.StorageSnapshot {
+func (_m *ReadOnlyExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) fvmstate.StorageSnapshot {
 	ret := _m.Called(_a0)
 
-	var r0 delta.StorageSnapshot
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) delta.StorageSnapshot); ok {
+	var r0 fvmstate.StorageSnapshot
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) fvmstate.StorageSnapshot); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(delta.StorageSnapshot)
+			r0 = ret.Get(0).(fvmstate.StorageSnapshot)
 		}
 	}
 
