@@ -54,8 +54,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	if found {
 		// A nil key means that we don't have a Random Beacon key for this epoch.
 		if key == nil {
-			return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
-				epoch, view, module.ErrDKGFailed)
+			return nil, fmt.Errorf("DKG for epoch %d failed (view=%d): %w", epoch, view, module.ErrDKGFailed)
 		}
 		return key, nil
 	}
