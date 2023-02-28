@@ -408,6 +408,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				return nil
 			})
 
+			if builder.gossipSubTracer != nil {
+				gossipSubConfigs.WithTracer(builder.gossipSubTracer)
+			}
+
 			// builds GossipSub with the given factory
 			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
 			if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -18,7 +19,6 @@ import (
 // GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
 // It also logs the mesh peers and updates the local mesh size metric.
 type GossipSubMeshTracer struct {
-	pubsub.RawTracer
 	component.Component
 
 	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
@@ -52,6 +52,18 @@ func NewGossipSubMeshTracer(
 		Build()
 
 	return g
+}
+
+// GetMeshPeers returns the local mesh peers for the given topic.
+func (t *GossipSubMeshTracer) GetMeshPeers(topic string) []peer.ID {
+	t.topicMeshMu.RLock()
+	defer t.topicMeshMu.RUnlock()
+
+	peers := make([]peer.ID, 0, len(t.topicMeshMap[topic]))
+	for p := range t.topicMeshMap[topic] {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 // Graft is called when a peer is added to a topic mesh. The tracer uses this to track the mesh peers.
@@ -164,4 +176,56 @@ func (t *GossipSubMeshTracer) logPeers() {
 		}
 		lg.Info().Msg("topic mesh peers of local node since last heartbeat")
 	}
+}
+
+func (t *GossipSubMeshTracer) AddPeer(p peer.ID, proto protocol.ID) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) RemovePeer(p peer.ID) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) Join(topic string) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) Leave(topic string) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) ThrottlePeer(p peer.ID) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) RecvRPC(rpc *pubsub.RPC) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
+	// no-op
+}
+
+func (t *GossipSubMeshTracer) UndeliverableMessage(msg *pubsub.Message) {
+	// no-op
 }
