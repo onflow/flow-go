@@ -419,6 +419,12 @@ func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOpt
 	}
 }
 
+func withGossipSubTracer(tracer p2p.PubSubTracer) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetGossipSubTracer(tracer)
+	}
+}
+
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,

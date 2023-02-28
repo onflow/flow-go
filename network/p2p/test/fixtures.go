@@ -125,6 +125,10 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.PubSubTracer != nil {
+		builder.SetGossipSubTracer(parameters.PubSubTracer)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -139,6 +143,7 @@ func NodeFixture(
 	if parameters.PeerProvider != nil {
 		n.WithPeersProvider(parameters.PeerProvider)
 	}
+
 	return n, *identity
 }
 
@@ -164,12 +169,19 @@ type NodeFixtureParameters struct {
 	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
 	Metrics            module.LibP2PMetrics
 	ResourceManager    network.ResourceManager
+	PubSubTracer       p2p.PubSubTracer
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
 		p.IdProvider = idProvider
+	}
+}
+
+func WithGossipSubTracer(tracer p2p.PubSubTracer) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.PubSubTracer = tracer
 	}
 }
 

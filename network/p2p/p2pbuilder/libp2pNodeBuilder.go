@@ -431,6 +431,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			if builder.gossipSubTracer == nil {
+				builder.logger.Warn().Msg("libp2p tracer is not set")
+				return
+			}
 			builder.logger.Debug().Msg("starting libp2p tracer")
 			builder.gossipSubTracer.Start(ctx)
 
