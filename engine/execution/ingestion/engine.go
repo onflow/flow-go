@@ -623,13 +623,13 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	view := e.execState.NewView(*executableBlock.StartState)
+	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
 		parentErID,
 		executableBlock,
-		view)
+		snapshot)
 	if err != nil {
 		lg.Err(err).Msg("error while computing block")
 		return
@@ -1099,7 +1099,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
-	blockView := e.execState.NewView(stateCommit)
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
 	if e.extensiveLogging {
 		args := make([]string, 0)
@@ -1114,7 +1114,12 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 			Str("args", strings.Join(args[:], ",")).
 			Msg("extensive log: executed script content")
 	}
-	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
+	return e.computationManager.ExecuteScript(
+		ctx,
+		script,
+		arguments,
+		block,
+		blockSnapshot)
 }
 
 func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
@@ -1124,10 +1129,10 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
 
-	blockView := e.execState.NewView(stateCommit)
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
 	id := flow.NewRegisterID(string(owner), string(key))
-	data, err := blockView.Get(id)
+	data, err := blockSnapshot.Get(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
 	}
@@ -1144,7 +1149,12 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 	// return early if state with the given state commitment is not in memory
 	// and already purged. This reduces allocations for get accounts targeting old blocks.
 	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf("failed to get account at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block.", blockID.String(), hex.EncodeToString(stateCommit[:]))
+		return nil, fmt.Errorf(
+			"failed to get account at block (%s): state commitment not "+
+				"found (%s). this error usually happens if the reference "+
+				"block for this script is not set to a recent block.",
+			blockID.String(),
+			hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()
@@ -1152,9 +1162,9 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
-	blockView := e.execState.NewView(stateCommit)
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.GetAccount(addr, block, blockView)
+	return e.computationManager.GetAccount(addr, block, blockSnapshot)
 }
 
 // save the execution result of a block

@@ -32,7 +32,7 @@ func (_m *Meter) ComputationIntensities() meter.MeteredComputationIntensities {
 }
 
 // ComputationUsed provides a mock function with given fields:
-func (_m *Meter) ComputationUsed() uint64 {
+func (_m *Meter) ComputationUsed() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64
@@ -42,11 +42,18 @@ func (_m *Meter) ComputationUsed() uint64 {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// MemoryEstimate provides a mock function with given fields:
-func (_m *Meter) MemoryEstimate() uint64 {
+// InteractionUsed provides a mock function with given fields:
+func (_m *Meter) InteractionUsed() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64
@@ -56,7 +63,35 @@ func (_m *Meter) MemoryEstimate() uint64 {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MemoryUsed provides a mock function with given fields:
+func (_m *Meter) MemoryUsed() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MeterComputation provides a mock function with given fields: _a0, _a1

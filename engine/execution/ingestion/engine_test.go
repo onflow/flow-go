@@ -24,7 +24,6 @@ import (
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
@@ -293,7 +292,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		On("ComputeBlock", mock.Anything, previousExecutionResultID, &eb, mock.Anything).
 		Return(computationResult, nil).Once()
 
-	ctx.executionState.On("NewView", newStateCommitment).Return(new(delta.View))
+	ctx.executionState.On("NewStorageSnapshot", newStateCommitment).Return(nil)
 
 	ctx.executionState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
@@ -1373,13 +1372,13 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
 			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-			view := new(delta.View)
-			ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState).Return(nil)
+
 			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
 
 			// Successful call to computation manager
 			ctx.computationManager.
-				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
+				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, nil).
 				Return(scriptResult, nil)
 
 			// Execute our script and expect no error
