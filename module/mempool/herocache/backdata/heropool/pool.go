@@ -157,10 +157,9 @@ func (p Pool) Head() (flow.Entity, bool) {
 // The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
 // Pool goes out of available slots if it is full and no ejection is set.
 //
-// If the pool has an available slot (either empty or by ejection), then the second boolean returned value
-// (ejectionOccurred) determines whether an ejection happened to make one slot free or not.
 // Ejection happens if there is no available slot, and there is an ejection mode set.
-func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedItem flow.Entity) {
+// If an ejection occurred, ejectedEntity holds the ejected entity.
+func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity flow.Entity) {
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
@@ -181,7 +180,7 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedIt
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead(), true, nil // returning false for no ejection.
+	return p.claimFreeHead(), true, nil
 }
 
 // Size returns total number of entities that this list maintains.
