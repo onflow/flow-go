@@ -540,19 +540,22 @@ func TestInvalidCommittedStateModification(t *testing.T) {
 	committedState, err := txn.CommitNestedTransaction(id1)
 	require.NoError(t, err)
 
-	err = committedState.MergeState(
+	err = committedState.Merge(
 		state.NewState(
 			delta.NewDeltaView(nil),
 			state.DefaultParameters()))
-	require.ErrorContains(t, err, "cannot MergeState on a committed state")
+	require.ErrorContains(t, err, "cannot Merge on a finalized view")
 
 	txn.ResumeNestedTransaction(committedState)
 
 	err = txn.Set(key, createByteArray(2))
-	require.ErrorContains(t, err, "cannot Set on a committed state")
+	require.ErrorContains(t, err, "cannot Set on a finalized view")
 
 	_, err = txn.Get(key)
-	require.ErrorContains(t, err, "cannot Get on a committed state")
+	require.ErrorContains(t, err, "cannot Get on a finalized view")
+
+	err = txn.RestartNestedTransaction(id1)
+	require.ErrorContains(t, err, "cannot DropChanges on a finalized view")
 
 	_, err = txn.CommitNestedTransaction(id1)
 	require.NoError(t, err)
