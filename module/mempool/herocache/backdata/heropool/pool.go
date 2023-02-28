@@ -88,12 +88,11 @@ func (p *Pool) initFreeEntities() {
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list.
 //
-// The first boolean return value (slotAvailable) says whether pool has an available slot. Pool goes out of available slots if
+// The boolean return value (slotAvailable) says whether pool has an available slot. Pool goes out of available slots if
 // it is full and no ejection is set.
 //
-// If the pool has an available slot (either empty or by ejection), then the second boolean returned value (ejectionOccurred)
-// determines whether an ejection happened to make one slot free or not. Ejection happens if there is no available
-// slot, and there is an ejection mode set.
+// If the pool has no available slots and an ejection is set, ejection occurs when adding a new entity.
+// If an ejection occurred, ejectedEntity holds the ejected entity.
 func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (entityIndex EIndex, slotAvailable bool, ejectedEntity flow.Entity) {
 	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
 	if slotAvailable {
