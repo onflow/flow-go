@@ -298,9 +298,18 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 		return nil
 	}
 
-	computationUsed := executor.env.ComputationUsed()
-	if computationUsed > uint64(executor.txnState.TotalComputationLimit()) {
-		computationUsed = uint64(executor.txnState.TotalComputationLimit())
+	computationLimit := uint64(executor.txnState.TotalComputationLimit())
+
+	computationUsed, err := executor.env.ComputationUsed()
+	if err != nil {
+		return errors.NewTransactionFeeDeductionFailedError(
+			executor.proc.Transaction.Payer,
+			computationLimit,
+			err)
+	}
+
+	if computationUsed > computationLimit {
+		computationUsed = computationLimit
 	}
 
 	_, err = executor.env.DeductTransactionFees(
@@ -450,8 +459,19 @@ func (executor *transactionExecutor) commit(
 
 	// if tx failed this will only contain fee deduction logs
 	executor.proc.Logs = executor.env.Logs()
-	executor.proc.ComputationUsed = executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
+
+	computationUsed, err := executor.env.ComputationUsed()
+	if err != nil {
+		return fmt.Errorf("error getting computation used: %w", err)
+	}
+	executor.proc.ComputationUsed = computationUsed
+
+	memoryUsed, err := executor.env.MemoryUsed()
+	if err != nil {
+		return fmt.Errorf("error getting memory used: %w", err)
+	}
+	executor.proc.MemoryEstimate = memoryUsed
+
 	executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
 
 	// if tx failed this will only contain fee deduction events
