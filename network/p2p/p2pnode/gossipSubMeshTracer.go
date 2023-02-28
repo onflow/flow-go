@@ -6,7 +6,6 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -20,6 +19,7 @@ import (
 // It also logs the mesh peers and updates the local mesh size metric.
 type GossipSubMeshTracer struct {
 	component.Component
+	pubsub.RawTracer
 
 	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
 	topicMeshMap   map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
@@ -38,6 +38,7 @@ func NewGossipSubMeshTracer(
 	loggerInterval time.Duration) *GossipSubMeshTracer {
 
 	g := &GossipSubMeshTracer{
+		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
 		idProvider:     idProvider,
 		metrics:        metrics,
@@ -176,56 +177,4 @@ func (t *GossipSubMeshTracer) logPeers() {
 		}
 		lg.Info().Msg("topic mesh peers of local node since last heartbeat")
 	}
-}
-
-func (t *GossipSubMeshTracer) AddPeer(p peer.ID, proto protocol.ID) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) RemovePeer(p peer.ID) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) Join(topic string) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) Leave(topic string) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) ThrottlePeer(p peer.ID) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) RecvRPC(rpc *pubsub.RPC) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
-	// no-op
-}
-
-func (t *GossipSubMeshTracer) UndeliverableMessage(msg *pubsub.Message) {
-	// no-op
 }
