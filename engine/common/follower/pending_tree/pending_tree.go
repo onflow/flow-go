@@ -2,6 +2,7 @@ package pending_tree
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"sync"
@@ -61,6 +62,9 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 	}
 }
 
+// AddBlocks
+// Expected errors during normal operations:
+//   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
 func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyingQC *flow.QuorumCertificate) ([]CertifiedBlock, error) {
 	certifiedBlocks := make([]CertifiedBlock, 0, len(incomingCertifiedBlocks))
 	for i := 0; i < len(incomingCertifiedBlocks)-1; i++ {
@@ -94,11 +98,10 @@ func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyin
 				// this vertex is already in tree, skip it
 				continue
 			} else {
-				panic("")
-				//return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
-				//	"conflicting QCs at view %d: %v and %v",
-				//	qc.View, qc.BlockID, conflictingQC.BlockID,
-				//)}
+				return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
+					"conflicting QCs at view %d: %v and %v",
+					block.View(), v.ID(), block.ID(),
+				)}
 			}
 		}
 

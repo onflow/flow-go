@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -91,6 +92,23 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[:1], longestFork[1].Header.QuorumCertificate())
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), append(longestFork, shortFork...), unwrapCertifiedBlocks(connectedBlocks))
+}
+
+// TestByzantineThresholdExceeded tests that submitting two certified blocks for the same view is reported as
+// byzantine threshold reached exception. This scenario is possible only if network has reached more than 1/3 byzantine participants.
+func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+	conflictingBlock := unittest.BlockWithParentFixture(s.finalized)
+	// use same view for conflicted blocks, this is not possible unless there is more than
+	// 1/3 byzantine participants
+	conflictingBlock.Header.View = block.Header.View
+	_, err := s.pendingTree.AddBlocks([]*flow.Block{block}, unittest.CertifyBlock(block.Header))
+	// adding same block should result in no-op
+	_, err = s.pendingTree.AddBlocks([]*flow.Block{block}, unittest.CertifyBlock(block.Header))
+	require.NoError(s.T(), err)
+	connectedBlocks, err := s.pendingTree.AddBlocks([]*flow.Block{conflictingBlock}, unittest.CertifyBlock(conflictingBlock.Header))
+	require.Empty(s.T(), connectedBlocks)
+	require.True(s.T(), model.IsByzantineThresholdExceededError(err))
 }
 
 func unwrapCertifiedBlocks(certified []CertifiedBlock) []*flow.Block {
