@@ -15,6 +15,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	// logIntervalMsg is the message logged by the tracer every logInterval.
+	MeshLogIntervalMsg = "topic mesh peers of local node since last heartbeat"
+)
+
 // GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
 // It also logs the mesh peers and updates the local mesh size metric.
 type GossipSubMeshTracer struct {
@@ -48,7 +53,8 @@ func NewGossipSubMeshTracer(
 
 	g.Component = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			go g.logLoop(ctx, ready)
+			ready()
+			g.logLoop(ctx)
 		}).
 		Build()
 
@@ -116,9 +122,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
-func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
+func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 	ticker := time.NewTicker(t.loggerInterval)
 	defer ticker.Stop()
 
@@ -172,9 +176,9 @@ func (t *GossipSubMeshTracer) logPeers() {
 		if shouldWarn {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
-				Msg("topic mesh peers of local node since last heartbeat")
+				Msg(MeshLogIntervalMsg)
 			continue
 		}
-		lg.Info().Msg("topic mesh peers of local node since last heartbeat")
+		lg.Info().Msg(MeshLogIntervalMsg)
 	}
 }
