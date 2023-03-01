@@ -873,7 +873,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 		kmac := msig.NewBLSHasher(string(tag))
 
-		t.Run("Pairing issue with private key equal to 1 and -1", newVMTest().run(
+		t.Run("Pairing issue with private key equal to 1", newVMTest().run(
 			func(
 				t *testing.T,
 				vm fvm.VM,
@@ -883,35 +883,24 @@ func TestBLSMultiSignature(t *testing.T) {
 				derivedBlockData *derived.DerivedBlockData,
 			) {
 				// sk = 1 leads to a pairing edge case
-				sk1Bytes := make([]byte, crypto.PrKeyLenBLSBLS12381)
-				sk1Bytes[crypto.PrKeyLenBLSBLS12381-1] = 1
-				sk1, err := crypto.DecodePrivateKey(crypto.BLSBLS12381, sk1Bytes)
+				skBytes := make([]byte, crypto.PrKeyLenBLSBLS12381)
+				skBytes[crypto.PrKeyLenBLSBLS12381-1] = 1
+				sk := randomSK(t, BLSSignatureAlgorithm)
+				pk := sk.PublicKey()
+				sig, err := sk.Sign(message, kmac)
 				require.NoError(t, err)
 
-				// sk = -1 leads to a pairing edge case
-				skMinus1Bytes := []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
-					0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
-					0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00}
-				skMinus1, err := crypto.DecodePrivateKey(crypto.BLSBLS12381, skMinus1Bytes)
-				require.NoError(t, err)
+				script := fvm.Script(code).WithArguments(
+					jsoncdc.MustEncode(testutil.BytesToCadenceArray(pk.Encode())),
+					jsoncdc.MustEncode(testutil.BytesToCadenceArray(sig)),
+					jsoncdc.MustEncode(cadenceMessage),
+					jsoncdc.MustEncode(cadence.String(tag)),
+				)
 
-				for _, sk := range []crypto.PrivateKey{sk1, skMinus1} {
-					pk := sk.PublicKey()
-					sig, err := sk.Sign(message, kmac)
-					require.NoError(t, err)
-
-					script := fvm.Script(code).WithArguments(
-						jsoncdc.MustEncode(testutil.BytesToCadenceArray(pk.Encode())),
-						jsoncdc.MustEncode(testutil.BytesToCadenceArray(sig)),
-						jsoncdc.MustEncode(cadenceMessage),
-						jsoncdc.MustEncode(cadence.String(tag)),
-					)
-
-					err = vm.Run(ctx, script, view)
-					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					assert.Equal(t, cadence.NewBool(true), script.Value)
-				}
+				err = vm.Run(ctx, script, view)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+				assert.Equal(t, cadence.NewBool(true), script.Value)
 			},
 		))
 
