@@ -80,7 +80,7 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flo
 				continue
 			} else {
 				// TODO: raise this properly
-				panic("protocol violation, two certified blocks at same height, byzantine threshold exceeded")
+				panic("protocol violation, two certified blocks at same view, byzantine threshold exceeded")
 			}
 		}
 

@@ -73,7 +73,24 @@ func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
 // Add [B4, B5, B6, B7], expect to get []
 // Add [B1], expect to get [B1, B2, B3, B4, B5, B6, B7]
 func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
+	longestFork := unittest.ChainFixtureFrom(5, s.finalized)
+	B2 := unittest.BlockWithParentFixture(longestFork[0].Header)
+	// make sure short fork doesn't have conflicting views, so we don't trigger exception
+	B2.Header.View = longestFork[len(longestFork)-1].Header.View + 1
+	B3 := unittest.BlockWithParentFixture(B2.Header)
+	shortFork := []*flow.Block{B2, B3}
 
+	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork, certifyLast(shortFork))
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), connectedBlocks)
+
+	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[1:], certifyLast(longestFork))
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), connectedBlocks)
+
+	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[:1], longestFork[1].Header.QuorumCertificate())
+	require.NoError(s.T(), err)
+	require.ElementsMatch(s.T(), append(longestFork, shortFork...), unwrapCertifiedBlocks(connectedBlocks))
 }
 
 func unwrapCertifiedBlocks(certified []CertifiedBlock) []*flow.Block {
