@@ -105,6 +105,9 @@ type SubscriptionFilter interface {
 	FilterIncomingSubscriptions(peer.ID, []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error)
 }
 
+// PubSubTracer is the abstraction of the underlying pubsub tracer that is used by the Flow network. It wraps the
+// pubsub.RawTracer interface with the component.Component interface so that it can be started and stopped.
+// The RawTracer interface is used to trace the internal events of the pubsub system.
 type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
