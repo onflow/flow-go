@@ -2,7 +2,6 @@ package tracer_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -38,8 +37,9 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	topic2 := channels.TopicFromChannel(channels.PushReceipts, sporkId)
 
 	loggerCycle := atomic.NewInt32(0)
+
+	// logger hook to count the number of times the meshTracer logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		fmt.Println(message)
 		if level == zerolog.InfoLevel {
 			if message == tracer.MeshLogIntervalMsg {
 				loggerCycle.Inc()
