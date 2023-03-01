@@ -281,7 +281,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for registerId := range view.Ledger.RegisterTouches {
+	for _, registerId := range view.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),
