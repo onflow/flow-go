@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -12,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
-type OnEquivocation func(first *model.Proposal, other *model.Proposal)
+type OnEquivocation func(first *flow.Block, other *flow.Block)
 
 // Cache stores pending blocks received from other replicas, caches blocks by blockID, it also
 // maintains secondary index by view and by parent. Additional indexes are used to track proposal equivocation
@@ -23,20 +22,20 @@ type Cache struct {
 	backend *herocache.Cache // cache with random ejection
 	lock    sync.RWMutex
 	// secondary index by view, can be used to detect equivocation
-	byView map[uint64]*model.Proposal
+	byView map[uint64]*flow.Block
 	// secondary index by parentID, can be used to find child of the block
-	byParent map[flow.Identifier]*model.Proposal
+	byParent map[flow.Identifier]*flow.Block
 	// when message equivocation has been detected report it using this callback
 	onEquivocation OnEquivocation
 }
 
 // Peek performs lookup of cached block by blockID.
 // Concurrency safe
-func (c *Cache) Peek(blockID flow.Identifier) *model.Proposal {
+func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if block, found := c.backend.ByID(blockID); found {
-		return block.(*model.Proposal)
+		return block.(*flow.Block)
 	} else {
 		return nil
 	}
@@ -54,8 +53,8 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 			log.With().Str("component", "follower.cache").Logger(),
 			distributor,
 		),
-		byView:         make(map[uint64]*model.Proposal),
-		byParent:       make(map[flow.Identifier]*model.Proposal),
+		byView:         make(map[uint64]*flow.Block),
+		byParent:       make(map[flow.Identifier]*flow.Block),
 		onEquivocation: onEquivocation,
 	}
 	distributor.AddConsumer(cache.handleEjectedEntity)
@@ -66,9 +65,9 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 // WARNING: Concurrency safety of this function is guaranteed by s.lock, this callback can be called
 // only in herocache.Cache.Add and we perform this call while s.lock is in locked state.
 func (c *Cache) handleEjectedEntity(entity flow.Entity) {
-	block := entity.(*model.Proposal)
-	delete(c.byView, block.Block.View)
-	delete(c.byParent, block.Block.QC.BlockID)
+	block := entity.(*flow.Block)
+	delete(c.byView, block.Header.View)
+	delete(c.byParent, block.Header.ParentID)
 }
 
 // AddBlocks atomically applies batch of blocks to the cache of pending but not yet certified blocks. Upon insertion cache tries to resolve
@@ -93,8 +92,8 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 // Note that implementation behaves correctly where len(batch) == 1.
 // If message equivocation was detected it will be reported using a notification.
 // Concurrency safe.
-func (c *Cache) AddBlocks(batch []*model.Proposal) (certifiedBatch []*model.Proposal, certifyingQC *flow.QuorumCertificate) {
-	var equivocatedBlocks [][]*model.Proposal
+func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, certifyingQC *flow.QuorumCertificate) {
+	var equivocatedBlocks [][]*flow.Block
 
 	// prefill certifiedBatch with minimum viable result
 	// since batch is a chain of blocks, then by definition all except the last one
@@ -103,34 +102,34 @@ func (c *Cache) AddBlocks(batch []*model.Proposal) (certifiedBatch []*model.Prop
 
 	if len(batch) > 1 {
 		// set certifyingQC, QC from last block certifies complete batch
-		certifyingQC = batch[len(batch)-1].Block.QC
+		certifyingQC = batch[len(batch)-1].Header.QuorumCertificate()
 	}
 	lastBlockID := batch[len(batch)-1].ID()
 
 	c.lock.Lock()
 	// check for message equivocation, report any if detected
 	for _, block := range batch {
-		if otherBlock, ok := c.byView[block.Block.View]; ok {
+		if otherBlock, ok := c.byView[block.Header.View]; ok {
 			if otherBlock.ID() != block.ID() {
-				equivocatedBlocks = append(equivocatedBlocks, []*model.Proposal{otherBlock, block})
+				equivocatedBlocks = append(equivocatedBlocks, []*flow.Block{otherBlock, block})
 			}
 		} else {
-			c.byView[block.Block.View] = block
+			c.byView[block.Header.View] = block
 		}
 		// store all blocks in the cache to provide deduplication
 		c.backend.Add(block.ID(), block)
-		c.byParent[block.Block.QC.BlockID] = block
+		c.byParent[block.Header.ParentID] = block
 	}
 
 	firstBlock := batch[0]           // lowest height/view
 	lastBlock := batch[len(batch)-1] // highest height/view
 
 	// start by checking if batch certifies any block that was stored in the cache
-	if parent, ok := c.backend.ByID(firstBlock.Block.QC.BlockID); ok {
+	if parent, ok := c.backend.ByID(firstBlock.Header.ParentID); ok {
 		// parent found, it can be certified by the batch, we need to include it to the certified blocks
-		certifiedBatch = append([]*model.Proposal{parent.(*model.Proposal)}, certifiedBatch...)
+		certifiedBatch = append([]*flow.Block{parent.(*flow.Block)}, certifiedBatch...)
 		// set certifyingQC, QC from last block certifies complete batch
-		certifyingQC = batch[len(batch)-1].Block.QC
+		certifyingQC = batch[len(batch)-1].Header.QuorumCertificate()
 	}
 
 	// check if there is a block in cache that certifies last block of the batch.
@@ -139,7 +138,7 @@ func (c *Cache) AddBlocks(batch []*model.Proposal) (certifiedBatch []*model.Prop
 		// no need to store anything since the block is certified and child is already in cache
 		certifiedBatch = append(certifiedBatch, lastBlock)
 		// in this case we will get a new certifying QC
-		certifyingQC = child.Block.QC
+		certifyingQC = child.Header.QuorumCertificate()
 	}
 
 	c.lock.Unlock()

@@ -12,8 +12,6 @@ type Proposal struct {
 	LastViewTC *flow.TimeoutCertificate
 }
 
-var _ flow.Entity = (*Proposal)(nil)
-
 // ProposerVote extracts the proposer vote from the proposal
 func (p *Proposal) ProposerVote() *Vote {
 	vote := Vote{
@@ -23,16 +21,6 @@ func (p *Proposal) ProposerVote() *Vote {
 		SigData:  p.SigData,
 	}
 	return &vote
-}
-
-// ID implements flow.Entity interface by returning static Block.BlockID
-func (p *Proposal) ID() flow.Identifier {
-	return p.Block.BlockID
-}
-
-// Checksum implements flow.Entity interface by returning static Block.BlockID
-func (p *Proposal) Checksum() flow.Identifier {
-	return p.Block.BlockID
 }
 
 // ProposalFromFlow turns a flow header into a hotstuff block type.
