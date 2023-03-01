@@ -108,8 +108,7 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 ) error {
 	addresses := limiter.getStorageCheckAddresses(txnState, payer, maxTxFees)
 
-	commonAddresses := make([]common.Address, len(addresses))
-	usages := make([]uint64, len(commonAddresses))
+	usages := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
 		ca := common.Address(address)
@@ -118,13 +117,12 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 			return err
 		}
 
-		commonAddresses[i] = ca
 		usages[i] = u
 	}
 
 	result, invokeErr := env.AccountsStorageCapacity(
-		commonAddresses,
-		common.Address(payer),
+		addresses,
+		payer,
 		maxTxFees,
 	)
 
