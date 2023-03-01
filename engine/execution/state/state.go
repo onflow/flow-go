@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -26,7 +27,7 @@ import (
 type ReadOnlyExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state
 	// commitment.
-	NewStorageSnapshot(flow.StateCommitment) delta.StorageSnapshot
+	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
 
 	GetRegisters(
 		context.Context,
@@ -185,7 +186,7 @@ type LedgerStorageSnapshot struct {
 func NewLedgerStorageSnapshot(
 	ldg ledger.Ledger,
 	commitment flow.StateCommitment,
-) delta.StorageSnapshot {
+) fvmState.StorageSnapshot {
 	return &LedgerStorageSnapshot{
 		ledger:     ldg,
 		commitment: commitment,
@@ -230,7 +231,7 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
-) delta.StorageSnapshot {
+) fvmState.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
