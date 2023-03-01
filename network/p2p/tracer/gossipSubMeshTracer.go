@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// logIntervalMsg is the message logged by the tracer every logInterval.
+	// MeshLogIntervalMsg is the message logged by the tracer every logInterval.
 	MeshLogIntervalMsg = "topic mesh peers of local node since last heartbeat"
 )
 
