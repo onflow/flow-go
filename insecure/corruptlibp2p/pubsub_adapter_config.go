@@ -92,6 +92,9 @@ func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string
 		return f(pmsg.Data)
 	}))
 }
+func (c *CorruptPubSubAdapterConfig) WithScoreTracer(_ p2p.PeerScoreTracer) {
+	// CorruptPubSub does not support score tracer. This is a no-op.
+}
 
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
