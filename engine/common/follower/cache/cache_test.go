@@ -176,6 +176,54 @@ func (s *CacheSuite) TestSecondaryIndexCleanup() {
 	require.Len(s.T(), s.cache.byParent, defaultHeroCacheLimit)
 }
 
+// TestMultipleChildrenForSameParent tests a scenario where we have:
+// /  A <- B
+// /    <- C
+// We insert:
+// 1. [B]
+// 2. [C]
+// 3. [A]
+// We should be able to certify A since B and C are in cache, any QC will work.
+func (s *CacheSuite) TestMultipleChildrenForSameParent() {
+	A := unittest.BlockFixture()
+	B := unittest.BlockWithParentFixture(A.Header)
+	C := unittest.BlockWithParentFixture(A.Header)
+	C.Header.View = B.Header.View + 1 // make sure views are different
+
+	s.cache.AddBlocks([]*flow.Block{B})
+	s.cache.AddBlocks([]*flow.Block{C})
+	certifiedBlocks, certifyingQC := s.cache.AddBlocks([]*flow.Block{&A})
+	require.Len(s.T(), certifiedBlocks, 1)
+	require.Equal(s.T(), &A, certifiedBlocks[0])
+	require.Equal(s.T(), A.ID(), certifyingQC.BlockID)
+}
+
+// TestChildEjectedBeforeAddingParent tests a scenario where we have:
+// /  A <- B
+// /    <- C
+// We insert:
+// 1. [B]
+// 2. [C]
+// 3. [A]
+// Between 2. and 3. B gets ejected, we should be able to certify A since C is still in cache.
+func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
+	A := unittest.BlockFixture()
+	B := unittest.BlockWithParentFixture(A.Header)
+	C := unittest.BlockWithParentFixture(A.Header)
+	C.Header.View = B.Header.View + 1 // make sure views are different
+
+	s.cache.AddBlocks([]*flow.Block{B})
+	s.cache.AddBlocks([]*flow.Block{C})
+	// eject B
+	s.cache.backend.Remove(B.ID())
+	s.cache.handleEjectedEntity(B)
+
+	certifiedBlocks, certifyingQC := s.cache.AddBlocks([]*flow.Block{&A})
+	require.Len(s.T(), certifiedBlocks, 1)
+	require.Equal(s.T(), &A, certifiedBlocks[0])
+	require.Equal(s.T(), A.ID(), certifyingQC.BlockID)
+}
+
 // TestAddOverCacheLimit tests a scenario where caller feeds blocks to the cache in concurrent way
 // largely exceeding internal cache capacity leading to ejection of large number of blocks.
 // Expect to eventually certify all possible blocks assuming producer continue to push same blocks over and over again.
