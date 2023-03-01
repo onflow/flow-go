@@ -6,6 +6,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
+// GossipSubNoopTracer is a no-op tracer that implements the RawTracer interface
+// for the Flow network.
 type GossipSubNoopTracer struct {
 }
 
