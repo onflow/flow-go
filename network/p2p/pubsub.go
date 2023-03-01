@@ -2,6 +2,8 @@ package p2p
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -50,6 +52,10 @@ type PubSubAdapterConfig interface {
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
 	WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error)
+
+	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
+	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
+	WithScoreTracer(tracer PeerScoreTracer)
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
@@ -100,4 +106,69 @@ type SubscriptionFilter interface {
 	// FilterIncomingSubscriptions is invoked for all RPCs containing subscription notifications.
 	// It filters and returns the subscriptions of interest to the current node.
 	FilterIncomingSubscriptions(peer.ID, []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error)
+}
+
+// PeerScoreSnapshot is a snapshot of the overall peer score at a given time.
+type PeerScoreSnapshot struct {
+	Score              float64
+	Topics             map[string]*TopicScoreSnapshot
+	AppSpecificScore   float64
+	IPColocationFactor float64
+	BehaviourPenalty   float64
+}
+
+// TopicScoreSnapshot is a snapshot of the peer score within a topic at a given time.
+type TopicScoreSnapshot struct {
+	TimeInMesh               time.Duration
+	FirstMessageDeliveries   float64
+	MeshMessageDeliveries    float64
+	InvalidMessageDeliveries float64
+}
+
+// IsWarning returns true if the peer score is in warning state.
+func (p PeerScoreSnapshot) IsWarning() bool {
+	for _, topic := range p.Topics {
+		if topic.IsWarning() {
+			return true
+		}
+	}
+
+	if p.AppSpecificScore < 0 {
+		return true
+	}
+
+	if p.IPColocationFactor > 0 {
+		return true
+	}
+
+	if p.BehaviourPenalty > 0 {
+		return true
+	}
+
+	if p.Score < 0 {
+		return true
+	}
+
+	return false
+}
+
+func (s TopicScoreSnapshot) String() string {
+	return fmt.Sprintf("time in mesh: %s, first message deliveries: %f, mesh message deliveries: %f, invalid message deliveries: %f",
+		s.TimeInMesh, s.FirstMessageDeliveries, s.MeshMessageDeliveries, s.InvalidMessageDeliveries)
+}
+
+// IsWarning returns true if the topic score is in warning state.
+func (s TopicScoreSnapshot) IsWarning() bool {
+	// TODO: also check for first message deliveries and time in mesh when we have a better understanding of the score.
+	return s.InvalidMessageDeliveries > 0
+}
+
+// PeerScoreTracer is the interface for the tracer that is used to trace the peer score.
+type PeerScoreTracer interface {
+	// UpdatePeerScoreSnapshots updates the peer score snapshot/
+	UpdatePeerScoreSnapshots(map[peer.ID]*PeerScoreSnapshot)
+
+	// UpdateInterval returns the update interval for the tracer. The tracer will be receiving updates
+	// at this interval.
+	UpdateInterval() time.Duration
 }
