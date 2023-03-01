@@ -37,7 +37,9 @@ func TestDerivedChainData(t *testing.T) {
 	require.NotNil(t, block1)
 
 	loc1 := testLocation("0a")
-	prog1 := &interpreter.Program{}
+	prog1 := &Program{
+		Program: &interpreter.Program{},
+	}
 
 	txn, err := block1.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
@@ -61,7 +63,9 @@ func TestDerivedChainData(t *testing.T) {
 	require.NotSame(t, block1, block2)
 
 	loc2 := testLocation("0b")
-	prog2 := &interpreter.Program{}
+	prog2 := &Program{
+		Program: &interpreter.Program{},
+	}
 
 	txn, err = block2.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
