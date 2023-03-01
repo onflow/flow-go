@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -43,7 +44,7 @@ type ComputationManager interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		snapshot delta.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -53,7 +54,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot delta.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -62,7 +63,7 @@ type ComputationManager interface {
 	GetAccount(
 		addr flow.Address,
 		header *flow.Header,
-		snapshot delta.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -183,7 +184,7 @@ func (e *Manager) ExecuteScript(
 	code []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 ) ([]byte, error) {
 
 	startedAt := time.Now()
@@ -284,7 +285,7 @@ func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -319,7 +320,7 @@ func (e *Manager) ComputeBlock(
 func (e *Manager) GetAccount(
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

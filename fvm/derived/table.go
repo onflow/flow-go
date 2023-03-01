@@ -189,16 +189,6 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 			txn.executionTime)
 	}
 
-	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
-		(!txn.isSnapshotReadTransaction ||
-			txn.snapshotTime != EndOfBlockExecutionTime) {
-
-		return newNotRetryableError(
-			"invalid TableTransaction: missing commit range [%v, %v)",
-			table.latestCommitExecutionTime+1,
-			txn.snapshotTime)
-	}
-
 	for _, entry := range txn.readSet {
 		if entry.isInvalid {
 			return newRetryableError(
@@ -237,6 +227,16 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
+	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
+		(!txn.isSnapshotReadTransaction ||
+			txn.snapshotTime != EndOfBlockExecutionTime) {
+
+		return newNotRetryableError(
+			"invalid TableTransaction: missing commit range [%v, %v)",
+			table.latestCommitExecutionTime+1,
+			txn.snapshotTime)
+	}
+
 	// NOTE: Instead of throwing out all the write entries, we can commit
 	// the valid write entries then return error.
 	err := table.unsafeValidate(txn)
@@ -247,9 +247,9 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	for key, entry := range txn.writeSet {
 		_, ok := table.items[key]
 		if ok {
-			// A previous transaction already committed an equivalent TableTransaction
-			// entry.  Since both TableTransaction entry are valid, just reuse the
-			// existing one for future transactions.
+			// A previous transaction already committed an equivalent
+			// TableTransaction entry.  Since both TableTransaction entry are
+			// valid, just reuse the existing one for future transactions.
 			continue
 		}
 
