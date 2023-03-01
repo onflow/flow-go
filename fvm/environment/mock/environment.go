@@ -1114,11 +1114,11 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 }
 
 // SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) error {
+func (_m *Environment) SetAccountFrozen(address flow.Address, frozen bool) error {
 	ret := _m.Called(address, frozen)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, bool) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, bool) error); ok {
 		r0 = rf(address, frozen)
 	} else {
 		r0 = ret.Error(0)
