@@ -182,7 +182,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
 	fnb.flags.BoolVar(&fnb.BaseConfig.GossipSubConfig.PeerScoring, "peer-scoring-enabled", defaultConfig.GossipSubConfig.PeerScoring, "enabling peer scoring on pubsub network")
-	fnb.flags.DurationVar(&fnb.BaseConfig.GossipSubConfig.LocalMeshLogInterval, "local-mesh-logging-interval", defaultConfig.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh")
+	fnb.flags.DurationVar(&fnb.BaseConfig.GossipSubConfig.LocalMeshLogInterval, "gossipsub-local-mesh-logging-interval", defaultConfig.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh in gossipsub")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
