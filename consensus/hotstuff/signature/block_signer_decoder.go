@@ -34,6 +34,14 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 		return []flow.Identifier{}, nil
 	}
 
+	// EMERGENCY FIX: replace normal code by NoopBlockSignerDecoder behaviour for block:
+	// blockID: "6ce44da69c552fdc5389cffda2af43092ce6f8cfdf559ce48e7cb597e9c7bd6c"
+	// block_height:47616301
+	// view: 447720
+	if header.View == uint64(447720) {
+		return nil, nil
+	}
+
 	id := header.ID()
 	members, err := b.IdentitiesByBlock(id)
 	if err != nil {
