@@ -12,30 +12,37 @@ type CertifiedBlock struct {
 	QC    *flow.QuorumCertificate
 }
 
+func (b *CertifiedBlock) ID() flow.Identifier {
+	return b.QC.BlockID
+}
+
+func (b *CertifiedBlock) View() uint64 {
+	return b.QC.View
+}
+
 // PendingBlockVertex wraps a block proposal to implement forest.Vertex
 // so the proposal can be stored in forest.LevelledForest
 type PendingBlockVertex struct {
-	block                *flow.Block
-	qc                   *flow.QuorumCertificate
+	CertifiedBlock
 	connectedToFinalized bool
 }
 
 // NewVertex creates new vertex while performing a sanity check of data correctness
-func NewVertex(block *flow.Block, qc *flow.QuorumCertificate, connectedToFinalized bool) (*PendingBlockVertex, error) {
-	if block.Header.View != qc.View {
-		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view", block.Header.View, qc.View)
+func NewVertex(certifiedBlock CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
+	if certifiedBlock.Block.Header.View != certifiedBlock.QC.View {
+		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view",
+			certifiedBlock.Block.Header.View, certifiedBlock.QC.View)
 	}
 	return &PendingBlockVertex{
-		block:                block,
-		qc:                   qc,
+		CertifiedBlock:       certifiedBlock,
 		connectedToFinalized: connectedToFinalized,
 	}, nil
 }
 
-func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.qc.BlockID }
-func (v *PendingBlockVertex) Level() uint64             { return v.qc.View }
+func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.QC.BlockID }
+func (v *PendingBlockVertex) Level() uint64             { return v.QC.View }
 func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
-	return v.block.Header.ParentID, v.block.Header.ParentView
+	return v.Block.Header.ParentID, v.Block.Header.ParentView
 }
 
 // PendingTree is a mempool holding certified blocks that eventually might be connected to the finalized state.
@@ -54,37 +61,48 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 	}
 }
 
-func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flow.QuorumCertificate) ([]CertifiedBlock, error) {
-	qcs := make([]*flow.QuorumCertificate, 0, len(certifiedBlocks))
-	for _, block := range certifiedBlocks[1:] {
-		qcs = append(qcs, block.Header.QuorumCertificate())
+func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyingQC *flow.QuorumCertificate) ([]CertifiedBlock, error) {
+	certifiedBlocks := make([]CertifiedBlock, 0, len(incomingCertifiedBlocks))
+	for i := 0; i < len(incomingCertifiedBlocks)-1; i++ {
+		certifiedBlocks = append(certifiedBlocks, CertifiedBlock{
+			Block: incomingCertifiedBlocks[i],
+			QC:    incomingCertifiedBlocks[i+1].Header.QuorumCertificate(),
+		})
 	}
-	qcs = append(qcs, certifyingQC)
+	certifiedBlocks = append(certifiedBlocks, CertifiedBlock{
+		Block: incomingCertifiedBlocks[len(incomingCertifiedBlocks)-1],
+		QC:    certifyingQC,
+	})
 
 	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	var connectedToFinalized bool
-	if certifiedBlocks[0].Header.ParentID == t.lastFinalizedID {
+	if certifiedBlocks[0].Block.Header.ParentID == t.lastFinalizedID {
 		connectedToFinalized = true
-	} else if parentVertex, found := t.forest.GetVertex(certifiedBlocks[0].Header.ParentID); found {
+	} else if parentVertex, found := t.forest.GetVertex(certifiedBlocks[0].Block.Header.ParentID); found {
 		connectedToFinalized = parentVertex.(*PendingBlockVertex).connectedToFinalized
 	}
 
 	var connectedBlocks []CertifiedBlock
-	for i, block := range certifiedBlocks {
-		iter := t.forest.GetVerticesAtLevel(block.Header.View)
+	for _, block := range certifiedBlocks {
+		iter := t.forest.GetVerticesAtLevel(block.View())
 		if iter.HasNext() {
-			v := iter.NextVertex()
+			v := iter.NextVertex().(*PendingBlockVertex)
+
 			if v.VertexID() == block.ID() {
 				// this vertex is already in tree, skip it
 				continue
 			} else {
-				// TODO: raise this properly
-				panic("protocol violation, two certified blocks at same view, byzantine threshold exceeded")
+				panic("")
+				//return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
+				//	"conflicting QCs at view %d: %v and %v",
+				//	qc.View, qc.BlockID, conflictingQC.BlockID,
+				//)}
 			}
 		}
 
-		vertex, err := NewVertex(block, qcs[i], connectedToFinalized)
+		vertex, err := NewVertex(block, connectedToFinalized)
 		if err != nil {
 			return nil, fmt.Errorf("could not create new vertex: %w", err)
 		}
@@ -100,15 +118,11 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []*flow.Block, certifyingQC *flo
 		connectedBlocks = t.updateAndCollectFork(vertex.(*PendingBlockVertex))
 	}
 
-	t.lock.Unlock()
 	return connectedBlocks, nil
 }
 
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
-	certifiedBlocks := []CertifiedBlock{{
-		Block: vertex.block,
-		QC:    vertex.qc,
-	}}
+	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}
 	vertex.connectedToFinalized = true
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
