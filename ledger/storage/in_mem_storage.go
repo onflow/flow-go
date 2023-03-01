@@ -56,12 +56,11 @@ func (s *InMemStorage) GetMul(hashs []hash.Hash) ([][]byte, error) {
 	return values, nil
 }
 
-func (s *InMemStorage) SetMul(keys []hash.Hash, values [][]byte) error {
+func (s *InMemStorage) SetMul(pairs map[hash.Hash][]byte) error {
 	s.rwMU.Lock()
 	defer s.rwMU.Unlock()
 
-	for i, key := range keys {
-		value := values[i]
+	for key, value := range pairs {
 		s.store[key] = value
 	}
 

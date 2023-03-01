@@ -5,7 +5,7 @@ import "github.com/onflow/flow-go/ledger/common/hash"
 type Storage interface {
 	Get(hash.Hash) ([]byte, error)
 	GetMul([]hash.Hash) ([][]byte, error)
-	SetMul(keys []hash.Hash, values [][]byte) error
+	SetMul(keyValuePairs map[hash.Hash][]byte) error
 }
 
 type LeafNode struct {

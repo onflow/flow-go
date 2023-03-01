@@ -35,11 +35,10 @@ func (s *PayloadStorage) Get(hash hash.Hash) (ledger.Path, *ledger.Payload, erro
 }
 
 func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
-	keys := make([]hash.Hash, len(updates))
-	values := make([][]byte, len(updates))
+	pairs := make(map[hash.Hash][]byte)
 	scratch := make([]byte, 1024*4)
 
-	for i, update := range updates {
+	for _, update := range updates {
 		key := update.Hash
 		buf, err := EncodePayload(update.Path, &update.Payload, scratch)
 		if err != nil {
@@ -51,14 +50,12 @@ func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
 		// next encoding operation
 		value := make([]byte, len(buf))
 		copy(value[:], buf)
-
-		keys[i] = key
-		values[i] = value
+		pairs[key] = value
 	}
 
-	err := s.storage.SetMul(keys, values)
+	err := s.storage.SetMul(pairs)
 	if err != nil {
-		return fmt.Errorf("could not store %v key-value pairs: %w", len(keys), err)
+		return fmt.Errorf("could not store %v key-value pairs: %w", len(pairs), err)
 	}
 
 	return nil

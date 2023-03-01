@@ -59,13 +59,13 @@ func (_m *Storage) GetMul(_a0 []hash.Hash) ([][]byte, error) {
 	return r0, r1
 }
 
-// SetMul provides a mock function with given fields: keys, values
-func (_m *Storage) SetMul(keys []hash.Hash, values [][]byte) error {
-	ret := _m.Called(keys, values)
+// SetMul provides a mock function with given fields: keyValuePairs
+func (_m *Storage) SetMul(keyValuePairs map[hash.Hash][]byte) error {
+	ret := _m.Called(keyValuePairs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]hash.Hash, [][]byte) error); ok {
-		r0 = rf(keys, values)
+	if rf, ok := ret.Get(0).(func(map[hash.Hash][]byte) error); ok {
+		r0 = rf(keyValuePairs)
 	} else {
 		r0 = ret.Error(0)
 	}

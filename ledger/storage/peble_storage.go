@@ -134,10 +134,10 @@ func (p *pebleStorage) GetMul(hs []hash.Hash) ([][]byte, error) {
 }
 
 // SetMul implements ledger.Storage
-func (p *pebleStorage) SetMul(keys []hash.Hash, values [][]byte) error {
+func (p *pebleStorage) SetMul(pairs map[hash.Hash][]byte) error {
 	b := p.db.NewBatch()
-	for i := 0; i < len(values); i++ {
-		err := b.Set(keys[i][:], values[i], nil)
+	for key, value := range pairs {
+		err := b.Set(key[:], value, nil)
 		if err != nil {
 			return err
 		}

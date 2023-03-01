@@ -64,14 +64,14 @@ func testStorageImplementation(
 	test("set does not fail", func(t *testing.T, storage ledger.Storage) {
 		key := keyBytes()
 		value := valueBytes()
-		err := storage.SetMul([]hash.Hash{key}, [][]byte{value})
+		err := storage.SetMul(map[hash.Hash][]byte{key: value})
 		require.NoError(t, err)
 	})
 
 	test("set then get does not fail", func(t *testing.T, storage ledger.Storage) {
 		key := keyBytes()
 		value := valueBytes()
-		err := storage.SetMul([]hash.Hash{key}, [][]byte{value})
+		err := storage.SetMul(map[hash.Hash][]byte{key: value})
 		require.NoError(t, err)
 		gotValue, err := storage.Get(key)
 		require.NoError(t, err)
@@ -82,7 +82,7 @@ func testStorageImplementation(
 	test("set empty then get nil", func(t *testing.T, storage ledger.Storage) {
 		key := keyBytes()
 		value := make([]byte, 0)
-		err := storage.SetMul([]hash.Hash{key}, [][]byte{value})
+		err := storage.SetMul(map[hash.Hash][]byte{key: value})
 		require.NoError(t, err)
 		gotValue, err := storage.Get(key)
 
@@ -94,9 +94,9 @@ func testStorageImplementation(
 		key := keyBytes()
 		value1 := valueBytes()
 		value2 := valueBytes()
-		err := storage.SetMul([]hash.Hash{key}, [][]byte{value1})
+		err := storage.SetMul(map[hash.Hash][]byte{key: value1})
 		require.NoError(t, err)
-		err = storage.SetMul([]hash.Hash{key}, [][]byte{value2})
+		err = storage.SetMul(map[hash.Hash][]byte{key: value2})
 		require.NoError(t, err)
 		gotValue, err := storage.Get(key)
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func testStorageImplementation(
 	test("set then get twice", func(t *testing.T, storage ledger.Storage) {
 		key := keyBytes()
 		value := valueBytes()
-		err := storage.SetMul([]hash.Hash{key}, [][]byte{value})
+		err := storage.SetMul(map[hash.Hash][]byte{key: value})
 		require.NoError(t, err)
 		gotValue1, err := storage.Get(key)
 		require.NoError(t, err)
@@ -123,7 +123,8 @@ func testStorageImplementation(
 		key2 := keyBytes()
 		value1 := valueBytes()
 		value2 := valueBytes()
-		err := storage.SetMul([]hash.Hash{key1, key2}, [][]byte{value1, value2})
+		err := storage.SetMul(map[hash.Hash][]byte{key1: value1, key2: value2})
+
 		require.NoError(t, err)
 		gotValue1, err := storage.Get(key1)
 		require.NoError(t, err)
@@ -139,7 +140,7 @@ func testStorageImplementation(
 		key2 := keyBytes()
 		value1 := valueBytes()
 		value2 := valueBytes()
-		err := storage.SetMul([]hash.Hash{key1, key2}, [][]byte{value1, value2})
+		err := storage.SetMul(map[hash.Hash][]byte{key1: value1, key2: value2})
 		require.NoError(t, err)
 		values, err := storage.GetMul([]hash.Hash{key1, key2})
 		require.NoError(t, err)
@@ -163,7 +164,7 @@ func testStorageImplementation(
 		readsDone := make(chan error)
 
 		// set once so the values are not empty on first read
-		err := storage.SetMul([]hash.Hash{key1, key2}, [][]byte{value1, value1})
+		err := storage.SetMul(map[hash.Hash][]byte{key1: value1, key2: value1})
 		require.NoError(t, err)
 
 		go func() {
@@ -173,11 +174,11 @@ func testStorageImplementation(
 			}()
 
 			for i := 0; i < repetitions; i++ {
-				err = storage.SetMul([]hash.Hash{key1, key2}, [][]byte{value1, value1})
+				err := storage.SetMul(map[hash.Hash][]byte{key1: value1, key2: value1})
 				if err != nil {
 					return
 				}
-				err = storage.SetMul([]hash.Hash{key1, key2}, [][]byte{value2, value2})
+				err = storage.SetMul(map[hash.Hash][]byte{key1: value2, key2: value2})
 				if err != nil {
 					return
 				}

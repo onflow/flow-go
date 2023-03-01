@@ -65,14 +65,14 @@ func (s *PayloadStore) GetMul(hashs []hash.Hash) ([][]byte, error) {
 	return values, nil
 }
 
-func (s *PayloadStore) SetMul(keys []hash.Hash, values [][]byte) error {
+func (s *PayloadStore) SetMul(pairs map[hash.Hash][]byte) error {
 	s.Lock()
 	defer s.Unlock()
 
-	for i, key := range keys {
-		value := values[i]
+	for key, value := range pairs {
 		s.stored[key] = value
 	}
+
 	return nil
 }
 
