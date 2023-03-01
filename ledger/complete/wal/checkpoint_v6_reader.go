@@ -181,6 +181,7 @@ func readNodesFromSubTriesConcurrently(
 			return nil, fmt.Errorf("fail to read %v-th subtrie, trie: %w", i, result.Err)
 		}
 
+		logger.Info().Msgf("finished %v th subtrie", i)
 		nodes = append(nodes, result.Nodes...)
 	}
 

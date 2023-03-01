@@ -1,9 +1,9 @@
 package unittest
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/storage"
 )
@@ -25,12 +25,14 @@ type PayloadStore struct {
 	stored map[hash.Hash][]byte
 }
 
-func (s *PayloadStore) Get(hash hash.Hash) ([]byte, error) {
+func (s *PayloadStore) Get(key hash.Hash) ([]byte, error) {
 	s.RLock()
 	defer s.RUnlock()
-	node, found := s.stored[hash]
+	node, found := s.stored[key]
 	if !found {
-		return nil, fmt.Errorf("key not found: %v", hash)
+		return nil, ledger.ErrStorageMissingKeys{
+			Keys: []hash.Hash{key},
+		}
 	}
 
 	// return the copied data
@@ -56,7 +58,9 @@ func (s *PayloadStore) GetMul(hashs []hash.Hash) ([][]byte, error) {
 	}
 
 	if len(missingHashs) > 0 {
-		return nil, fmt.Errorf("keys not found %v", missingHashs)
+		return nil, ledger.ErrStorageMissingKeys{
+			Keys: missingHashs,
+		}
 	}
 	return values, nil
 }

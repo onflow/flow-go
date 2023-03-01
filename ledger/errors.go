@@ -1,5 +1,9 @@
 package ledger
 
+import (
+	"github.com/onflow/flow-go/ledger/common/hash"
+)
+
 // ErrLedgerConstruction is returned upon a failure in ledger creation steps
 type ErrLedgerConstruction struct {
 	Err error
@@ -40,7 +44,25 @@ func (e ErrMissingKeys) Is(other error) bool {
 	return ok
 }
 
+type ErrStorageMissingKeys struct {
+	Keys []hash.Hash
+}
+
+// ErrStorageMissingKeys is returned when some keys are not found in storage
+func (e ErrStorageMissingKeys) Error() string {
+	str := "keys are missing: \n"
+	for _, k := range e.Keys {
+		str += "\t" + k.String() + "\n"
+	}
+	return str
+}
+
+// Is returns true if the type of errors are the same
+func (e ErrStorageMissingKeys) Is(other error) bool {
+	_, ok := other.(ErrStorageMissingKeys)
+	return ok
+}
+
 // TODO add more errors
 // ErrorFetchQuery
 // ErrorCommitChanges
-// ErrorMissingKeys

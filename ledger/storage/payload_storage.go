@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
@@ -63,7 +64,16 @@ func (s *PayloadStorage) Add(updates []ledger.LeafNode) error {
 	return nil
 }
 
-// TODO: replace the storage with other key-value store
+// TODO: replace with flags to specify the location
 func CreatePayloadStorage() *PayloadStorage {
-	return NewPayloadStorage(NewInMemStorage())
+	pebbleOptions := PebleStorageOptions{
+		Options: &pebble.Options{},
+		dirname: "/var/flow/data/payloads",
+	}
+
+	store, err := NewPebbleStorage(pebbleOptions)
+	if err != nil {
+		panic(fmt.Sprintf("fail to initialize pebble store: %v", err))
+	}
+	return NewPayloadStorage(store)
 }
