@@ -126,13 +126,15 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
         goto out;
     } 
     // if pk = -g2 then ret <- s == -h
-    if (ep2_cmp(elemsG2[0], elemsG2[1])==RLC_EQ) {
+    if (ep2_cmp(elemsG2[0], elemsG2[1])==RLC_EQ) { 
         ep_st sum; ep_new(&sum);
         ep_add(&sum, elemsG1[0], elemsG1[1]);
         if (ep_is_infty(&sum)) {
+            ep_free(&sum);
             ret = VALID;
             goto out;
         }
+        ep_free(&sum);
     }  
 
     fp12_t pair;
@@ -160,6 +162,7 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
             goto out;
         }
     }
+    
 out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
