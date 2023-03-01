@@ -17,6 +17,10 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
+var BLS12381Order = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
+	0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
+	0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
+
 // TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
 func TestBLSMainMethods(t *testing.T) {
 	// test the key generation seed lengths
@@ -50,6 +54,34 @@ func TestBLSMainMethods(t *testing.T) {
 		valid, err = pk.Verify(invalidSig, msg, hasher)
 		require.NoError(t, err)
 		assert.False(t, valid)
+	})
+
+	t.Run("private key equal to 1 and -1", func(t *testing.T) {
+		sk1Bytes := make([]byte, PrKeyLenBLSBLS12381)
+		sk1Bytes[PrKeyLenBLSBLS12381-1] = 1
+		sk1, err := DecodePrivateKey(BLSBLS12381, sk1Bytes)
+		require.NoError(t, err)
+
+		skMinus1Bytes := make([]byte, PrKeyLenBLSBLS12381)
+		copy(skMinus1Bytes, BLS12381Order)
+		skMinus1Bytes[PrKeyLenBLSBLS12381-1] -= 1
+		skMinus1, err := DecodePrivateKey(BLSBLS12381, skMinus1Bytes)
+		require.NoError(t, err)
+
+		for _, sk := range []PrivateKey{sk1, skMinus1} {
+			input := make([]byte, 100)
+			_, err = mrand.Read(input)
+			require.NoError(t, err)
+			s, err := sk.Sign(input, hasher)
+			require.NoError(t, err)
+			pk := sk.PublicKey()
+
+			// test a valid signature
+			result, err := pk.Verify(s, input, hasher)
+			assert.NoError(t, err)
+			assert.True(t, result, fmt.Sprintf(
+				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+		}
 	})
 }
 
