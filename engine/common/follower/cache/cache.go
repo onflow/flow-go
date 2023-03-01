@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
+// OnEquivocation is a callback to report observing two different blocks with the same view.
 type OnEquivocation func(first *flow.Block, other *flow.Block)
 type BlocksByID map[flow.Identifier]*flow.Block
 
