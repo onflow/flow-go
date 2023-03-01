@@ -101,20 +101,21 @@ func computeLeafNodeHash(path ledger.Path, payload *ledger.Payload, height int) 
 	return ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), height)
 }
 
+// computeInterimNodeHash takes two children and the height of the current node, and returns
+// its hash.
+// note: the height can not be inferred from lChild.height + 1, because both lChild and rChild
+// could be nil
 func computeInterimNodeHash(lChild, rChild *Node, height int) hash.Hash {
-	var h1, h2 hash.Hash
-	if lChild != nil {
-		h1 = lChild.Hash()
-	} else {
-		h1 = ledger.GetDefaultHashForHeight(height - 1)
-	}
-
-	if rChild != nil {
-		h2 = rChild.Hash()
-	} else {
-		h2 = ledger.GetDefaultHashForHeight(height - 1)
-	}
+	h1 := hashOrDefault(lChild, height-1)
+	h2 := hashOrDefault(rChild, height-1)
 	return hash.HashInterNode(h1, h2)
+}
+
+func hashOrDefault(node *Node, height int) hash.Hash {
+	if node == nil {
+		return ledger.GetDefaultHashForHeight(height)
+	}
+	return node.Hash()
 }
 
 // NewInterimNode creates a new interim Node.
