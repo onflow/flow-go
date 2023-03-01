@@ -190,7 +190,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		loadedCode := false
-		viewExecA := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				expectedId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -235,7 +235,7 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecA2 := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA2 := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -298,7 +298,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		viewExecB = delta.NewDeltaView(
-			delta.NewPeekerStorageSnapshot(mainView))
+			state.NewPeekerStorageSnapshot(mainView))
 
 		err = vm.Run(context, procCallB, viewExecB)
 		require.NoError(t, err)
@@ -351,7 +351,7 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecB2 := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecB2 := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				idA := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -387,7 +387,7 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		viewExecA := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -441,7 +441,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		viewExecC := delta.NewDeltaView(
-			delta.NewPeekerStorageSnapshot(mainView))
+			state.NewPeekerStorageSnapshot(mainView))
 
 		err = vm.Run(context, procCallC, viewExecC)
 		require.NoError(t, err)

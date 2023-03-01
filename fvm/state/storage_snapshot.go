@@ -1,4 +1,4 @@
-package delta
+package state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
