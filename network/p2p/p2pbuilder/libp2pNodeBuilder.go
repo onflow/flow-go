@@ -55,6 +55,11 @@ const (
 	// mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
 	// topology as a whole specially when there are no updates to the mesh topology for a long time.
 	defaultMeshTracerLoggingInterval = 1 * time.Minute
+
+	// defaultGossipSubScoreTracerInterval is the default interval at which the gossipsub score tracer logs the peer scores.
+	// This is used for debugging and forensics purposes.
+	// Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
+	defaultGossipSubScoreTracerInterval = 1 * time.Minute
 )
 
 // DefaultGossipSubConfig returns the default configuration for the gossipsub protocol.
@@ -62,6 +67,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 	return &GossipSubConfig{
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
+		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
 	}
 }
 
@@ -130,6 +136,7 @@ type NodeBuilder interface {
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder
+	SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -145,6 +152,8 @@ type ResourceManagerConfig struct {
 type GossipSubConfig struct {
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration
+	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
+	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
 }
@@ -157,21 +166,22 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID              flow.Identifier
-	addr                 string
-	networkKey           fcrypto.PrivateKey
-	logger               zerolog.Logger
-	metrics              module.LibP2PMetrics
-	basicResolver        madns.BasicResolver
-	subscriptionFilter   pubsub.SubscriptionFilter
-	resourceManager      network.ResourceManager
-	resourceManagerCfg   *ResourceManagerConfig
-	connManager          connmgr.ConnManager
-	connGater            connmgr.ConnectionGater
-	idProvider           module.IdentityProvider
-	gossipSubFactory     GossipSubFactoryFunc
-	gossipSubConfigFunc  GossipSubAdapterConfigFunc
-	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
+	sporkID                      flow.Identifier
+	addr                         string
+	networkKey                   fcrypto.PrivateKey
+	logger                       zerolog.Logger
+	metrics                      module.LibP2PMetrics
+	basicResolver                madns.BasicResolver
+	subscriptionFilter           pubsub.SubscriptionFilter
+	resourceManager              network.ResourceManager
+	resourceManagerCfg           *ResourceManagerConfig
+	connManager                  connmgr.ConnManager
+	connGater                    connmgr.ConnectionGater
+	idProvider                   module.IdentityProvider
+	gossipSubFactory             GossipSubFactoryFunc
+	gossipSubConfigFunc          GossipSubAdapterConfigFunc
+	gossipSubPeerScoring         bool          // whether to enable gossipsub peer scoring
+	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
@@ -286,6 +296,11 @@ func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.Unic
 func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, cf GossipSubAdapterConfigFunc) NodeBuilder {
 	builder.gossipSubFactory = gf
 	builder.gossipSubConfigFunc = cf
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder {
+	builder.gossipSubScoreTracerInterval = interval
 	return builder
 }
 
@@ -411,6 +426,17 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 			if builder.gossipSubTracer != nil {
 				gossipSubConfigs.WithTracer(builder.gossipSubTracer)
+			}
+
+			if builder.gossipSubScoreTracerInterval > 0 {
+				scoreTracer := tracer.NewGossipSubScoreTracer(
+					builder.logger,
+					builder.idProvider,
+					builder.metrics,
+					builder.gossipSubScoreTracerInterval)
+				gossipSubConfigs.WithScoreTracer(scoreTracer)
+				builder.logger.Debug().Msg("starting gossipsub score tracer")
+				scoreTracer.Start(ctx)
 			}
 
 			// builds GossipSub with the given factory
@@ -564,6 +590,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 
 	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
 	builder.SetGossipSubTracer(meshTracer)
+	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
 		r, _ := flow.ParseRole(role)

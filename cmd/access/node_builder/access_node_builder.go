@@ -1107,6 +1107,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			// disable connection pruning for the access node which supports the observer
 			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
 			SetGossipSubTracer(meshTracer).
+			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
 			Build()
 
 		if err != nil {

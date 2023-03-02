@@ -881,6 +881,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				)
 			}).
 			SetGossipSubTracer(meshTracer).
+			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
 			Build()
 
 		if err != nil {

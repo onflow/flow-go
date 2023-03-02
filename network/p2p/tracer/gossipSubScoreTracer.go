@@ -141,6 +141,7 @@ func (g *GossipSubScoreTracer) GetTopicScores(peerID peer.ID) (map[string]p2p.To
 }
 
 func (g *GossipSubScoreTracer) logLoop(ctx irrecoverable.SignalerContext) {
+	g.logger.Debug().Msg("starting log loop")
 	for {
 		select {
 		case <-ctx.Done():
