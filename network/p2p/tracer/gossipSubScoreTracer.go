@@ -63,9 +63,11 @@ func NewGossipSubScoreTracer(
 // UpdatePeerScoreSnapshots updates the tracer's snapshot of the peer scores.
 func (g *GossipSubScoreTracer) UpdatePeerScoreSnapshots(snapshot map[peer.ID]*p2p.PeerScoreSnapshot) {
 	g.snapshotLock.Lock()
-	defer g.snapshotLock.Unlock()
-
+	// critical section
 	g.snapshot = snapshot
+	g.snapshotLock.Unlock()
+
+	g.requestSnapshotUpdate() // notify the log loop that there is a new snapshot.
 }
 
 // UpdateInterval returns the interval at which the tracer expects to receive updates from the gossipsub router.
