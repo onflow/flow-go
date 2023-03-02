@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -16,7 +17,7 @@ import (
 type Environment interface {
 	runtime.Interface
 
-	SetAccountFrozen(address common.Address, frozen bool) error
+	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
 var setAccountFrozenFunctionType = &sema.FunctionType{
@@ -72,7 +73,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 				var err error
 				if reusable.fvmEnv != nil {
 					err = reusable.fvmEnv.SetAccountFrozen(
-						common.Address(address),
+						flow.ConvertAddress(address),
 						bool(frozen))
 				} else {
 					err = errors.NewOperationNotSupportedError("SetAccountFrozen")
