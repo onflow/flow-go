@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
@@ -18,6 +19,8 @@ const (
 )
 
 type GossipSubScoreTracer struct {
+	component.Component
+
 	updateInterval time.Duration // interval at which it is expecting to receive updates from the gossipsub router
 	logger         zerolog.Logger
 
@@ -28,6 +31,27 @@ type GossipSubScoreTracer struct {
 }
 
 var _ p2p.PeerScoreTracer = (*GossipSubScoreTracer)(nil)
+
+func NewGossipSubScoreTracer(logger zerolog.Logger, provider module.IdentityProvider, updateInterval time.Duration) *GossipSubScoreTracer {
+	g := &GossipSubScoreTracer{
+		logger:         logger.With().Str("component", "gossipsub_score_tracer").Logger(),
+		updateInterval: updateInterval,
+		snapshotUpdate: make(chan struct{}, 1),
+		snapshot:       make(map[peer.ID]*p2p.PeerScoreSnapshot),
+		idProvider:     provider,
+	}
+
+	g.Component = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			g.logLoop(ctx)
+		}).
+		Build()
+
+	return g
+}
+
+}
 
 // UpdatePeerScoreSnapshots updates the tracer's snapshot of the peer scores.
 func (g *GossipSubScoreTracer) UpdatePeerScoreSnapshots(snapshot map[peer.ID]*p2p.PeerScoreSnapshot) {
@@ -113,28 +137,50 @@ func (g *GossipSubScoreTracer) logLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
+			g.logger.Debug().Msg("stopping log loop")
 			return
 		default:
 		}
 
 		select {
 		case <-ctx.Done():
+			g.logger.Debug().Msg("stopping log loop")
 			return
 		case <-g.snapshotUpdate:
+			g.logger.Debug().Msg("received snapshot update")
 			g.logPeerScores()
 		}
 	}
 }
 
-func (g *GossipSubScoreTracer) logPeerScores() {
-
+// requestSnapshotUpdate requests a snapshot update from the gossipsub router.
+// It is thread-safe and can be called from multiple goroutines. It is non-blocking.
+// If there is already a pending request, it will not send another one and will return immediately (no-op).
+func (g *GossipSubScoreTracer) requestSnapshotUpdate() {
+	select {
+	case g.snapshotUpdate <- struct{}{}:
+		g.logger.Debug().Msg("requested snapshot update")
+	default:
+	}
 }
 
-// logPeerScore logs the peer score snapshot for the given peer.
-func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
+// logPeerScores logs the peer score snapshots for all peers.
+func (g *GossipSubScoreTracer) logPeerScores() {
 	g.snapshotLock.RLock()
 	defer g.snapshotLock.RUnlock()
 
+	g.logger.Debug().Msg("logging peer scores")
+
+	for peerID := range g.snapshot {
+		g.logPeerScore(peerID)
+	}
+
+	g.logger.Debug().Msg("finished logging peer scores")
+}
+
+// logPeerScore logs the peer score snapshot for the given peer.
+// Note: this function is not thread-safe and should be called with the lock held.
+func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
 	snapshot, ok := g.snapshot[peerID]
 	if !ok {
 		return
