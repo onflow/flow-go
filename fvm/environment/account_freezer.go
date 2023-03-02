@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +17,7 @@ import (
 // compliance with the environment interface.
 type AccountFreezer interface {
 	// Note that the script variant will return OperationNotSupportedError.
-	SetAccountFrozen(address flow.Address, frozen bool) error
+	SetAccountFrozen(address common.Address, frozen bool) error
 
 	FrozenAccounts() []flow.Address
 
@@ -38,7 +40,7 @@ func NewParseRestrictedAccountFreezer(
 }
 
 func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
-	address flow.Address,
+	address common.Address,
 	frozen bool,
 ) error {
 	return parseRestrict2Arg(
@@ -63,7 +65,7 @@ func (NoAccountFreezer) FrozenAccounts() []flow.Address {
 	return nil
 }
 
-func (NoAccountFreezer) SetAccountFrozen(_ flow.Address, _ bool) error {
+func (NoAccountFreezer) SetAccountFrozen(_ common.Address, _ bool) error {
 	return errors.NewOperationNotSupportedError("SetAccountFrozen")
 }
 
@@ -102,9 +104,11 @@ func (freezer *accountFreezer) FrozenAccounts() []flow.Address {
 }
 
 func (freezer *accountFreezer) SetAccountFrozen(
-	address flow.Address,
+	runtimeAddress common.Address,
 	frozen bool,
 ) error {
+	address := flow.ConvertAddress(runtimeAddress)
+
 	if address == freezer.serviceAddress {
 		return fmt.Errorf(
 			"setting account frozen failed: %w",

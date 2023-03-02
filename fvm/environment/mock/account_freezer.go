@@ -3,7 +3,10 @@
 package mock
 
 import (
+	common "github.com/onflow/cadence/runtime/common"
+
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -34,11 +37,11 @@ func (_m *AccountFreezer) Reset() {
 }
 
 // SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *AccountFreezer) SetAccountFrozen(address flow.Address, frozen bool) error {
+func (_m *AccountFreezer) SetAccountFrozen(address common.Address, frozen bool) error {
 	ret := _m.Called(address, frozen)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address, bool) error); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, bool) error); ok {
 		r0 = rf(address, frozen)
 	} else {
 		r0 = ret.Error(0)
