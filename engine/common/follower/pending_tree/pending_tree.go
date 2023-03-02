@@ -21,6 +21,10 @@ func (b *CertifiedBlock) View() uint64 {
 	return b.QC.View
 }
 
+func (b *CertifiedBlock) Height() uint64 {
+	return b.Block.Header.Height
+}
+
 // PendingBlockVertex wraps a block proposal to implement forest.Vertex
 // so the proposal can be stored in forest.LevelledForest
 type PendingBlockVertex struct {
@@ -62,7 +66,7 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 	}
 }
 
-// AddBlocks accepts a batch of certified blocks in ascending height order.
+// AddBlocks accepts a batch of certified blocks ordered in any way.
 // Skips in height between blocks are allowed.
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
@@ -71,7 +75,13 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 	defer t.lock.Unlock()
 
 	var connectedBlocks []CertifiedBlock
+	firstBlock := certifiedBlocks[0]
 	for _, block := range certifiedBlocks {
+		// skip blocks lower than finalized view
+		if block.View() < t.forest.LowestLevel {
+			continue
+		}
+
 		iter := t.forest.GetVerticesAtLevel(block.View())
 		if iter.HasNext() {
 			v := iter.NextVertex().(*PendingBlockVertex)
@@ -87,6 +97,12 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 			}
 		}
 
+		// We need to find the lowest block by height since it has the possibility to be connected to finalized block.
+		// We can't use view here, since when chain forks we might have view > height.
+		if firstBlock.Height() > block.Height() {
+			firstBlock = block
+		}
+
 		vertex, err := NewVertex(block, false)
 		if err != nil {
 			return nil, fmt.Errorf("could not create new vertex: %w", err)
@@ -97,8 +113,6 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 		}
 		t.forest.AddVertex(vertex)
 	}
-
-	firstBlock := certifiedBlocks[0]
 
 	var connectedToFinalized bool
 	if firstBlock.Block.Header.ParentID == t.lastFinalizedID {
