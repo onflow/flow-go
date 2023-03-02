@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -23,6 +24,7 @@ type GossipSubScoreTracer struct {
 
 	updateInterval time.Duration // interval at which it is expecting to receive updates from the gossipsub router
 	logger         zerolog.Logger
+	collector      module.GossipSubScoringMetrics
 
 	snapshotUpdate chan struct{} // a channel to notify the snapshot update.
 	snapshotLock   sync.RWMutex
@@ -32,10 +34,15 @@ type GossipSubScoreTracer struct {
 
 var _ p2p.PeerScoreTracer = (*GossipSubScoreTracer)(nil)
 
-func NewGossipSubScoreTracer(logger zerolog.Logger, provider module.IdentityProvider, updateInterval time.Duration) *GossipSubScoreTracer {
+func NewGossipSubScoreTracer(
+	logger zerolog.Logger,
+	provider module.IdentityProvider,
+	collector module.GossipSubScoringMetrics,
+	updateInterval time.Duration) *GossipSubScoreTracer {
 	g := &GossipSubScoreTracer{
 		logger:         logger.With().Str("component", "gossipsub_score_tracer").Logger(),
 		updateInterval: updateInterval,
+		collector:      collector,
 		snapshotUpdate: make(chan struct{}, 1),
 		snapshot:       make(map[peer.ID]*p2p.PeerScoreSnapshot),
 		idProvider:     provider,
@@ -168,20 +175,27 @@ func (g *GossipSubScoreTracer) logPeerScores() {
 	defer g.snapshotLock.RUnlock()
 
 	g.logger.Debug().Msg("logging peer scores")
+	warningStateCount := uint(0)
 
 	for peerID := range g.snapshot {
-		g.logPeerScore(peerID)
+		warning := g.logPeerScore(peerID)
+		if warning {
+			warningStateCount++
+		}
 	}
 
+	g.collector.SetWarningStateCount(warningStateCount)
 	g.logger.Debug().Msg("finished logging peer scores")
 }
 
 // logPeerScore logs the peer score snapshot for the given peer.
+// It also updates the score-related metrics.
+// The return value indicates whether the peer score is in the warning state.
 // Note: this function is not thread-safe and should be called with the lock held.
-func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
+func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 	snapshot, ok := g.snapshot[peerID]
 	if !ok {
-		return
+		return false
 	}
 
 	var lg zerolog.Logger
@@ -204,6 +218,11 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
 		Float64("ip_colocation_factor", snapshot.IPColocationFactor).
 		Float64("behaviour_penalty", snapshot.BehaviourPenalty).Logger()
 
+	g.collector.OnOverallPeerScoreUpdated(snapshot.Score)
+	g.collector.OnAppSpecificScoreUpdated(snapshot.AppSpecificScore)
+	g.collector.OnIPColocationFactorUpdated(snapshot.IPColocationFactor)
+	g.collector.OnBehaviourPenaltyUpdated(snapshot.BehaviourPenalty)
+
 	for topic, topicSnapshot := range snapshot.Topics {
 		lg = lg.With().
 			Str("topic", topic).
@@ -211,12 +230,18 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
 			Float64("first_message_deliveries", topicSnapshot.FirstMessageDeliveries).
 			Float64("mesh_message_deliveries", topicSnapshot.MeshMessageDeliveries).
 			Float64("invalid_messages", topicSnapshot.InvalidMessageDeliveries).Logger()
+
+		g.collector.OnFirstMessageDeliveredUpdated(channels.Topic(topic), topicSnapshot.FirstMessageDeliveries)
+		g.collector.OnMeshMessageDeliveredUpdated(channels.Topic(topic), topicSnapshot.MeshMessageDeliveries)
+		g.collector.OnInvalidMessageDeliveredUpdated(channels.Topic(topic), topicSnapshot.InvalidMessageDeliveries)
+		g.collector.OnTimeInMeshUpdated(channels.Topic(topic), topicSnapshot.TimeInMesh)
 	}
 
 	if snapshot.IsWarning() {
 		lg.Warn().Msg(PeerScoreLogMessage)
-		return
+		return true
 	}
 
 	lg.Info().Msg(PeerScoreLogMessage)
+	return false
 }
