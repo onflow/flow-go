@@ -7,15 +7,24 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
+)
+
+const (
+	PeerScoreLogMessage = "peer score snapshot update"
 )
 
 type GossipSubScoreTracer struct {
 	updateInterval time.Duration // interval at which it is expecting to receive updates from the gossipsub router
 	logger         zerolog.Logger
 
-	snapshotLock sync.RWMutex
-	snapshot     map[peer.ID]*p2p.PeerScoreSnapshot
+	snapshotUpdate chan struct{} // a channel to notify the snapshot update.
+	snapshotLock   sync.RWMutex
+	snapshot       map[peer.ID]*p2p.PeerScoreSnapshot
+	idProvider     module.IdentityProvider
 }
 
 var _ p2p.PeerScoreTracer = (*GossipSubScoreTracer)(nil)
@@ -100,4 +109,70 @@ func (g *GossipSubScoreTracer) GetTopicScores(peerID peer.ID) (map[string]p2p.To
 	return topicsSnapshot, true
 }
 
+func (g *GossipSubScoreTracer) logLoop(ctx irrecoverable.SignalerContext) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
+		select {
+		case <-ctx.Done():
+			return
+		case <-g.snapshotUpdate:
+			g.logPeerScores()
+		}
+	}
+}
+
+func (g *GossipSubScoreTracer) logPeerScores() {
+
+}
+
+// logPeerScore logs the peer score snapshot for the given peer.
+func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) {
+	g.snapshotLock.RLock()
+	defer g.snapshotLock.RUnlock()
+
+	snapshot, ok := g.snapshot[peerID]
+	if !ok {
+		return
+	}
+
+	var lg zerolog.Logger
+
+	identity, valid := g.idProvider.ByPeerID(peerID)
+	if !valid {
+		lg = g.logger.With().
+			Str("flow_id", "unknown").
+			Str("role", "unknown").Logger()
+	} else {
+		lg = g.logger.With().
+			Hex("flow_id", logging.ID(identity.NodeID)).
+			Str("role", identity.Role.String()).Logger()
+	}
+
+	lg = g.logger.With().
+		Str("peer_id", peerID.String()).
+		Float64("overall_score", snapshot.Score).
+		Float64("app_specific_score", snapshot.AppSpecificScore).
+		Float64("ip_colocation_factor", snapshot.IPColocationFactor).
+		Float64("behaviour_penalty", snapshot.BehaviourPenalty).Logger()
+
+	for topic, topicSnapshot := range snapshot.Topics {
+		lg = lg.With().
+			Str("topic", topic).
+			Dur("time_in_mesh", topicSnapshot.TimeInMesh).
+			Float64("first_message_deliveries", topicSnapshot.FirstMessageDeliveries).
+			Float64("mesh_message_deliveries", topicSnapshot.MeshMessageDeliveries).
+			Float64("invalid_messages", topicSnapshot.InvalidMessageDeliveries).Logger()
+	}
+
+	if snapshot.IsWarning() {
+		lg.Warn().Msg(PeerScoreLogMessage)
+		return
+	}
+
+	lg.Info().Msg(PeerScoreLogMessage)
+}
