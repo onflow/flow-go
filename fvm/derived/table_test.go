@@ -1,6 +1,7 @@
 package derived
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1035,8 +1036,8 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 }
 
 type testValueComputer struct {
-	value  int
-	called bool
+	valueFunc func() (int, error)
+	called    bool
 }
 
 func (computer *testValueComputer) Compute(
@@ -1052,7 +1053,7 @@ func (computer *testValueComputer) Compute(
 		return 0, err
 	}
 
-	return computer.value, nil
+	return computer.valueFunc()
 }
 
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
@@ -1066,11 +1067,24 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		// first attempt to compute the value returns an error.
+		// But it's perfectly safe to handle the error and try again with the same txnState.
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return 0, fmt.Errorf("compute error") },
+		}
+		_, err = txnDerivedData.GetOrCompute(txnState, key, computer)
+		assert.Error(t, err)
+		assert.Equal(t, 0, txnState.NumNestedTransactions())
+
+		// second attempt to compute the value succeeds.
+
+		computer = &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
@@ -1093,11 +1107,13 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
