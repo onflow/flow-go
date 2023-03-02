@@ -146,6 +146,7 @@ func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
 	assert.Equal(s.T(), blocks, connectedBlocks)
 }
 
+// TestBlocksLowerThanFinalizedView tests that implementation drops blocks lower than finalized view.
 func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	newFinalized := unittest.BlockWithParentFixture(block.Header)
