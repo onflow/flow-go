@@ -184,24 +184,26 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, 
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		// unexpected error for:
-		//  * empty `signatures` slice
-		//  * if some signature(s) could not be decoded, which should be impossible since we check all signatures before adding them
-		//    (note that there is no `TrustedAdd` method on this module)
-		// Hence, any error here is a symptom of an internal bug
+		// `AggregateBLSSignatures` returns two possible errors:
+		//  - crypto.BLSAggregateEmptyListError if `signatures` slice is empty, i.e no signatures have been added yet:
+		//    respond with model.InsufficientSignaturesError
+		//  - crypto.invalidSignatureError if some signature(s) could not be decoded, which should be impossible since
+		//    we check all signatures before adding them (there is no `TrustedAdd` method in this module)
 		if crypto.IsBLSAggregateEmptyListError(err) {
 			return nil, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
 		}
+		// any other error here is a symptom of an internal bug
 		return nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
 	// TODO-1: add logic to check if only one `NewestQCView` is used. In that case
-	// check the aggregated signature against identity (that's enough to insure
-	// aggregated key is identity, given all signatures are valid)
+	// check the aggregated signature is not identity (that's enough to ensure
+	// aggregated key is not identity, given all signatures are individually valid)
 	// This is not implemented for now because `VerifyTC` does not error for an identity public key
-	// (crypto layer does not invalid signatures in `VerifyBLSSignatureManyMessages`)
+	// (that's because the crypto layer currently does not return false when verifying signatures using `VerifyBLSSignatureManyMessages`
+	//  and encountering identity public keys)
 	//
 	// TODO-2: check if the logic should be extended to look at the partial aggregated signatures of all
-	// signatures against the same message
+	// signatures against the same message.
 	return signersData, aggSignature, nil
 }

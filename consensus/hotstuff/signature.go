@@ -85,10 +85,10 @@ type WeightedSignatureAggregator interface {
 	// The function errors with:
 	//   - model.InsufficientSignaturesError if no signatures have been added yet
 	//   - model.InvalidSignatureIncludedError if:
-	//   - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
-	//   - Or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
-	//     invalid (while aggregated public key is valid)
-	//   - model.InvalidAggregatedKeyError if if all signatures deserialize correctly but the signer's
+	//     - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
+	//     - or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
+	//       invalid (while aggregated public key is valid)
+	//   - model.InvalidAggregatedKeyError if all signatures deserialize correctly but the signer's
 	//     staking public keys sum up to an invalid key (BLS identity public key).
 	//     Any aggregated signature would fail the cryptographic verification under the identity public
 	//     key and therefore such signature is considered invalid. Such scenario can only happen if

@@ -40,7 +40,7 @@ func MakeTimeoutMessage(view uint64, newestQCView uint64) []byte {
 // In this context, all signatures apply to blocks.
 // Return values:
 //   - nil if `aggregatedSig` is valid against the public keys and message.
-//   - model.InsufficientSignaturesError if `signers` is empty or nil.
+//   - model.InsufficientSignaturesError if `pubKeys` is empty or nil.
 //   - model.ErrInvalidSignature if the signature is invalid against the public keys and message.
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
@@ -55,7 +55,7 @@ func verifyAggregatedSignatureOneMessage(
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 	if err != nil {
 		// `AggregateBLSPublicKeys` returns an error in two distinct cases:
-		//  (i) In case no keys are provided, i.e. `len(signers) == 0`.
+		//  (i) In case no keys are provided, i.e. `len(pubKeys) == 0`.
 		//      This scenario _is expected_ during normal operations, because a byzantine
 		//      proposer might construct an (invalid) QC with an empty list of signers.
 		// (ii) In case some provided public keys type is not BLS.
@@ -82,13 +82,13 @@ func verifyAggregatedSignatureOneMessage(
 // multiple messages and public keys.
 // Proofs of possession of all input keys are assumed to be valid (checked by the protocol).
 // This logic is commonly used across the different implementations of `hotstuff.Verifier`.
-// It is the responsibility of the calling code to ensure that all `signers` are authorized,
+// It is the responsibility of the calling code to ensure that all `pks` are authorized,
 // without duplicates. The caller must also make sure the `hasher` passed is non nil and has
 // 128-bytes outputs.
 // Return values:
 //   - nil if `sigData` is cryptographically valid
-//   - model.InsufficientSignaturesError if `signers is empty.
-//   - model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//   - model.InsufficientSignaturesError if `pks` is empty.
+//   - model.InvalidFormatError if `pks`/`highQCViews` have differing lengths
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
@@ -97,7 +97,8 @@ func verifyTCSignatureManyMessages(
 	sigData crypto.Signature,
 	view uint64,
 	highQCViews []uint64,
-	hasher hash.Hasher) error {
+	hasher hash.Hasher,
+) error {
 	if len(pks) != len(highQCViews) {
 		return model.NewInvalidFormatErrorf("public keys and highQCViews mismatch")
 	}
