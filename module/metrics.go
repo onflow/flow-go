@@ -83,6 +83,7 @@ type GossipSubRouterMetrics interface {
 }
 
 type LibP2PMetrics interface {
+	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	ResolverMetrics
 	DHTMetrics
