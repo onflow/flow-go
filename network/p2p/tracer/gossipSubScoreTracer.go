@@ -19,6 +19,8 @@ const (
 	PeerScoreLogMessage = "peer score snapshot update"
 )
 
+// GossipSubScoreTracer is a tracer that keeps track of the peer scores of the gossipsub router.
+// It is used to log the peer scores at regular intervals.
 type GossipSubScoreTracer struct {
 	component.Component
 
