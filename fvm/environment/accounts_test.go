@@ -25,7 +25,7 @@ func TestAccounts_Create(t *testing.T) {
 		require.NoError(t, err)
 
 		// account status
-		require.Equal(t, len(view.Ledger.RegisterTouches), 1)
+		require.Equal(t, len(view.AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {

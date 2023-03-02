@@ -4,138 +4,31 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SimpleView provides a simple view for testing and migration purposes.
-type SimpleView struct {
-	Parent *SimpleView
-	Ledger *MapLedger
+// TODO(patrick): combine this with storage.testutils.TestStorageSnapshot
+// once #3962 is merged.
+type MapStorageSnapshot map[flow.RegisterID]flow.RegisterValue
+
+func (storage MapStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	return storage[id], nil
 }
 
-func NewSimpleView() *SimpleView {
-	return &SimpleView{
-		Ledger: NewMapLedger(),
-	}
-}
-
-func NewSimpleViewFromPayloads(payloads []ledger.Payload) *SimpleView {
-	return &SimpleView{
-		Ledger: NewMapLedgerFromPayloads(payloads),
-	}
-}
-
-func (v *SimpleView) NewChild() state.View {
-	ch := NewSimpleView()
-	ch.Parent = v
-	return ch
-}
-
-func (v *SimpleView) MergeView(o state.View) error {
-	var other *SimpleView
-	var ok bool
-	if other, ok = o.(*SimpleView); !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
-	}
-
-	for key, value := range other.Ledger.Registers {
-		err := v.Ledger.Set(key, value)
-		if err != nil {
-			return fmt.Errorf("can not merge: %w", err)
-		}
-	}
-
-	for k := range other.Ledger.RegisterTouches {
-		v.Ledger.RegisterTouches[k] = struct{}{}
-	}
-	return nil
-}
-
-func (v *SimpleView) DropDelta() {
-	v.Ledger.Registers = make(map[flow.RegisterID]flow.RegisterValue)
-}
-
-func (v *SimpleView) Set(id flow.RegisterID, value flow.RegisterValue) error {
-	return v.Ledger.Set(id, value)
-}
-
-func (v *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	value, err := v.Ledger.Get(id)
-	if err != nil {
-		return nil, err
-	}
-	if len(value) > 0 {
-		return value, nil
-	}
-
-	if v.Parent != nil {
-		return v.Parent.Get(id)
-	}
-
-	return nil, nil
-}
-
-// returns all the register ids that has been touched
-func (v *SimpleView) AllRegisterIDs() []flow.RegisterID {
-	res := make([]flow.RegisterID, 0, len(v.Ledger.RegisterTouches))
-	for k := range v.Ledger.RegisterTouches {
-		res = append(res, k)
-	}
-	return res
-}
-
-// returns all the register ids that has been updated
-func (v *SimpleView) UpdatedRegisterIDs() []flow.RegisterID {
-	res := make([]flow.RegisterID, 0, len(v.Ledger.RegisterUpdated))
-	for k := range v.Ledger.RegisterUpdated {
-		res = append(res, k)
-	}
-	return res
-}
-
-func (v *SimpleView) UpdatedRegisters() flow.RegisterEntries {
-	entries := make(flow.RegisterEntries, 0, len(v.Ledger.RegisterUpdated))
-	for key := range v.Ledger.RegisterUpdated {
-		entries = append(
-			entries,
-			flow.RegisterEntry{
-				Key:   key,
-				Value: v.Ledger.Registers[key],
-			})
-	}
-	return entries
-}
-
-func (v *SimpleView) Payloads() []ledger.Payload {
-	return v.Ledger.Payloads()
-}
-
-// A MapLedger is a naive ledger storage implementation backed by a simple map.
-//
-// This implementation is designed for testing and migration purposes.
-type MapLedger struct {
-	sync.RWMutex
-	Registers       map[flow.RegisterID]flow.RegisterValue
-	RegisterTouches map[flow.RegisterID]struct{}
-	RegisterUpdated map[flow.RegisterID]struct{}
-}
-
-// NewMapLedger returns an instance of map ledger (should only be used for
-// testing and migration)
-func NewMapLedger() *MapLedger {
-	return &MapLedger{
-		Registers:       make(map[flow.RegisterID]flow.RegisterValue),
-		RegisterTouches: make(map[flow.RegisterID]struct{}),
-		RegisterUpdated: make(map[flow.RegisterID]struct{}),
-	}
-}
-
-// NewMapLedger returns an instance of map ledger with entries loaded from
-// payloads (should only be used for testing and migration)
-func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
-	ledger := NewMapLedger()
+// NewStorageSnapshotFromPayload returns an instance of StorageSnapshot with
+// entries loaded from payloads (should only be used for migration)
+func NewStorageSnapshotFromPayload(
+	payloads []ledger.Payload,
+) MapStorageSnapshot {
+	snapshot := make(MapStorageSnapshot, len(payloads))
 	for _, entry := range payloads {
 		key, err := entry.Key()
 		if err != nil {
@@ -146,28 +39,97 @@ func NewMapLedgerFromPayloads(payloads []ledger.Payload) *MapLedger {
 			string(key.KeyParts[0].Value),
 			string(key.KeyParts[1].Value))
 
-		ledger.Registers[id] = entry.Value()
+		snapshot[id] = entry.Value()
 	}
 
-	return ledger
+	return snapshot
 }
 
-func (m *MapLedger) Set(id flow.RegisterID, value flow.RegisterValue) error {
-	m.Lock()
-	defer m.Unlock()
-
-	m.RegisterTouches[id] = struct{}{}
-	m.RegisterUpdated[id] = struct{}{}
-	m.Registers[id] = value
-	return nil
+// TODO(patrick): rename to MigrationView
+// SimpleView provides a simple view for testing and migration purposes.
+type SimpleView struct {
+	// Get/Set/DropDelta are guarded by mutex since migration concurrently
+	// assess the same view.
+	//
+	// Note that we can't use RWLock since all view access, including Get,
+	// mutate the view's internal state.
+	sync.Mutex
+	base state.View
 }
 
-func (m *MapLedger) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	m.Lock()
-	defer m.Unlock()
+func NewSimpleView() *SimpleView {
+	return &SimpleView{
+		base: delta.NewDeltaView(nil),
+	}
+}
 
-	m.RegisterTouches[id] = struct{}{}
-	return m.Registers[id], nil
+func NewSimpleViewFromPayloads(payloads []ledger.Payload) *SimpleView {
+	return &SimpleView{
+		base: delta.NewDeltaView(NewStorageSnapshotFromPayload(payloads)),
+	}
+}
+
+func (view *SimpleView) NewChild() state.View {
+	return &SimpleView{
+		base: view.base.NewChild(),
+	}
+}
+
+func (view *SimpleView) MergeView(o state.View) error {
+	other, ok := o.(*SimpleView)
+	if !ok {
+		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
+	}
+
+	return view.base.MergeView(other.base)
+}
+
+func (view *SimpleView) DropDelta() {
+	view.Lock()
+	defer view.Unlock()
+
+	view.base.DropDelta()
+}
+
+func (view *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	view.Lock()
+	defer view.Unlock()
+
+	return view.base.Get(id)
+}
+
+func (view *SimpleView) Set(
+	id flow.RegisterID,
+	value flow.RegisterValue,
+) error {
+	view.Lock()
+	defer view.Unlock()
+
+	return view.base.Set(id, value)
+}
+
+func (view *SimpleView) AllRegisterIDs() []flow.RegisterID {
+	return view.base.AllRegisterIDs()
+}
+
+func (view *SimpleView) UpdatedRegisterIDs() []flow.RegisterID {
+	return view.base.UpdatedRegisterIDs()
+}
+
+func (view *SimpleView) UpdatedRegisters() flow.RegisterEntries {
+	return view.base.UpdatedRegisters()
+}
+
+func (view *SimpleView) UpdatedPayloads() []ledger.Payload {
+	updates := view.UpdatedRegisters()
+
+	ret := make([]ledger.Payload, 0, len(updates))
+	for _, entry := range updates {
+		key := registerIdToLedgerKey(entry.Key)
+		ret = append(ret, *ledger.NewPayload(key, ledger.Value(entry.Value)))
+	}
+
+	return ret
 }
 
 func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
@@ -177,17 +139,4 @@ func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
 	}
 
 	return ledger.NewKey(keyParts)
-}
-
-func (m *MapLedger) Payloads() []ledger.Payload {
-	m.RLock()
-	defer m.RUnlock()
-
-	ret := make([]ledger.Payload, 0, len(m.Registers))
-	for id, val := range m.Registers {
-		key := registerIdToLedgerKey(id)
-		ret = append(ret, *ledger.NewPayload(key, ledger.Value(val)))
-	}
-
-	return ret
 }
