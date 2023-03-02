@@ -82,6 +82,10 @@ func convertTopicScoreSnapshot(snapshot map[string]*pubsub.TopicScoreSnapshot) m
 	return newSnapshot
 }
 
+func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
+	g.options = append(g.options, pubsub.WithRawTracer(tracer))
+}
+
 func (g *GossipSubAdapterConfig) Build() []pubsub.Option {
 	return g.options
 }

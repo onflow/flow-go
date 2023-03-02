@@ -82,9 +82,16 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
+// GossipSubLocalMeshMetrics encapsulates the metrics collectors for GossipSub mesh of the networking layer.
+type GossipSubLocalMeshMetrics interface {
+	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
+	OnLocalMeshSizeUpdated(topic string, size int)
+}
+
 type LibP2PMetrics interface {
 	GossipSubScoringMetrics
 	GossipSubRouterMetrics
+	GossipSubLocalMeshMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter

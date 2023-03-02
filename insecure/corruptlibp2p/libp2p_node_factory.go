@@ -56,9 +56,11 @@ func NewCorruptLibP2PNodeFactory(
 			role,
 			onInterceptPeerDialFilters,
 			onInterceptSecuredFilters,
-			peerScoringEnabled,
 			connectionPruning,
 			updateInterval,
+			&p2pbuilder.GossipSubConfig{
+				PeerScoring: peerScoringEnabled,
+			},
 			p2pbuilder.DefaultResourceManagerConfig(),
 			ratelimit.NewUnicastRateLimiterDistributor())
 

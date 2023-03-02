@@ -151,3 +151,29 @@ func (nc *GossipSubMetrics) OnIncomingRpcRejected() {
 func (nc *GossipSubMetrics) OnPublishedGossipMessagesReceived(count int) {
 	nc.receivedPublishMessageCount.Add(float64(count))
 }
+
+// GossipSubLocalMeshMetrics is a metrics collector for the local mesh of GossipSub protocol.
+type GossipSubLocalMeshMetrics struct {
+	localMeshSize prometheus.GaugeVec
+}
+
+func NewGossipSubLocalMeshMetrics(prefix string) *GossipSubLocalMeshMetrics {
+	return &GossipSubLocalMeshMetrics{
+		localMeshSize: *promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespaceNetwork,
+				Subsystem: subsystemGossip,
+				Name:      prefix + "gossipsub_local_mesh_size",
+				Help:      "number of peers in the local mesh of the node",
+			},
+			[]string{LabelChannel},
+		),
+	}
+}
+
+var _ module.GossipSubLocalMeshMetrics = (*GossipSubLocalMeshMetrics)(nil)
+
+// OnLocalMeshSizeUpdated updates the local mesh size metric.
+func (g *GossipSubLocalMeshMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+	g.localMeshSize.WithLabelValues(topic).Set(float64(size))
+}

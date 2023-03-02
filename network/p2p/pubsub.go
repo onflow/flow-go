@@ -9,6 +9,8 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+
+	"github.com/onflow/flow-go/module/component"
 )
 
 type ValidationResult int
@@ -52,6 +54,7 @@ type PubSubAdapterConfig interface {
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
 	WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error)
+	WithTracer(t PubSubTracer)
 
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
@@ -106,6 +109,14 @@ type SubscriptionFilter interface {
 	// FilterIncomingSubscriptions is invoked for all RPCs containing subscription notifications.
 	// It filters and returns the subscriptions of interest to the current node.
 	FilterIncomingSubscriptions(peer.ID, []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error)
+}
+
+// PubSubTracer is the abstraction of the underlying pubsub tracer that is used by the Flow network. It wraps the
+// pubsub.RawTracer interface with the component.Component interface so that it can be started and stopped.
+// The RawTracer interface is used to trace the internal events of the pubsub system.
+type PubSubTracer interface {
+	component.Component
+	pubsub.RawTracer
 }
 
 // PeerScoreSnapshot is a snapshot of the overall peer score at a given time.

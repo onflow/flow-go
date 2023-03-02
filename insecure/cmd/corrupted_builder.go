@@ -80,7 +80,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.IdentityProvider,
 			cnb.Metrics.Network,
 			cnb.Resolver,
-			cnb.PeerScoringEnabled,
+			cnb.GossipSubConfig.PeerScoring,
 			cnb.BaseConfig.NodeRole,
 			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters

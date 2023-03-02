@@ -179,6 +179,11 @@ func (_m *NetworkMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
+func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+	_m.Called(topic, size)
+}
+
 // OnPruneReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
