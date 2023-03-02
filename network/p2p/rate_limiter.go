@@ -6,16 +6,24 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// RateLimiter unicast rate limiter interface
+// RateLimiter rate limiter with lockout feature that can be used via the IsRateLimited method.
+// This limiter allows users to flag a peer as rate limited for a lockout duration.
 type RateLimiter interface {
+	BasicRateLimiter
+	// IsRateLimited returns true if a peer is rate limited.
+	IsRateLimited(peerID peer.ID) bool
+}
+
+// BasicRateLimiter rate limiter interface
+type BasicRateLimiter interface {
 	// Allow returns true if a message with the give size should be allowed to be processed.
 	Allow(peerID peer.ID, msgSize int) bool
 
-	// IsRateLimited returns true if a peer is rate limited.
-	IsRateLimited(peerID peer.ID) bool
-
 	// SetTimeNowFunc allows users to override the underlying time module used.
 	SetTimeNowFunc(now GetTimeNow)
+
+	// Now returns the time using the configured GetTimeNow func.
+	Now() time.Time
 
 	// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
 	// is stopped it can not be reused.

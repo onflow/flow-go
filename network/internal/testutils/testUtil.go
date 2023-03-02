@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -419,6 +420,12 @@ func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOpt
 	}
 }
 
+func withGossipSubRPCInspectorCfg(cfg *validation.ControlMsgValidationInspectorConfig) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetRPCValidationInspectorConfig(cfg)
+	}
+}
+
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
@@ -431,6 +438,9 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
+	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	require.NoError(t, err)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -439,7 +449,8 @@ func generateLibP2PNode(t *testing.T,
 		sporkID,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
-		SetResourceManager(NewResourceManager(t))
+		SetResourceManager(NewResourceManager(t)).
+		SetRPCValidationInspectorConfig(defaultRPCValidationInpectorCfg)
 
 	for _, opt := range opts {
 		opt(builder)

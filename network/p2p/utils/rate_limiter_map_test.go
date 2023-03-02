@@ -1,21 +1,20 @@
-package limiter_map_test
+package utils_test
 
 import (
 	"testing"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 
-	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit/internal/limiter_map"
+	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
 func TestLimiterMap_get(t *testing.T) {
 	t.Parallel()
-	m := limiter_map.NewLimiterMap(time.Second, time.Second)
+	m := utils.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -28,7 +27,7 @@ func TestLimiterMap_get(t *testing.T) {
 // TestLimiterMap_remove checks the map removes keys as expected.
 func TestLimiterMap_remove(t *testing.T) {
 	t.Parallel()
-	m := limiter_map.NewLimiterMap(time.Second, time.Second)
+	m := utils.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -46,7 +45,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
-	m := limiter_map.NewLimiterMap(ttl, time.Second)
+	m := utils.NewLimiterMap(ttl, time.Second)
 
 	start := time.Now()
 
@@ -88,7 +87,7 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	// set short tick to kick of Cleanup
 	tick := 10 * time.Millisecond
 
-	m := limiter_map.NewLimiterMap(ttl, tick)
+	m := utils.NewLimiterMap(ttl, tick)
 
 	start := time.Now()
 

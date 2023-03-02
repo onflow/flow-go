@@ -3,7 +3,6 @@ package p2pnode
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 
@@ -42,8 +41,8 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	}))
 }
 
-func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error) {
-	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(f))
+func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.GossipSubRPCInspector) {
+	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
 }
 
 func (g *GossipSubAdapterConfig) Build() []pubsub.Option {

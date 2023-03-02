@@ -1,4 +1,4 @@
-package ratelimit
+package utils
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ func TestMessageRateLimiter_Allow(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup message rate limiter
-	messageRateLimiter := NewMessageRateLimiter(limit, burst, 1)
+	messageRateLimiter := NewRateLimiter(limit, burst, 1)
 
 	require.True(t, messageRateLimiter.Allow(peerID, 0))
 
@@ -49,7 +49,7 @@ func TestMessageRateLimiter_IsRateLimited(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup message rate limiter
-	messageRateLimiter := NewMessageRateLimiter(limit, burst, 1)
+	messageRateLimiter := NewRateLimiter(limit, burst, 1)
 
 	require.False(t, messageRateLimiter.IsRateLimited(peerID))
 	require.True(t, messageRateLimiter.Allow(peerID, 0))

@@ -1,4 +1,4 @@
-package limiter_map
+package utils
 
 import (
 	"sync"

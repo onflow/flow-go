@@ -44,7 +44,6 @@ func NewCorruptLibP2PNodeFactory(
 		if chainID != flow.BftTestnet {
 			panic("illegal chain id for using corrupt libp2p node")
 		}
-
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
@@ -60,6 +59,7 @@ func NewCorruptLibP2PNodeFactory(
 			connectionPruning,
 			updateInterval,
 			p2pbuilder.DefaultResourceManagerConfig(),
+			p2pbuilder.DefaultRPCValidationConfig(),
 			ratelimit.NewUnicastRateLimiterDistributor())
 
 		if err != nil {

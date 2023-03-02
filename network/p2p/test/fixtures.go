@@ -58,7 +58,7 @@ func NodeFixture(
 		Unicasts:        nil,
 		Key:             NetworkingKeyFixtures(t),
 		Address:         unittest.DefaultAddress,
-		Logger:          unittest.Logger().Level(zerolog.ErrorLevel),
+		Logger:          unittest.Logger().Level(zerolog.DebugLevel),
 		Role:            flow.RoleCollection,
 		Metrics:         metrics.NewNoopCollector(),
 		ResourceManager: testutils.NewResourceManager(t),
@@ -94,7 +94,8 @@ func NodeFixture(
 				parameters.DhtOptions...,
 			)
 		}).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
+		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
+		SetRPCValidationInspectorConfig(p2pbuilder.DefaultRPCValidationConfig())
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)

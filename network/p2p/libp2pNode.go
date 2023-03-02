@@ -23,6 +23,7 @@ import (
 // us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
 type LibP2PNode interface {
 	module.ReadyDoneAware
+	Subscriptions
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -71,6 +72,10 @@ type LibP2PNode interface {
 	// SetComponentManager sets the component manager for the node.
 	// SetComponentManager may be called at most once.
 	SetComponentManager(cm *component.ComponentManager)
+}
+
+// Subscriptions set of funcs related to current subscription info of a node.
+type Subscriptions interface {
 	// HasSubscription returns true if the node currently has an active subscription to the topic.
 	HasSubscription(topic channels.Topic) bool
 }

@@ -1,6 +1,8 @@
 package ratelimit
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/network/p2p"
@@ -21,6 +23,10 @@ func (n *NoopRateLimiter) SetTimeNowFunc(_ p2p.GetTimeNow) {}
 func (n *NoopRateLimiter) Stop() {}
 
 func (n *NoopRateLimiter) Start() {}
+
+func (n *NoopRateLimiter) Now() time.Time {
+	return time.Now()
+}
 
 func NewNoopRateLimiter() *NoopRateLimiter {
 	return &NoopRateLimiter{}

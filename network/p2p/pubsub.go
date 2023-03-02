@@ -49,7 +49,13 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error)
+	WithAppSpecificRpcInspector(inspector GossipSubRPCInspector)
+}
+
+// GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+type GossipSubRPCInspector interface {
+	// Inspect inspects an incoming RPC message.
+	Inspect(peer.ID, *pubsub.RPC) error
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

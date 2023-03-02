@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -71,6 +72,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	connectionPruning bool,
 	updateInterval time.Duration,
 	rCfg *ResourceManagerConfig,
+	rpcInspectorCfg *validation.ControlMsgValidationInspectorConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
 ) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
@@ -88,6 +90,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			connectionPruning,
 			updateInterval,
 			rCfg,
+			rpcInspectorCfg,
 			unicastRateLimiterDistributor)
 
 		if err != nil {
@@ -110,6 +113,7 @@ type NodeBuilder interface {
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
+	SetRPCValidationInspectorConfig(cfg *validation.ControlMsgValidationInspectorConfig) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -128,28 +132,47 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 	}
 }
 
+// DefaultRPCValidationConfig returns default RPC control message inspector config.
+func DefaultRPCValidationConfig() *validation.ControlMsgValidationInspectorConfig {
+	graftCfg, _ := validation.NewCtrlMsgValidationConfig(validation.ControlMsgGraft, validation.CtrlMsgValidationLimits{
+		validation.UpperThresholdMapKey:  validation.DefaultGraftUpperThreshold,
+		validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
+		validation.RateLimitMapKey:       validation.DefaultGraftRateLimit,
+	})
+	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(validation.ControlMsgPrune, validation.CtrlMsgValidationLimits{
+		validation.UpperThresholdMapKey:  validation.DefaultPruneUpperThreshold,
+		validation.SafetyThresholdMapKey: validation.DefaultPruneSafetyThreshold,
+		validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
+	})
+	return &validation.ControlMsgValidationInspectorConfig{
+		GraftValidationCfg: graftCfg,
+		PruneValidationCfg: pruneCfg,
+	}
+}
+
 type LibP2PNodeBuilder struct {
-	sporkID                     flow.Identifier
-	addr                        string
-	networkKey                  fcrypto.PrivateKey
-	logger                      zerolog.Logger
-	metrics                     module.LibP2PMetrics
-	basicResolver               madns.BasicResolver
-	subscriptionFilter          pubsub.SubscriptionFilter
-	resourceManager             network.ResourceManager
-	resourceManagerCfg          *ResourceManagerConfig
-	connManager                 connmgr.ConnManager
-	connGater                   connmgr.ConnectionGater
-	idProvider                  module.IdentityProvider
-	gossipSubFactory            GossipSubFactoryFunc
-	gossipSubConfigFunc         GossipSubAdapterConfigFunc
-	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
-	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerEnablePruning    bool
-	peerManagerUpdateInterval   time.Duration
-	peerScoringParameterOptions []scoring.PeerScoreParamsOption
-	createNode                  CreateNodeFunc
-	rateLimiterDistributor      p2p.UnicastRateLimiterDistributor
+	sporkID                      flow.Identifier
+	addr                         string
+	networkKey                   fcrypto.PrivateKey
+	logger                       zerolog.Logger
+	metrics                      module.LibP2PMetrics
+	basicResolver                madns.BasicResolver
+	subscriptionFilter           pubsub.SubscriptionFilter
+	resourceManager              network.ResourceManager
+	resourceManagerCfg           *ResourceManagerConfig
+	connManager                  connmgr.ConnManager
+	connGater                    connmgr.ConnectionGater
+	idProvider                   module.IdentityProvider
+	gossipSubFactory             GossipSubFactoryFunc
+	gossipSubConfigFunc          GossipSubAdapterConfigFunc
+	gossipSubPeerScoring         bool // whether to enable gossipsub peer scoring
+	routingFactory               func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerEnablePruning     bool
+	peerManagerUpdateInterval    time.Duration
+	peerScoringParameterOptions  []scoring.PeerScoreParamsOption
+	createNode                   CreateNodeFunc
+	rateLimiterDistributor       p2p.UnicastRateLimiterDistributor
+	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -159,15 +182,16 @@ func NewNodeBuilder(logger zerolog.Logger,
 	sporkID flow.Identifier,
 	rCfg *ResourceManagerConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:              logger,
-		sporkID:             sporkID,
-		addr:                addr,
-		networkKey:          networkKey,
-		createNode:          DefaultCreateNodeFunc,
-		gossipSubFactory:    defaultGossipSubFactory(),
-		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
-		metrics:             metrics,
-		resourceManagerCfg:  rCfg,
+		logger:                       logger,
+		sporkID:                      sporkID,
+		addr:                         addr,
+		networkKey:                   networkKey,
+		createNode:                   DefaultCreateNodeFunc,
+		gossipSubFactory:             defaultGossipSubFactory(),
+		gossipSubConfigFunc:          defaultGossipSubAdapterConfig(),
+		metrics:                      metrics,
+		resourceManagerCfg:           rCfg,
+		rpcValidationInspectorConfig: DefaultRPCValidationConfig(),
 	}
 }
 
@@ -248,6 +272,11 @@ func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.Unic
 func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, cf GossipSubAdapterConfigFunc) NodeBuilder {
 	builder.gossipSubFactory = gf
 	builder.gossipSubConfigFunc = cf
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetRPCValidationInspectorConfig(cfg *validation.ControlMsgValidationInspectorConfig) NodeBuilder {
+	builder.rpcValidationInspectorConfig = cfg
 	return builder
 }
 
@@ -364,12 +393,21 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				gossipSubConfigs.WithScoreOption(scoreOpt)
 			}
 
-			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
+			// create aggregate RPC inspector
+			gossipSubRPCInspector := inspector.NewAggregateRPCInspector()
+
+			// create gossip metrics inspector
 			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
-			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
-				gossipSubMetrics.ObserveRPC(from, rpc)
-				return nil
-			})
+			rpcMetricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
+			gossipSubRPCInspector.AddInspector(rpcMetricsInspector)
+
+			// create and start gossip control message validation inspector
+			//rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig)
+			//rpcControlMsgInspector.Start(ctx)
+			//gossipSubRPCInspector.AddInspector(rpcControlMsgInspector)
+
+			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC
+			gossipSubConfigs.WithAppSpecificRpcInspector(gossipSubRPCInspector)
 
 			// builds GossipSub with the given factory
 			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
@@ -479,6 +517,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	connectionPruning bool,
 	updateInterval time.Duration,
 	rCfg *ResourceManagerConfig,
+	rpcInspectorCfg *validation.ControlMsgValidationInspectorConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) (NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
@@ -504,7 +543,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		}).
 		SetPeerManagerOptions(connectionPruning, updateInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(unicastRateLimiterDistributor)
+		SetRateLimiterDistributor(unicastRateLimiterDistributor).
+		SetRPCValidationInspectorConfig(rpcInspectorCfg)
 
 	if peerScoringEnabled {
 		builder.EnableGossipSubPeerScoring(idProvider)

@@ -1,18 +1,11 @@
 package ratelimit
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/onflow/flow-go/network/channels"
-)
-
-const (
-	cleanUpTickInterval = 10 * time.Minute
-	rateLimiterTTL      = 10 * time.Minute
 )
 
 var (

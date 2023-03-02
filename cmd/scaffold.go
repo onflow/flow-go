@@ -53,12 +53,14 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -205,11 +207,16 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	// unicast stream handler rate limits
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastMessageRateLimit, "unicast-message-rate-limit", defaultConfig.NetworkConfig.UnicastMessageRateLimit, "maximum number of unicast messages that a peer can send per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", defaultConfig.NetworkConfig.UnicastBandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.NetworkConfig.UnicastBandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
-	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", defaultConfig.NetworkConfig.UnicastRateLimitLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
-	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", defaultConfig.NetworkConfig.UnicastRateLimitDryRun, "disable peer disconnects and connections gating when rate limiting peers")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit, "unicast-message-rate-limit", defaultConfig.UnicastRateLimitersConfig.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthRateLimit, "unicast-bandwidth-rate-limit", defaultConfig.UnicastRateLimitersConfig.BandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.UnicastRateLimitersConfig.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration, "unicast-rate-limit-lockout-duration", defaultConfig.UnicastRateLimitersConfig.LockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
+	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitersConfig.DryRun, "unicast-rate-limit-dry-run", defaultConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
+
+	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Graft, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Graft, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Prune, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Prune, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -293,21 +300,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitDryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitersConfig.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.UnicastMessageRateLimit > 0 {
-		unicastMessageRateLimiter := ratelimit.NewMessageRateLimiter(
-			rate.Limit(fnb.BaseConfig.UnicastMessageRateLimit),
-			fnb.BaseConfig.UnicastMessageRateLimit,
-			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+	if fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
+		unicastMessageRateLimiter := utils.NewRateLimiter(
+			rate.Limit(fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit),
+			fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit,
+			fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+		if !fnb.BaseConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			// don't allow rate limited peers to establishing incoming connections
@@ -315,20 +322,19 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// don't create outbound connections to rate limited peers
 			peerManagerFilters = append(peerManagerFilters, f)
 		}
-
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit),
-			fnb.BaseConfig.UnicastBandwidthBurstLimit,
-			fnb.BaseConfig.UnicastRateLimitLockoutDuration,
+			rate.Limit(fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
+			fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
+			fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+		if !fnb.BaseConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
@@ -343,6 +349,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		// setup gossip sub RPC control message inspector config
+		controlMsgRPCInspectorCfg, err := fnb.gossipSubRPCInspectorConfig()
+		if err != nil {
+			return nil, err
 		}
 
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
@@ -361,6 +373,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkConnectionPruning,
 			fnb.PeerUpdateInterval,
 			fnb.LibP2PResourceManagerConfig,
+			controlMsgRPCInspectorCfg,
 			fnb.UnicastRateLimiterDistributor,
 		)
 
@@ -1805,6 +1818,26 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 		}
 	}
 	return nil
+}
+
+// gossipSubRPCInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
+func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig() (*validation.ControlMsgValidationInspectorConfig, error) {
+	// setup rpc validation configuration for each control message type
+	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(validation.ControlMsgGraft, fnb.GossipSubRPCValidationConfigs.Graft)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
+	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(validation.ControlMsgPrune, fnb.GossipSubRPCValidationConfigs.Prune)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
+	// setup gossip sub RPC control message inspector config
+	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
+		NumberOfWorkers:    fnb.GossipSubRPCValidationConfigs.NumberOfWorkers,
+		GraftValidationCfg: graftValidationCfg,
+		PruneValidationCfg: pruneValidationCfg,
+	}
+	return controlMsgRPCInspectorCfg, nil
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
