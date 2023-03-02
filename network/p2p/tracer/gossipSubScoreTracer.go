@@ -51,8 +51,6 @@ func NewGossipSubScoreTracer(logger zerolog.Logger, provider module.IdentityProv
 	return g
 }
 
-}
-
 // UpdatePeerScoreSnapshots updates the tracer's snapshot of the peer scores.
 func (g *GossipSubScoreTracer) UpdatePeerScoreSnapshots(snapshot map[peer.ID]*p2p.PeerScoreSnapshot) {
 	g.snapshotLock.Lock()
