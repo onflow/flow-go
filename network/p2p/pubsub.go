@@ -153,7 +153,7 @@ func (p PeerScoreSnapshot) IsWarning() bool {
 }
 
 func (s TopicScoreSnapshot) String() string {
-	return fmt.Sprintf("time in mesh: %s, first message deliveries: %f, mesh message deliveries: %f, invalid message deliveries: %f",
+	return fmt.Sprintf("time_in_mesh: %s, first_message_deliveries: %f, mesh message deliveries: %f, invalid message deliveries: %f",
 		s.TimeInMesh, s.FirstMessageDeliveries, s.MeshMessageDeliveries, s.InvalidMessageDeliveries)
 }
 
