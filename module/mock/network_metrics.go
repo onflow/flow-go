@@ -3,6 +3,7 @@
 package mock
 
 import (
+	channels "github.com/onflow/flow-go/network/channels"
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/libp2p/go-libp2p/core/network"
@@ -129,6 +130,16 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
+// OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
+}
+
+// OnBehaviourPenaltyUpdated provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnBehaviourPenaltyUpdated(_a0 float64) {
+	_m.Called(_a0)
+}
+
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *NetworkMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -149,6 +160,11 @@ func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
+// OnFirstMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnGraftReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnGraftReceived(count int) {
 	_m.Called(count)
@@ -157,6 +173,11 @@ func (_m *NetworkMetrics) OnGraftReceived(count int) {
 // OnIHaveReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnIHaveReceived(count int) {
 	_m.Called(count)
+}
+
+// OnIPColocationFactorUpdated provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnIPColocationFactorUpdated(_a0 float64) {
+	_m.Called(_a0)
 }
 
 // OnIWantReceived provides a mock function with given fields: count
@@ -179,9 +200,24 @@ func (_m *NetworkMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
 func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
+}
+
+// OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
+// OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
 }
 
 // OnPruneReceived provides a mock function with given fields: count
@@ -197,6 +233,11 @@ func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
 // OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
 func (_m *NetworkMetrics) OnRateLimitedPeer(pid peer.ID, role string, msgType string, topic string, reason string) {
 	_m.Called(pid, role, msgType, topic, reason)
+}
+
+// OnTimeInMeshUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Duration) {
+	_m.Called(_a0, _a1)
 }
 
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense
@@ -227,6 +268,11 @@ func (_m *NetworkMetrics) RoutingTablePeerAdded() {
 // RoutingTablePeerRemoved provides a mock function with given fields:
 func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
 	_m.Called()
+}
+
+// SetWarningStateCount provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) SetWarningStateCount(_a0 uint) {
+	_m.Called(_a0)
 }
 
 // UnicastMessageSendingCompleted provides a mock function with given fields: topic
