@@ -1074,8 +1074,14 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[key]
-		assert.True(t, ok)
+		found := false
+		for _, id := range view.AllRegisterIDs() {
+			if id == key {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
 
 		// Commit to setup the next test.
 		err = txnDerivedData.Commit()
@@ -1095,7 +1101,13 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[key]
-		assert.True(t, ok)
+		found := false
+		for _, id := range view.AllRegisterIDs() {
+			if id == key {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
 	})
 }
