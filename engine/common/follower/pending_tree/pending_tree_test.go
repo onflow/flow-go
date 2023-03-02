@@ -32,10 +32,10 @@ func (s *PendingTreeSuite) SetupTest() {
 // Having: F <- B1 <- B2 <- B3
 // Add [B1, B2, B3], expect to get [B1;QC_B1, B2;QC_B2; B3;QC_B3]
 func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
-	blocks := unittest.ChainFixtureFrom(3, s.finalized)
-	connectedBlocks, err := s.pendingTree.AddBlocks(blocks, certifyLast(blocks))
+	blocks := certifiedBlocksChain(3, s.finalized)
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks, unwrapCertifiedBlocks(connectedBlocks), certifyLast(blocks))
+	require.Equal(s.T(), blocks, connectedBlocks)
 }
 
 // TestBlocksAreNotConnectedToFinalized tests that adding blocks that don't connect to the finalized block result
@@ -43,8 +43,8 @@ func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
 // Having: F <- B1 <- B2 <- B3
 // Add [B2, B3], expect to get []
 func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
-	blocks := unittest.ChainFixtureFrom(3, s.finalized)
-	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[1:], certifyLast(blocks))
+	blocks := certifiedBlocksChain(3, s.finalized)
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
 }
@@ -55,14 +55,14 @@ func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
 // Add [B3, B4, B5], expect to get []
 // Add [B1, B2], expect to get [B1, B2, B3, B4, B5]
 func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
-	blocks := unittest.ChainFixtureFrom(5, s.finalized)
-	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[len(blocks)-3:], certifyLast(blocks))
+	blocks := certifiedBlocksChain(5, s.finalized)
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[len(blocks)-3:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
 
-	connectedBlocks, err = s.pendingTree.AddBlocks(blocks[:len(blocks)-3], blocks[len(blocks)-3].Header.QuorumCertificate())
+	connectedBlocks, err = s.pendingTree.AddBlocks(blocks[:len(blocks)-3])
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks, unwrapCertifiedBlocks(connectedBlocks))
+	require.Equal(s.T(), blocks, connectedBlocks)
 }
 
 // TestInsertingMissingBlockToFinalized tests that adding blocks that don't connect to the finalized block result
@@ -74,24 +74,27 @@ func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
 // Add [B4, B5, B6, B7], expect to get []
 // Add [B1], expect to get [B1, B2, B3, B4, B5, B6, B7]
 func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
-	longestFork := unittest.ChainFixtureFrom(5, s.finalized)
-	B2 := unittest.BlockWithParentFixture(longestFork[0].Header)
+	longestFork := certifiedBlocksChain(5, s.finalized)
+	B2 := unittest.BlockWithParentFixture(longestFork[0].Block.Header)
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
-	B2.Header.View = longestFork[len(longestFork)-1].Header.View + 1
+	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
-	shortFork := []*flow.Block{B2, B3}
+	shortFork := []CertifiedBlock{{
+		Block: B2,
+		QC:    B3.Header.QuorumCertificate(),
+	}, certifiedBlockFixture(B3)}
 
-	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork, certifyLast(shortFork))
+	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
 
-	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[1:], certifyLast(longestFork))
+	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[1:])
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
 
-	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[:1], longestFork[1].Header.QuorumCertificate())
+	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[:1])
 	require.NoError(s.T(), err)
-	require.ElementsMatch(s.T(), append(longestFork, shortFork...), unwrapCertifiedBlocks(connectedBlocks))
+	require.ElementsMatch(s.T(), append(longestFork, shortFork...), connectedBlocks)
 }
 
 // TestByzantineThresholdExceeded tests that submitting two certified blocks for the same view is reported as
@@ -102,23 +105,31 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 	// use same view for conflicted blocks, this is not possible unless there is more than
 	// 1/3 byzantine participants
 	conflictingBlock.Header.View = block.Header.View
-	_, err := s.pendingTree.AddBlocks([]*flow.Block{block}, unittest.CertifyBlock(block.Header))
+	_, err := s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
 	// adding same block should result in no-op
-	_, err = s.pendingTree.AddBlocks([]*flow.Block{block}, unittest.CertifyBlock(block.Header))
+	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
-	connectedBlocks, err := s.pendingTree.AddBlocks([]*flow.Block{conflictingBlock}, unittest.CertifyBlock(conflictingBlock.Header))
+	connectedBlocks, err := s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(conflictingBlock)})
 	require.Empty(s.T(), connectedBlocks)
 	require.True(s.T(), model.IsByzantineThresholdExceededError(err))
 }
 
-func unwrapCertifiedBlocks(certified []CertifiedBlock) []*flow.Block {
-	blocks := make([]*flow.Block, 0, len(certified))
-	for _, cert := range certified {
-		blocks = append(blocks, cert.Block)
+func certifiedBlocksChain(count int, parent *flow.Header) []CertifiedBlock {
+	result := make([]CertifiedBlock, 0, count)
+	blocks := unittest.ChainFixtureFrom(count, parent)
+	for i := 0; i < count-1; i++ {
+		result = append(result, CertifiedBlock{
+			Block: blocks[i],
+			QC:    blocks[i+1].Header.QuorumCertificate(),
+		})
 	}
-	return blocks
+	result = append(result, certifiedBlockFixture(blocks[len(blocks)-1]))
+	return result
 }
 
-func certifyLast(blocks []*flow.Block) *flow.QuorumCertificate {
-	return unittest.CertifyBlock(blocks[len(blocks)-1].Header)
+func certifiedBlockFixture(block *flow.Block) CertifiedBlock {
+	return CertifiedBlock{
+		Block: block,
+		QC:    unittest.CertifyBlock(block.Header),
+	}
 }

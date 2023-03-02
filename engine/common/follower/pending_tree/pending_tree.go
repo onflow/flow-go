@@ -62,31 +62,13 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 	}
 }
 
-// AddBlocks
+// AddBlocks accepts a batch of certified blocks in ascending height order.
+// Skips in height between blocks are allowed.
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
-func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyingQC *flow.QuorumCertificate) ([]CertifiedBlock, error) {
-	certifiedBlocks := make([]CertifiedBlock, 0, len(incomingCertifiedBlocks))
-	for i := 0; i < len(incomingCertifiedBlocks)-1; i++ {
-		certifiedBlocks = append(certifiedBlocks, CertifiedBlock{
-			Block: incomingCertifiedBlocks[i],
-			QC:    incomingCertifiedBlocks[i+1].Header.QuorumCertificate(),
-		})
-	}
-	certifiedBlocks = append(certifiedBlocks, CertifiedBlock{
-		Block: incomingCertifiedBlocks[len(incomingCertifiedBlocks)-1],
-		QC:    certifyingQC,
-	})
-
+func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBlock, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	var connectedToFinalized bool
-	if certifiedBlocks[0].Block.Header.ParentID == t.lastFinalizedID {
-		connectedToFinalized = true
-	} else if parentVertex, found := t.forest.GetVertex(certifiedBlocks[0].Block.Header.ParentID); found {
-		connectedToFinalized = parentVertex.(*PendingBlockVertex).connectedToFinalized
-	}
 
 	var connectedBlocks []CertifiedBlock
 	for _, block := range certifiedBlocks {
@@ -105,7 +87,7 @@ func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyin
 			}
 		}
 
-		vertex, err := NewVertex(block, connectedToFinalized)
+		vertex, err := NewVertex(block, false)
 		if err != nil {
 			return nil, fmt.Errorf("could not create new vertex: %w", err)
 		}
@@ -116,12 +98,37 @@ func (t *PendingTree) AddBlocks(incomingCertifiedBlocks []*flow.Block, certifyin
 		t.forest.AddVertex(vertex)
 	}
 
+	firstBlock := certifiedBlocks[0]
+
+	var connectedToFinalized bool
+	if firstBlock.Block.Header.ParentID == t.lastFinalizedID {
+		connectedToFinalized = true
+	} else if parentVertex, found := t.forest.GetVertex(firstBlock.Block.Header.ParentID); found {
+		connectedToFinalized = parentVertex.(*PendingBlockVertex).connectedToFinalized
+	}
+
 	if connectedToFinalized {
-		vertex, _ := t.forest.GetVertex(certifiedBlocks[0].ID())
+		vertex, _ := t.forest.GetVertex(firstBlock.ID())
 		connectedBlocks = t.updateAndCollectFork(vertex.(*PendingBlockVertex))
 	}
 
 	return connectedBlocks, nil
+}
+
+func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
+	blockID := finalized.ID()
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.forest.LowestLevel >= finalized.View {
+		return nil
+	}
+
+	t.lastFinalizedID = blockID
+	err := t.forest.PruneUpToLevel(finalized.View)
+	if err != nil {
+		return fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
+	}
+	return nil
 }
 
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
