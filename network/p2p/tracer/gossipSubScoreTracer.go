@@ -76,15 +76,15 @@ func (g *GossipSubScoreTracer) UpdateInterval() time.Duration {
 }
 
 // GetScore returns the overall score for the given peer.
-func (g *GossipSubScoreTracer) GetScore(peerID peer.ID) float64 {
+func (g *GossipSubScoreTracer) GetScore(peerID peer.ID) (float64, bool) {
 	g.snapshotLock.RLock()
 	defer g.snapshotLock.RUnlock()
 
 	if snapshot, ok := g.snapshot[peerID]; ok {
-		return snapshot.Score
+		return snapshot.Score, true
 	}
 
-	return 0
+	return 0, false
 }
 
 // GetAppScore returns the application score for the given peer.
@@ -124,6 +124,7 @@ func (g *GossipSubScoreTracer) GetBehaviourPenalty(peerID peer.ID) (float64, boo
 }
 
 // GetTopicScores returns the topic scores for the given peer.
+// The returned map is keyed by topic name.
 func (g *GossipSubScoreTracer) GetTopicScores(peerID peer.ID) (map[string]p2p.TopicScoreSnapshot, bool) {
 	g.snapshotLock.RLock()
 	defer g.snapshotLock.RUnlock()
