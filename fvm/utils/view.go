@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,20 +56,22 @@ func (view *SimpleView) NewChild() state.View {
 	}
 }
 
-func (view *SimpleView) MergeView(o state.View) error {
-	other, ok := o.(*SimpleView)
-	if !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
-	}
-
-	return view.base.MergeView(other.base)
+func (view *SimpleView) Merge(other state.ExecutionSnapshot) error {
+	return view.base.Merge(other)
 }
 
-func (view *SimpleView) DropDelta() {
+func (view *SimpleView) SpockSecret() []byte {
+	return nil
+}
+
+func (view *SimpleView) Meter() *meter.Meter {
+	return nil
+}
+
+func (view *SimpleView) DropChanges() error {
 	view.Lock()
 	defer view.Unlock()
-
-	view.base.DropDelta()
+	return view.base.DropChanges()
 }
 
 func (view *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
