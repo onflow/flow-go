@@ -128,16 +128,6 @@ func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (
 	)
 }
 
-func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
-
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
-	}
-
-	return ledger.NewQuery(ledger.State(commitment), keys)
-}
-
 func RegisterEntriesToKeysValues(
 	entries flow.RegisterEntries,
 ) (
