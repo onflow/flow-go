@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -50,6 +52,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	accessScore := float64(77)
 
 	scoreMetrics := mockmodule.NewGossipSubScoringMetrics(t)
+	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
@@ -62,20 +65,42 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		p2ptest.WithLogger(logger),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
 		p2ptest.WithPeerScoringEnabled(idProvider),         // enable peer scoring for sake of testing.
-		p2ptest.WithAppSpecificScore(func(pid peer.ID) float64 {
-			id, ok := idProvider.ByPeerID(pid)
-			require.True(t, ok)
+		p2ptest.WithPeerScoreParamsOption(
+			scoring.WithAppSpecificScoreFunction(
+				func(pid peer.ID) float64 {
+					id, ok := idProvider.ByPeerID(pid)
+					require.True(t, ok)
 
-			switch id.Role {
-			case flow.RoleConsensus:
-				return consensusScore
-			case flow.RoleAccess:
-				return accessScore
-			default:
-				t.Fatalf("unexpected role: %s", id.Role)
-			}
-			return 0
-		}),
+					switch id.Role {
+					case flow.RoleConsensus:
+						return consensusScore
+					case flow.RoleAccess:
+						return accessScore
+					default:
+						t.Fatalf("unexpected role: %s", id.Role)
+					}
+					return 0
+				})),
+		p2ptest.WithPeerScoreParamsOption(scoring.WithTopicScoreParams(topic1, &pubsub.TopicScoreParams{
+			// set the topic score params to some fixed values for sake of testing.
+			// Note that these values are not realistic and should not be used in production.
+			TopicWeight:                     1,
+			TimeInMeshQuantum:               1 * time.Second,
+			TimeInMeshWeight:                1,
+			TimeInMeshCap:                   1000,
+			FirstMessageDeliveriesWeight:    1,
+			FirstMessageDeliveriesDecay:     0.999,
+			FirstMessageDeliveriesCap:       1000,
+			MeshMessageDeliveriesWeight:     -1,
+			MeshMessageDeliveriesDecay:      0.999,
+			MeshMessageDeliveriesThreshold:  100,
+			MeshMessageDeliveriesActivation: 1 * time.Second,
+			MeshMessageDeliveriesCap:        1000,
+			MeshFailurePenaltyWeight:        -1,
+			MeshFailurePenaltyDecay:         0.999,
+			InvalidMessageDeliveriesWeight:  -1,
+			InvalidMessageDeliveriesDecay:   0.999,
+		})),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
@@ -106,13 +131,12 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	scoreMetrics.On("OnAppSpecificScoreUpdated", mock.Anything).Return()
 	scoreMetrics.On("OnIPColocationFactorUpdated", mock.Anything).Return()
 	scoreMetrics.On("OnBehaviourPenaltyUpdated", mock.Anything).Return()
-	scoreMetrics.On("OnTimeInMeshUpdated", mock.Anything, mock.Anything).Return()
-	scoreMetrics.On("OnFirstMessageDeliveredUpdated", mock.Anything, mock.Anything).Return()
-	scoreMetrics.On("OnMeshMessageDeliveredUpdated", mock.Anything, mock.Anything).Return()
-	scoreMetrics.On("OnMeshMessageDeliveredUpdated", mock.Anything, mock.Anything).Return()
-	scoreMetrics.On("SetWarningStateCount", mock.Anything).Return()
-
-	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	scoreMetrics.On("OnTimeInMeshUpdated", topic1, mock.Anything).Return()
+	scoreMetrics.On("OnFirstMessageDeliveredUpdated", topic1, mock.Anything).Return()
+	scoreMetrics.On("OnMeshMessageDeliveredUpdated", topic1, mock.Anything).Return()
+	scoreMetrics.On("OnMeshMessageDeliveredUpdated", topic1, mock.Anything).Return()
+	scoreMetrics.On("OnInvalidMessageDeliveredUpdated", topic1, mock.Anything).Return()
+	scoreMetrics.On("SetWarningStateCount", uint(0)).Return()
 
 	_, err := tracerNode.Subscribe(
 		topic1,
@@ -180,12 +204,20 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing mesh score.
-		_, ok = tracerNode.PeerScoreExposer().GetTopicScores(consensusNode.Host().ID())
+		consensusMeshScores, ok := tracerNode.PeerScoreExposer().GetTopicScores(consensusNode.Host().ID())
+		if !ok {
+			return false
+		}
+		_, ok = consensusMeshScores[topic1.String()]
 		if !ok {
 			return false
 		}
 
-		_, ok = tracerNode.PeerScoreExposer().GetTopicScores(accessNode.Host().ID())
+		accessMeshScore, ok := tracerNode.PeerScoreExposer().GetTopicScores(accessNode.Host().ID())
+		if !ok {
+			return false
+		}
+		_, ok = accessMeshScore[topic1.String()]
 		if !ok {
 			return false
 		}

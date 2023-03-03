@@ -160,7 +160,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 		p2ptest.WithRole(flow.RoleAccess),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
-		p2ptest.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
+		p2ptest.WithPeerScoreParamsOption(scoring.WithAppSpecificScoreFunction(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}))))
 
 	allNodes := append([]p2p.LibP2PNode{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)

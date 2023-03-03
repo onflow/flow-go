@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
@@ -106,11 +105,10 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		scoreOptionParams := make([]scoring.PeerScoreParamsOption, 0)
-		if parameters.AppSpecificScore != nil {
-			scoreOptionParams = append(scoreOptionParams, scoring.WithAppSpecificScoreFunction(parameters.AppSpecificScore))
+		if parameters.PeerScoreOptions == nil {
+			parameters.PeerScoreOptions = make([]scoring.PeerScoreParamsOption, 0)
 		}
-		builder.EnableGossipSubPeerScoring(parameters.IdProvider, scoreOptionParams...)
+		builder.EnableGossipSubPeerScoring(parameters.IdProvider, parameters.PeerScoreOptions...)
 	}
 
 	if parameters.UpdateInterval != 0 {
@@ -162,10 +160,10 @@ type NodeFixtureParameters struct {
 	Logger                           zerolog.Logger
 	PeerScoringEnabled               bool
 	IdProvider                       module.IdentityProvider
-	AppSpecificScore                 func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
-	ConnectionPruning                bool                  // peer manager parameter
-	UpdateInterval                   time.Duration         // peer manager parameter
-	PeerProvider                     p2p.PeersProvider     // peer manager parameter
+	PeerScoreOptions                 []scoring.PeerScoreParamsOption
+	ConnectionPruning                bool              // peer manager parameter
+	UpdateInterval                   time.Duration     // peer manager parameter
+	PeerProvider                     p2p.PeersProvider // peer manager parameter
 	ConnGater                        connmgr.ConnectionGater
 	ConnManager                      connmgr.ConnManager
 	GossipSubFactory                 p2pbuilder.GossipSubFactoryFunc
@@ -245,9 +243,12 @@ func WithRole(role flow.Role) NodeFixtureParameterOption {
 	}
 }
 
-func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOption {
+func WithPeerScoreParamsOption(opt scoring.PeerScoreParamsOption) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.AppSpecificScore = score
+		if p.PeerScoreOptions == nil {
+			p.PeerScoreOptions = make([]scoring.PeerScoreParamsOption, 0)
+		}
+		p.PeerScoreOptions = append(p.PeerScoreOptions, opt)
 	}
 }
 
