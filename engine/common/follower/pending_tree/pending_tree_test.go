@@ -157,6 +157,27 @@ func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 	require.Equal(s.T(), uint64(0), s.pendingTree.forest.GetSize())
 }
 
+// TestAddingBlockAfterFinalization tests that adding a batch of blocks which includes finalized block correctly returns
+// a chain of connected blocks without finalized one.
+// Having F <- A <- B <- C.
+// Adding [A, B, C] returns [A, B, C].
+// Finalize A.
+// Adding [A, B, C] returns [B, C] since A is already finalized and B connects to A.
+func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
+	blocks := certifiedBlocksFixture(3, s.finalized)
+
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), blocks, connectedBlocks)
+
+	err = s.pendingTree.FinalizeForkAtLevel(blocks[0].Block.Header)
+	require.NoError(s.T(), err)
+
+	connectedBlocks, err = s.pendingTree.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), blocks[1:], connectedBlocks)
+}
+
 func certifiedBlocksFixture(count int, parent *flow.Header) []CertifiedBlock {
 	result := make([]CertifiedBlock, 0, count)
 	blocks := unittest.ChainFixtureFrom(count, parent)
