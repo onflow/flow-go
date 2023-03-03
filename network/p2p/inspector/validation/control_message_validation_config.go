@@ -78,6 +78,8 @@ type CtrlMsgValidationConfig struct {
 	// SafetyThreshold lower limit for the size of the RPC control message, any RPC messages
 	// with a size < SafetyThreshold can skip validation step to avoid resource wasting.
 	SafetyThreshold int
+	//RateLimit rate limit used for rate limiter, this is a per second limit.
+	RateLimit int
 	// RateLimiter basic limiter without lockout duration.
 	RateLimiter p2p.BasicRateLimiter
 }
@@ -99,6 +101,7 @@ func NewCtrlMsgValidationConfig(controlMsg ControlMsg, cfgLimitValues CtrlMsgVal
 			ControlMsg:      controlMsg,
 			UpperThreshold:  cfgLimitValues.UpperThreshold(),
 			SafetyThreshold: cfgLimitValues.SafetyThreshold(),
+			RateLimit:       cfgLimitValues.RateLimit(),
 			RateLimiter:     ratelimit.NewControlMessageRateLimiter(rate.Limit(cfgLimitValues.RateLimit()), cfgLimitValues.RateLimit()),
 		}, nil
 	}

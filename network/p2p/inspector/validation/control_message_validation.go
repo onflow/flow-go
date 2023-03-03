@@ -2,6 +2,8 @@ package validation
 
 import (
 	"fmt"
+
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -127,7 +129,7 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType Contro
 	count, topicIDS := c.getCtrlMsgData(ctrlMsgType, ctrlMsg)
 	// if count greater than upper threshold drop message and penalize
 	if count > validationConfig.UpperThreshold {
-		err := fmt.Errorf("number of messges received exceeds the configured upper threshold: %d", count)
+		err := NewUpperThresholdErr(validationConfig.ControlMsg, count, validationConfig.UpperThreshold)
 		c.logger.Warn().
 			Err(err).
 			Bool(logging.KeySuspicious, true).
@@ -145,28 +147,25 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType Contro
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *inspectMsgReq) {
 	lg := c.logger.With().
 		Int("count", req.count).
-		Strs("topic-ids", req.topicIDS).
 		Str("control-message", string(req.validationConfig.ControlMsg)).Logger()
 	switch {
 	case !req.validationConfig.RateLimiter.Allow(req.peer, req.count): // check if peer RPC messages are rate limited
-		err := fmt.Errorf("control messages of type %s are currently rate limited", req.validationConfig.ControlMsg)
-		lg.Warn().
-			Err(err).
+		lg.Error().
 			Bool(logging.KeySuspicious, true).
-			Msg("rejecting RPC message peer is rate limited")
-		// punish ErrRateLimitedGraftPrune
+			Msg(fmt.Sprintf("rejecting RPC control messages of type %s are currently rate limited for peer", req.validationConfig.ControlMsg))
+		// punish rate limited peer
 	case req.count > req.validationConfig.SafetyThreshold: // check if peer RPC messages count greater than safety threshold further inspect each message individually
-		err := c.validateTopics(req.topicIDS)
+		err := c.validateTopics(req.validationConfig.ControlMsg, req.topicIDS)
 		if err != nil {
-			lg.Warn().
+			lg.Error().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
-				Msg("rejecting RPC message topic validation failed")
+				Msg(fmt.Sprintf("rejecting RPC message topic validation failed: %s", err))
 		}
 		// punish invalid topic
 	default:
 		lg.Info().
-			Msg("skipping RPC control message inspection validation message count below safety threshold")
+			Msg(fmt.Sprintf("skipping RPC control message %s inspection validation message count %d below safety threshold", req.validationConfig.ControlMsg, req.count))
 	}
 }
 
@@ -218,17 +217,19 @@ func (c *ControlMsgValidationInspector) getCtrlMsgData(ctrlMsgType ControlMsg, c
 
 // validateTopics ensures the topic is a valid flow topic/channel and the node has a subscription to that topic.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(topics []string) error {
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsg ControlMsg, topics []string) error {
+	var errs *multierror.Error
 	for _, t := range topics {
 		topic := channels.Topic(t)
 		channel, ok := channels.ChannelFromTopic(topic)
 		if !ok {
-			return fmt.Errorf("could not get channel from topic: %s", topic)
+			errs = multierror.Append(errs, NewMalformedTopicErr(ctrlMsg, topic))
+			continue
 		}
 
 		if !channels.ChannelExists(channel) {
-			return fmt.Errorf("the channel for topic does not exist: %s", topic)
+			errs = multierror.Append(errs, NewUnknownTopicChannelErr(ctrlMsg, topic))
 		}
 	}
-	return nil
+	return errs.ErrorOrNil()
 }

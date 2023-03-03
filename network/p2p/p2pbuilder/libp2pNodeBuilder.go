@@ -145,6 +145,7 @@ func DefaultRPCValidationConfig() *validation.ControlMsgValidationInspectorConfi
 		validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
 	})
 	return &validation.ControlMsgValidationInspectorConfig{
+		NumberOfWorkers:    validation.DefaultNumberOfWorkers,
 		GraftValidationCfg: graftCfg,
 		PruneValidationCfg: pruneCfg,
 	}
@@ -402,9 +403,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			gossipSubRPCInspector.AddInspector(rpcMetricsInspector)
 
 			// create and start gossip control message validation inspector
-			//rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig)
-			//rpcControlMsgInspector.Start(ctx)
-			//gossipSubRPCInspector.AddInspector(rpcControlMsgInspector)
+			rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig)
+			rpcControlMsgInspector.Start(ctx)
+			gossipSubRPCInspector.AddInspector(rpcControlMsgInspector)
 
 			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC
 			gossipSubConfigs.WithAppSpecificRpcInspector(gossipSubRPCInspector)

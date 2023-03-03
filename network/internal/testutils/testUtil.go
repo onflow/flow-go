@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -417,12 +416,6 @@ func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) n
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
-	}
-}
-
-func withGossipSubRPCInspectorCfg(cfg *validation.ControlMsgValidationInspectorConfig) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
-		nb.SetRPCValidationInspectorConfig(cfg)
 	}
 }
 
