@@ -203,65 +203,84 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
-	// TODO: this is temporarily extracted here, so its easier to refactor this method to
-	// use programs.derivedTxnData.GetOrComputeProgram.
-	//
-	// Add dependencies of the current program to the stack
-	// weather it is loaded or just retrieved from the cache.
-	// If it is loaded, the dependencies will actually already be on the stack,
-	// but it is not a problem if we add them again.
-	var dependencies derived.ProgramDependencies
-	defer func() {
-		programs.dependencyStack.addDependencies(dependencies)
-	}()
-	loadCalled := false
-	defer func() {
-		if loadCalled {
-			programs.cacheMiss()
-			return
-		}
-		programs.cacheHit()
-	}()
-
-	// reading program from cache
-	program, programState, has := programs.txnState.GetProgram(address)
-	if has {
-		dependencies = program.Dependencies
-		err := programs.txnState.AttachAndCommitNestedTransaction(programState)
-		if err != nil {
-			panic(fmt.Sprintf(
-				"merge error while getting program, panic: %s",
-				err))
-		}
-
-		return program.Program, nil
+	loader := newProgramLoader(load, programs.dependencyStack)
+	program, err := programs.txnState.GetOrComputeProgram(
+		programs.txnState,
+		address,
+		loader,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting program: %w", err)
 	}
 
-	var err error
-	var interpreterProgram *interpreter.Program
-	interpreterProgram, programState, dependencies, err =
-		programs.loadWithDependencyTracking(address, load)
-	loadCalled = true
+	programs.dependencyStack.addDependencies(program.Dependencies)
 
+	if loader.Called() {
+		programs.cacheMiss()
+	} else {
+		programs.cacheHit()
+	}
+
+	return program.Program, nil
+}
+
+// programLoader is used to load a program from a location.
+type programLoader struct {
+	loadFunc        func() (*interpreter.Program, error)
+	dependencyStack *dependencyStack
+	called          bool
+}
+
+var _ derived.ValueComputer[common.AddressLocation, *derived.Program] = (*programLoader)(nil)
+
+func newProgramLoader(
+	loadFunc func() (*interpreter.Program, error),
+	dependencyStack *dependencyStack,
+) *programLoader {
+	return &programLoader{
+		loadFunc:        loadFunc,
+		dependencyStack: dependencyStack,
+		called:          false,
+	}
+}
+
+func (loader *programLoader) Compute(
+	txState state.NestedTransaction,
+	address common.AddressLocation,
+) (
+	*derived.Program,
+	error,
+) {
+	if loader.called {
+		// This should never happen, as the program loader is only called once per
+		// program. The same loader is never reused. This is only here to make
+		// this more apparent.
+		panic("program loader called twice")
+	}
+
+	loader.called = true
+
+	interpreterProgram, dependencies, err :=
+		loader.loadWithDependencyTracking(address, loader.loadFunc)
 	if err != nil {
 		return nil, fmt.Errorf("load program failed: %w", err)
 	}
 
-	// update program cache
-	programs.txnState.SetProgram(address, &derived.Program{
+	return &derived.Program{
 		Program:      interpreterProgram,
 		Dependencies: dependencies,
-	}, programState)
-
-	return interpreterProgram, nil
+	}, nil
 }
 
-func (programs *Programs) loadWithDependencyTracking(
+func (loader *programLoader) Called() bool {
+	return loader.called
+}
+
+func (loader *programLoader) loadWithDependencyTracking(
 	address common.AddressLocation,
 	load func() (*interpreter.Program, error),
 ) (
 	*interpreter.Program,
-	*state.State,
 	derived.ProgramDependencies,
 	error,
 ) {
@@ -270,19 +289,19 @@ func (programs *Programs) loadWithDependencyTracking(
 	// If this program depends on another program,
 	// that program will be loaded before this one finishes loading (calls set).
 	// That is why this is a stack.
-	programs.dependencyStack.push(address)
+	loader.dependencyStack.push(address)
 
-	program, programState, err := programs.loadInNestedStateTransaction(address, load)
+	program, err := load()
 
 	// Get collected dependencies of the loaded program.
 	// Pop the dependencies from the stack even if loading errored.
-	stackLocation, dependencies, depErr := programs.dependencyStack.pop()
+	stackLocation, dependencies, depErr := loader.dependencyStack.pop()
 	if depErr != nil {
 		err = multierror.Append(err, depErr).ErrorOrNil()
 	}
 
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if stackLocation != address {
@@ -295,49 +314,11 @@ func (programs *Programs) loadWithDependencyTracking(
 		//   - set(B): pops B
 		//   - set(A): pops A
 		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return nil, nil, nil, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"cannot set program. Popped dependencies are for an unexpeced address"+
 				" (expected %s, got %s)", address, stackLocation)
 	}
-	return program, programState, dependencies, nil
-}
-
-func (programs *Programs) loadInNestedStateTransaction(
-	address common.AddressLocation,
-	load func() (*interpreter.Program, error),
-) (
-	*interpreter.Program,
-	*state.State,
-	error,
-) {
-	// Address location program is reusable across transactions.  Create
-	// a nested transaction here in order to capture the states read to
-	// parse the program.
-	_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
-		address)
-	if err != nil {
-		panic(err)
-	}
-	program, err := load()
-
-	// Commit even if loading errored.
-	programState, commitErr := programs.txnState.CommitParseRestrictedNestedTransaction(address)
-	if commitErr != nil {
-		err = multierror.Append(err, commitErr).ErrorOrNil()
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if programState.BytesWritten() > 0 {
-		// This should never happen. Loading a program should not write to the state.
-		// If this happens, it indicates an implementation error.
-		return nil, nil, fmt.Errorf(
-			"cannot set program to address %v. "+
-				"State was written to during program parsing", address)
-	}
-
-	return program, programState, nil
+	return program, dependencies, nil
 }
 
 func (programs *Programs) getOrLoadNonAddressProgram(
