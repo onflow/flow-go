@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -26,7 +27,6 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -80,7 +80,7 @@ func (vmt vmTest) run(
 
 		ctx := fvm.NewContext(opts...)
 
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -110,7 +110,7 @@ func (vmt vmTest) bootstrapWith(
 
 	ctx := fvm.NewContext(opts...)
 
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -478,7 +478,7 @@ func TestWithServiceAccount(t *testing.T) {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
@@ -1494,7 +1494,7 @@ func TestStorageUsed(t *testing.T) {
 	accountStatusId := flow.AccountStatusRegisterID(
 		flow.BytesToAddress(address))
 
-	simpleView := utils.NewSimpleView()
+	simpleView := delta.NewDeltaView(nil)
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
 	err = simpleView.Set(accountStatusId, status.ToBytes())
@@ -1512,7 +1512,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Testnet)
-	simpleView := utils.NewSimpleView()
+	simpleView := delta.NewDeltaView(nil)
 
 	const computationLimit = 5
 

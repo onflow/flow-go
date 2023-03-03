@@ -54,12 +54,12 @@ type CryptoLibrary interface {
 }
 
 type ParseRestrictedCryptoLibrary struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     CryptoLibrary
 }
 
 func NewParseRestrictedCryptoLibrary(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl CryptoLibrary,
 ) CryptoLibrary {
 	return ParseRestrictedCryptoLibrary{

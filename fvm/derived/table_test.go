@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -1040,7 +1040,7 @@ type testValueComputer struct {
 }
 
 func (computer *testValueComputer) Compute(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	key flow.RegisterID,
 ) (
 	int,
@@ -1062,7 +1062,7 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
@@ -1089,7 +1089,7 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	})
 
 	t.Run("get value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)

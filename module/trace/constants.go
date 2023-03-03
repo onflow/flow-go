@@ -98,8 +98,6 @@ const (
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 
