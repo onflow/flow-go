@@ -435,6 +435,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					builder.metrics,
 					builder.gossipSubScoreTracerInterval)
 				gossipSubConfigs.WithScoreTracer(scoreTracer)
+				node.SetPeerScoreExposer(scoreTracer)
 				builder.logger.Debug().Msg("starting gossipsub score tracer")
 				scoreTracer.Start(ctx)
 			}
