@@ -252,7 +252,7 @@ func (creator *accountCreator) CreateBootstrapAccount(
 }
 
 func (creator *accountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -265,23 +265,23 @@ func (creator *accountCreator) CreateAccount(
 	}
 
 	// don't enforce limit during account creation
-	var addr common.Address
+	var address flow.Address
 	creator.txnState.RunWithAllLimitsDisabled(func() {
-		addr, err = creator.createAccount(payer)
+		address, err = creator.createAccount(flow.ConvertAddress(runtimePayer))
 	})
 
-	return addr, err
+	return common.MustBytesToAddress(address.Bytes()), err
 }
 
 func (creator *accountCreator) createAccount(
-	payer common.Address,
+	payer flow.Address,
 ) (
-	common.Address,
+	flow.Address,
 	error,
 ) {
 	flowAddress, err := creator.createBasicAccount(nil)
 	if err != nil {
-		return common.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	if creator.isServiceAccountEnabled {
@@ -289,10 +289,10 @@ func (creator *accountCreator) createAccount(
 			flowAddress,
 			payer)
 		if invokeErr != nil {
-			return common.Address{}, invokeErr
+			return flow.EmptyAddress, invokeErr
 		}
 	}
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
-	return common.Address(flowAddress), nil
+	return flowAddress, nil
 }

@@ -193,13 +193,13 @@ func (_m *ExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) fvmstate.
 	return r0
 }
 
-// SaveExecutionResults provides a mock function with given fields: ctx, result, executionReceipt
-func (_m *ExecutionState) SaveExecutionResults(ctx context.Context, result *execution.ComputationResult, executionReceipt *flow.ExecutionReceipt) error {
-	ret := _m.Called(ctx, result, executionReceipt)
+// SaveExecutionResults provides a mock function with given fields: ctx, result
+func (_m *ExecutionState) SaveExecutionResults(ctx context.Context, result *execution.ComputationResult) error {
+	ret := _m.Called(ctx, result)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.ComputationResult, *flow.ExecutionReceipt) error); ok {
-		r0 = rf(ctx, result, executionReceipt)
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.ComputationResult) error); ok {
+		r0 = rf(ctx, result)
 	} else {
 		r0 = ret.Error(0)
 	}

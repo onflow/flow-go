@@ -87,7 +87,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	rag := &RandomAddressGenerator{}
 
+	executorID := unittest.IdentifierFixture()
+
 	me := new(modulemock.Local)
+	me.On("NodeID").Return(executorID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -179,17 +183,33 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			nil,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1+1)      // +1 system chunk
-		assert.Len(t, result.Chunks, 1+1)              // +1 system chunk
-		assert.Len(t, result.ChunkDataPacks, 1+1)      // +1 system chunk
-		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
+		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
 		require.Equal(t, 2, committer.callCount)
 
 		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
 
-		// regular collection chunk
-		chunk1 := result.Chunks[0]
+		expectedChunk1EndState := incStateCommitment(*block.StartState)
+		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
+
+		assert.Equal(t, expectedChunk2EndState, result.EndState)
+
+		assertEventHashesMatch(t, 1+1, result)
+
+		// Verify ExecutionReceipt
+		receipt := result.ExecutionReceipt
+
+		assert.Equal(t, executorID, receipt.ExecutorID)
+		assert.Equal(
+			t,
+			parentBlockExecutionResultID,
+			receipt.PreviousResultID)
+		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
+
+		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
+
+		chunk1 := receipt.Chunks[0]
 
 		assert.Equal(t, block.ID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
@@ -198,11 +218,26 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assert.Equal(t, *block.StartState, chunk1.StartState)
 
-		expectedChunk1EndState := incStateCommitment(*block.StartState)
-
 		assert.NotEqual(t, *block.StartState, chunk1.EndState)
 		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
+
+		chunk2 := receipt.Chunks[1]
+		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, uint(1), chunk2.CollectionIndex)
+		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, result.EventsHashes[1], chunk2.EventCollection)
+
+		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk2.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
+		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
+		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
+
+		// Verify ChunkDataPacks
+
+		assert.Len(t, result.ChunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := result.ChunkDataPacks[0]
 
@@ -210,6 +245,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
 		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
 		assert.NotNil(t, chunkDataPack1.Collection)
+
+		chunkDataPack2 := result.ChunkDataPacks[1]
+
+		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
+		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
+		assert.Nil(t, chunkDataPack2.Collection)
+
+		// Verify BlockExecutionData
+
+		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
 
 		chunkExecutionData1 := result.ChunkExecutionDatas[0]
 		assert.Equal(
@@ -219,44 +265,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
 		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
 
-		// system chunk is special case, but currently also 1 tx
-		chunk2 := result.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
-		assert.Equal(t, uint(1), chunk2.CollectionIndex)
-		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
-		assert.Equal(t, result.EventsHashes[1], chunk2.EventCollection)
-
-		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
-
-		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
-
-		assert.NotEqual(t, *block.StartState, chunk2.EndState)
-		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
-		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
-		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
-
-		chunkDataPack2 := result.ChunkDataPacks[1]
-
-		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
-		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
-		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
-		assert.Nil(t, chunkDataPack2.Collection)
-
 		chunkExecutionData2 := result.ChunkExecutionDatas[1]
 		assert.NotNil(t, chunkExecutionData2.Collection)
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
-
-		assert.Equal(t, expectedChunk2EndState, result.EndState)
-
-		assert.Equal(
-			t,
-			parentBlockExecutionResultID,
-			result.ExecutionResult.PreviousResultID)
-
-		assertEventHashesMatch(t, 1+1, result)
-
-		assert.NotEqual(t, flow.ZeroID, result.ExecutionDataID)
 
 		vm.AssertExpectations(t)
 	})
@@ -1011,6 +1023,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	)
 
 	me := new(modulemock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1114,6 +1128,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	)
 
 	me := new(modulemock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
