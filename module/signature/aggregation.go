@@ -173,8 +173,8 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // Returns:
 //   - InsufficientSignaturesError if no signatures have been added yet
 //   - InvalidSignatureIncludedError if:
-//   - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
-//   - Or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
+//     -- some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
+//     -- Or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
 //     invalid (while aggregated public key is valid)
 //   - ErrIdentityPublicKey if the signer's public keys add up to the BLS identity public key.
 //     Any aggregated signature would fail the cryptographic verification if verified against the
