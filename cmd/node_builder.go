@@ -219,7 +219,7 @@ type GossipSubRPCValidationConfigs struct {
 	NumberOfWorkers int
 	// Graft GRAFT control message validation limits.
 	Graft map[string]int
-	// Graft PRUNE control message validation limits.
+	// Prune PRUNE control message validation limits.
 	Prune map[string]int
 }
 

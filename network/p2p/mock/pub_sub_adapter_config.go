@@ -6,10 +6,6 @@ import (
 	p2p "github.com/onflow/flow-go/network/p2p"
 	mock "github.com/stretchr/testify/mock"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
-
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-
 	routing "github.com/libp2p/go-libp2p/core/routing"
 )
 
@@ -18,9 +14,9 @@ type PubSubAdapterConfig struct {
 	mock.Mock
 }
 
-// WithAppSpecificRpcInspector provides a mock function with given fields: f
-func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(f func(peer.ID, *pubsub.RPC) error) {
-	_m.Called(f)
+// WithAppSpecificRpcInspector provides a mock function with given fields: inspector
+func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.GossipSubRPCInspector) {
+	_m.Called(inspector)
 }
 
 // WithMessageIdFunction provides a mock function with given fields: f
