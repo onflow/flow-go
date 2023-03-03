@@ -598,36 +598,36 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 //   - (firstHeight, finalHeight, true, true, nil) if epoch is ended
 //
 // No errors are expected during normal operation.
-func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, epochStarted, epochEnded bool, err error) {
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, isFirstBlockFinalized, isLastBlockFinalized bool, err error) {
 	err = q.snap.state.db.View(func(tx *badger.Txn) error {
 		// Retrieve the epoch's first height
 		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				epochStarted = false
-				epochEnded = false
+				isFirstBlockFinalized = false
+				isLastBlockFinalized = false
 				return nil
 			}
 			return err // unexpected error
 		}
-		epochStarted = true
+		isFirstBlockFinalized = true
 
 		var subsequentEpochFirstHeight uint64
 		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				epochEnded = false
+				isLastBlockFinalized = false
 				return nil
 			}
 			return err // unexpected error
 		}
 		finalHeight = subsequentEpochFirstHeight - 1
-		epochEnded = true
+		isLastBlockFinalized = true
 
 		return nil
 	})
 	if err != nil {
 		return 0, 0, false, false, err
 	}
-	return firstHeight, finalHeight, epochStarted, epochEnded, nil
+	return firstHeight, finalHeight, isFirstBlockFinalized, isLastBlockFinalized, nil
 }
