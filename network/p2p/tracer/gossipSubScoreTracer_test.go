@@ -218,11 +218,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			return false
 		}
 		_, ok = accessMeshScore[topic1.String()]
-		if !ok {
-			return false
-		}
-
-		return true
+		return ok
 	}, 2*time.Second, 10*time.Millisecond)
 
 	time.Sleep(2 * time.Second)
