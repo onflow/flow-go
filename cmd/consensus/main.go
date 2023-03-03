@@ -241,16 +241,7 @@ func main() {
 				return err
 			}
 
-			mutableState, err = badgerState.NewFullConsensusState(
-				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Storage.QuorumCertificates,
-				node.Tracer,
-				node.ProtocolEvents,
-				blockTimer,
-				receiptValidator,
-				sealValidator)
+			mutableState, err = badgerState.NewFullConsensusState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blockTimer, receiptValidator, sealValidator)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.NodeConfig) error {
