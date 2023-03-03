@@ -356,12 +356,10 @@ func (s *Snapshot) RandomSource() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	randomSource, err := seed.FromParentQCSignature(qc.SigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from QC's signature: %w", err)
 	}
-
 	return randomSource, nil
 }
 
