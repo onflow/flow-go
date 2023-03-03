@@ -131,7 +131,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
@@ -139,7 +139,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution nodes")
-		return nil, err
+		return nil, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
 	}
 	b.log.Trace().
 		Str("execution_id", successfulNode.String()).
@@ -203,7 +203,7 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, nil, rpc.ConvertMultiError(errors, "failed to retrieve events from execution nodes", codes.Internal)
+	return nil, nil, errors.ErrorOrNil()
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,

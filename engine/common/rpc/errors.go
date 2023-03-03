@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"errors"
 
 	"github.com/hashicorp/go-multierror"
@@ -9,6 +10,41 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 )
+
+// ConvertError converts a generic error into a grpc status error
+func ConvertError(err error, msg string, defaultCode codes.Code) error {
+	if err == nil {
+		return nil
+	}
+
+	// Already converted
+	if status.Code(err) != codes.Unknown {
+		return err
+	}
+
+	// Handle multierrors separately
+	if multiErr, ok := err.(*multierror.Error); ok {
+		return ConvertMultiError(multiErr, msg, defaultCode)
+	}
+
+	if msg != "" {
+		msg += ": "
+	}
+
+	var returnCode codes.Code
+	switch {
+	case errors.Is(err, storage.ErrNotFound):
+		returnCode = codes.NotFound
+	case errors.Is(err, context.Canceled):
+		returnCode = codes.Canceled
+	case errors.Is(err, context.DeadlineExceeded):
+		returnCode = codes.DeadlineExceeded
+	default:
+		returnCode = defaultCode
+	}
+
+	return status.Errorf(returnCode, "%s%v", msg, err)
+}
 
 // ConvertStorageError converts a generic error into a grpc status error, converting storage errors
 // into codes.NotFound

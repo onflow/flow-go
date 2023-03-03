@@ -2,7 +2,9 @@ package backend
 
 import (
 	"context"
-	"fmt"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,8 +30,8 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 	}
 
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		// node should always have the latest block
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block header: %v", err)
 	}
 
 	status, err := b.getBlockStatus(header)
@@ -42,8 +44,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
 	status, err := b.getBlockStatus(header)
@@ -56,8 +57,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Iden
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
 	status, err := b.getBlockStatus(header)
@@ -70,7 +70,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height u
 func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.BlockStatusUnknown, fmt.Errorf("failed to find latest sealed header: %w", err)
+		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 
 	if header.Height > sealed.Height {

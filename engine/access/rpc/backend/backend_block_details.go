@@ -2,7 +2,9 @@ package backend
 
 import (
 	"context"
-	"fmt"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,14 +30,13 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 	}
 
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		// node should always have the latest block
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
 	block, err := b.blocks.ByID(header.ID())
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
 	status, err := b.getBlockStatus(block)
@@ -48,8 +49,7 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
 	status, err := b.getBlockStatus(block)
@@ -62,8 +62,7 @@ func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier
 func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		return nil, flow.BlockStatusUnknown, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
 	status, err := b.getBlockStatus(block)
@@ -76,7 +75,7 @@ func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64)
 func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.BlockStatusUnknown, fmt.Errorf("failed to find latest sealed header: %w", err)
+		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 
 	if block.Header.Height > sealed.Height {
