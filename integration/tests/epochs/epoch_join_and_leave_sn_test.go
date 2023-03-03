@@ -1,12 +1,12 @@
 package epochs
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveSN(t *testing.T) {
