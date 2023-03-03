@@ -12,18 +12,11 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// TODO(patrick): remove and switch to *programs.DerivedTransactionData once
-// https://github.com/onflow/flow-emulator/pull/229 is integrated.
-type DerivedTransactionData interface {
-	GetProgram(loc common.AddressLocation) (*derived.Program, *state.State, bool)
-	SetProgram(loc common.AddressLocation, prog *derived.Program, state *state.State)
-}
 
 // Programs manages operations around cadence program parsing.
 //
@@ -36,10 +29,8 @@ type Programs struct {
 	meter   Meter
 	metrics MetricsReporter
 
-	txnState *state.TransactionState
+	txnState storage.Transaction
 	accounts Accounts
-
-	derivedTxnData DerivedTransactionData
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
@@ -54,9 +45,8 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	accounts Accounts,
-	derivedTxnData DerivedTransactionData,
 ) *Programs {
 	return &Programs{
 		tracer:             tracer,
@@ -64,7 +54,6 @@ func NewPrograms(
 		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
-		derivedTxnData:     derivedTxnData,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
 		dependencyStack:    newDependencyStack(),
 	}
@@ -88,7 +77,8 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.txnState.CommitParseRestricted(address)
+	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
+		address)
 	if err != nil {
 		return err
 	}
@@ -119,7 +109,7 @@ func (programs *Programs) set(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 
-	programs.derivedTxnData.SetProgram(address, &derived.Program{
+	programs.txnState.SetProgram(address, &derived.Program{
 		Program:      program,
 		Dependencies: dependencies,
 	}, state)
@@ -143,12 +133,12 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.derivedTxnData.GetProgram(address)
+	program, state, has := programs.txnState.GetProgram(address)
 	if has {
 		programs.cacheHit()
 
 		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommit(state)
+		err := programs.txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
 			panic(fmt.Sprintf(
 				"merge error while getting program, panic: %s",
