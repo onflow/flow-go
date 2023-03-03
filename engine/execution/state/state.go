@@ -53,7 +53,6 @@ type ExecutionState interface {
 	SaveExecutionResults(
 		ctx context.Context,
 		result *execution.ComputationResult,
-		executionReceipt *flow.ExecutionReceipt,
 	) error
 }
 
@@ -256,7 +255,6 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	executionReceipt *flow.ExecutionReceipt,
 ) error {
 	span, childCtx := s.tracer.StartSpanFromContext(
 		ctx,
@@ -308,7 +306,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
-	executionResult := &executionReceipt.ExecutionResult
+	executionResult := &result.ExecutionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)
@@ -319,7 +317,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
-	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}

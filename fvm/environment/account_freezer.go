@@ -23,12 +23,12 @@ type AccountFreezer interface {
 }
 
 type ParseRestrictedAccountFreezer struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountFreezer
 }
 
 func NewParseRestrictedAccountFreezer(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountFreezer,
 ) AccountFreezer {
 	return ParseRestrictedAccountFreezer{

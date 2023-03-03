@@ -66,11 +66,11 @@ func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) 
 }
 
 // AccountsStorageCapacity provides a mock function with given fields: addresses, payer, maxTxFees
-func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer common.Address, maxTxFees uint64) (cadence.Value, error) {
+func (_m *Environment) AccountsStorageCapacity(addresses []flow.Address, payer flow.Address, maxTxFees uint64) (cadence.Value, error) {
 	ret := _m.Called(addresses, payer, maxTxFees)
 
 	var r0 cadence.Value
-	if rf, ok := ret.Get(0).(func([]common.Address, common.Address, uint64) cadence.Value); ok {
+	if rf, ok := ret.Get(0).(func([]flow.Address, flow.Address, uint64) cadence.Value); ok {
 		r0 = rf(addresses, payer, maxTxFees)
 	} else {
 		if ret.Get(0) != nil {
@@ -79,7 +79,7 @@ func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]common.Address, common.Address, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func([]flow.Address, flow.Address, uint64) error); ok {
 		r1 = rf(addresses, payer, maxTxFees)
 	} else {
 		r1 = ret.Error(1)

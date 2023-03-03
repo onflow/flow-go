@@ -111,7 +111,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	}
 
 	me := new(module.Local)
-	me.On("NodeID").Return(flow.ZeroID)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -223,7 +224,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	privKey := privateKeys[0]
 
 	me := new(module.Local)
-	me.On("NodeID").Return(flow.ZeroID)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 

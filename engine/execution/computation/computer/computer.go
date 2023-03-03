@@ -130,6 +130,7 @@ type blockComputer struct {
 	executionDataProvider *provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
+	receiptHasher         hash.Hasher
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -173,6 +174,7 @@ func NewBlockComputer(
 		executionDataProvider: executionDataProvider,
 		signer:                signer,
 		spockHasher:           utils.NewSPOCKHasher(),
+		receiptHasher:         utils.NewExecutionReceiptHasher(),
 	}, nil
 }
 
@@ -315,6 +317,7 @@ func (e *blockComputer) executeBlock(
 		e.signer,
 		e.executionDataProvider,
 		e.spockHasher,
+		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
 		len(collections))
