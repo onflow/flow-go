@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -843,7 +844,7 @@ func TestQuorumCertificate(t *testing.T) {
 	require.NoError(t, err)
 
 	// should not be able to get QC or random beacon seed from a block with no children
-	t.Run("no children", func(t *testing.T) {
+	t.Run("no QC available", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// create a block to query
@@ -853,35 +854,10 @@ func TestQuorumCertificate(t *testing.T) {
 			require.Nil(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
-			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			_, err = state.AtBlockID(block1.ID()).RandomSource()
-			assert.Error(t, err)
-		})
-	})
-
-	// should not be able to get random beacon seed from a block with only invalid
-	// or unvalidated children
-	t.Run("un-validated child", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-
-			// create a block to query
-			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), block1)
-			require.Nil(t, err)
-
-			// add child
-			unvalidatedChild := unittest.BlockWithParentFixture(head)
-			unvalidatedChild.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), unvalidatedChild)
-			assert.Nil(t, err)
-
-			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
-			assert.Error(t, err)
-
-			_, err = state.AtBlockID(block1.ID()).RandomSource()
-			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 
@@ -898,7 +874,7 @@ func TestQuorumCertificate(t *testing.T) {
 	})
 
 	// should be able to get QC and random beacon seed from a block with a valid child
-	t.Run("valid child", func(t *testing.T) {
+	t.Run("QC available", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// add a block so we aren't testing against root

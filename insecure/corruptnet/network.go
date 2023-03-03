@@ -16,7 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
@@ -424,7 +424,7 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 
 func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attack orchestrator.
-	return ingestion.GenerateExecutionReceipt(n.me, n.receiptHasher, result, []crypto.Signature{})
+	return computer.GenerateExecutionReceipt(n.me, n.receiptHasher, result, []crypto.Signature{})
 }
 
 func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {

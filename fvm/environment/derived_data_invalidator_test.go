@@ -6,13 +6,15 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,8 +34,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
 	programA := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressA: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressA: {},
 		},
 	}
 
@@ -42,9 +44,9 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programBLoc := common.AddressLocation{Address: cAddressB, Name: "B"}
 	programB := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressA: {},
-			cAddressB: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressA: {},
+			addressB: {},
 		},
 	}
 
@@ -53,8 +55,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programDLoc := common.AddressLocation{Address: cAddressD, Name: "D"}
 	programD := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
-			cAddressD: {},
+		Dependencies: map[flow.Address]struct{}{
+			addressD: {},
 		},
 	}
 
@@ -63,12 +65,12 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programCLoc := common.AddressLocation{Address: cAddressC, Name: "C"}
 	programC := &derived.Program{
 		Program: nil,
-		Dependencies: map[common.Address]struct{}{
+		Dependencies: map[flow.Address]struct{}{
 			// C indirectly depends on A trough B
-			cAddressA: {},
-			cAddressB: {},
-			cAddressC: {},
-			cAddressD: {},
+			addressA: {},
+			addressB: {},
+			addressC: {},
+			addressD: {},
 		},
 	}
 
@@ -95,8 +97,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator A invalidates all but D", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressA,
+			FrozenAccounts: []flow.Address{
+				addressA,
 			},
 		}.ProgramInvalidator()
 
@@ -109,8 +111,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator D invalidates D, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressD,
+			FrozenAccounts: []flow.Address{
+				addressD,
 			},
 		}.ProgramInvalidator()
 
@@ -123,8 +125,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator B invalidates B, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []common.Address{
-				cAddressB,
+			FrozenAccounts: []flow.Address{
+				addressB,
 			},
 		}.ProgramInvalidator()
 
@@ -139,7 +141,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressA,
+					Address: addressA,
 					Name:    "A",
 				},
 			},
@@ -156,7 +158,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressC,
+					Address: addressC,
 					Name:    "C",
 				},
 			},
@@ -173,7 +175,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdateKeys: []environment.ContractUpdateKey{
 				{
-					Address: cAddressD,
+					Address: addressD,
 					Name:    "D",
 				},
 			},
@@ -225,7 +227,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	baseView := utils.NewSimpleView()
+	baseView := delta.NewDeltaView(nil)
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
@@ -239,14 +241,18 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		baseView)
 	require.NoError(t, err)
 
-	view := baseView.NewChild().(*utils.SimpleView)
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	view := baseView.NewChild()
+	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	computer := fvm.NewMeterParamOverridesComputer(ctx, derivedTxnData)
+	txnState := storage.SerialTransaction{
+		NestedTransaction:           nestedTxn,
+		DerivedTransactionCommitter: derivedTxnData,
+	}
+	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
 	require.NoError(t, err)
@@ -265,8 +271,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		err := txnState.Set(id, flow.RegisterValue("blah"))
 		require.NoError(t, err)
@@ -274,14 +279,13 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		env := environment.NewTransactionEnvironment(
 			tracing.NewTracerSpan(),
 			ctx.EnvironmentParams,
-			txnState,
-			nil)
+			txnState)
 
 		invalidator := environment.NewDerivedDataInvalidator(nil, env)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for registerId := range view.Ledger.RegisterTouches {
+	for _, registerId := range view.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),

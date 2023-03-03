@@ -24,7 +24,7 @@ func Test_GCPBucketUploader(t *testing.T) {
 	uploader, err := NewGCPBucketUploader(context.Background(), bucketName, zerolog.Nop())
 	require.NoError(t, err)
 
-	cr := generateComputationResult(t)
+	cr, _ := generateComputationResult(t)
 
 	buffer := &bytes.Buffer{}
 	err = WriteComputationResultsTo(cr, buffer)

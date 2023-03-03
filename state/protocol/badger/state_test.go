@@ -64,7 +64,18 @@ func TestBootstrapAndOpen(t *testing.T) {
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(
+			complianceMetrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+		)
 		require.NoError(t, err)
 
 		complianceMetrics.AssertExpectations(t)
@@ -133,7 +144,18 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(
+			complianceMetrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+		)
 		require.NoError(t, err)
 
 		// assert update final view was called
@@ -488,8 +510,8 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	headers, _, seals, _, _, blocks, qcs, setups, commits, statuses, results := storutil.StorageLayer(t, db)
+	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	f(state, err)
 }
 

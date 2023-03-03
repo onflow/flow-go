@@ -9,6 +9,7 @@ import (
 )
 
 type testInvalidator struct {
+	callCount      int
 	invalidateAll  bool
 	invalidateName string
 }
@@ -18,11 +19,12 @@ func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 		invalidator.invalidateName != ""
 }
 
-func (invalidator testInvalidator) ShouldInvalidateEntry(
+func (invalidator *testInvalidator) ShouldInvalidateEntry(
 	key string,
 	value *string,
 	state *state.State,
 ) bool {
+	invalidator.callCount += 1
 	return invalidator.invalidateAll ||
 		invalidator.invalidateName == key
 }
@@ -38,15 +40,15 @@ func TestChainedInvalidator(t *testing.T) {
 
 	chain = chainedTableInvalidators[string, *string]{
 		{
-			TableInvalidator: testInvalidator{},
+			TableInvalidator: &testInvalidator{},
 			executionTime:    1,
 		},
 		{
-			TableInvalidator: testInvalidator{},
+			TableInvalidator: &testInvalidator{},
 			executionTime:    2,
 		},
 		{
-			TableInvalidator: testInvalidator{},
+			TableInvalidator: &testInvalidator{},
 			executionTime:    3,
 		},
 	}
@@ -54,19 +56,19 @@ func TestChainedInvalidator(t *testing.T) {
 
 	chain = chainedTableInvalidators[string, *string]{
 		{
-			TableInvalidator: testInvalidator{invalidateName: "1"},
+			TableInvalidator: &testInvalidator{invalidateName: "1"},
 			executionTime:    1,
 		},
 		{
-			TableInvalidator: testInvalidator{invalidateName: "3a"},
+			TableInvalidator: &testInvalidator{invalidateName: "3a"},
 			executionTime:    3,
 		},
 		{
-			TableInvalidator: testInvalidator{invalidateName: "3b"},
+			TableInvalidator: &testInvalidator{invalidateName: "3b"},
 			executionTime:    3,
 		},
 		{
-			TableInvalidator: testInvalidator{invalidateName: "7"},
+			TableInvalidator: &testInvalidator{invalidateName: "7"},
 			executionTime:    7,
 		},
 	}

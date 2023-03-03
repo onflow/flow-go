@@ -9,12 +9,10 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
@@ -24,8 +22,9 @@ import (
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
-	// NewView creates a new ready-only view at the given state commitment.
-	NewView(flow.StateCommitment) *delta.View
+	// NewStorageSnapshot creates a new ready-only view at the given state
+	// commitment.
+	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
 
 	GetRegisters(
 		context.Context,
@@ -50,11 +49,7 @@ type ReadOnlyExecutionState interface {
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
-	RetrieveStateDelta(context.Context, flow.Identifier) (*messages.ExecutionStateDelta, error)
-
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
-
-	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
 
 	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
@@ -72,7 +67,6 @@ type ExecutionState interface {
 	SaveExecutionResults(
 		ctx context.Context,
 		result *execution.ComputationResult,
-		executionReceipt *flow.ExecutionReceipt,
 	) error
 }
 
@@ -172,41 +166,65 @@ func RegisterEntriesToKeysValues(
 	return keys, values
 }
 
-func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+// TODO(patrick): revisit caching.  readCache needs to be mutex guarded for
+// parallel execution.
+type LedgerStorageSnapshot struct {
+	ledger     ledger.Ledger
+	commitment flow.StateCommitment
 
-	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
+	readCache map[flow.RegisterID]flow.RegisterValue
+}
 
-	return func(regID flow.RegisterID) (flow.RegisterValue, error) {
-		if value, ok := readCache[regID]; ok {
-			return value.Value, nil
-		}
-
-		query, err := makeSingleValueQuery(commitment, regID)
-
-		if err != nil {
-			return nil, fmt.Errorf("cannot create ledger query: %w", err)
-		}
-
-		value, err := ldg.GetSingleValue(query)
-
-		if err != nil {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", regID, commitment, err)
-		}
-
-		// Prevent caching of value with len zero
-		if len(value) == 0 {
-			return nil, nil
-		}
-
-		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
-
-		return value, nil
+func NewLedgerStorageSnapshot(
+	ldg ledger.Ledger,
+	commitment flow.StateCommitment,
+) fvmState.StorageSnapshot {
+	return &LedgerStorageSnapshot{
+		ledger:     ldg,
+		commitment: commitment,
+		readCache:  make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewDeltaView(LedgerGetRegister(s.ls, commitment))
+func (storage *LedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	if value, ok := storage.readCache[id]; ok {
+		return value, nil
+	}
+
+	query, err := makeSingleValueQuery(storage.commitment, id)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create ledger query: %w", err)
+	}
+
+	value, err := storage.ledger.GetSingleValue(query)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error getting register (%s) value at %x: %w",
+			id,
+			storage.commitment,
+			err)
+	}
+
+	// Prevent caching of value with len zero
+	if len(value) == 0 {
+		return nil, nil
+	}
+
+	// don't cache value with len zero
+	storage.readCache[id] = value
+
+	return value, nil
+}
+
+func (s *state) NewStorageSnapshot(
+	commitment flow.StateCommitment,
+) fvmState.StorageSnapshot {
+	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
 type RegisterUpdatesHolder interface {
@@ -321,7 +339,6 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	executionReceipt *flow.ExecutionReceipt,
 ) error {
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
@@ -376,7 +393,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
-	executionResult := &executionReceipt.ExecutionResult
+	executionResult := &result.ExecutionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)
@@ -387,7 +404,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
-	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
@@ -403,88 +420,6 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
 	return nil
-}
-
-func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	block, err := s.blocks.ByID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve block: %w", err)
-	}
-	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
-
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := s.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, fmt.Errorf("cannot retrieve collection for delta: %w", err)
-		}
-		completeCollections[collection.ID()] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: collection.Transactions,
-		}
-	}
-
-	var startStateCommitment flow.StateCommitment
-	var endStateCommitment flow.StateCommitment
-	var stateInteractions []*delta.Snapshot
-	var events []flow.Event
-	var serviceEvents []flow.Event
-	var txResults []flow.TransactionResult
-
-	err = s.db.View(func(txn *badger.Txn) error {
-		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup state commitment: %w", err)
-
-		}
-
-		err = operation.LookupStateCommitment(block.Header.ParentID, &startStateCommitment)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup parent state commitment: %w", err)
-		}
-
-		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup events: %w", err)
-		}
-
-		err = operation.LookupServiceEventsByBlockID(blockID, &serviceEvents)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup events: %w", err)
-		}
-
-		err = operation.LookupTransactionResultsByBlockID(blockID, &txResults)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup transaction errors: %w", err)
-		}
-
-		err = operation.RetrieveExecutionStateInteractions(blockID, &stateInteractions)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup execution state views: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &messages.ExecutionStateDelta{
-		ExecutableBlock: entity.ExecutableBlock{
-			Block:               block,
-			StartState:          &startStateCommitment,
-			CompleteCollections: completeCollections,
-		},
-		StateInteractions:  stateInteractions,
-		EndState:           endStateCommitment,
-		Events:             events,
-		ServiceEvents:      serviceEvents,
-		TransactionResults: txResults,
-	}, nil
-}
-
-func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
-	return s.collections.ByID(identifier)
 }
 
 func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
