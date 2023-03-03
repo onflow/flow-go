@@ -65,7 +65,6 @@ typedef enum {
 } BLST_ERROR;
 
 typedef uint8_t byte;
-typedef uint64_t limb_t;
 
 // field elements F_r
 // where `r` is the order of G1/G2.
