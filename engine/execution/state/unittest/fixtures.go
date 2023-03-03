@@ -84,6 +84,13 @@ func ComputationResultForBlockFixture(
 				TrieUpdate: nil,
 			})
 	}
+	executionResult := flow.NewExecutionResult(
+		parentBlockExecutionResultID,
+		completeBlock.ID(),
+		chunks,
+		nil,
+		flow.ZeroID)
+
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
 		ExecutableBlock:        completeBlock,
@@ -92,19 +99,16 @@ func ComputationResultForBlockFixture(
 		Proofs:                 proofs,
 		Events:                 events,
 		EventsHashes:           eventHashes,
-		SpockSignatures:        spockHashes,
-		Chunks:                 chunks,
 		ChunkDataPacks:         chunkDataPacks,
 		EndState:               *completeBlock.StartState,
 		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID:             completeBlock.ID(),
 			ChunkExecutionDatas: chunkExecutionDatas,
 		},
-		ExecutionResult: flow.NewExecutionResult(
-			parentBlockExecutionResultID,
-			completeBlock.ID(),
-			chunks,
-			nil,
-			flow.ZeroID),
+		ExecutionReceipt: &flow.ExecutionReceipt{
+			ExecutionResult:   *executionResult,
+			Spocks:            spockHashes,
+			ExecutorSignature: crypto.Signature{},
+		},
 	}
 }

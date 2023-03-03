@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -34,7 +34,7 @@ type TransactionStorageLimiter struct{}
 // the fee deduction step happens after the storage limit check.
 func (limiter TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
@@ -55,7 +55,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 // storage limit is exceeded.  The returned list include addresses of updated
 // registers (and the payer's address).
 func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	payer flow.Address,
 	maxTxFees uint64,
 ) []flow.Address {
@@ -102,14 +102,13 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 // address and exceeded the storage limit.
 func (limiter TransactionStorageLimiter) checkStorageLimits(
 	env environment.Environment,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
 	addresses := limiter.getStorageCheckAddresses(txnState, payer, maxTxFees)
 
-	commonAddresses := make([]common.Address, len(addresses))
-	usages := make([]uint64, len(commonAddresses))
+	usages := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
 		ca := common.Address(address)
@@ -118,13 +117,12 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 			return err
 		}
 
-		commonAddresses[i] = ca
 		usages[i] = u
 	}
 
 	result, invokeErr := env.AccountsStorageCapacity(
-		commonAddresses,
-		common.Address(payer),
+		addresses,
+		payer,
 		maxTxFees,
 	)
 
