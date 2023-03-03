@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/storage"
 )
 
 func TestConvertError(t *testing.T) {
