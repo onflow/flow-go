@@ -92,7 +92,7 @@ int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 void     map_to_G1(ep_t, const byte*, const int);
 
 // Fr utilities
-extern const Fr BLS12_381_rR;
+extern const limb_t BLS12_381_rR[Fr_LIMBS];
 bool_t      Fr_is_zero(const Fr* a);
 bool_t      Fr_is_equal(const Fr* a, const Fr* b);
 void        Fr_set_limb(Fr*, const limb_t);

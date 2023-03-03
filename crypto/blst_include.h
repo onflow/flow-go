@@ -6,12 +6,66 @@
 // extra tools to use BLST low level that are needed by the Flow crypto library
 // eventually this file would replace blst.h
 
-#include "blst.h" // TODO: should be deleted
+//#include "blst.h" // TODO: should be deleted
 #include "point.h"
 #include "consts.h"
 
 // types used by the Flow crypto library that are imported from BLST
 // these type definitions are used as an abstraction from BLST internal types
+
+// Parts of this file have been copied from blst.h in the BLST repo
+/*
+ * Copyright Supranational LLC
+ * Licensed under the Apache License, Version 2.0, see LICENSE for details.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#ifdef __SIZE_TYPE__
+typedef __SIZE_TYPE__ size_t;
+#else
+#include <stddef.h>
+#endif
+
+#if defined(__UINT8_TYPE__) && defined(__UINT32_TYPE__) \
+                            && defined(__UINT64_TYPE__)
+typedef __UINT8_TYPE__  uint8_t;
+typedef __UINT32_TYPE__ uint32_t;
+typedef __UINT64_TYPE__ uint64_t;
+#else
+#include <stdint.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#elif defined(__BLST_CGO__)
+typedef _Bool bool; /* it's assumed that cgo calls modern enough compiler */
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__>=199901
+# define bool _Bool
+#else
+# define bool int
+#endif
+
+#ifdef SWIG
+# define DEFNULL =NULL
+#elif defined __cplusplus
+# define DEFNULL =0
+#else
+# define DEFNULL
+#endif
+
+typedef enum {
+    BLST_SUCCESS = 0,
+    BLST_BAD_ENCODING,
+    BLST_POINT_NOT_ON_CURVE,
+    BLST_POINT_NOT_IN_GROUP,
+    BLST_AGGR_TYPE_MISMATCH,
+    BLST_VERIFY_FAIL,
+    BLST_PK_IS_INFINITY,
+    BLST_BAD_SCALAR,
+} BLST_ERROR;
+
+typedef uint8_t byte;
+typedef uint64_t limb_t;
 
 // field elements F_r
 // where `r` is the order of G1/G2.

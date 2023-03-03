@@ -16,9 +16,8 @@ static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t ind
     Fr denominator; // eventually would represent D*R^k 
 
     // Initialize N and D to Montgomery constant R
-    // TODO: hardcode R
-    Fr_copy(&numerator, &BLS12_381_rR);
-    Fr_copy(&denominator, &BLS12_381_rR);
+    Fr_copy(&numerator, (Fr*)BLS12_381_rR);
+    Fr_copy(&denominator, (Fr*)BLS12_381_rR);
 
     // sign of D: 0 for positive and 1 for negative
     int sign = 0; 

@@ -25,7 +25,7 @@ int get_Fr_BYTES() {
 
 // Fr utilities
 // Montgomery constant R related to the curve order r
-const Fr BLS12_381_rR = (Fr){  /* (1<<256)%r */
+const limb_t BLS12_381_rR[Fr_LIMBS] = {  /* (1<<256)%r */
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5),
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
 };
