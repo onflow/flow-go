@@ -75,8 +75,8 @@ func TestBLSMainMethods(t *testing.T) {
 			// test a valid signature
 			result, err := pk.Verify(s, input, hasher)
 			assert.NoError(t, err)
-			assert.True(t, result, fmt.Sprintf(
-				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+			assert.True(t, result,
+				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk)
 		}
 	})
 }
