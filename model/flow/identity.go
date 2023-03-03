@@ -397,7 +397,10 @@ func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
 	return pks
 }
 
-func (il IdentityList) Fingerprint() Identifier {
+// StaticID uniquely identifies a list of identities, by node ID. This can be used
+// to perpetually identify a group of nodes, even if mutable fields of some nodes
+// are changed, as node IDs are immutable.
+func (il IdentityList) StaticID() Identifier {
 	return GetIDs(il).Fingerprint()
 }
 

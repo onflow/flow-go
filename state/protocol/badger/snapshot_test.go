@@ -204,7 +204,7 @@ func TestClusters(t *testing.T) {
 			actual := actualClusters[i]
 
 			assert.Equal(t, len(expected), len(actual))
-			assert.Equal(t, expected.Fingerprint(), actual.Fingerprint())
+			assert.Equal(t, expected.StaticID(), actual.StaticID())
 		}
 	})
 }
