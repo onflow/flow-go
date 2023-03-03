@@ -8,7 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -19,10 +19,76 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
-// ReadOnlyExecutionState allows to read the execution state
-type ReadOnlyExecutionState interface {
-	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
+// Iterator is used for iterating over a set of registers
+type Iterator interface {
+	// First returns the first item of the iterator
+	First() (flow.RegisterID, flow.RegisterValue)
+	// HasNext returns true if another register could be read
+	HasNext() bool
+	// Next returns the next register and moves the cursor
+	Next() (flow.RegisterID, flow.RegisterValue)
+	// Close release resources and return error if any hit during iteration
+	Close() error
+}
+
+// SnapshotReader provides read functionality at a specific snapshot
+//
+// TODO:(Ramtin) update this interface with ReadByPrefix and Warmup functionality
+type SnapshotReader interface {
+	// Read returns the value for a single register
+	// if no value is found it returns an empty byte slice and no error
+	// returned errors are fatal
+	// TODO: (ramtin) rename to Read when FVM is updated and consolidate it
+	Get(id flow.RegisterID) (value flow.RegisterValue, err error)
+
+	// BatchRead returns a set of values for the given registerIDs
+	// it has the same behaviour as `Read` except it operates on a batch of registers
+	// returned errors are fatal
+	BatchRead(ids []flow.RegisterID) (itr Iterator, err error)
+}
+
+type BlockAwareStorage interface {
+	// OnFinalizedBlock is called whenever a block has been finalized.
+	// Calls are in the order the blocks are finalized.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnFinalizedBlock(block *flow.Header)
+
+	// OnSealedBlock is called when a block is sealed
+	// Calls are in the order blocks get sealed.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnSealedBlock(block *flow.Header)
+
+	// OnBlockExecuted is called when a block is executed
+	// Calls are in the order blocks get executed.
+	// Prerequisites:
+	// Implementation must be concurrency safe;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnBlockExecuted(block *flow.Header, delta delta.SpockSnapshot) error
+}
+
+type ReadOnlyRegisterStorage interface {
+	module.ReadyDoneAware
+	// SnapshotReaderAtBlock returns an SnapshotReader for the given blockID
+	// if a register is not changed in the given block the latest value from ancestor blocks is returned
+	// it could be used for reading several values of the same blockID
+	SnapshotReaderAtBlock(blockID flow.Identifier) (SnapshotReader, error)
+
+	// TODO(ramtin): consolidate this into above and depricate
+	NewStorageSnapshot(commitment flow.StateCommitment) SnapshotReader
+}
+
+// RegisterStorage stores registers at given height,
+type RegisterStorage interface {
+	ReadOnlyRegisterStorage
+	BlockAwareStorage
+}
+
+type ReadOnlyAttestationStorage interface {
+	module.ReadyDoneAware
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -33,11 +99,39 @@ type ReadOnlyExecutionState interface {
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
+	// GetExecutionResultID returns execution result ID for the given blockID
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
+	// GetHighestExecutedBlockID returns the highest executed block height and blockID
+	// TODO(ramtin): this probably should be captured in another interface controlled by ingestion engine
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
+	// GetBlockIDByChunkID returns the blockID for the given ChunkID
+	// TODO(ramtin): we probably don't need this
 	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
+}
+
+// AttestationStorage stores attestations needed to prove execution
+//
+// TODO(ramtin): clean up some of the endpoints and move them to their relevant interface
+type AttestationStorage interface {
+	ReadOnlyAttestationStorage
+
+	BlockAwareStorage
+
+	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
+
+	SaveExecutionResults(
+		ctx context.Context,
+		result *execution.ComputationResult,
+		executionReceipt *flow.ExecutionReceipt,
+	) error
+}
+
+// ReadOnlyExecutionState allows to read the execution state
+type ReadOnlyExecutionState interface {
+	ReadOnlyRegisterStorage
+	ReadOnlyAttestationStorage
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -47,14 +141,8 @@ type ReadOnlyExecutionState interface {
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
 	ReadOnlyExecutionState
-
-	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
-
-	SaveExecutionResults(
-		ctx context.Context,
-		result *execution.ComputationResult,
-		executionReceipt *flow.ExecutionReceipt,
-	) error
+	RegisterStorage
+	AttestationStorage
 }
 
 const (
@@ -79,6 +167,8 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
+	// TODO(ramtin): properly implement the read done methods
+	module.NoopReadyDoneAware
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -155,7 +245,7 @@ type LedgerStorageSnapshot struct {
 func NewLedgerStorageSnapshot(
 	ldg ledger.Ledger,
 	commitment flow.StateCommitment,
-) fvmState.StorageSnapshot {
+) SnapshotReader {
 	return &LedgerStorageSnapshot{
 		ledger:     ldg,
 		commitment: commitment,
@@ -163,12 +253,7 @@ func NewLedgerStorageSnapshot(
 	}
 }
 
-func (storage *LedgerStorageSnapshot) Get(
-	id flow.RegisterID,
-) (
-	flow.RegisterValue,
-	error,
-) {
+func (storage *LedgerStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	if value, ok := storage.readCache[id]; ok {
 		return value, nil
 	}
@@ -198,9 +283,23 @@ func (storage *LedgerStorageSnapshot) Get(
 	return value, nil
 }
 
-func (s *state) NewStorageSnapshot(
-	commitment flow.StateCommitment,
-) fvmState.StorageSnapshot {
+// TODO(ramtin): implement me
+func (*LedgerStorageSnapshot) BatchRead(ids []flow.RegisterID) (itr Iterator, err error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (s *state) SnapshotReaderAtBlock(blockID flow.Identifier) (SnapshotReader, error) {
+	stateCommit, err := s.commits.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"cannot get the state commitment for block %s: %w",
+			blockID.String(),
+			err)
+	}
+	return NewLedgerStorageSnapshot(s.ls, stateCommit), nil
+}
+
+func (s *state) NewStorageSnapshot(commitment flow.StateCommitment) SnapshotReader {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
@@ -359,6 +458,22 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return height, blockID, nil
+}
+
+func (s *state) OnFinalizedBlock(block *flow.Header) {
+	// no-op
+	return
+}
+
+func (s *state) OnSealedBlock(block *flow.Header) {
+	// no-op
+	return
+}
+
+func (s *state) OnBlockExecuted(block *flow.Header, delta delta.SpockSnapshot) error {
+	// ramtin: currently we don't do anything here, the committer injected to the computer engine is doing the update right now
+	// no-op
+	return nil
 }
 
 // IsBlockExecuted returns whether the block has been executed.
