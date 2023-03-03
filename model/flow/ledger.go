@@ -181,6 +181,18 @@ func (d RegisterEntries) Values() []RegisterValue {
 	return r
 }
 
+// RegisterIterator is used for iterating over a set of registers
+type RegisterIterator interface {
+	// First returns the first item of the iterator
+	First() *RegisterEntry
+	// HasNext returns true if another register could be read
+	HasNext() bool
+	// Next returns the next register and moves the cursor
+	Next() *RegisterEntry
+	// Close release resources and return error if any hit during iteration
+	Close() error
+}
+
 // StorageProof (proof of a read or update to the state, Merkle path of some sort)
 type StorageProof = []byte
 

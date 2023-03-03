@@ -19,32 +19,21 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
-// Iterator is used for iterating over a set of registers
-type Iterator interface {
-	// First returns the first item of the iterator
-	First() (flow.RegisterID, flow.RegisterValue)
-	// HasNext returns true if another register could be read
-	HasNext() bool
-	// Next returns the next register and moves the cursor
-	Next() (flow.RegisterID, flow.RegisterValue)
-	// Close release resources and return error if any hit during iteration
-	Close() error
-}
-
 // SnapshotReader provides read functionality at a specific snapshot
 //
-// TODO:(Ramtin) update this interface with ReadByPrefix and Warmup functionality
+// TODO(ramtin): update this interface with ReadByPrefix and Warmup functionality
+// TODO(ramtin): maybe consolidate this with the FVM one
 type SnapshotReader interface {
 	// Read returns the value for a single register
 	// if no value is found it returns an empty byte slice and no error
 	// returned errors are fatal
-	// TODO: (ramtin) rename to Read when FVM is updated and consolidate it
+	// TODO(ramtin): rename to Read
 	Get(id flow.RegisterID) (value flow.RegisterValue, err error)
 
 	// BatchRead returns a set of values for the given registerIDs
 	// it has the same behaviour as `Read` except it operates on a batch of registers
 	// returned errors are fatal
-	BatchRead(ids []flow.RegisterID) (itr Iterator, err error)
+	BatchRead(ids []flow.RegisterID) (itr flow.RegisterIterator, err error)
 }
 
 type BlockAwareStorage interface {
@@ -284,7 +273,7 @@ func (storage *LedgerStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValu
 }
 
 // TODO(ramtin): implement me
-func (*LedgerStorageSnapshot) BatchRead(ids []flow.RegisterID) (itr Iterator, err error) {
+func (*LedgerStorageSnapshot) BatchRead(ids []flow.RegisterID) (itr flow.RegisterIterator, err error) {
 	return nil, errors.New("not implemented yet")
 }
 
