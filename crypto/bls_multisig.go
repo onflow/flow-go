@@ -5,11 +5,13 @@ package crypto
 
 import (
 	"errors"
+	"fmt"
 
 	_ "errors"
 
 	_ "fmt"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	_ "github.com/onflow/flow-go/crypto/hash"
 )
 
@@ -41,7 +43,6 @@ import "C"
 // used for signatures.
 var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
-/*
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //
 // The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
@@ -97,8 +98,6 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 //   - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 
-
-
 	// check for empty list
 	if len(sigs) == 0 {
 		return nil, blsAggregateEmptyListError
@@ -144,8 +143,6 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 //   - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 
-
-
 	// check for empty list
 	if len(keys) == 0 {
 		return nil, blsAggregateEmptyListError
@@ -181,8 +178,6 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 //   - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
-
-
 	// check for empty list
 	if len(keys) == 0 {
 		return nil, blsAggregateEmptyListError
@@ -203,7 +198,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
 	return sumKey, nil
-}*/
+}
 
 // IdentityBLSPublicKey returns an identity public key which corresponds to the point
 // at infinity in G2 (identity element of G2).
@@ -216,8 +211,6 @@ func IdentityBLSPublicKey() PublicKey {
 	identity.isIdentity = true
 	return &identity
 }
-
-/*
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.
 //
@@ -234,8 +227,6 @@ func IdentityBLSPublicKey() PublicKey {
 //   - (nil, notBLSKeyError) if at least one input key is not of type BLS BLS12-381
 //   - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
-
-
 
 	aggPKBLS, ok := aggKey.(*pubKeyBLSBLS12381)
 	if !ok {
@@ -334,8 +325,6 @@ func VerifyBLSSignatureOneMessage(
 func VerifyBLSSignatureManyMessages(
 	pks []PublicKey, s Signature, messages [][]byte, kmac []hash.Hasher,
 ) (bool, error) {
-
-
 
 	// check signature length
 	if len(s) != signatureLengthBLSBLS12381 {
@@ -484,8 +473,6 @@ func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
 
-
-
 	// empty list check
 	if len(pks) == 0 {
 		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
@@ -549,7 +536,6 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	return verifBool, nil
 }
-*/
 
 // blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
 // is empty or nil and thereby represents an invalid input.

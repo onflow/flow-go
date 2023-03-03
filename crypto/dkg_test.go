@@ -20,7 +20,7 @@ var gt *testing.T
 func TestDKG(t *testing.T) {
 	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
-	//t.Run("JointFeldman", testJointFeldman)
+	t.Run("JointFeldman", testJointFeldman)
 }
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
@@ -96,7 +96,6 @@ func testFeldmanVSSQual(t *testing.T) {
 	// are only tested within joint feldman.
 }
 
-/*
 // Testing JointFeldman by simulating a network of n participants
 func testJointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -134,7 +133,7 @@ func testJointFeldman(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, duplicatedMessages)
 	})
 }
-*/
+
 // Supported Key Generation protocols
 const (
 	feldmanVSS = iota

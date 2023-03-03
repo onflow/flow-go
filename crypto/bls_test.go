@@ -8,7 +8,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	_ "math/rand"
+	mrand "math/rand"
 	"testing"
+	"time"
 	_ "time"
 
 	"github.com/stretchr/testify/assert"
@@ -130,7 +132,7 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
 	})
 
-	/*t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
+	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
 		data := []byte("random_data")
 		// empty tag hasher
 		sigKmac := NewExpandMsgXOFKMAC128("")
@@ -139,7 +141,7 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		// PoP hasher
 		h2 := popKMAC.ComputeHash(data)
 		assert.NotEqual(t, h1, h2)
-	})*/
+	})
 
 }
 
@@ -215,7 +217,7 @@ func TestBLSUtils(t *testing.T) {
 }
 
 // BLS Proof of Possession test
-/*func TestBLSPOP(t *testing.T) {
+func TestBLSPOP(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -266,8 +268,6 @@ func TestBLSUtils(t *testing.T) {
 		assert.False(t, result)
 	})
 }
-
-
 
 // BLS multi-signature
 // signature aggregation sanity check
@@ -935,7 +935,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		assert.False(t, valid, "verification should fail with nil hasher")
 		inputPks[0] = tmpPK
 	})
-}*/
+}
 
 // TestBLSErrorTypes verifies working of error-type-detecting functions
 // such as `IsInvalidInputsError`.
@@ -963,7 +963,6 @@ func TestBLSErrorTypes(t *testing.T) {
 	})
 }
 
-/*
 // VerifyBLSSignatureManyMessages bench
 // Bench the slowest case where all messages and public keys are distinct.
 // (2*n) pairings without aggrgetion Vs (n+1) pairings with aggregation.
@@ -1059,7 +1058,6 @@ func BenchmarkAggregate(b *testing.B) {
 	})
 }
 
-
 func TestBLSIdentity(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
@@ -1112,4 +1110,4 @@ func TestBLSIdentity(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, valid)
 	})
-}*/
+}

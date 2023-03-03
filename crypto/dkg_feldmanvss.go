@@ -285,7 +285,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		// the dealer's own share
 		if i-1 == s.myIndex {
 			xdata := make([]byte, shareSize)
-			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
+			frPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			err := readScalarFrStar(&s.x, xdata)
 			if err != nil {
 				return fmt.Errorf("unexpected error when generating the dealer's own share: %w", err)
@@ -295,7 +295,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		// the-other-participant shares
 		data := make([]byte, shareSize+1)
 		data[0] = byte(feldmanVSSShare)
-		zrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
+		frPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		s.processor.PrivateSend(int(i-1), data)
 	}
 	// broadcast the vector
@@ -401,11 +401,11 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// zrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Fr
+// frPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Fr[X]
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func zrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
+func frPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 	C.Fr_polynomialImage_export((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
 		(*C.Fr)(&a[0]), (C.int)(len(a)),

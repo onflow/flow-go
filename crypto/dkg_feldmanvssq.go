@@ -495,7 +495,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 	data := make([]byte, complaintAnswerSize+1)
 	data[0] = byte(feldmanVSSComplaintAnswer)
 	data[1] = byte(complainee)
-	zrPolynomialImage(data[2:], s.a, complainee+1, nil)
+	frPolynomialImage(data[2:], s.a, complainee+1, nil)
 	s.complaints[complainee].answerReceived = true
 	s.processor.Broadcast(data)
 }
