@@ -102,13 +102,13 @@ type Snapshot interface {
 	// No errors are expected under normal operation.
 	Descendants() ([]flow.Identifier, error)
 
-	// RandomSource returns the source of randomness _for_ the snapshot's Head block. 
-	// Note that the source of randomness for a block `H`, is contained in the 
+	// RandomSource returns the source of randomness _for_ the snapshot's Head block.
+	// Note that the source of randomness for a block `H`, is contained in the
 	// QuorumCertificate [QC] for block `H` (QCs for H are distributed as part of child
-	// blocks, timeout messages or timeout certificates). While there might be different 
-	// QCs for block H, they all yield exactly the same source of randomness (feature of 
-	// threshold signatures used here). Therefore, it is a possibility that there is no 
-	// QC known (yet) for the head block. 
+	// blocks, timeout messages or timeout certificates). While there might be different
+	// QCs for block H, they all yield exactly the same source of randomness (feature of
+	// threshold signatures used here). Therefore, it is a possibility that there is no
+	// QC known (yet) for the head block.
 	// NOTE: not to be confused with the epoch source of randomness!
 	// Expected error returns:
 	// * storage.ErrNotFound is returned if the QC is unknown.
