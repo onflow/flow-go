@@ -268,15 +268,21 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	s.vA = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
 	// non-zero a[0] - group private key is not zero
-	randZrStar(&s.a[0])
+	if err := randFrStar(&s.a[0]); err != nil {
+		return fmt.Errorf("generating the polynomial failed: %w", err)
+	}
 	generatorScalarMultG2(&s.vA[0], &s.a[0])
 	if s.threshold > 0 {
 		for i := 1; i < s.threshold; i++ {
-			randZr(&s.a[i])
+			if err := randFr(&s.a[i]); err != nil {
+				return fmt.Errorf("generating the polynomial failed: %w", err)
+			}
 			generatorScalarMultG2(&s.vA[i], &s.a[i])
 		}
 		// non-zero a[t] to enforce the polynomial degree
-		randZrStar(&s.a[s.threshold])
+		if err := randFrStar(&s.a[s.threshold]); err != nil {
+			return fmt.Errorf("generating the polynomial failed: %w", err)
+		}
 		generatorScalarMultG2(&s.vA[s.threshold], &s.a[s.threshold])
 	}
 

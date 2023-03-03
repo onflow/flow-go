@@ -122,7 +122,7 @@ func (p *pointG2) isInfinity() bool {
 }
 
 // returns a random element of Fr in input pointer
-func randZr(x *scalar) error {
+func randFr(x *scalar) error {
 	bytes := make([]byte, frBytesLen+securityBits/8)
 	_, err := rand.Read(bytes) // checking one output is enough
 	if err != nil {
@@ -133,7 +133,7 @@ func randZr(x *scalar) error {
 }
 
 // writes a random element of Fr* in input pointer
-func randZrStar(x *scalar) error {
+func randFrStar(x *scalar) error {
 	bytes := make([]byte, frBytesLen+securityBits/8)
 	isZero := true
 	for isZero {
@@ -153,10 +153,7 @@ func mapToZr(x *scalar, src []byte) bool {
 	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	if isZero {
-		return true
-	}
-	return false
+	return bool(isZero)
 }
 
 // writeScalar writes a scalar in a slice of bytes

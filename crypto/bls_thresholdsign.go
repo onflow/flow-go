@@ -564,12 +564,18 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	}
 	// Generate a polynomial P in Fr[X] of degree t
 	a := make([]scalar, threshold+1)
-	randZrStar(&a[0]) // non-identity key
+	if err := randFrStar(&a[0]); err != nil { // non-identity key
+		return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+	}
 	if threshold > 0 {
 		for i := 1; i < threshold; i++ {
-			randZr(&a[i])
+			if err := randFr(&a[i]); err != nil {
+				return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+			}
 		}
-		randZrStar(&a[threshold]) // enforce the polynomial degree
+		if err := randFrStar(&a[threshold]); err != nil { // enforce the polynomial degree
+			return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+		}
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
