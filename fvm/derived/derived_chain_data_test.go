@@ -19,7 +19,7 @@ func TestDerivedChainData(t *testing.T) {
 
 	testLocation := func(hex string) common.AddressLocation {
 		return common.AddressLocation{
-			Address: common.Address(flow.HexToAddress(hex)),
+			Address: common.MustBytesToAddress(flow.HexToAddress(hex).Bytes()),
 			Name:    hex,
 		}
 	}
