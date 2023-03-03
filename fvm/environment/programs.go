@@ -41,7 +41,7 @@ type Programs struct {
 	dependencyStack *dependencyStack
 }
 
-// NewPrograms construts a new ProgramHandler
+// NewPrograms constructs a new ProgramHandler
 func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
@@ -173,10 +173,6 @@ func (programs *Programs) get(
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
 // to load the dependencies of the program.
-//
-// TODO: this function currently just calls GetProgram and SetProgram in pair.
-// This method can be re-written in a far better way by removing the individual
-// GetProgram and SetProgram methods.
 func (programs *Programs) GetAndSetProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
@@ -207,6 +203,26 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
+	// TODO: this is temporarily extracted here, so its easier to refactor this method to
+	// use programs.derivedTxnData.GetOrComputeProgram.
+	//
+	// Add dependencies of the current program to the stack
+	// weather it is loaded or just retrieved from the cache.
+	// If it is loaded, the dependencies will actually already be on the stack,
+	// but it is not a problem if we add them again.
+	var dependencies derived.ProgramDependencies
+	defer func() {
+		programs.dependencyStack.addDependencies(dependencies)
+	}()
+	loadCalled := false
+	defer func() {
+		if loadCalled {
+			programs.cacheMiss()
+			return
+		}
+		programs.cacheHit()
+	}()
+
 	// TODO: to be removed when freezing account feature is removed
 	freezeError := programs.accounts.CheckAccountNotFrozen(
 		flow.ConvertAddress(address.Address),
@@ -218,9 +234,7 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// reading program from cache
 	program, programState, has := programs.txnState.GetProgram(address)
 	if has {
-		programs.cacheHit()
-
-		programs.dependencyStack.addDependencies(program.Dependencies)
+		dependencies = program.Dependencies
 		err := programs.txnState.AttachAndCommitNestedTransaction(programState)
 		if err != nil {
 			panic(fmt.Sprintf(
@@ -230,10 +244,12 @@ func (programs *Programs) getOrLoadAddressProgram(
 
 		return program.Program, nil
 	}
-	programs.cacheMiss()
 
-	interpreterProgram, programState, dependencies, err :=
+	var err error
+	var interpreterProgram *interpreter.Program
+	interpreterProgram, programState, dependencies, err =
 		programs.loadWithDependencyTracking(address, load)
+	loadCalled = true
 
 	if err != nil {
 		return nil, fmt.Errorf("load program failed: %w", err)
