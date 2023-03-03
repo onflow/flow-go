@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
