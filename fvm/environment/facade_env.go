@@ -304,7 +304,7 @@ func (env *facadeEnvironment) Reset() {
 }
 
 // Miscellaneous cadence runtime.Interface API.
-func (*facadeEnvironment) ResourceOwnerChanged(
+func (facadeEnvironment) ResourceOwnerChanged(
 	*interpreter.Interpreter,
 	*interpreter.CompositeValue,
 	common.Address,
