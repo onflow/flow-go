@@ -62,7 +62,7 @@ func NodeFixture(
 		Role:                             flow.RoleCollection,
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
-		GossipSubPeerScoreTracerInterval: p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval,
+		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 	}
 
 	for _, opt := range opts {
