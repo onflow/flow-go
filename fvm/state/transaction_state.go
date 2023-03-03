@@ -306,9 +306,9 @@ func (s *transactionState) mergeIntoParent() (*State, error) {
 		return nil, err
 	}
 
-	childState.committed = true
+	childState.Finalize()
 
-	err = s.current().state.MergeState(childState)
+	err = s.current().state.Merge(childState)
 	if err != nil {
 		return nil, err
 	}
@@ -417,8 +417,7 @@ func (s *transactionState) RestartNestedTransaction(
 		}
 	}
 
-	s.currentState().View().DropDelta()
-	return nil
+	return s.currentState().DropChanges()
 }
 
 func (s *transactionState) Get(

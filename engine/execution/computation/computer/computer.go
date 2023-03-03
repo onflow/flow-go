@@ -529,5 +529,5 @@ func (e *blockComputer) mergeView(
 	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
 	defer mergeSpan.End()
 
-	return parent.MergeView(child)
+	return parent.Merge(child)
 }
