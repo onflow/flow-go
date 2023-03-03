@@ -67,7 +67,7 @@ func (b *backendTransactions) SendTransaction(
 	// store the transaction locally
 	err = b.transactions.Store(tx)
 	if err != nil {
-		return status.Error(codes.Internal, fmt.Sprintf("failed to store transaction: %v", err))
+		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
 
 	if b.retry.IsActive() {
