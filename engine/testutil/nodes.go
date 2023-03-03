@@ -645,10 +645,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	computation := &testmock.ComputerWrap{
-		Manager: computationEngine,
-	}
-
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
 	require.NoError(t, err)
 
@@ -675,7 +671,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		eventsStorage,
 		serviceEventsStorage,
 		txResultStorage,
-		computation,
+		computationEngine,
 		pusherEngine,
 		execState,
 		node.Metrics,
@@ -739,7 +735,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
 		SyncEngine:          syncEngine,
-		ExecutionEngine:     computation,
+		ExecutionEngine:     computationEngine,
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,

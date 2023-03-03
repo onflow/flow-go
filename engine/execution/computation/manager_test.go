@@ -152,7 +152,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
@@ -182,10 +186,12 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	computationResult := unittest2.ComputationResultFixture([][]flow.Identifier{
-		{unittest.IdentifierFixture()},
-		{unittest.IdentifierFixture()},
-	})
+	computationResult := unittest2.ComputationResultFixture(
+		unittest.IdentifierFixture(),
+		[][]flow.Identifier{
+			{unittest.IdentifierFixture()},
+			{unittest.IdentifierFixture()},
+		})
 
 	blockComputer := &FakeBlockComputer{
 		computationResult: computationResult,
@@ -207,7 +213,11 @@ func TestComputeBlock_Uploader(t *testing.T) {
 			flow.StateCommitment(ledger.InitialState())))
 	blockView := view.NewChild()
 
-	_, err = manager.ComputeBlock(context.Background(), computationResult.ExecutableBlock, blockView)
+	_, err = manager.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		computationResult.ExecutableBlock,
+		blockView)
 	require.NoError(t, err)
 }
 
@@ -225,10 +235,6 @@ func TestExecuteScript(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
-
-	view := delta.NewDeltaView(ledger)
-
-	scriptView := view.NewChild()
 
 	script := []byte(fmt.Sprintf(
 		`
@@ -267,7 +273,12 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(context.Background(), script, nil, header, scriptView)
+	_, err = engine.ExecuteScript(
+		context.Background(),
+		script,
+		nil,
+		header,
+		ledger)
 	require.NoError(t, err)
 }
 
@@ -284,12 +295,10 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	view := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+	snapshot := state.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, fmt.Errorf("error getting register")
-		}))
-
-	scriptView := view.NewChild()
+		})
 
 	script := []byte(fmt.Sprintf(
 		`
@@ -328,7 +337,12 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(context.Background(), script, nil, header, scriptView)
+	_, err = engine.ExecuteScript(
+		context.Background(),
+		script,
+		nil,
+		header,
+		snapshot)
 	require.ErrorContains(t, err, "error getting register")
 }
 
@@ -371,7 +385,12 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
+	_, err = manager.ExecuteScript(
+		context.Background(),
+		[]byte("whatever"),
+		nil,
+		header,
+		nil)
 
 	require.Error(t, err)
 
@@ -417,7 +436,12 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
+	_, err = manager.ExecuteScript(
+		context.Background(),
+		[]byte("whatever"),
+		nil,
+		header,
+		nil)
 
 	require.NoError(t, err)
 
@@ -463,7 +487,12 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
+	_, err = manager.ExecuteScript(
+		context.Background(),
+		[]byte("whatever"),
+		nil,
+		header,
+		nil)
 
 	require.NoError(t, err)
 
@@ -476,7 +505,14 @@ func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.Vie
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
-func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+func (p *PanickingVM) GetAccount(
+	f fvm.Context,
+	address flow.Address,
+	view state.View,
+) (
+	*flow.Account,
+	error,
+) {
 	panic("not expected")
 }
 
@@ -494,7 +530,14 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 	return nil
 }
 
-func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View) (*flow.Account, error) {
+func (l *LongRunningVM) GetAccount(
+	f fvm.Context,
+	address flow.Address,
+	view state.View,
+) (
+	*flow.Account,
+	error,
+) {
 	panic("not expected")
 }
 
@@ -502,12 +545,17 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(
+	context.Context,
+	flow.Identifier,
+	*entity.ExecutableBlock,
+	state.StorageSnapshot,
+	*derived.DerivedBlockData,
+) (
+	*execution.ComputationResult,
+	error,
+) {
 	return f.computationResult, nil
-}
-
-func noopView() *delta.View {
-	return delta.NewDeltaView(nil)
 }
 
 func TestExecuteScriptTimeout(t *testing.T) {
@@ -542,7 +590,12 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(context.Background(), script, nil, header, noopView())
+	value, err := manager.ExecuteScript(
+		context.Background(),
+		script,
+		nil,
+		header,
+		nil)
 
 	require.Error(t, err)
 	require.Nil(t, value)
@@ -588,7 +641,12 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		header := unittest.BlockHeaderFixture()
-		value, err = manager.ExecuteScript(reqCtx, script, nil, header, noopView())
+		value, err = manager.ExecuteScript(
+			reqCtx,
+			script,
+			nil,
+			header,
+			nil)
 		wg.Done()
 	}()
 	cancel()
@@ -704,7 +762,11 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	eventEncoder.enabled = true
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		blockView)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
@@ -789,8 +851,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	scriptView := view.NewChild()
-	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, header, scriptView)
+	_, err = manager.ExecuteScript(
+		context.Background(),
+		script,
+		[][]byte{jsoncdc.MustEncode(address)},
+		header,
+		view)
 
 	require.NoError(t, err)
 

@@ -7,7 +7,6 @@ import (
 type View interface {
 	NewChild() View
 	MergeView(child View) error
-	DropDelta() // drops all the delta changes
 
 	// UpdatedRegisters returns all registers that were updated by this view.
 	// The returned entries are sorted by ids.
@@ -21,13 +20,14 @@ type View interface {
 	// The returned ids are unsorted.
 	AllRegisterIDs() []flow.RegisterID
 
-	Ledger
+	Storage
 }
 
-// Ledger is the storage interface used by the virtual machine to read and write register values.
-//
-// TODO Rename this to Storage
-type Ledger interface {
+// Storage is the storage interface used by the virtual machine to read and
+// write register values.
+type Storage interface {
 	Set(id flow.RegisterID, value flow.RegisterValue) error
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
+
+	DropDelta() // drops all the delta changes
 }

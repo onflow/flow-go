@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
@@ -174,6 +176,45 @@ func (programs *Programs) get(
 	}
 
 	return nil, false
+}
+
+// GetAndSetProgram gets the program from the cache,
+// or loads it (by calling load) if it is not in the cache.
+// When loading a program, this method will be re-entered
+// to load the dependencies of the program.
+//
+// TODO: this function currently just calls GetProgram and SetProgram in pair.
+// This method can be re-written in a far better way by removing the individual
+// GetProgram and SetProgram methods.
+func (programs *Programs) GetAndSetProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+
+	prog, err := programs.GetProgram(location)
+	if err != nil {
+		return nil, err
+	}
+	if prog != nil {
+		return prog, nil
+	}
+
+	prog, err = load()
+	if err != nil {
+		// if loading fails, we still need to call set with nil program
+		// to pop the loading stack.
+		setErr := programs.SetProgram(location, nil)
+		if setErr != nil {
+			err = multierror.Append(err, setErr).ErrorOrNil()
+		}
+		return nil, err
+	}
+	err = programs.SetProgram(location, prog)
+	if err != nil {
+		return nil, err
+	}
+
+	return prog, nil
 }
 
 func (programs *Programs) GetProgram(

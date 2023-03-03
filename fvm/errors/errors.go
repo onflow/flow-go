@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/errors"
 )
 
 type Unwrappable interface {
@@ -112,18 +111,6 @@ func HandleRuntimeError(err error) error {
 	runErr, ok := err.(runtime.Error)
 	if !ok {
 		return NewUnknownFailure(err)
-	}
-
-	// External errors are reported by the runtime but originate from the VM.
-	// External errors may be fatal or non-fatal, so additional handling by SplitErrorTypes
-	if externalErr, ok := errors.GetExternalError(err); ok {
-		if recoveredErr, ok := externalErr.Recovered.(error); ok {
-			// If the recovered value is an error, pass it to the original
-			// error handler to distinguish between fatal and non-fatal errors.
-			return recoveredErr
-		}
-		// if not recovered return
-		return NewUnknownFailure(externalErr)
 	}
 
 	// All other errors are non-fatal Cadence errors.
