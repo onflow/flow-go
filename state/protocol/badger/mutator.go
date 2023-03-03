@@ -697,7 +697,7 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch.
 // We accept the EpochSetup event for the current epoch (w.r.t. input block B) which contains
 // the FirstView for the epoch (denoted W). By construction, B.View >= W.
-// Definition: B is the first block of the epoch when B.parent.View < W
+// Definition: B is the first block of the epoch if and only if B.parent.View < W
 //
 // NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
 // No errors are expected during normal operation.
@@ -713,11 +713,7 @@ func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header, currentEpochSetu
 		return false, fmt.Errorf("[unexpected] could not retrieve parent (id=%s): %v", block.ParentID, err)
 	}
 
-	// check for epoch transition: B.parent.View < W
-	if parent.View < currentEpochFirstView {
-		return true, nil
-	}
-	return false, nil
+	return parent.View < currentEpochFirstView, nil
 }
 
 // epochTransitionMetricsAndEventsOnBlockFinalized determines metrics to update
