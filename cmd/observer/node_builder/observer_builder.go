@@ -269,15 +269,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(
-			state,
-			node.Storage.Index,
-			node.Storage.Payloads,
-			node.Storage.QuorumCertificates,
-			node.Tracer,
-			node.ProtocolEvents,
-			blocktimer.DefaultBlockTimer,
-		)
+		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 		builder.FollowerState = followerState
 
 		return err

@@ -299,14 +299,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		Return(previousExecutionResultID, nil)
 
 	mocked := ctx.executionState.
-		On("SaveExecutionResults",
-			mock.Anything,
-			computationResult,
-			mock.MatchedBy(func(executionReceipt *flow.ExecutionReceipt) bool {
-				return executionReceipt.ExecutionResult.BlockID == executableBlock.Block.ID() &&
-					executionReceipt.ExecutionResult.PreviousResultID == previousExecutionResultID
-			}),
-		).
+		On("SaveExecutionResults", mock.Anything, computationResult).
 		Return(nil)
 
 	mocked.RunFn =
@@ -327,27 +320,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		On(
 			"BroadcastExecutionReceipt",
 			mock.Anything,
-			mock.MatchedBy(func(er *flow.ExecutionReceipt) bool {
-				return er.ExecutionResult.BlockID == executableBlock.Block.ID() &&
-					er.ExecutionResult.PreviousResultID == previousExecutionResultID
-			}),
+			mock.Anything,
 		).
 		Run(func(args mock.Arguments) {
 			receipt := args[1].(*flow.ExecutionReceipt)
-
-			executor, err := ctx.snapshot.Identity(receipt.ExecutorID)
-			assert.NoError(ctx.t, err, "could not find executor in protocol state")
-
-			// verify the signature
-			id := receipt.ID()
-			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], ctx.engine.receiptHasher)
-			assert.NoError(ctx.t, err)
-
-			assert.True(ctx.t, validSig, "execution receipt signature invalid")
-
-			spocks := receipt.Spocks
-
-			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
 
 			ctx.mu.Lock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
@@ -1321,11 +1297,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	// mock execution state conversion and signing of
-
-	me.EXPECT().NodeID()
-	me.EXPECT().Sign(gomock.Any(), gomock.Any())
-
 	cr := executionUnittest.ComputationResultFixture(
 		previousExecutionResultID,
 		nil)
@@ -1334,7 +1305,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	cr.ExecutableBlock.StartState = &startState
 
 	execState.
-		On("SaveExecutionResults", mock.Anything, cr, mock.Anything).
+		On("SaveExecutionResults", mock.Anything, cr).
 		Return(nil)
 
 	e := Engine{
@@ -1344,10 +1315,8 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		me:        me,
 	}
 
-	er, err := e.saveExecutionResults(context.Background(), cr)
+	err := e.saveExecutionResults(context.Background(), cr)
 	assert.NoError(t, err)
-
-	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)
 
 	execState.AssertExpectations(t)
 }

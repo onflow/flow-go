@@ -6,13 +6,15 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -225,7 +227,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	baseView := utils.NewSimpleView()
+	baseView := delta.NewDeltaView(nil)
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
@@ -239,14 +241,18 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		baseView)
 	require.NoError(t, err)
 
-	view := baseView.NewChild().(*utils.SimpleView)
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	view := baseView.NewChild()
+	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	computer := fvm.NewMeterParamOverridesComputer(ctx, derivedTxnData)
+	txnState := storage.SerialTransaction{
+		NestedTransaction:           nestedTxn,
+		DerivedTransactionCommitter: derivedTxnData,
+	}
+	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
 	require.NoError(t, err)
@@ -265,8 +271,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		err := txnState.Set(id, flow.RegisterValue("blah"))
 		require.NoError(t, err)
@@ -274,8 +279,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		env := environment.NewTransactionEnvironment(
 			tracing.NewTracerSpan(),
 			ctx.EnvironmentParams,
-			txnState,
-			nil)
+			txnState)
 
 		invalidator := environment.NewDerivedDataInvalidator(nil, env)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)

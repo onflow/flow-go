@@ -10,6 +10,39 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type DerivedTransaction interface {
+	GetProgram(
+		addressLocation common.AddressLocation,
+	) (
+		*Program,
+		*state.State,
+		bool,
+	)
+
+	SetProgram(
+		addressLocation common.AddressLocation,
+		program *Program,
+		state *state.State,
+	)
+
+	GetMeterParamOverrides(
+		txnState state.NestedTransaction,
+		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+	) (
+		MeterParamOverrides,
+		error,
+	)
+
+	AddInvalidator(invalidator TransactionInvalidator)
+}
+
+type DerivedTransactionCommitter interface {
+	DerivedTransaction
+
+	Validate() error
+	Commit() error
+}
+
 // ProgramDependencies are the programs' addresses used by this program.
 type ProgramDependencies map[flow.Address]struct{}
 
@@ -91,7 +124,7 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
@@ -118,7 +151,7 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewTableTransaction(
@@ -190,7 +223,7 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 }
 
 func (transaction *DerivedTransactionData) GetMeterParamOverrides(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 ) (
 	MeterParamOverrides,

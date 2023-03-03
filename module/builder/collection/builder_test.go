@@ -98,10 +98,10 @@ func (suite *BuilderSuite) SetupTest() {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, qcs, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
