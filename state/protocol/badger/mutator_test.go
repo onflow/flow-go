@@ -860,9 +860,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
 		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
-		assert.ErrorIs(t, err, realprotocol.ErrEpochNotEnded)
+		assert.ErrorIs(t, err, realprotocol.ErrEpochTransitionNotFinalized)
 		_, err = state.AtBlockID(block9.ID()).Epochs().Current().FirstHeight()
-		assert.ErrorIs(t, err, realprotocol.ErrEpochNotStarted)
+		assert.ErrorIs(t, err, realprotocol.ErrEpochTransitionNotFinalized)
 
 		err = state.Finalize(context.Background(), block9.ID())
 		require.NoError(t, err)

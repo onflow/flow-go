@@ -1098,9 +1098,9 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 // TestSnapshot_EpochHeightBoundaries tests querying epoch height boundaries in various conditions.
 //   - FirstHeight should be queryable as soon as the epoch's first block is finalized,
-//     otherwise should return protocol.ErrEpochNotStarted
+//     otherwise should return protocol.ErrEpochTransitionNotFinalized
 //   - FinalHeight should be queryable as soon as the next epoch's first block is finalized,
-//     otherwise should return protocol.ErrEpochNotEnded
+//     otherwise should return protocol.ErrEpochTransitionNotFinalized
 func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -1119,7 +1119,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 		})
 
 		// build first epoch (but don't complete it yet)
@@ -1132,12 +1132,12 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 			// first and final height of not started next epoch should be unknown
 			_, err = state.Final().Epochs().Next().FirstHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 			_, err = state.Final().Epochs().Next().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 		})
 
 		// complete epoch 1 (enter epoch 2)
@@ -1162,7 +1162,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch2FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 		})
 	})
 }
