@@ -176,10 +176,26 @@ func (s TopicScoreSnapshot) IsWarning() bool {
 
 // PeerScoreTracer is the interface for the tracer that is used to trace the peer score.
 type PeerScoreTracer interface {
+	PeerScoreExposer
 	// UpdatePeerScoreSnapshots updates the peer score snapshot/
 	UpdatePeerScoreSnapshots(map[peer.ID]*PeerScoreSnapshot)
 
 	// UpdateInterval returns the update interval for the tracer. The tracer will be receiving updates
 	// at this interval.
 	UpdateInterval() time.Duration
+}
+
+// PeerScoreExposer is the interface for the tracer that is used to expose the peers score.
+type PeerScoreExposer interface {
+	// GetScore returns the overall score for the given peer.
+	GetScore(peerID peer.ID) (float64, bool)
+	// GetAppScore returns the application score for the given peer.
+	GetAppScore(peerID peer.ID) (float64, bool)
+	// GetIPColocationFactor returns the IP colocation factor for the given peer.
+	GetIPColocationFactor(peerID peer.ID) (float64, bool)
+	// GetBehaviourPenalty returns the behaviour penalty for the given peer.
+	GetBehaviourPenalty(peerID peer.ID) (float64, bool)
+	// GetTopicScores returns the topic scores for the given peer for all topics.
+	// The returned map is keyed by topic name.
+	GetTopicScores(peerID peer.ID) (map[string]TopicScoreSnapshot, bool)
 }
