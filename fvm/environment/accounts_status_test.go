@@ -16,6 +16,9 @@ func TestAccountStatus(t *testing.T) {
 	require.False(t, s.IsAccountFrozen())
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {
+		// TODO: remove freezing feature
+		t.Skip("Skip as we are removing the freezing feature.")
+
 		s.SetFrozenFlag(true)
 		require.True(t, s.IsAccountFrozen())
 
@@ -24,9 +27,6 @@ func TestAccountStatus(t *testing.T) {
 	})
 
 	t.Run("test setting values", func(t *testing.T) {
-		// set some values for side effect checks
-		s.SetFrozenFlag(true)
-
 		index := atree.StorageIndex{1, 2, 3, 4, 5, 6, 7, 8}
 		s.SetStorageIndex(index)
 		s.SetPublicKeyCount(34)
@@ -37,8 +37,6 @@ func TestAccountStatus(t *testing.T) {
 		require.True(t, bytes.Equal(index[:], returnedIndex[:]))
 		require.Equal(t, uint64(34), s.PublicKeyCount())
 
-		// check no side effect on flags
-		require.True(t, s.IsAccountFrozen())
 	})
 
 	t.Run("test serialization", func(t *testing.T) {
