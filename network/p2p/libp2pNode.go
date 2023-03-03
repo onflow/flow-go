@@ -73,4 +73,10 @@ type LibP2PNode interface {
 	SetComponentManager(cm *component.ComponentManager)
 	// HasSubscription returns true if the node currently has an active subscription to the topic.
 	HasSubscription(topic channels.Topic) bool
+	// SetPeerScoreExposer sets the node's peer score exposer implementation.
+	// SetPeerScoreExposer may be called at most once. It is an error to call this
+	// method if the node's peer score exposer has already been set.
+	SetPeerScoreExposer(e PeerScoreExposer)
+	// PeerScoreExposer returns the node's peer score exposer implementation.
+	PeerScoreExposer() PeerScoreExposer
 }
