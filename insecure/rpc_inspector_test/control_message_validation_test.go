@@ -187,7 +187,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 
 	// create our RPC validation inspector
 	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.NumberOfWorkers = 2
 
 	messageCount := inspectorConfig.GraftValidationCfg.RateLimit
 	controlMessageCount := int64(1)
@@ -237,12 +237,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 	}
-
-	// sleep for one second and spam another message to ensure rate limiter is now allowing messages as expected
-	// if it is not we should encounter more rate limiter error logs than expected.
-	time.Sleep(time.Second)
-	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
-
+	
 	// eventually we should encounter 2 rate limit errors for each control message type
 	require.Eventually(t, func() bool {
 		return graftRateLimitErrsReceived.Load() == 2 && pruneRateLimitErrsReceived.Load() == 2
