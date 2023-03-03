@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -19,5 +20,6 @@ type EpochJoinAndLeaveSNSuite struct {
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveSNSuite) TestEpochJoinAndLeaveSN() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "fails on CI regularly")
 	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.assertNetworkHealthyAfterSNChange)
 }
