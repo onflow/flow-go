@@ -228,17 +228,20 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	return indices, aggregatedSignature, nil
 }
 
-// VerifyAggregate verifies an aggregated signature against the stored message and the stored
+// VerifyAggregate verifies an input signature against the stored message and the stored
 // keys corresponding to the input signers.
-// The aggregated public key of input signers is returned.
+// The aggregated public key of input signers is returned. In particular this allows comparing the
+// aggregated key against the identity public key.
 // The function is not thread-safe.
 // Possible returns:
-//   - (true, agg_key, nil): aggregate signature is valid
-//   - (false, agg_key, nil): aggregate signature is cryptographically invalid
+//   - (true, agg_key, nil): signature is valid
+//   - (false, agg_key, nil): signature is cryptographically invalid. This also includes the case where
+//     `agg_key` is equal to the identity public key (because of equivocation). If the caller needs to
+//     differentiate this case, `crypto.IsIdentityPublicKey` can be used to test the returned `agg_key`
 //   - (false, nil, err) with error types:
-//   - InsufficientSignaturesError if no signer indices are given (`signers` is empty)
-//   - InvalidSignerIdxError if some signer indices are out of bound
-//   - generic error in case of an unexpected runtime failure
+//     -- InsufficientSignaturesError if no signer indices are given (`signers` is empty)
+//     -- InvalidSignerIdxError if some signer indices are out of bound
+//     -- generic error in case of an unexpected runtime failure
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, crypto.PublicKey, error) {
 	keys := make([]crypto.PublicKey, 0, len(signers))
 	for _, signer := range signers {
