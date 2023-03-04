@@ -230,7 +230,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		w := &fixtures.NoopWAL{}
 
-		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
+		payloadStorage := unittest.CreateMockPayloadStore()
+		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion, payloadStorage)
 		require.NoError(t, err)
 
 		compactor := fixtures.NewNoopCompactor(led)

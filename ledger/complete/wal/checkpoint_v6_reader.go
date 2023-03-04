@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -80,6 +81,216 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	}
 
 	return tries, nil
+}
+
+func ReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (leafNodes []*ledger.LeafNode, errToReturn error) {
+	filepath := filePathCheckpointHeader(dir, fileName)
+
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(file *os.File) {
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(f)
+
+	return readLeafNodes(f, logger)
+}
+
+type jobReadSubtrieLeaf struct {
+	Index    int
+	Checksum uint32
+	Result   chan<- *resultReadSubTrieLeaf
+}
+
+type resultReadSubTrieLeaf struct {
+	Nodes []*ledger.LeafNode
+	Err   error
+}
+
+func readLeafNodes(headerFile *os.File, logger *zerolog.Logger) ([]*ledger.LeafNode, error) {
+
+	// the full path of header file
+	headerPath := headerFile.Name()
+	dir, fileName := filepath.Split(headerPath)
+
+	lg := logger.With().Str("checkpoint_file", headerPath).Logger()
+	lg.Info().Msgf("reading v6 checkpoint file")
+
+	subtrieChecksums, _, err := readCheckpointHeader(headerPath, logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not read header: %w", err)
+	}
+
+	// ensure all checkpoint part file exists, might return os.ErrNotExist error
+	// if a file is missing
+	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
+	if err != nil {
+		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
+	}
+
+	// TODO making number of goroutine configable for reading subtries, which can help us
+	// test the code on machines that don't have as much RAM as EN by using fewer goroutines.
+	leafNodes, err := readNodesFromSubTriesConcurrently(dir, fileName, subtrieChecksums, &lg)
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
+	}
+
+	return leafNodes, nil
+}
+
+func readNodesFromSubTriesConcurrently(
+	dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([]*ledger.LeafNode, error) {
+
+	numOfSubTries := len(subtrieChecksums)
+	jobs := make(chan jobReadSubtrieLeaf, numOfSubTries)
+	resultChs := make([]<-chan *resultReadSubTrieLeaf, numOfSubTries)
+
+	// push all jobs into the channel
+	for i, checksum := range subtrieChecksums {
+		resultCh := make(chan *resultReadSubTrieLeaf)
+		resultChs[i] = resultCh
+		jobs <- jobReadSubtrieLeaf{
+			Index:    i,
+			Checksum: checksum,
+			Result:   resultCh,
+		}
+	}
+	close(jobs)
+
+	// TODO: make nWorker configable
+	nWorker := numOfSubTries // use as many worker as the jobs to read subtries concurrently
+	for i := 0; i < nWorker; i++ {
+		go func() {
+			for job := range jobs {
+				nodes, err := readLeafNodeFromCheckpointSubtrie(dir, fileName, job.Index, job.Checksum, logger)
+				job.Result <- &resultReadSubTrieLeaf{
+					Nodes: nodes,
+					Err:   err,
+				}
+				close(job.Result)
+			}
+		}()
+	}
+
+	// reading job results in the same order as their indices
+	nodes := make([]*ledger.LeafNode, 0)
+	for i, resultCh := range resultChs {
+		result := <-resultCh
+		if result.Err != nil {
+			return nil, fmt.Errorf("fail to read %v-th subtrie, trie: %w", i, result.Err)
+		}
+
+		logger.Info().Msgf("finished %v th subtrie", i)
+		nodes = append(nodes, result.Nodes...)
+	}
+
+	return nodes, nil
+}
+
+func readLeafNodeFromCheckpointSubtrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) (leafNodes []*ledger.LeafNode, errToReturn error) {
+	filepath, _, err := filePathSubTries(dir, fileName, index)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict subtrie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(f)
+
+	// valite the magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, f)
+	if err != nil {
+		return nil, err
+	}
+
+	nodesCount, expectedSum, err := readSubTriesFooter(f)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read sub trie node count: %w", err)
+	}
+
+	if checksum != expectedSum {
+		return nil, fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
+			"match with the checksum in subtrie file %v", checksum, expectedSum)
+	}
+
+	// restart from the beginning of the file, make sure CRC32Reader has seen all the bytes
+	// in order to compute the correct checksum
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
+	}
+
+	reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
+
+	// read version again for calculating checksum
+	_, _, err = readFileHeader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read version again for subtrie: %w", err)
+	}
+
+	// read file part index and verify
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+	logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots", index), int(nodesCount), logger)
+
+	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	leafNodes = make([]*ledger.LeafNode, 0, nodesCount+1)
+	for i := uint64(1); i <= nodesCount; i++ {
+		node, path, payload, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			if nodeIndex >= i {
+				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
+			}
+			return nodes[nodeIndex], nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
+		}
+		nodes[i] = node
+		if node.IsLeaf() {
+			leafNodes = append(leafNodes,
+				&ledger.LeafNode{
+					Hash:    node.Hash(),
+					Path:    path,
+					Payload: *payload,
+				})
+		}
+		logging(i)
+	}
+
+	// read footer and discard, since we only care about checksum
+	_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// calculate the actual checksum
+	actualSum := reader.Crc32()
+
+	if actualSum != expectedSum {
+		return nil, fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
+			expectedSum, actualSum)
+	}
+
+	// read the checksum and discard, since we only care about whether ensureReachedEOF
+	_, err = io.ReadFull(reader, scratch[:crc32SumSize])
+	if err != nil {
+		return nil, fmt.Errorf("could not read subtrie file's checksum: %w", err)
+	}
+
+	err = ensureReachedEOF(reader)
+	if err != nil {
+		return nil, fmt.Errorf("fail to read %v-th sutrie file: %w", index, err)
+	}
+
+	return leafNodes, nil
 }
 
 // OpenAndReadCheckpointV6 open the checkpoint file and read it with readCheckpointV6
@@ -388,7 +599,7 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 
 	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	for i := uint64(1); i <= nodesCount; i++ {
-		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		node, _, _, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -548,7 +759,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 
 	// read the nodes from subtrie level to the root level
 	for i := uint64(1); i <= topLevelNodesCount; i++ {
-		node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		node, _, _, err := flattener.ReadNodeV6(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}

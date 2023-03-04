@@ -40,6 +40,7 @@ type Ledger struct {
 	logger            zerolog.Logger
 	trieUpdateCh      chan *WALTrieUpdate
 	pathFinderVersion uint8
+	payloadStorage    ledger.PayloadStorage
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -48,7 +49,9 @@ func NewLedger(
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	pathFinderVer uint8) (*Ledger, error) {
+	pathFinderVer uint8,
+	payloadStorage ledger.PayloadStorage,
+) (*Ledger, error) {
 
 	logger := log.With().Str("ledger_mod", "complete").Logger()
 
@@ -64,13 +67,14 @@ func NewLedger(
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
 		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
+		payloadStorage:    payloadStorage,
 	}
 
 	// pause records to prevent double logging trie removals
 	wal.PauseRecord()
 	defer wal.UnpauseRecord()
 
-	err = wal.ReplayOnForest(forest)
+	err = wal.ReplayOnForest(forest, payloadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
@@ -128,7 +132,7 @@ func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	valueSizes, err = l.forest.ValueSizes(trieRead)
+	valueSizes, err = l.forest.ValueSizes(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +157,7 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 		return nil, err
 	}
 	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
-	value, err = l.forest.ReadSingleValue(trieRead)
+	value, err = l.forest.ReadSingleValue(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +181,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	values, err = l.forest.Read(trieRead)
+	values, err = l.forest.Read(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +260,7 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	// `trieCh` is used to send created trie to Compactor.
 	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 
-	newTrie, err := l.forest.NewTrie(trieUpdate)
+	newTrie, err := l.forest.NewTrie(trieUpdate, l.payloadStorage)
 	walError := <-resultCh
 
 	if err != nil {
@@ -289,7 +293,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	}
 
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	batchProof, err := l.forest.Proofs(trieRead)
+	batchProof, err := l.forest.Proofs(trieRead, l.payloadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
@@ -375,7 +379,11 @@ func (l *Ledger) ExportCheckpointAt(
 		// preCheckpointReporters, which doesn't use the payloads.
 	} else {
 		// get all payloads
-		payloads = t.AllPayloads()
+		payloads, err = t.AllPayloads(l.payloadStorage)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("could not get all payloads: %w", err)
+		}
+
 		payloadSize := len(payloads)
 
 		// migrate payloads
@@ -418,7 +426,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 		// no need to prune the data since it has already been prunned through migrations
 		applyPruning := false
-		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning, l.payloadStorage)
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 		}
@@ -467,7 +475,10 @@ func (l *Ledger) ExportCheckpointAt(
 	if noMigration {
 		// when there is no mgiration, we generate the payloads now before
 		// running the postCheckpointReporters
-		payloads = newTrie.AllPayloads()
+		payloads, err = newTrie.AllPayloads(l.payloadStorage)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("could not get all payloads: %w", err)
+		}
 	}
 
 	// running post checkpoint reporters

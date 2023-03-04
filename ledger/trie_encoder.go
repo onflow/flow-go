@@ -401,6 +401,12 @@ func encodedPayloadLength(p *Payload, version uint16) int {
 		return 0
 	}
 
+	// empty payload has empty encKey, whereas non-empty payload
+	// has at least 2 bytes to indicate the number of keys
+	if p.IsEmpty() {
+		return 8
+	}
+
 	// Error isn't checked here because encoded key will be used directly
 	// in later commit and no error will be returned.
 	k, _ := p.Key()

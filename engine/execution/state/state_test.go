@@ -29,7 +29,8 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
-			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+			payloadStorage := unittest.CreateMockPayloadStore()
+			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion, payloadStorage)
 			require.NoError(t, err)
 			compactor := fixtures.NewNoopCompactor(ls)
 			<-compactor.Ready()

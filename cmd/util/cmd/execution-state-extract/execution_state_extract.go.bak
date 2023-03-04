@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	ledgerstorage "github.com/onflow/flow-go/ledger/storage"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -50,12 +51,15 @@ func extractExecutionState(
 
 	log.Info().Msg("init ledger")
 
+	payloadStorage := ledgerstorage.CreatePayloadStorage()
 	led, err := complete.NewLedger(
 		diskWal,
 		complete.DefaultCacheSize,
 		&metrics.NoopCollector{},
 		log,
-		complete.DefaultPathFinderVersion)
+		complete.DefaultPathFinderVersion,
+		payloadStorage,
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}

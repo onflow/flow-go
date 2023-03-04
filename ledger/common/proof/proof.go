@@ -46,7 +46,10 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			computed = hash.HashInterNode(computed, siblingHash)
 		}
 	}
-	return (computed == hash.Hash(expectedState)) == p.Inclusion
+
+	// for both inclusion and non-inclusion proof the computed hash
+	// must match the expected root hash
+	return computed == hash.Hash(expectedState)
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof

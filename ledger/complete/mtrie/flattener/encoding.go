@@ -31,16 +31,14 @@ const (
 	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
 )
 
-const payloadEncodingVersion = 1
+const PayloadEncodingVersion = 1
 
 // encodeLeafNode encodes leaf node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
-// - hash (32 bytes)
-// - path (32 bytes)
-// - payload (4 bytes + n bytes)
-// Encoded leaf node size is 81 bytes (assuming length of hash/path is 32 bytes) +
-// length of encoded payload size.
+// - node hash (32 bytes)
+// - leaf hash (32 bytes)
+// Encoded leaf node size is 67 bytes
 // Scratch buffer is used to avoid allocs. It should be used directly instead
 // of using append.  This function uses len(scratch) and ignores cap(scratch),
 // so any extra capacity will not be utilized.
@@ -49,22 +47,20 @@ const payloadEncodingVersion = 1
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := ledger.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
-
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
 		encHashSize +
-		encPathSize +
-		encPayloadLengthSize +
-		encPayloadSize
+		encHashSize
 
 	// buf uses received scratch buffer if it's large enough.
 	// Otherwise, a new buffer is allocated.
 	// buf is used directly so len(buf) must not be 0.
 	// buf will be resliced to proper size before being returned from this function.
-	buf := scratch
+	var buf []byte
 	if len(scratch) < encodedNodeSize {
 		buf = make([]byte, encodedNodeSize)
+	} else {
+		buf = scratch[:encodedNodeSize]
 	}
 
 	pos := 0
@@ -82,18 +78,10 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	copy(buf[pos:], hash[:])
 	pos += encHashSize
 
-	// Encode path (32 bytes path)
-	path := n.Path()
-	copy(buf[pos:], path[:])
-	pos += encPathSize
-
-	// Encode payload (4 bytes Big Endian for encoded payload length and n bytes encoded payload)
-	binary.BigEndian.PutUint32(buf[pos:], uint32(encPayloadSize))
-	pos += encPayloadLengthSize
-
-	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
-	// Returned buf is resliced to include appended payload.
-	buf = ledger.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
+	// Encode hash (32 bytes hashValue)
+	leafHash := n.ExpandedLeafHash()
+	copy(buf[pos:], leafHash[:])
+	// pos += encHashSize
 
 	return buf
 }
@@ -123,9 +111,11 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 	// Otherwise, a new buffer is allocated.
 	// buf is used directly so len(buf) must not be 0.
 	// buf will be resliced to proper size before being returned from this function.
-	buf := scratch
+	var buf []byte
 	if len(scratch) < encodedNodeSize {
 		buf = make([]byte, encodedNodeSize)
+	} else {
+		buf = scratch[:encodedNodeSize]
 	}
 
 	pos := 0
@@ -149,9 +139,9 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 
 	// Encode right child index (8 bytes Big Endian)
 	binary.BigEndian.PutUint64(buf[pos:], rchildIndex)
-	pos += encNodeIndexSize
+	// pos += encNodeIndexSize
 
-	return buf[:pos]
+	return buf
 }
 
 // EncodeNode encodes node.
@@ -209,30 +199,22 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
 	}
+	// pos += encHashSize
 
 	if nType == byte(leafNodeType) {
 
-		// Read path (32 bytes)
-		encPath := scratch[:encPathSize]
-		_, err := io.ReadFull(reader, encPath)
+		_, err := io.ReadFull(reader, scratch[:encHashSize])
 		if err != nil {
-			return nil, fmt.Errorf("failed to read path of serialized node: %w", err)
+			return nil, fmt.Errorf("failed to read bytes for leaf node hash")
 		}
 
-		// Decode and create ledger.Path.
-		path, err := ledger.ToPath(encPath)
+		leafHash, err := hash.ToHash(scratch[:encHashSize])
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode path of serialized node: %w", err)
+			return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
 		}
 
-		// Read encoded payload data and create ledger.Payload.
-		payload, err := readPayloadFromReader(reader, scratch)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
-		}
-
-		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
-		return node, nil
+		n := node.NewNode(int(height), nil, nil, nodeHash, leafHash)
+		return n, nil
 	}
 
 	// Read interim node
@@ -264,7 +246,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		return nil, fmt.Errorf("failed to find right child node of serialized node: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
+	n := node.NewInterimNodeWithHash(int(height), lchild, rchild, nodeHash)
 	return n, nil
 }
 
@@ -385,7 +367,7 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	// Decode and copy payload
-	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
+	payload, err := ledger.DecodePayloadWithoutPrefix(scratch, false, PayloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}
