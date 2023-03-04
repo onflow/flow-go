@@ -106,6 +106,7 @@ void     ep2_mult_gen(ep2_t, const bn_t);
 
 void     bn_randZr(bn_t);
 void     bn_randZr_star(bn_t);
+int      bn_map_to_Zr(bn_t, const uint8_t*, int);
 void     bn_map_to_Zr_star(bn_t, const uint8_t*, int);
 
 void     bn_sum_vector(bn_t, const bn_st*, const int);

@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -129,7 +128,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrIdentityUnverified,
 	}
 	slashingViolationsConsumer.On(
@@ -164,7 +163,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -191,7 +190,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrSenderEjected,
 	}
 	slashingViolationsConsumer.On(
@@ -225,7 +224,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -248,9 +247,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  message.TestMessage,
+		MsgType:  "*message.TestMessage",
 		Channel:  channels.ConsensusCommittee,
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
@@ -285,7 +284,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 			Text: string("hello"),
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -305,7 +304,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	invalidMessageCode := byte('X')
+	invalidMessageCode := codec.MessageCode(byte('X'))
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
@@ -313,7 +312,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",
 		Channel:  channels.TestNetworkChannel,
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      codec.NewUnknownMsgCodeErr(invalidMessageCode),
 	}
 
@@ -352,10 +351,10 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 			e, err := unittest.NetworkCodec().Encode(msg)
 			require.NoError(u.T(), err)
 			// manipulate message code byte
-			e[0] = invalidMessageCode
+			e[0] = invalidMessageCode.Uint8()
 			return e, nil
 		},
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -377,19 +376,17 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	modifiedMessageCode := codec.CodeDKGMessage
 
-	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
-		Identity: nilID,
+		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "",
+		MsgType:  "*messages.DKGMessage",
 		Channel:  channels.TestNetworkChannel,
-		Protocol: message.ProtocolUnicast,
-		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
-		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
+		Protocol: message.ProtocolTypeUnicast,
+		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
 	slashingViolationsConsumer.On(
-		"OnInvalidMsgError",
+		"OnUnAuthorizedSenderError",
 		expectedViolation,
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
@@ -423,10 +420,10 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 			e, err := unittest.NetworkCodec().Encode(msg)
 			require.NoError(u.T(), err)
 			// manipulate message code byte
-			e[0] = modifiedMessageCode
+			e[0] = modifiedMessageCode.Uint8()
 			return e, nil
 		},
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -451,7 +448,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 			Text: expectedPayload,
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	overlay := mocknetwork.NewOverlay(u.T())
@@ -475,7 +472,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 			require.Equal(u.T(), testChannel, msg.Channel())                                              // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
-			require.Equal(u.T(), network.ProtocolTypeUnicast, msg.Protocol())                             // protocol
+			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
 			require.Equal(u.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
 		})
 
@@ -507,9 +504,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  "BlockProposal",
+		MsgType:  "*messages.BlockProposal",
 		Channel:  channels.ConsensusCommittee,
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedUnicastOnChannel,
 	}
 
@@ -546,7 +543,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		channel,
 		payload,
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -570,9 +567,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	expectedViolation := &slashing.Violation{
 		Identity: nil,
 		PeerID:   expectedSenderPeerID.String(),
-		MsgType:  message.TestMessage,
+		MsgType:  "*message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
-		Protocol: message.ProtocolUnicast,
+		Protocol: message.ProtocolTypeUnicast,
 		Err:      middleware.ErrUnicastMsgWithoutSub,
 	}
 
@@ -605,7 +602,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 			Text: "TestUnicastAuthorization_ReceiverHasNoSubscription",
 		},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	// send message via unicast
@@ -629,7 +626,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		channel,
 		&messages.EntityRequest{},
 		unittest.NetworkCodec().Encode,
-		network.ProtocolTypeUnicast)
+		message.ProtocolTypeUnicast)
 	require.NoError(u.T(), err)
 
 	u.senderID.Role = flow.RoleConsensus
@@ -656,7 +653,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 			require.Equal(u.T(), channel, msg.Channel())                      // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())           // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])     // target id
-			require.Equal(u.T(), network.ProtocolTypeUnicast, msg.Protocol()) // protocol
+			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol()) // protocol
 		})
 
 	u.startMiddlewares(overlay)

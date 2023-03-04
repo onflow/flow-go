@@ -3,7 +3,7 @@ package seed
 import "encoding/binary"
 
 // list of customizers used for different sub-protocol PRNGs.
-// These customizers help instanciate different PRNGs from the
+// These customizers help instantiate different PRNGs from the
 // same source of randomness.
 
 var (

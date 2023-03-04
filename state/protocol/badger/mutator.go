@@ -443,6 +443,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
+		qc := candidate.Header.QuorumCertificate()
+		err = m.qcs.StoreTx(qc)(tx)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not store qc: %w", err)
+		}
+
 		// index the latest sealed block in this fork
 		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
 		if err != nil {

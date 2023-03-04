@@ -189,36 +189,51 @@ void bn_randZr_star(bn_t x) {
     byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
+    rand_bytes(seed, seed_len); // overwrite seed
 }
 
 // generates a random number less than the order r
 void bn_randZr(bn_t x) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
     // reduce the modular reduction bias
     bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
     bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
-    bn_mod(x, x, r);
-    bn_free(r);
+    bn_mod(x, x, &core_get()->ep_r);
 }
 
-// reads a scalar from an array and maps it to Zr
-// the resulting scalar is in the range 0 < a < r
-// len must be less than BITS_TO_BYTES(RLC_BN_BITS)
+// Reads a scalar from an array and maps it to Zr.
+// The resulting scalar `a` satisfies 0 <= a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS).
+// It returns VALID if scalar is zero and INVALID otherwise
+int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
+    bn_t tmp;
+    bn_new(tmp);
+    bn_new_size(tmp, BYTES_TO_DIGITS(len));
+    bn_read_bin(tmp, bin, len);
+    bn_mod(a, tmp, &core_get()->ep_r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
+    bn_free(tmp);
+    if (bn_cmp_dig(a, 0) == RLC_EQ) {
+        return VALID;
+    }
+    return INVALID;
+}
+
+// Reads a scalar from an array and maps it to Zr*.
+// The resulting scalar `a` satisfies 0 < a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS)
 void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_t tmp;
     bn_new(tmp);
     bn_new_size(tmp, BYTES_TO_DIGITS(len));
     bn_read_bin(tmp, bin, len);
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_sub_dig(r,r,1);
-    bn_mod_basic(a,tmp,r);
+    bn_t r_1;
+    bn_new(r_1); 
+    bn_sub_dig(r_1, &core_get()->ep_r, 1);
+    bn_mod_basic(a,tmp,r_1);
     bn_add_dig(a,a,1);
-    bn_free(r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
     bn_free(tmp);
+    bn_free(r_1);
 }
 
 // returns the sign of y.

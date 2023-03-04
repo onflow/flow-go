@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -11,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type NoopCollector struct{}
@@ -214,7 +217,7 @@ func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)          
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
-func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)           {}
 func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
@@ -234,6 +237,12 @@ func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, 
 func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
 func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
 func (nc *NoopCollector) OnUnauthorizedMessage(role, msgType, topic, offense string)            {}
+func (nc *NoopCollector) ObserveHTTPRequestDuration(context.Context, httpmetrics.HTTPReqProperties, time.Duration) {
+}
+func (nc *NoopCollector) ObserveHTTPResponseSize(context.Context, httpmetrics.HTTPReqProperties, int64) {
+}
+func (nc *NoopCollector) AddInflightRequests(context.Context, httpmetrics.HTTPProperties, int) {}
+func (nc *NoopCollector) AddTotalRequests(context.Context, string, string)                     {}
 func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 }
 

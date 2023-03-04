@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -234,8 +234,7 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	_ *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
@@ -268,7 +267,7 @@ type bootstrapExecutor struct {
 	BootstrapParams
 
 	ctx      Context
-	txnState *state.TransactionState
+	txnState storage.Transaction
 
 	accountCreator environment.BootstrapAccountCreator
 }
@@ -276,7 +275,7 @@ type bootstrapExecutor struct {
 func newBootstrapExecutor(
 	params BootstrapParams,
 	ctx Context,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 ) *bootstrapExecutor {
 	return &bootstrapExecutor{
 		BootstrapParams: params,
@@ -349,9 +348,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
 
-	// set the list of nodes which are allowed to stake in this network
-	b.setStakingAllowlist(service, b.identities.NodeIDs())
-
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
 	// deploy staking proxy contract to the service account
@@ -364,6 +360,9 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployStakingCollection(service, fungibleToken, flowToken)
 
 	b.registerNodes(service, fungibleToken, flowToken)
+
+	// set the list of nodes which are allowed to stake in this network
+	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	return nil
 }
@@ -906,8 +905,11 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		return nil, err
 	}
 
-	err = Run(tx.NewExecutor(ctx, b.txnState, prog))
-	txErr, fatalErr := errors.SplitErrorTypes(err)
+	txn := &storage.SerialTransaction{
+		NestedTransaction:           b.txnState,
+		DerivedTransactionCommitter: prog,
+	}
+	err = Run(tx.NewExecutor(ctx, txn))
 
-	return txErr, fatalErr
+	return tx.Err, err
 }

@@ -524,11 +524,18 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
 			violation := &slashing.Violation{
-				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast,
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
+			}
+
+			msgCode, err := codec.MessageCodeFromPayload(msg.Payload)
+			if err != nil {
+				violation.Err = err
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
 			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
-			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			_, what, err := codec.InterfaceFromMessageCode(msgCode)
 			if err != nil {
 				violation.Err = err
 				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
@@ -595,7 +602,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	topicValidator := flowpubsub.TopicValidator(m.log, m.codec, m.slashingViolationsConsumer, peerFilter, validators...)
+	topicValidator := flowpubsub.TopicValidator(m.log, peerFilter, validators...)
 	s, err := m.libP2PNode.Subscribe(topic, topicValidator)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
@@ -618,8 +625,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 }
 
 // processPubSubMessages processes messages received from the pubsub subscription.
-func (m *Middleware) processPubSubMessages(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, peerID, network.ProtocolTypePubSub)
+func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID) {
+	m.processAuthenticatedMessage(msg, peerID, message.ProtocolTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -644,42 +651,16 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
 func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
-	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-	if codec.IsErrUnknownMsgCode(err) {
-		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{
-			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
-		}
-		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		return
-	}
-	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
-		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{
-			PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err,
-		}
-		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
-		return
-	}
-
-	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector.
-	if err != nil {
-		m.log.
-			Error().
-			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-			Str("peer_id", remotePeer.String()).
-			Str("channel", msg.ChannelID).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to decode message payload")
-		return
-	}
-
-	messageType := network.MessageType(decodedMsgPayload)
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize := unicastMaxMsgSize(messageType)
+	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
+	if err != nil {
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
+			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
+		})
+		return
+	}
 	if msg.Size() > maxSize {
 		// message size exceeded
 		m.log.Error().
@@ -694,7 +675,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, message.ProtocolUnicast)
+		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload, channel, message.ProtocolTypeUnicast)
 		if err != nil {
 			m.log.
 				Error().
@@ -706,14 +687,12 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			return
 		}
 	}
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer, network.ProtocolTypeUnicast)
+	m.processAuthenticatedMessage(msg, remotePeer, message.ProtocolTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
-// The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
-// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID, protocol network.ProtocolType) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
 	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
@@ -723,6 +702,35 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 			Str("peer_id", peerID.String()).
 			Bool(logging.KeySuspicious, true).
 			Msg("dropped message from unknown peer")
+		return
+	}
+
+	channel := channels.Channel(msg.ChannelID)
+	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+	switch {
+	case codec.IsErrUnknownMsgCode(err):
+		// slash peer if message contains unknown message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	case err != nil:
+		// this condition should never happen and indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return
 	}
 
@@ -826,6 +834,21 @@ func unicastMaxMsgSize(messageType string) int {
 	default:
 		return DefaultMaxUnicastMsgSize
 	}
+}
+
+// unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func unicastMaxMsgSizeByCode(payload []byte) (int, error) {
+	msgCode, err := codec.MessageCodeFromPayload(payload)
+	if err != nil {
+		return 0, err
+	}
+	_, messageType, err := codec.InterfaceFromMessageCode(msgCode)
+	if err != nil {
+		return 0, err
+	}
+
+	maxSize := unicastMaxMsgSize(messageType)
+	return maxSize, nil
 }
 
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
