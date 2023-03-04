@@ -316,6 +316,14 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 		require.Equal(t, p, decodedp)
 	})
 
+	t.Run("decoding_empty", func(t *testing.T) {
+		buf := make([]byte, 0)
+		encoded := ledger.EncodeAndAppendPayloadWithoutPrefix(buf, ledger.EmptyPayload(), 1)
+		decoded, err := ledger.DecodePayloadWithoutPrefix(encoded, false, 1)
+		require.NoError(t, err)
+		require.True(t, ledger.EmptyPayload().ValueEquals(decoded), decoded)
+	})
+
 	const encodedPayloadSize = 43 // size of encoded payload p without prefix (version + type)
 
 	testCases := []struct {

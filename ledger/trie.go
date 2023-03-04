@@ -62,6 +62,11 @@ func GetDefaultHashForHeight(height int) hash.Hash {
 	return defaultHashes[height]
 }
 
+// ComputeFullyExpandedLeafValue computes the value for the fully expanded leaf node
+func ComputeFullyExpandedLeafValue(path Path, payload *Payload) hash.Hash {
+	return ComputeCompactValue(hash.Hash(path), payload.Value(), 0)
+}
+
 // ComputeCompactValue computes the value for the node considering the sub tree
 // to only include this value and default values. It writes the hash result to the result input.
 // UNCHECKED: payload!= nil
@@ -494,11 +499,13 @@ func NewTrieBatchProof() *TrieBatchProof {
 
 // NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
 // filled with n newly created proofs (empty)
-func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
+func NewTrieBatchProofWithEmptyProofs(paths []Path) *TrieBatchProof {
 	bp := new(TrieBatchProof)
-	bp.Proofs = make([]*TrieProof, numberOfProofs)
-	for i := 0; i < numberOfProofs; i++ {
-		bp.Proofs[i] = NewTrieProof()
+	bp.Proofs = make([]*TrieProof, len(paths))
+	for i := 0; i < len(paths); i++ {
+		proof := NewTrieProof()
+		proof.Path = paths[i]
+		bp.Proofs[i] = proof
 	}
 	return bp
 }

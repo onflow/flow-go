@@ -23,7 +23,8 @@ func TestBootstrapLedger(t *testing.T) {
 
 		metricsCollector := &metrics.NoopCollector{}
 		wal := &fixtures.NoopWAL{}
-		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
+		payloadStorage := unittest.CreateMockPayloadStore()
+		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion, payloadStorage)
 		require.NoError(t, err)
 		compactor := fixtures.NewNoopCompactor(ls)
 		<-compactor.Ready()
@@ -63,7 +64,8 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 
 		metricsCollector := &metrics.NoopCollector{}
 		wal := &fixtures.NoopWAL{}
-		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
+		payloadStorage := unittest.CreateMockPayloadStore()
+		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion, payloadStorage)
 		require.NoError(t, err)
 		compactor := fixtures.NewNoopCompactor(ls)
 		<-compactor.Ready()

@@ -90,7 +90,8 @@ func TestExtractExecutionState(t *testing.T) {
 
 			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), execdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 			require.NoError(t, err)
-			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
+			payloadStorage := unittest.CreateMockPayloadStore()
+			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion, payloadStorage)
 			require.NoError(t, err)
 			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 			require.NoError(t, err)
@@ -161,7 +162,8 @@ func TestExtractExecutionState(t *testing.T) {
 					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 					require.NoError(t, err)
 
-					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
+					payloadStorage := unittest.CreateMockPayloadStore()
+					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion, payloadStorage)
 					require.NoError(t, err)
 
 					const (

@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	ledgerstorage "github.com/onflow/flow-go/ledger/storage"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -668,8 +669,9 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
+	payloadStorage := ledgerstorage.CreatePayloadStorage()
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
-		"ledger").Logger(), ledger.DefaultPathFinderVersion)
+		"ledger").Logger(), ledger.DefaultPathFinderVersion, payloadStorage)
 	return exeNode.ledgerStorage, err
 }
 

@@ -33,7 +33,9 @@ func (w *NoopWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, error) { r
 
 func (w *NoopWAL) RecordDelete(rootHash ledger.RootHash) error { return nil }
 
-func (w *NoopWAL) ReplayOnForest(forest *mtrie.Forest) error { return nil }
+func (w *NoopWAL) ReplayOnForest(forest *mtrie.Forest, payloadStorage ledger.PayloadStorage) error {
+	return nil
+}
 
 func (w *NoopWAL) Segments() (first, last int, err error) { return 0, 0, nil }
 

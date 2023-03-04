@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -126,13 +125,10 @@ func TestTrieQueueWithInitialValues(t *testing.T) {
 }
 
 func randomMTrie() (*trie.MTrie, error) {
-	var randomPath ledger.Path
-	rand.Read(randomPath[:])
-
 	var randomHashValue hash.Hash
 	rand.Read(randomHashValue[:])
 
-	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
+	root := node.NewNode(256, nil, nil, randomHashValue, randomHashValue)
 
 	return trie.NewMTrie(root, 1, 1)
 }

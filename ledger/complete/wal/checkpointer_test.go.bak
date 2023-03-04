@@ -399,7 +399,8 @@ func Test_Checkpointing(t *testing.T) {
 			_, err = checkpointer.LoadCheckpoint(4)
 			require.NoError(t, err)
 
-			err = wal6.ReplayOnForest(f6)
+			store := unittest.CreateMockPayloadStore()
+			err = wal6.ReplayOnForest(f6, store)
 			require.NoError(t, err)
 
 			<-wal6.Done()
@@ -410,10 +411,10 @@ func Test_Checkpointing(t *testing.T) {
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
-			values, err := f.Read(trieRead)
+			values, err := f.Read(trieRead, store)
 			require.NoError(t, err)
 
-			values6, err := f6.Read(trieRead)
+			values6, err := f6.Read(trieRead, store)
 			require.NoError(t, err)
 
 			for i := range keys2 {
