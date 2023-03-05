@@ -257,7 +257,7 @@ func readLeafNodeFromCheckpointSubtrie(dir string, fileName string, index int, c
 		if node.IsLeaf() {
 			leafNodes = append(leafNodes,
 				&ledger.LeafNode{
-					Hash:    node.Hash(),
+					Hash:    node.ExpandedLeafHash(),
 					Path:    path,
 					Payload: *payload,
 				})
