@@ -293,7 +293,7 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 			Msg("chunk data pack query takes longer than expected timeout")
 	}
 
-	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
+	_, err = e.ensureAuthorized(request.RequesterId)
 	if err != nil {
 		lg.Error().
 			Err(err).
@@ -346,21 +346,8 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	lg.Info().Msg("chunk data pack request successfully replied")
 }
 
-func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
-	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
-	}
-
-	authorizedAt, err := e.checkAuthorizedAtBlock(blockID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
-	}
-	if !authorizedAt {
-		return nil, engine.NewInvalidInputErrorf("this node is not authorized at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
-	}
-
-	origin, err := e.state.AtBlockID(blockID).Identity(originID)
+func (e *Engine) ensureAuthorized(originID flow.Identifier) (*flow.Identity, error) {
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
 	}
@@ -371,7 +358,7 @@ func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identif
 	}
 
 	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
+		return nil, engine.NewInvalidInputErrorf("node %s has zero weight requesting chunk data pack (%s)", originID)
 	}
 	return origin, nil
 }

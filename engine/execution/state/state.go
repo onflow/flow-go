@@ -36,8 +36,6 @@ type ReadOnlyExecutionState interface {
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
-
-	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -333,10 +331,6 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
 	return nil
-}
-
-func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
-	return s.headers.IDByChunkID(chunkID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {

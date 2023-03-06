@@ -61,7 +61,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
-		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -121,7 +120,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithWeight(0)), nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
-		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -180,7 +178,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
-		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -304,7 +301,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			}).
 			Return(nil)
 
-		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 		execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -362,7 +358,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		blockID := unittest.IdentifierFixture()
 
-		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
 
