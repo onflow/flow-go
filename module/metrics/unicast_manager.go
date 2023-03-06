@@ -57,7 +57,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "attempts_to_dial_peer_total",
-			Help:      "number of retry attempts before a peer is dialed successfully",
+			Help:      "number of retry attempts before a connection is established successfully",
 			Buckets:   []float64{1, 2, 3},
 		}, []string{LabelSuccess},
 	)
