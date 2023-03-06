@@ -9,6 +9,7 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -41,8 +42,7 @@ func Run(executor ProcedureExecutor) error {
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
-		txnState *state.TransactionState,
-		derivedTxnData *derived.DerivedTransactionData,
+		txnState storage.Transaction,
 	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
@@ -93,7 +93,7 @@ func (vm *VirtualMachine) Run(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var derivedTxnData *derived.DerivedTransactionData
+	var derivedTxnData derived.DerivedTransactionCommitter
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
@@ -112,14 +112,19 @@ func (vm *VirtualMachine) Run(
 		return fmt.Errorf("error creating derived transaction data: %w", err)
 	}
 
-	txnState := state.NewTransactionState(
+	nestedTxn := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
-	err = Run(proc.NewExecutor(ctx, txnState, derivedTxnData))
+	txnState := &storage.SerialTransaction{
+		NestedTransaction:           nestedTxn,
+		DerivedTransactionCommitter: derivedTxnData,
+	}
+
+	err = Run(proc.NewExecutor(ctx, txnState))
 	if err != nil {
 		return err
 	}
@@ -130,7 +135,7 @@ func (vm *VirtualMachine) Run(
 	if proc.Type() == TransactionProcedureType {
 		// NOTE: It is not safe to ignore derivedTxnData' commit error for
 		// transactions that trigger derived data invalidation.
-		return derivedTxnData.Commit()
+		return txnState.Commit()
 	}
 
 	return nil
@@ -145,7 +150,7 @@ func (vm *VirtualMachine) GetAccount(
 	*flow.Account,
 	error,
 ) {
-	txnState := state.NewTransactionState(
+	nestedTxn := state.NewTransactionState(
 		v,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -159,7 +164,7 @@ func (vm *VirtualMachine) GetAccount(
 		derivedBlockData = derived.NewEmptyDerivedBlockData()
 	}
 
-	derviedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
 		derived.EndOfBlockExecutionTime,
 		derived.EndOfBlockExecutionTime)
 	if err != nil {
@@ -168,12 +173,16 @@ func (vm *VirtualMachine) GetAccount(
 			err)
 	}
 
-	env := environment.NewScriptEnvironment(
+	txnState := &storage.SerialTransaction{
+		NestedTransaction:           nestedTxn,
+		DerivedTransactionCommitter: derivedTxnData,
+	}
+
+	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
-		txnState,
-		derviedTxnData)
+		txnState)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsLedgerFailure(err) {

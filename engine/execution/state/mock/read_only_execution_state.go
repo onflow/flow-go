@@ -115,52 +115,6 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context)
 	return r0, r1, r2
 }
 
-// GetProof provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetProof(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []byte); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([][]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) [][]byte); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // HasState provides a mock function with given fields: _a0
 func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
 	ret := _m.Called(_a0)

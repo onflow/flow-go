@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -75,10 +75,9 @@ func NewScriptWithContextAndArgs(
 
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) ProcedureExecutor {
-	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
+	return newScriptExecutor(ctx, proc, txnState)
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -118,10 +117,9 @@ func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
 }
 
 type scriptExecutor struct {
-	ctx            Context
-	proc           *ScriptProcedure
-	txnState       *state.TransactionState
-	derivedTxnData *derived.DerivedTransactionData
+	ctx      Context
+	proc     *ScriptProcedure
+	txnState storage.Transaction
 
 	env environment.Environment
 }
@@ -129,20 +127,17 @@ type scriptExecutor struct {
 func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) *scriptExecutor {
 	return &scriptExecutor{
-		ctx:            ctx,
-		proc:           proc,
-		txnState:       txnState,
-		derivedTxnData: derivedTxnData,
-		env: environment.NewScriptEnvironment(
+		ctx:      ctx,
+		proc:     proc,
+		txnState: txnState,
+		env: environment.NewScriptEnv(
 			proc.RequestContext,
 			ctx.TracerSpan,
 			ctx.EnvironmentParams,
-			txnState,
-			derivedTxnData),
+			txnState),
 	}
 }
 
@@ -179,8 +174,7 @@ func (executor *scriptExecutor) execute() error {
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
-		executor.txnState,
-		executor.derivedTxnData)
+		executor.txnState)
 	if err != nil {
 		return fmt.Errorf("error getting meter parameters: %w", err)
 	}
@@ -221,6 +215,6 @@ func (executor *scriptExecutor) execute() error {
 	}
 	executor.proc.MemoryEstimate = memoryUsed
 
-	_, err = executor.txnState.Commit(txnId)
+	_, err = executor.txnState.CommitNestedTransaction(txnId)
 	return err
 }
