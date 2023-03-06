@@ -1,34 +1,21 @@
 package utils
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(patrick): combine this with storage.testutils.TestStorageSnapshot
-// once #3962 is merged.
-type MapStorageSnapshot map[flow.RegisterID]flow.RegisterValue
-
-func (storage MapStorageSnapshot) Get(
-	id flow.RegisterID,
-) (
-	flow.RegisterValue,
-	error,
-) {
-	return storage[id], nil
-}
-
 // NewStorageSnapshotFromPayload returns an instance of StorageSnapshot with
 // entries loaded from payloads (should only be used for migration)
 func NewStorageSnapshotFromPayload(
 	payloads []ledger.Payload,
-) MapStorageSnapshot {
-	snapshot := make(MapStorageSnapshot, len(payloads))
+) state.MapStorageSnapshot {
+	snapshot := make(state.MapStorageSnapshot, len(payloads))
 	for _, entry := range payloads {
 		key, err := entry.Key()
 		if err != nil {
@@ -57,12 +44,6 @@ type SimpleView struct {
 	base state.View
 }
 
-func NewSimpleView() *SimpleView {
-	return &SimpleView{
-		base: delta.NewDeltaView(nil),
-	}
-}
-
 func NewSimpleViewFromPayloads(payloads []ledger.Payload) *SimpleView {
 	return &SimpleView{
 		base: delta.NewDeltaView(NewStorageSnapshotFromPayload(payloads)),
@@ -75,20 +56,22 @@ func (view *SimpleView) NewChild() state.View {
 	}
 }
 
-func (view *SimpleView) MergeView(o state.View) error {
-	other, ok := o.(*SimpleView)
-	if !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
-	}
-
-	return view.base.MergeView(other.base)
+func (view *SimpleView) Merge(other state.ExecutionSnapshot) error {
+	return view.base.Merge(other)
 }
 
-func (view *SimpleView) DropDelta() {
+func (view *SimpleView) SpockSecret() []byte {
+	return nil
+}
+
+func (view *SimpleView) Meter() *meter.Meter {
+	return nil
+}
+
+func (view *SimpleView) DropChanges() error {
 	view.Lock()
 	defer view.Unlock()
-
-	view.base.DropDelta()
+	return view.base.DropChanges()
 }
 
 func (view *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {

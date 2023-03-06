@@ -53,8 +53,9 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.Address(spec.AddressFromChain(sys.chain)),
-		Name:    spec.LocationName,
+		Address: common.MustBytesToAddress(
+			spec.AddressFromChain(sys.chain).Bytes()),
+		Name: spec.LocationName,
 	}
 
 	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
@@ -168,7 +169,7 @@ var setupNewAccountSpec = ContractFunctionSpec{
 // account.
 func (sys *SystemContracts) SetupNewAccount(
 	flowAddress flow.Address,
-	payer common.Address,
+	payer flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		setupNewAccountSpec,
@@ -191,7 +192,7 @@ var accountAvailableBalanceSpec = ContractFunctionSpec{
 // AccountAvailableBalance executes the get available balance contract on the
 // storage fees contract.
 func (sys *SystemContracts) AccountAvailableBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountAvailableBalanceSpec,
@@ -213,7 +214,7 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 // AccountBalance executes the get available balance contract on the service
 // account.
 func (sys *SystemContracts) AccountBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountBalanceInvocationSpec,
@@ -235,7 +236,7 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 // AccountStorageCapacity executes the get storage capacity contract on the
 // service account.
 func (sys *SystemContracts) AccountStorageCapacity(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountStorageCapacitySpec,
@@ -247,8 +248,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
-	addresses []common.Address,
-	payer common.Address,
+	addresses []flow.Address,
+	payer flow.Address,
 	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))

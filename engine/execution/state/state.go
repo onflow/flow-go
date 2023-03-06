@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -22,21 +21,8 @@ import (
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
-	// NewStorageSnapshot creates a new ready-only view at the given state
-	// commitment.
+	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
 	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
-
-	GetRegisters(
-		context.Context,
-		flow.StateCommitment,
-		[]flow.RegisterID,
-	) ([]flow.RegisterValue, error)
-
-	GetProof(
-		context.Context,
-		flow.StateCommitment,
-		[]flow.RegisterID,
-	) (flow.StorageProof, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -67,7 +53,6 @@ type ExecutionState interface {
 	SaveExecutionResults(
 		ctx context.Context,
 		result *execution.ComputationResult,
-		executionReceipt *flow.ExecutionReceipt,
 	) error
 }
 
@@ -140,16 +125,6 @@ func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
 		RegisterIDToKey(id),
 	)
-}
-
-func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
-
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
-	}
-
-	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
 func RegisterEntriesToKeysValues(
@@ -249,66 +224,6 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	return flow.StateCommitment(commit), trieUpdate, nil
 }
 
-func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
-
-	query, err := makeQuery(commit, registerIDs)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
-	}
-
-	values, err := s.ls.Get(query)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot query ledger: %w", err)
-	}
-
-	return query, values, err
-}
-
-func (s *state) GetRegisters(
-	ctx context.Context,
-	commit flow.StateCommitment,
-	registerIDs []flow.RegisterID,
-) ([]flow.RegisterValue, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-	defer span.End()
-
-	_, values, err := s.getRegisters(commit, registerIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	registerValues := make([]flow.RegisterValue, len(values))
-	for i, v := range values {
-		registerValues[i] = v
-	}
-
-	return registerValues, nil
-}
-
-func (s *state) GetProof(
-	ctx context.Context,
-	commit flow.StateCommitment,
-	registerIDs []flow.RegisterID,
-) (flow.StorageProof, error) {
-
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
-	defer span.End()
-
-	query, err := makeQuery(commit, registerIDs)
-
-	if err != nil {
-		return nil, fmt.Errorf("cannot create ledger query: %w", err)
-	}
-
-	// Get proofs in an arbitrary order, not correlated to the register ID order in the query.
-	proof, err := s.ls.Prove(query)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get proof: %w", err)
-	}
-	return proof, nil
-}
-
 func (s *state) HasState(commitment flow.StateCommitment) bool {
 	return s.ls.HasState(ledger.State(commitment))
 }
@@ -340,11 +255,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
-	executionReceipt *flow.ExecutionReceipt,
 ) error {
-	spew.Config.DisableMethods = true
-	spew.Config.DisablePointerMethods = true
-
 	span, childCtx := s.tracer.StartSpanFromContext(
 		ctx,
 		trace.EXEStateSaveExecutionResults)
@@ -395,7 +306,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
-	executionResult := &executionReceipt.ExecutionResult
+	executionResult := &result.ExecutionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)
@@ -406,7 +317,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
-	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
