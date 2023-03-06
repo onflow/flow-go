@@ -162,7 +162,6 @@ func (t *GossipSubMeshTracer) logPeers() {
 					Str("flow_id", "unknown").
 					Str("role", "unknown").
 					Logger()
-
 				continue
 			}
 
