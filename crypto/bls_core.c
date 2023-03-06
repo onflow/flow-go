@@ -19,15 +19,6 @@ int get_sk_len() {
     return SK_LEN;
 }
 
-// checks an input scalar a satisfies 0 < a < r
-// where (r) is the order of G1/G2
-int check_membership_Zr_star(const bn_t a){
-    if (bn_cmp(a, &core_get()->ep_r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) {
-        return INVALID; 
-    }
-    return VALID;
-}
-
 // Checks if input point p is in the subgroup G1. 
 // The function assumes the input is known to be on the curve E1.
 int check_membership_G1(const ep_t p){
@@ -68,9 +59,10 @@ int check_membership_G2(const ep2_t p){
 }
 
 // Computes a BLS signature from a G1 point 
-static void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
+static void bls_sign_ep(byte* s, const Fr* sk, const ep_t h) {
     ep_t p;
     ep_new(p);
+
     // s = h^sk
     ep_mult(p, h, sk);
     ep_write_bin_compact(s, p, SIGNATURE_LEN);
@@ -78,7 +70,7 @@ static void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
 }
 
 // Computes a BLS signature from a hash
-void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
+void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
     ep_t h;
     ep_new(h);
     // hash to G1
@@ -92,8 +84,7 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
 // and a message data.
 // The signature and public key are assumed to be in G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const int len) { 
-    
+static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const int len) {     
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -108,7 +99,7 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], (ep2_st*)pk);
+    ep2_copy(elemsG2[1], (ep2_st*)pk); 
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
@@ -341,12 +332,14 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     
     // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
+    if (read_ret != RLC_OK) {
         return read_ret;
+    }
 
     // check s is in G1
-    if (check_membership_G1(s) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+    if (check_membership_G1(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
+    }
     
     return bls_verify_ep(pk, s, data, len);
 }

@@ -409,14 +409,11 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	signers := make([]index, 0, len(s.shares))
 	for index, share := range s.shares {
 		shares = append(shares, share...)
-		signers = append(signers, index)
+		signers = append(signers, index+1)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
-
 	// Lagrange Interpolate at point 0
-	result := C.G1_lagrangeInterpolateAtZero(
+	result := C.G1_lagrangeInterpolateAtZero_serialized(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
 		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
@@ -456,8 +453,6 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 // are considered to reconstruct the signature.
 func BLSReconstructThresholdSignature(size int, threshold int,
 	shares []Signature, signers []int) (Signature, error) {
-	// set BLS settings
-	blsInstance.reInit()
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, invalidInputsErrorf(
@@ -501,12 +496,12 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 				"%d is a duplicate signer", index(signers[i]))
 		}
 		m[index(signers[i])] = true
-		indexSigners = append(indexSigners, index(signers[i]))
+		indexSigners = append(indexSigners, index(signers[i])+1)
 	}
 
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero(
+	if C.G1_lagrangeInterpolateAtZero_serialized(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
@@ -558,9 +553,6 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 			threshold)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
-
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
 	y := make([]pointG2, size)
@@ -570,21 +562,27 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	if err := seedRelic(seed); err != nil {
 		return nil, nil, nil, fmt.Errorf("seeding relic failed: %w", err)
 	}
-	// Generate a polynomial P in Zr[X] of degree t
+	// Generate a polynomial P in Fr[X] of degree t
 	a := make([]scalar, threshold+1)
-	randZrStar(&a[0]) // non-identity key
+	if err := randFrStar(&a[0]); err != nil { // non-identity key
+		return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+	}
 	if threshold > 0 {
 		for i := 1; i < threshold; i++ {
-			randZr(&a[i])
+			if err := randFr(&a[i]); err != nil {
+				return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+			}
 		}
-		randZrStar(&a[threshold]) // enforce the polynomial degree
+		if err := randFrStar(&a[threshold]); err != nil { // enforce the polynomial degree
+			return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+		}
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
-		C.Zr_polynomialImage(
-			(*C.bn_st)(&x[i-1]),
+		C.Fr_polynomialImage(
+			(*C.Fr)(&x[i-1]),
 			(*C.ep2_st)(&y[i-1]),
-			(*C.bn_st)(&a[0]), (C.int)(len(a)),
+			(*C.Fr)(&a[0]), (C.int)(len(a)),
 			(C.uint8_t)(i),
 		)
 	}

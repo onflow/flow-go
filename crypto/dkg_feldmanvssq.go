@@ -27,7 +27,7 @@ import (
 // a complaint answer. The protocol ends with all honest participants
 // reaching a consensus about the dealer qualification/disqualification.
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Fr, where r is the group order of G1/G2
 // Public keys are in G2.
 
 // feldman VSS protocol, with complaint mechanism, implements DKGState
@@ -402,13 +402,11 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		return
 	}
 	// read the participant private share
-	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
-		(*C.uchar)(&data[0]),
-		PrKeyLenBLSBLS12381,
-	) != valid {
+	err := readScalarFrStar(&s.x, data)
+	if err != nil {
 		s.buildAndBroadcastComplaint()
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("invalid share value %x", data))
+			fmt.Sprintf("invalid share value %x: %s", data, err))
 		return
 	}
 
@@ -497,7 +495,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 	data := make([]byte, complaintAnswerSize+1)
 	data[0] = byte(feldmanVSSComplaintAnswer)
 	data[1] = byte(complainee)
-	zrPolynomialImage(data[2:], s.a, complainee+1, nil)
+	frPolynomialImage(data[2:], s.a, complainee+1, nil)
 	s.complaints[complainee].answerReceived = true
 	s.processor.Broadcast(data)
 }
@@ -507,7 +505,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 // - true if the complaint answer is not correct
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
-	return C.verifyshare((*C.bn_st)(&c.answer),
+	return C.verifyshare((*C.Fr)(&c.answer),
 		(*C.ep2_st)(&s.y[complainer])) == 0
 }
 
@@ -624,14 +622,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
-		C.bn_new_wrapper((*C.bn_st)(&s.complaints[complainer].answer))
-		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&s.complaints[complainer].answer, data[1:])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		return
@@ -648,14 +643,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		C.bn_new_wrapper((*C.bn_st)(&c.answer))
-		if C.bn_read_Zr_bin((*C.bn_st)(&c.answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&c.answer, data[1:])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		if s.vAReceived {

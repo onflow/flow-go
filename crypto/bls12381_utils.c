@@ -19,8 +19,246 @@ int get_invalid() {
     return INVALID;
 }
 
-void bn_new_wrapper(bn_t a) {
-    bn_new(a);
+int get_Fr_BYTES() {
+    return Fr_BYTES;
+}
+
+// Fr utilities
+// Montgomery constant R related to the curve order r
+const limb_t BLS12_381_rR[Fr_LIMBS] = {  /* (1<<256)%r */
+    TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5),
+    TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
+};
+
+// TODO: temp utility function to delete
+bn_st* Fr_blst_to_relic(const Fr* x) {
+    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
+    byte* data = (byte*)malloc(Fr_BYTES);
+    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
+    out->alloc = RLC_DV_DIGS;
+    bn_read_bin(out, data, Fr_BYTES);
+    free(data);
+    return out;
+}
+
+// returns true if a == 0 and false otherwise
+bool_t Fr_is_zero(const Fr* a) {
+    return bytes_are_zero((const byte*)a, Fr_BYTES);
+}
+
+// returns true if a == b and false otherwise
+bool_t Fr_is_equal(const Fr* a, const Fr* b) {
+    return vec_is_equal(a, b, Fr_BYTES);
+}
+
+// sets `a` to limb `l`
+void Fr_set_limb(Fr* a, const limb_t l){
+    vec_zero((byte*)a + sizeof(limb_t), Fr_BYTES - sizeof(limb_t));
+    *((limb_t*)a) = l;
+}
+
+void Fr_copy(Fr* res, const Fr* a) {
+    vec_copy((byte*)res, (byte*)a, Fr_BYTES);
+}
+
+// sets `a` to 0
+void Fr_set_zero(Fr* a){
+    vec_zero((byte*)a, Fr_BYTES);
+}
+
+void Fr_add(Fr *res, const Fr *a, const Fr *b) {
+    add_mod_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r);
+}
+
+void Fr_sub(Fr *res, const Fr *a, const Fr *b) {
+    sub_mod_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r);
+}
+
+void Fr_neg(Fr *res, const Fr *a) {
+    cneg_mod_256((limb_t*)res, (limb_t*)a, 1, BLS12_381_r);
+}
+
+// res = a*b*R^(-1)
+void Fr_mul_montg(Fr *res, const Fr *a, const Fr *b) {
+    mul_mont_sparse_256((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_r, r0);
+}
+
+// res = a^2 * R^(-1)
+void Fr_squ_montg(Fr *res, const Fr *a) {
+    sqr_mont_sparse_256((limb_t*)res, (limb_t*)a, BLS12_381_r, r0);
+}
+
+// res = a*R
+void Fr_to_montg(Fr *res, const Fr *a) {
+    mul_mont_sparse_256((limb_t*)res, (limb_t*)a, BLS12_381_rRR, BLS12_381_r, r0);
+}
+
+// res = a*R^(-1)
+void Fr_from_montg(Fr *res, const Fr *a) {
+    from_mont_256((limb_t*)res, (limb_t*)a, BLS12_381_r, r0);
+}
+
+// res = a^(-1)*R
+void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
+    // copied and modified from BLST code
+    // Copyright Supranational LLC
+    static const vec256 rx2 =   { /* left-aligned value of the modulus */
+        TO_LIMB_T(0xfffffffe00000002), TO_LIMB_T(0xa77b4805fffcb7fd),
+        TO_LIMB_T(0x6673b0101343b00a), TO_LIMB_T(0xe7db4ea6533afa90),
+    };
+    vec512 temp;
+    ct_inverse_mod_256(temp, (limb_t*)a, BLS12_381_r, rx2);
+    redc_mont_256((limb_t*)res, temp, BLS12_381_r, r0);
+}
+
+// result is in Montgomery form if base is in montgomery form
+// if base = b*R, res = b^expo * R
+// In general, res = base^expo * R^(-expo+1)
+// `expo` is encoded as a little-endian limb_t table of length `expo_len`.
+void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
+    // mask of the most significant bit
+	const limb_t msb_mask =  (limb_t)1<<((sizeof(limb_t)<<3)-1);
+	limb_t mask = msb_mask;
+	int index = 0;
+
+    expo += expo_len;
+	// Treat most significant zero limbs
+	while((index < expo_len) && (*(--expo) == 0)) {
+		index++;
+    }
+	// Treat the most significant zero bits
+	while((*expo & mask) == 0) {
+		mask >>= 1;
+    }
+	// Treat the first `1` bit
+	Fr_copy(res, base);
+	mask >>= 1;
+	// Scan all limbs of the exponent
+	for ( ; index < expo_len; expo--) {
+		// Scan all bits 
+		for ( ; mask != 0 ; mask >>= 1 ) {
+			// square
+			Fr_squ_montg(res, res);
+			// multiply
+			if (*expo & mask) {
+				Fr_mul_montg(res, res ,base);
+			}
+		}
+		mask = msb_mask;
+        index++;
+	}
+}
+
+void Fr_inv_exp_montg(Fr *res, const Fr *a) {
+    Fr r_2;
+    Fr_copy(&r_2, (Fr*)BLS12_381_r);
+    r_2.limbs[0] -= 2;
+    Fr_exp_montg(res, a, (limb_t*)&r_2, 4);
+}
+
+// computes the sum of the array elements and writes the sum in jointx
+void Fr_sum_vector(Fr* jointx, const Fr x[], const int len) {
+    Fr_set_zero(jointx);
+    for (int i=0; i<len; i++) {
+        Fr_add(jointx, jointx, &x[i]);
+    }
+}
+
+// internal type of BLST `pow256` uses bytes little endian.
+// input is bytes big endian as used by Flow crypto lib external scalars.
+static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
+{
+    unsigned char* b = (unsigned char*)a + Fr_BYTES - 1;
+    if ((uptr_t)ret == (uptr_t)a) { // swap in place
+        for (int i=0; i<Fr_BYTES/2; i++) {
+            unsigned char tmp = *ret;
+            *(ret++) = *b;
+            *(b--) = tmp;
+        }
+        return;
+    }
+    for (int i=0; i<Fr_BYTES; i++) {
+        *(ret++) = *(b--);
+    }
+}
+
+// reads a scalar in `a` and checks it is a valid Fr element (a < r).
+// input bytes are big endian.
+// returns:
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr
+//    - v if the scalar is valid 
+BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    if (len != Fr_BYTES) {
+        return BLST_BAD_ENCODING;
+    }
+    pow256 tmp;
+    pow256_from_be_bytes(tmp, bin);
+    if (!check_mod_256(tmp, BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
+        return BLST_BAD_SCALAR;
+    }
+    vec_zero(tmp, Fr_BYTES);
+    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
+    return BLST_SUCCESS;
+}
+
+// reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
+// input bytes are big endian.
+// returns:
+//    - BLST_BAD_ENCODING if the length is invalid
+//    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
+//    - BLST_SUCCESS if the scalar is valid 
+BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
+    int ret = Fr_read_bytes(a, bin, len);
+    if (ret != BLST_SUCCESS) {
+        return ret;
+    }
+    // check if a=0
+    if (Fr_is_zero(a)) {
+        return BLST_BAD_SCALAR;
+    }
+    return BLST_SUCCESS;
+}
+
+// write Fr element `a` in big endian bytes.
+void Fr_write_bytes(uint8_t *bin, const Fr* a) {
+    be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
+}
+
+// maps big-endian bytes into an Fr element using modular reduction
+// output is vec256 (also used as Fr)
+static void 
+vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
+{
+    Fr digit, radix;
+    Fr_set_zero(out);
+    Fr_copy(&radix, (Fr*)BLS12_381_rRR); // R^2
+
+    bytes += n;
+    while (n > Fr_BYTES) {
+        limbs_from_be_bytes((limb_t*)&digit, bytes -= Fr_BYTES, Fr_BYTES); // l_i
+        Fr_mul_montg(&digit, &digit, &radix); // l_i * R^i  (i is the loop number starting at 1)
+        Fr_add(out, out, &digit);
+        Fr_mul_montg(&radix, &radix, (Fr*)BLS12_381_rRR); // R^(i+1)
+        n -= Fr_BYTES;
+    }
+    Fr_set_zero(&digit);
+    limbs_from_be_bytes((limb_t*)&digit, bytes -= n, n);
+    Fr_mul_montg(&digit, &digit, &radix);
+    Fr_add(out, out, &digit);
+    // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n
+    // reduce the extra R
+    Fr_from_montg(out, out);
+    // clean up possible sensitive data
+    Fr_set_zero(&digit);
+}
+
+// Reads a scalar from an array and maps it to Fr.
+// It returns true if scalar is zero and false otherwise.
+bool map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+    vec256_from_be_bytes(a, bin, len);
+    //Fr_set_limb(a, 1); TODO: delete
+    return Fr_is_zero(a);
 }
 
 // global variable of the pre-computed data
@@ -29,12 +267,12 @@ prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
 #if (hashToPoint == LOCAL_SSWU)
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
+extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_LIMBS];
+extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_LIMBS];
 #endif
 
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
-extern const uint64_t beta_data[Fp_DIGITS];
+extern const uint64_t beta_data[Fp_LIMBS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
 
@@ -45,7 +283,7 @@ void precomputed_data_set(const prec_st* p) {
 
 // Reads a prime field element from a digit vector in big endian format.
 // There is no conversion to Montgomery domain in this function.
- #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_DIGITS)
+ #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
 
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
@@ -72,7 +310,7 @@ prec_st* init_precomputed_data_BLS12_381() {
 
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_new(&bls_prec->beta);
-    bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
+    bn_read_raw(&bls_prec->beta, beta_data, Fp_LIMBS);
     bn_new(&bls_prec->z2_1_by3);
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
@@ -120,33 +358,41 @@ void seed_relic(byte* seed, int len) {
 }
 
 // Exponentiation of a generic point p in G1
-void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
+void ep_mult(ep_t res, const ep_t p, const Fr *expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2 
-    ep_mul_lwnaf(res, p, expo);
+    ep_mul_lwnaf(res, p, tmp_expo);
+    free(tmp_expo);
 }
 
 // Exponentiation of generator g1 in G1
 // These two function are here for bench purposes only
-void ep_mult_gen_bench(ep_t res, const bn_t expo) {
+void ep_mult_gen_bench(ep_t res, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
-    ep_mul_gen(res, (bn_st *)expo);
+    ep_mul_gen(res, tmp_expo);
+    free(tmp_expo);
 }
 
-void ep_mult_generic_bench(ep_t res, const bn_t expo) {
+void ep_mult_generic_bench(ep_t res, const Fr* expo) {
     // generic point multiplication
     ep_mult(res, &core_get()->ep_g, expo);
 }
 
 // Exponentiation of a generic point p in G2
-void ep2_mult(ep2_t res, ep2_t p, bn_t expo) {
+void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2
-    ep2_mul_lwnaf(res, p, expo);
+    ep2_mul_lwnaf(res, p, tmp_expo);
+    free(tmp_expo);
 }
 
-// Exponentiation of fixed g2 in G2
-void ep2_mult_gen(ep2_t res, const bn_t expo) {
+// Exponentiation of generator g2 in G2
+void ep2_mult_gen(ep2_t res, const Fr* expo) {
+    bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
-    g2_mul_gen(res, (bn_st*)expo);
+    g2_mul_gen(res, tmp_expo);
+    free(tmp_expo);
 }
 
 // DEBUG printing functions 
@@ -157,7 +403,15 @@ void bytes_print_(char* s, byte* data, int len) {
     printf("\n");
 }
 
-// DEBUG printing functions 
+void Fr_print_(char* s, Fr* a) {
+    printf("[%s]:\n", s);
+    limb_t* p = (limb_t*)(a) + Fr_LIMBS;
+    for (int i=0; i<Fr_LIMBS; i++) 
+        printf("%16llx", *(--p));
+    printf("\n");
+}
+ 
+
 void fp_print_(char* s, fp_st a) {
     char* str = malloc(sizeof(char) * fp_size_str(a, 16));
     fp_write_str(str, 100, a, 16);
@@ -180,60 +434,6 @@ void ep_print_(char* s, ep_st* p) {
 void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
-}
-
-// generates a random number less than the order r
-void bn_randZr_star(bn_t x) {
-    // reduce the modular reduction bias
-    const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
-    byte seed[seed_len];
-    rand_bytes(seed, seed_len);
-    bn_map_to_Zr_star(x, seed, seed_len);
-    rand_bytes(seed, seed_len); // overwrite seed
-}
-
-// generates a random number less than the order r
-void bn_randZr(bn_t x) {
-    // reduce the modular reduction bias
-    bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
-    bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
-    bn_mod(x, x, &core_get()->ep_r);
-}
-
-// Reads a scalar from an array and maps it to Zr.
-// The resulting scalar `a` satisfies 0 <= a < r.
-// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS).
-// It returns VALID if scalar is zero and INVALID otherwise
-int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
-    bn_t tmp;
-    bn_new(tmp);
-    bn_new_size(tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(tmp, bin, len);
-    bn_mod(a, tmp, &core_get()->ep_r);
-    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
-    bn_free(tmp);
-    if (bn_cmp_dig(a, 0) == RLC_EQ) {
-        return VALID;
-    }
-    return INVALID;
-}
-
-// Reads a scalar from an array and maps it to Zr*.
-// The resulting scalar `a` satisfies 0 < a < r.
-// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS)
-void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
-    bn_t tmp;
-    bn_new(tmp);
-    bn_new_size(tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(tmp, bin, len);
-    bn_t r_1;
-    bn_new(r_1); 
-    bn_sub_dig(r_1, &core_get()->ep_r, 1);
-    bn_mod_basic(a,tmp,r_1);
-    bn_add_dig(a,a,1);
-    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
-    bn_free(tmp);
-    bn_free(r_1);
 }
 
 // returns the sign of y.
@@ -538,37 +738,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-// reads a scalar in a and checks it is a valid Zr element (a < r)
-// returns RLC_OK if the scalar is valid and RLC_ERR otherwise.
-int bn_read_Zr_bin(bn_t a, const uint8_t *bin, int len) {
-    if (len!=Fr_BYTES) {
-        return RLC_ERR;
-    }
-    bn_read_bin(a, bin, Fr_BYTES);
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    if (bn_cmp(a, r) == RLC_LT) {
-        return RLC_OK;
-    }
-    return RLC_ERR;
-}
-
-// computes the sum of the array elements x and writes the sum in jointx
-// the sum is computed in Zr
-void bn_sum_vector(bn_t jointx, const bn_st* x, const int len) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_set_dig(jointx, 0);
-    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
-    for (int i=0; i<len; i++) {
-        bn_add(jointx, jointx, &x[i]);
-        if (bn_cmp(jointx, r) == RLC_GT) 
-            bn_sub(jointx, jointx, r);
-    }
-    bn_free(r);
-}
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
 void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){
@@ -739,7 +908,7 @@ int simple_subgroup_check_G2(const ep2_t p){
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 // beta such that beta^3 == 1 mod p
 // beta is in the Montgomery form
-const uint64_t beta_data[Fp_DIGITS] = { 
+const uint64_t beta_data[Fp_LIMBS] = { 
     0xcd03c9e48671f071, 0x5dab22461fcda5d2, 0x587042afd3851b95,
     0x8eb60ebe01bacb9e, 0x03f97d6e83d050d2, 0x18f0206554638741,
 };
@@ -756,7 +925,7 @@ int bowe_subgroup_check_G1(const ep_t p){
     if (ep_is_infty(p) == 1) 
         return VALID;
     fp_t b;
-    dv_copy(b, beta_data, Fp_DIGITS); 
+    dv_copy(b, beta_data, Fp_LIMBS); 
     ep_t sigma, sigma2, p_inv;
     ep_new(sigma);
     ep_new(sigma2);

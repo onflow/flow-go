@@ -14,14 +14,23 @@ package crypto
 // #include "bls12381_utils.h"
 import "C"
 import (
+	"crypto/rand"
 	"errors"
 )
 
+// Go wrappers around BLST C types
 // Go wrappers around Relic C types
-// Relic is compiled with ALLOC=AUTO
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
-type scalar C.bn_st
+type scalar C.Fr
+
+// BLS12-381 related lengths
+var frBytesLen = int(C.get_Fr_BYTES())
+
+// TODO: For now scalars are represented as field elements Fr since all scalars
+// are less than r - check if distinguishing two types in necessary
+//type pointG1_blst C.G1
+//type pointG2_blst C.G2
 
 // context required for the BLS set-up
 type ctx struct {
@@ -33,6 +42,12 @@ type ctx struct {
 // (Cgo does not export C macros)
 var valid = C.get_valid()
 var invalid = C.get_invalid()
+
+// get some constants from the C layer
+// var blst_errors = C.blst_get_errors()
+var blst_valid = (int)(C.BLST_SUCCESS)             //int(blst_errors[0])
+var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING) // int(blst_errors[0])
+var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)     // int(blst_errors[0])
 
 // initContext sets relic B12_381 parameters and precomputes some data in the C layer
 func (ct *ctx) initContext() error {
@@ -62,39 +77,32 @@ func seedRelic(seed []byte) error {
 	return nil
 }
 
-// setContext sets the context (previously initialized) of the C layer with
-// pre-saved data.
-func (ct *ctx) setContext() {
-	C.core_set(ct.relicCtx)
-	C.precomputed_data_set(ct.precCtx)
-}
-
 // Exponentiation in G1 (scalar point multiplication)
 func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
-	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
+	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.Fr)(expo))
 }
 
 // This function is for TEST only
 // Exponentiation of g1 in G1
 func generatorScalarMultG1(res *pointG1, expo *scalar) {
-	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.bn_st)(expo))
+	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.Fr)(expo))
 }
 
 // This function is for TEST only
 // Generic Exponentiation G1
 func genericScalarMultG1(res *pointG1, expo *scalar) {
-	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.bn_st)(expo))
+	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.Fr)(expo))
 }
 
 // Exponentiation of g2 in G2
 func generatorScalarMultG2(res *pointG2, expo *scalar) {
-	C.ep2_mult_gen((*C.ep2_st)(res), (*C.bn_st)(expo))
+	C.ep2_mult_gen((*C.ep2_st)(res), (*C.Fr)(expo))
 }
 
-// comparison in Zr where r is the group order of G1/G2
+// comparison in Fr where r is the group order of G1/G2
 // (both scalars should be reduced mod r)
 func (x *scalar) equals(other *scalar) bool {
-	return C.bn_cmp((*C.bn_st)(x), (*C.bn_st)(other)) == valid
+	return C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)) != 0
 }
 
 // comparison in G2
@@ -102,10 +110,10 @@ func (p *pointG2) equals(other *pointG2) bool {
 	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
 }
 
-// Comparison to zero in Zr.
+// Comparison to zero in Fr.
 // Scalar must be already reduced modulo r
 func (x *scalar) isZero() bool {
-	return C.bn_is_zero((*C.bn_st)(x)) == 1
+	return C.Fr_is_zero((*C.Fr)(x)) != 0
 }
 
 // Comparison to point at infinity in G2.
@@ -113,40 +121,44 @@ func (p *pointG2) isInfinity() bool {
 	return C.ep2_is_infty((*C.ep2_st)(p)) == 1
 }
 
-// returns a random number in Zr
-func randZr(x *scalar) {
-	C.bn_randZr((*C.bn_st)(x))
+// returns a random element of Fr in input pointer
+func randFr(x *scalar) error {
+	bytes := make([]byte, frBytesLen+securityBits/8)
+	_, err := rand.Read(bytes) // checking one output is enough
+	if err != nil {
+		return errors.New("internal rng failed")
+	}
+	_ = mapToZr(x, bytes)
+	return nil
 }
 
-// returns a random non-zero number in Zr
-func randZrStar(x *scalar) {
-	C.bn_randZr_star((*C.bn_st)(x))
+// writes a random element of Fr* in input pointer
+func randFrStar(x *scalar) error {
+	bytes := make([]byte, frBytesLen+securityBits/8)
+	isZero := true
+	for isZero {
+		_, err := rand.Read(bytes) // checking one output is enough
+		if err != nil {
+			return errors.New("internal rng failed")
+		}
+		isZero = mapToZr(x, bytes)
+	}
+	return nil
 }
 
 // mapToZr reads a scalar from a slice of bytes and maps it to Zr.
-// The resulting scalar `k` satisfies 0 <= k < r.
+// The resulting element `k` therefore satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
 func mapToZr(x *scalar, src []byte) bool {
-	isZero := C.bn_map_to_Zr((*C.bn_st)(x),
+	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return isZero == valid
+	return bool(isZero)
 }
 
-// writeScalar writes a G2 point in a slice of bytes
+// writeScalar writes a scalar in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
-	C.bn_write_bin((*C.uchar)(&dest[0]),
-		(C.int)(prKeyLengthBLSBLS12381),
-		(*C.bn_st)(x),
-	)
-}
-
-// readScalar reads a scalar from a slice of bytes
-func readScalar(x *scalar, src []byte) {
-	C.bn_read_bin((*C.bn_st)(x),
-		(*C.uchar)(&src[0]),
-		(C.int)(len(src)),
-	)
+	C.Fr_write_bytes((*C.uchar)(&dest[0]), (*C.Fr)(x))
 }
 
 // writePointG2 writes a G2 point in a slice of bytes
@@ -167,6 +179,28 @@ func writePointG1(dest []byte, a *pointG1) {
 		(*C.ep_st)(a),
 		(C.int)(signatureLengthBLSBLS12381),
 	)
+}
+
+// read an Fr* element from a byte slice
+// and stores it into a `scalar` type element.
+func readScalarFrStar(a *scalar, src []byte) error {
+	read := C.Fr_star_read_bytes(
+		(*C.Fr)(a),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)))
+
+	switch int(read) {
+	case blst_valid:
+		return nil
+	case blst_bad_encoding:
+		return invalidInputsErrorf("input length must be %d, got %d",
+			frBytesLen, len(src))
+	case blst_bad_scalar:
+		return invalidInputsErrorf("scalar is not in the correct range w.r.t the BLS12-381 curve")
+	default:
+		return invalidInputsErrorf("reading the scalar failed")
+	}
+
 }
 
 // readPointG2 reads a G2 point from a slice of bytes

@@ -61,7 +61,7 @@ const (
 	//
 	// SignatureLenBLSBLS12381 is the size of G1 elements
 	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
-	PrKeyLenBLSBLS12381     = 32
+	PrKeyLenBLSBLS12381     = 32                                // equal to frBytesLen
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
 	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 
@@ -165,12 +165,9 @@ func (sk *prKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
-	// set BLS context
-	blsInstance.reInit()
-
 	s := make([]byte, SignatureLenBLSBLS12381)
 	C.bls_sign((*C.uchar)(&s[0]),
-		(*C.bn_st)(&sk.scalar),
+		(*C.Fr)(&sk.scalar),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
 	return s, nil
@@ -202,9 +199,6 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, err
 	}
 
-	// intialize BLS context
-	blsInstance.reInit()
-
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false, nil
 	}
@@ -228,7 +222,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	case valid:
 		return true, nil
 	default:
-		return false, fmt.Errorf("signature verification failed")
+		return false, fmt.Errorf("signature verification failed: code %d", verif)
 	}
 }
 
@@ -277,7 +271,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 
 	// L is the OKM length
 	// L = ceil((3 * ceil(log2(r))) / 16) which makes L (security_bits/8)-larger than r size
-	okmLength := (3 * PrKeyLenBLSBLS12381) / 2
+	okmLength := (3 * frBytesLen) / 2
 
 	// HKDF secret = IKM || I2OSP(0, 1)
 	secret := make([]byte, len(ikm)+1)
@@ -326,20 +320,17 @@ func BLSInvalidSignature() Signature {
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.
+// Decoding assumes a bytes big endian format.
 // It checks the scalar is non-zero and is less than the group order.
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
-	if len(privateKeyBytes) != prKeyLengthBLSBLS12381 {
-		return nil, invalidInputsErrorf("input length must be %d, got %d",
-			prKeyLengthBLSBLS12381, len(privateKeyBytes))
-	}
 	sk := newPrKeyBLSBLS12381(nil)
 
-	readScalar(&sk.scalar, privateKeyBytes)
-	if C.check_membership_Zr_star((*C.bn_st)(&sk.scalar)) == valid {
-		return sk, nil
-	}
+	err := readScalarFrStar(&sk.scalar, privateKeyBytes)
 
-	return nil, invalidInputsErrorf("the private key is not a valid BLS12-381 curve key")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the private key: %w", err)
+	}
+	return sk, nil
 }
 
 // decodePublicKey decodes a slice of bytes into a public key.
@@ -392,16 +383,13 @@ type prKeyBLSBLS12381 struct {
 // If no scalar is provided, the function allocates an
 // empty scalar.
 func newPrKeyBLSBLS12381(x *scalar) *prKeyBLSBLS12381 {
-	var sk prKeyBLSBLS12381
-	if x == nil {
-		// initialize the scalar
-		C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
-	} else {
-		// set the scalar
-		sk.scalar = *x
+	if x != nil {
+		return &prKeyBLSBLS12381{
+			// the embedded public key is only computed when needed
+			scalar: *x,
+		}
 	}
-	// the embedded public key is only computed when needed
-	return &sk
+	return &prKeyBLSBLS12381{}
 }
 
 // Algorithm returns the Signing Algorithm
@@ -451,7 +439,7 @@ func (sk *prKeyBLSBLS12381) Equals(other PrivateKey) bool {
 	if !ok {
 		return false
 	}
-	return sk.scalar.equals(&otherBLS.scalar)
+	return (&sk.scalar).equals(&otherBLS.scalar)
 }
 
 // String returns the hex string representation of the key.
@@ -556,15 +544,6 @@ func (a *blsBLS12381Algo) init() error {
 	return nil
 }
 
-// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context
-// was previously initialized with a call to init().
-//
-// If the implementation evolves to support multiple contexts,
-// reinit should be called at every blsBLS12381Algo operation.
-func (a *blsBLS12381Algo) reInit() {
-	a.context.setContext()
-}
-
 // This is only a TEST/DEBUG/BENCH function.
 // It returns the hash to G1 point from a slice of 128 bytes
 func mapToG1(data []byte) *pointG1 {
@@ -592,7 +571,7 @@ func (sk *prKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 	// sign the hash
 	s := make([]byte, SignatureLenBLSBLS12381)
 	C.bls_sign((*C.uchar)(&s[0]),
-		(*C.bn_st)(&sk.scalar),
+		(*C.Fr)(&sk.scalar),
 		(*C.uchar)(&hash[0]),
 		(C.int)(len(hash)))
 	return s

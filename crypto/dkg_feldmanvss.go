@@ -21,7 +21,7 @@ import (
 // partcipants including itself. The particpants validate their shares
 // using a public verifiaction vector shared by the .
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Fr, where r is the group order of G1/G2
 // Public keys are in G2.
 
 // feldman VSS protocol, implements DKGState
@@ -30,7 +30,7 @@ type feldmanVSSstate struct {
 	*dkgCommon
 	// participant  index
 	dealerIndex index
-	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
+	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Fr[X], the vector size is (t+1)
 	// a_0 is the group private key
 	a []scalar
 	// Public vector of the group, the vector size is (t+1)
@@ -77,12 +77,11 @@ func NewFeldmanVSS(size int, threshold int, myIndex int,
 
 func (s *feldmanVSSstate) init() {
 	// set the bls context
-	blsInstance.reInit()
+
 	s.running = false
 	s.y = nil
 	s.xReceived = false
 	s.vAReceived = false
-	C.bn_new_wrapper((*C.bn_st)(&s.x))
 }
 
 // Start triggers the protocol start for the current participant.
@@ -264,21 +263,26 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
 
-	// Generate a polyomial P in Zr[X] of degree t
+	// Generate a polyomial P in Fr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
 	// non-zero a[0] - group private key is not zero
-	randZrStar(&s.a[0])
+	if err := randFrStar(&s.a[0]); err != nil {
+		return fmt.Errorf("generating the polynomial failed: %w", err)
+	}
 	generatorScalarMultG2(&s.vA[0], &s.a[0])
 	if s.threshold > 0 {
 		for i := 1; i < s.threshold; i++ {
-			C.bn_new_wrapper((*C.bn_st)(&s.a[i]))
-			randZr(&s.a[i])
+			if err := randFr(&s.a[i]); err != nil {
+				return fmt.Errorf("generating the polynomial failed: %w", err)
+			}
 			generatorScalarMultG2(&s.vA[i], &s.a[i])
 		}
 		// non-zero a[t] to enforce the polynomial degree
-		randZrStar(&s.a[s.threshold])
+		if err := randFrStar(&s.a[s.threshold]); err != nil {
+			return fmt.Errorf("generating the polynomial failed: %w", err)
+		}
 		generatorScalarMultG2(&s.vA[s.threshold], &s.a[s.threshold])
 	}
 
@@ -287,17 +291,17 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		// the dealer's own share
 		if i-1 == s.myIndex {
 			xdata := make([]byte, shareSize)
-			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
-			C.bn_read_bin((*C.bn_st)(&s.x),
-				(*C.uchar)(&xdata[0]),
-				PrKeyLenBLSBLS12381,
-			)
+			frPolynomialImage(xdata, s.a, i, &s.y[i-1])
+			err := readScalarFrStar(&s.x, xdata)
+			if err != nil {
+				return fmt.Errorf("unexpected error when generating the dealer's own share: %w", err)
+			}
 			continue
 		}
 		// the-other-participant shares
 		data := make([]byte, shareSize+1)
 		data[0] = byte(feldmanVSSShare)
-		zrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
+		frPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		s.processor.PrivateSend(int(i-1), data)
 	}
 	// broadcast the vector
@@ -350,13 +354,11 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	// read the participant private share
-	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
-		(*C.uchar)(&data[0]),
-		PrKeyLenBLSBLS12381,
-	) != valid {
+	err := readScalarFrStar(&s.x, data)
+	if err != nil {
 		s.validKey = false
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("invalid share value %x", data))
+			fmt.Sprintf("invalid share value %x: %s", data, err))
 		return
 	}
 
@@ -405,14 +407,14 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// zrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
+// frPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Fr[X]
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func zrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
-	C.Zr_polynomialImage_export((*C.uchar)(&dest[0]),
+func frPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
+	C.Fr_polynomialImage_export((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
-		(*C.bn_st)(&a[0]), (C.int)(len(a)),
+		(*C.Fr)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
 }
@@ -441,7 +443,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	return C.verifyshare((*C.bn_st)(&s.x),
+	return C.verifyshare((*C.Fr)(&s.x),
 		(*C.ep2_st)(&s.y[s.myIndex])) == 1
 }
 
