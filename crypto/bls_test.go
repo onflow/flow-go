@@ -7,11 +7,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	_ "math/rand"
 	mrand "math/rand"
 	"testing"
 	"time"
-	_ "time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,7 +67,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 
 // utility function to generate a random BLS private key
 func randomSK(t *testing.T, seed []byte) PrivateKey {
-	n, err := rand.Read(seed)
+	n, err := mrand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
@@ -270,23 +268,23 @@ func TestBLSPOP(t *testing.T) {
 }
 
 // BLS multi-signature
-// signature aggregation sanity check
+// signature aggregation with the same message sanity check
 //
 // Aggregate n signatures of the same message under different keys, and compare
 // it against the signature of the message under an aggregated private key.
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
-func TestBLSAggregateSignatures(t *testing.T) {
+func TestBLSAggregateSignaturesSameMessage(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// random message
 	input := make([]byte, 100)
-	_, err := rand.Read(input)
+	_, err := mrand.Read(input)
 	require.NoError(t, err)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
 	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
@@ -330,19 +328,21 @@ func TestBLSAggregateSignatures(t *testing.T) {
 	t.Run("one invalid signature", func(t *testing.T) {
 		input[0] ^= 1
 		randomIndex := mrand.Intn(sigsNum)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac) // sign a different message
 		input[0] ^= 1
 		aggSig, err = AggregateBLSSignatures(sigs)
 		require.NoError(t, err)
+		// First check: check the signatures are not equal
 		assert.NotEqual(t, aggSig, expectedSig,
 			"signature %s shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input)
+		// Second check: multi-verification should fail
 		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
 		require.NoError(t, err)
 		assert.False(t, valid,
 			"verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac) // rebuild the correct signature
 		require.NoError(t, err)
 	})
 

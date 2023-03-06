@@ -36,6 +36,7 @@ void Fr_polynomialImage(Fr* image, ep2_t y, const Fr* a, const int a_size, const
     if (y) {
         bn_st* tmp = Fr_blst_to_relic(image);
         g2_mul_gen(y, tmp);
+        free(tmp);
     }
 }
 
@@ -102,6 +103,7 @@ int verifyshare(const Fr* x, const ep2_t y) {
     ep2_new(res);
     bn_st* x_tmp = Fr_blst_to_relic(x);
     g2_mul_gen(res, x_tmp);
+    free(x_tmp);
     return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
 }
 

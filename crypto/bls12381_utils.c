@@ -30,11 +30,6 @@ const limb_t BLS12_381_rR[Fr_LIMBS] = {  /* (1<<256)%r */
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
 };
 
-/*0x1824b159acc5056f
-0x998c4fefecbc4ff5
-0x5884b7fa00034802
-0x00000001fffffffe*/
-
 // TODO: temp utility function to delete
 bn_st* Fr_blst_to_relic(const Fr* x) {
     bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
@@ -366,6 +361,7 @@ void ep_mult(ep_t res, const ep_t p, const Fr *expo) {
     bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2 
     ep_mul_lwnaf(res, p, tmp_expo);
+    free(tmp_expo);
 }
 
 // Exponentiation of generator g1 in G1
@@ -374,6 +370,7 @@ void ep_mult_gen_bench(ep_t res, const Fr* expo) {
     bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
     ep_mul_gen(res, tmp_expo);
+    free(tmp_expo);
 }
 
 void ep_mult_generic_bench(ep_t res, const Fr* expo) {
@@ -386,6 +383,7 @@ void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
     bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using window NAF of size 2
     ep2_mul_lwnaf(res, p, tmp_expo);
+    free(tmp_expo);
 }
 
 // Exponentiation of generator g2 in G2
@@ -393,6 +391,7 @@ void ep2_mult_gen(ep2_t res, const Fr* expo) {
     bn_st* tmp_expo = Fr_blst_to_relic(expo);
     // Using precomputed table of size 4
     g2_mul_gen(res, tmp_expo);
+    free(tmp_expo);
 }
 
 // DEBUG printing functions 
