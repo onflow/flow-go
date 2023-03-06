@@ -115,8 +115,6 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Run tests (${{ matrix.targets.name }})
       if: github.actor != 'bors[bot]'
       uses: nick-fields/retry@v2
