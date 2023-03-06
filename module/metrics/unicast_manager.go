@@ -67,7 +67,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "time_to_dial_peer_seconds",
-			Help:      "the amount of time it takes to dial a peer during stream creation",
+			Help:      "the amount of time it takes to dial a peer and establish a connection during stream creation",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
 		}, []string{LabelSuccess},
 	)
