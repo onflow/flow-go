@@ -35,6 +35,7 @@ bn_st* Fr_blst_to_relic(const Fr* x) {
     bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
     byte* data = (byte*)malloc(Fr_BYTES);
     be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
+    out->alloc = RLC_DV_DIGS;
     bn_read_bin(out, data, Fr_BYTES);
     free(data);
     return out;

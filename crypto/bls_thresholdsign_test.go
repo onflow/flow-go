@@ -31,10 +31,12 @@ var thresholdSignatureMessage = []byte("random message")
 
 // centralized test of the stateful threshold signature using the threshold key generation.
 func testCentralizedStatefulAPI(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Log(r)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		mrand.Seed(time.Now().UnixNano())
 		seed := make([]byte, SeedMinLenDKG)
 		_, err := mrand.Read(seed)
 		require.NoError(t, err)
