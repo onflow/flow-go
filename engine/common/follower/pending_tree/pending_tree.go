@@ -38,7 +38,7 @@ type PendingBlockVertex struct {
 	connectedToFinalized bool
 }
 
-// NewVertex creates new vertex while performing a sanity check of data correctness
+// NewVertex creates new vertex while performing a sanity check of data correctness.
 func NewVertex(certifiedBlock CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
 	if certifiedBlock.Block.Header.View != certifiedBlock.QC.View {
 		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view",
@@ -59,12 +59,19 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // PendingTree is a mempool holding certified blocks that eventually might be connected to the finalized state.
 // As soon as a valid fork of certified blocks descending from the latest finalized block we pass this information to caller.
 // Internally, the mempool utilizes the LevelledForest.
+// PendingTree is safe to use in concurrent environment.
+// NOTE: PendingTree relies on notion of `CertifiedBlock` which is a valid block which is certified by corresponding QC.
+// This works well for consensus follower as it is designed to work with certified blocks. To use this structure for consensus
+// participant we can abstract out CertifiedBlock or replace it with a generic argument that satisfies some contract(returns View, Height, BlockID).
+// With this change this structure can be used by consensus participant for tracking connection to the finalized state even without
+// having QC but relying on payload validation.
 type PendingTree struct {
 	forest          *forest.LevelledForest
 	lock            sync.RWMutex
 	lastFinalizedID flow.Identifier
 }
 
+// NewPendingTree creates new instance of PendingTree. Accepts finalized block to set up initial state.
 func NewPendingTree(finalized *flow.Header) *PendingTree {
 	return &PendingTree{
 		forest:          forest.NewLevelledForest(finalized.View),
@@ -136,15 +143,9 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 		return nil, nil
 	}
 
-	var connectedToFinalized bool
+	// check if the lowest block(by height) connects to the finalized state
 	firstBlock := certifiedBlocks[firstBlockIndex]
-	if firstBlock.Block.Header.ParentID == t.lastFinalizedID {
-		connectedToFinalized = true
-	} else if parentVertex, found := t.forest.GetVertex(firstBlock.Block.Header.ParentID); found {
-		connectedToFinalized = parentVertex.(*PendingBlockVertex).connectedToFinalized
-	}
-
-	if connectedToFinalized {
+	if t.connectsToFinalizedBlock(firstBlock) {
 		vertex, _ := t.forest.GetVertex(firstBlock.ID())
 		connectedBlocks = t.updateAndCollectFork(vertex.(*PendingBlockVertex))
 	}
@@ -152,6 +153,19 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 	return connectedBlocks, nil
 }
 
+// connectsToFinalizedBlock checks if candidate block connects to the finalized state.
+func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
+	if block.Block.Header.ParentID == t.lastFinalizedID {
+		return true
+	} else if parentVertex, found := t.forest.GetVertex(block.Block.Header.ParentID); found {
+		return parentVertex.(*PendingBlockVertex).connectedToFinalized
+	} else {
+		return false
+	}
+}
+
+// FinalizeForkAtLevel takes last finalized block and prunes levels below the finalized view.
+// When a block is finalized we don't care for all blocks below it since they were already finalized.
 func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 	blockID := finalized.ID()
 	t.lock.Lock()
@@ -168,6 +182,8 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 	return nil
 }
 
+// updateAndCollectFork recursively traverses leveled forest using parent-children(effectively traversing a subtree), marks each of traversed vertices as connected
+// to the finalized state and collects in a list which is returned as result.
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
 	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}
 	vertex.connectedToFinalized = true
