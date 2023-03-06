@@ -11,19 +11,18 @@ import (
 
 // UnicastManagerMetrics metrics collector for the unicast manager.
 type UnicastManagerMetrics struct {
-	// createStreamAttempts tracks the number of retry attempts to create a stream.
-	createStreamAttempts *prometheus.HistogramVec
-	// createStreamDuration tracks the overall time it takes to create a stream, this time includes
-	// time spent dialing the peer and time spent connecting to the peer and creating the stream.
-	createStreamDuration *prometheus.HistogramVec
-	// dialPeerAttempts tracks the number of retry attempts to dial a peer during stream creation.
-	dialPeerAttempts *prometheus.HistogramVec
-	// dialPeerDuration tracks the time it takes to dial a peer and establish a connection.
-	dialPeerDuration *prometheus.HistogramVec
-	// establishStreamOnConnAttempts tracks the number of retry attempts to create the stream after peer dialing completes and a connection is established.
-	establishStreamOnConnAttempts *prometheus.HistogramVec
-	// establishStreamOnConnDuration tracks the time it takes to create the stream after peer dialing completes and a connection is established.
-	establishStreamOnConnDuration *prometheus.HistogramVec
+         	// Tracks the number of times a stream creation is retried due to dial-backoff.
+	createStreamRetriesDueToDialBackoff *prometheus.HistogramVec
+	// Tracks the overall time it takes to create a stream, including dialing the peer and connecting to the peer due to dial-backoff.
+	createStreamTimeDueToDialBackoff *prometheus.HistogramVec
+	// Tracks the number of retry attempts to dial a peer during stream creation.
+	dialPeerRetries*prometheus.HistogramVec
+	// Tracks the time it takes to dial a peer and establish a connection during stream creation.
+	dialPeerTime *prometheus.HistogramVec
+	// Tracks the number of retry attempts to create the stream after peer dialing completes and a connection is established.
+	createStreamOnConnRetries *prometheus.HistogramVec
+	// Tracks the time it takes to create the stream after peer dialing completes and a connection is established.
+	createStreamOnConnTime *prometheus.HistogramVec
 
 	prefix string
 }
