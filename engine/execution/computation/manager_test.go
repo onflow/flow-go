@@ -506,7 +506,7 @@ func (p *PanickingVM) RunV2(
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
 ) (
-	state.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -537,13 +537,15 @@ func (l *LongRunningVM) RunV2(
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
 ) (
-	state.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	time.Sleep(l.duration)
 
-	return nil, fvm.ProcedureOutput{Value: cadence.NewVoid()}, nil
+	snapshot := &state.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{}
+	return snapshot, output, nil
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {

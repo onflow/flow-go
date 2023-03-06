@@ -63,7 +63,7 @@ type fakeCommitter struct {
 }
 
 func (committer *fakeCommitter) CommitView(
-	view state.View,
+	view *state.ExecutionSnapshot,
 	startState flow.StateCommitment,
 ) (
 	flow.StateCommitment,
@@ -1266,7 +1266,7 @@ func getSetAProgram(t *testing.T, derivedBlockData *derived.DerivedBlockData) {
 	derivedTxnData.SetProgram(
 		loc,
 		&derived.Program{},
-		&state.State{},
+		&state.ExecutionSnapshot{},
 	)
 	err = derivedTxnData.Commit()
 	require.NoError(t, err)

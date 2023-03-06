@@ -136,7 +136,9 @@ func TestFungibleTokenTracker(t *testing.T) {
 	reporterFactory := reporters.NewReportFileWriterFactory(dir, log)
 
 	br := reporters.NewFungibleTokenTracker(log, reporterFactory, chain, []string{reporters.FlowTokenTypeID(chain)})
-	err = br.Report(EntriesToPayloads(view.UpdatedRegisters()), ledger.State{})
+	err = br.Report(
+		EntriesToPayloads(view.Finalize().UpdatedRegisters()),
+		ledger.State{})
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(reporterFactory.Filename(reporters.FungibleTokenTrackerReportPrefix))
