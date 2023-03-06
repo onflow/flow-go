@@ -2,6 +2,7 @@ package pending_tree
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -179,6 +180,53 @@ func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
 	assert.Equal(s.T(), blocks[1:], connectedBlocks)
 }
 
+// TestConcurrentAddBlocks simulates multiple workers adding batches of blocks out of order.
+// We use next setup:
+// Number of workers - workers
+// Number of batches submitted by worker - batchesPerWorker
+// Number of blocks in each batch submitted by worker - blocksPerBatch
+// Each worker submits batchesPerWorker*blocksPerBatch blocks
+// In total we will submit workers*batchesPerWorker*blocksPerBatch
+// After submitting all blocks we expect that all blocks that were submitted would be returned to caller.
+func (s *PendingTreeSuite) TestConcurrentAddBlocks() {
+	workers := 10
+	batchesPerWorker := 10
+	blocksPerBatch := 10
+	blocksPerWorker := blocksPerBatch * batchesPerWorker
+	blocks := certifiedBlocksFixture(workers*blocksPerWorker, s.finalized)
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	var connectedBlocksLock sync.Mutex
+	connectedBlocksByID := make(map[flow.Identifier]CertifiedBlock, len(blocks))
+	for i := 0; i < workers; i++ {
+		go func(blocks []CertifiedBlock) {
+			defer wg.Done()
+			rand.Shuffle(len(blocks), func(i, j int) {
+				blocks[i], blocks[j] = blocks[j], blocks[i]
+			})
+			for batch := 0; batch < batchesPerWorker; batch++ {
+				connectedBlocks, _ := s.pendingTree.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
+				connectedBlocksLock.Lock()
+				for _, block := range connectedBlocks {
+					connectedBlocksByID[block.ID()] = block
+				}
+				connectedBlocksLock.Unlock()
+			}
+		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
+	}
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
+	require.Equal(s.T(), len(blocks), len(connectedBlocksByID))
+	allConnectedBlocks := make([]CertifiedBlock, 0, len(connectedBlocksByID))
+	for _, block := range connectedBlocksByID {
+		allConnectedBlocks = append(allConnectedBlocks, block)
+	}
+	require.ElementsMatch(s.T(), blocks, allConnectedBlocks)
+}
+
+// certifiedBlocksFixture builds a chain of certified blocks starting at some block.
 func certifiedBlocksFixture(count int, parent *flow.Header) []CertifiedBlock {
 	result := make([]CertifiedBlock, 0, count)
 	blocks := unittest.ChainFixtureFrom(count, parent)
@@ -192,6 +240,7 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []CertifiedBlock {
 	return result
 }
 
+// certifiedBlockFixture builds a certified block using a QC with fixture signatures.
 func certifiedBlockFixture(block *flow.Block) CertifiedBlock {
 	return CertifiedBlock{
 		Block: block,
