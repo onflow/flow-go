@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -107,10 +108,11 @@ type transaction struct {
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
 	ExecuteBlock(
-		context.Context,
-		*entity.ExecutableBlock,
-		state.View,
-		*derived.DerivedBlockData,
+		ctx context.Context,
+		parentBlockExecutionResultID flow.Identifier,
+		block *entity.ExecutableBlock,
+		snapshot state.StorageSnapshot,
+		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -128,6 +130,7 @@ type blockComputer struct {
 	executionDataProvider *provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
+	receiptHasher         hash.Hasher
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -171,14 +174,16 @@ func NewBlockComputer(
 		executionDataProvider: executionDataProvider,
 		signer:                signer,
 		spockHasher:           utils.NewSPOCKHasher(),
+		receiptHasher:         utils.NewExecutionReceiptHasher(),
 	}, nil
 }
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	stateView state.View,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -186,8 +191,9 @@ func (e *blockComputer) ExecuteBlock(
 ) {
 	results, err := e.executeBlock(
 		ctx,
+		parentBlockExecutionResultID,
 		block,
-		stateView,
+		snapshot,
 		derivedBlockData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
@@ -277,8 +283,9 @@ func (e *blockComputer) getRootSpanAndCollections(
 
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	stateView state.View,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -310,9 +317,13 @@ func (e *blockComputer) executeBlock(
 		e.signer,
 		e.executionDataProvider,
 		e.spockHasher,
+		e.receiptHasher,
+		parentBlockExecutionResultID,
 		block,
 		len(collections))
 	defer collector.Stop()
+
+	stateView := delta.NewDeltaView(snapshot)
 
 	var txnIndex uint32
 	for _, collection := range collections {
@@ -518,5 +529,5 @@ func (e *blockComputer) mergeView(
 	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
 	defer mergeSpan.End()
 
-	return parent.MergeView(child)
+	return parent.Merge(child)
 }

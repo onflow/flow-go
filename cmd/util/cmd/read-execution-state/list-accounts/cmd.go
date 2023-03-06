@@ -75,7 +75,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+	ldg := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 
 			ledgerKey := executionState.RegisterIDToKey(id)

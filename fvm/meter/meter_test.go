@@ -596,31 +596,40 @@ func TestStorageLimits(t *testing.T) {
 			meter.DefaultParameters(),
 		)
 
+		writeKey2 := flow.NewRegisterID("", "w2")
+		writeVal2 := []byte{0x1, 0x2, 0x3, 0x4, 0x5}
+		writeSize2 := meter.GetStorageKeyValueSizeForTesting(writeKey2, writeVal2)
+
+		err = meter1.MeterStorageRead(readKey1, readVal1, false)
+		require.NoError(t, err)
+
+		err = meter1.MeterStorageWrite(writeKey1, writeVal1, false)
+		require.NoError(t, err)
+
 		// read the same key value as meter1
 		err = meter2.MeterStorageRead(readKey1, readVal1, false)
 		require.NoError(t, err)
 
-		writeKey2 := flow.NewRegisterID("", "w2")
-		writeVal2 := []byte{0x1, 0x2, 0x3, 0x4, 0x5}
-		writeSize2 := meter.GetStorageKeyValueSizeForTesting(writeKey2, writeVal2)
 		err = meter2.MeterStorageWrite(writeKey2, writeVal2, false)
 		require.NoError(t, err)
 
 		// merge
 		meter1.MergeMeter(meter2)
 
-		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), readSize1*2+writeSize1+writeSize2)
-		require.Equal(t, meter1.TotalBytesReadFromStorage(), readSize1*2)
+		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), readSize1+writeSize1+writeSize2)
+		require.Equal(t, meter1.TotalBytesReadFromStorage(), readSize1)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), writeSize1+writeSize2)
 
-		storageUpdateSizeMap := meter1.GetStorageUpdateSizeMapForTesting()
-		readKey1Val, ok := storageUpdateSizeMap[readKey1]
+		reads, writes := meter1.GetStorageRWSizeMapForTesting()
+		readKey1Val, ok := reads[readKey1]
 		require.True(t, ok)
 		require.Equal(t, readKey1Val, readSize1) // meter merge only takes child values for rw bookkeeping
-		writeKey1Val, ok := storageUpdateSizeMap[writeKey1]
+
+		writeKey1Val, ok := writes[writeKey1]
 		require.True(t, ok)
 		require.Equal(t, writeKey1Val, writeSize1)
-		writeKey2Val, ok := storageUpdateSizeMap[writeKey2]
+
+		writeKey2Val, ok := writes[writeKey2]
 		require.True(t, ok)
 		require.Equal(t, writeKey2Val, writeSize2)
 	})

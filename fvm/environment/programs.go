@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
@@ -10,18 +12,11 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// TODO(patrick): remove and switch to *programs.DerivedTransactionData once
-// https://github.com/onflow/flow-emulator/pull/229 is integrated.
-type DerivedTransactionData interface {
-	GetProgram(loc common.AddressLocation) (*derived.Program, *state.State, bool)
-	SetProgram(loc common.AddressLocation, prog *derived.Program, state *state.State)
-}
 
 // Programs manages operations around cadence program parsing.
 //
@@ -34,10 +29,8 @@ type Programs struct {
 	meter   Meter
 	metrics MetricsReporter
 
-	txnState *state.TransactionState
+	txnState storage.Transaction
 	accounts Accounts
-
-	derivedTxnData DerivedTransactionData
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
@@ -52,9 +45,8 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	accounts Accounts,
-	derivedTxnData DerivedTransactionData,
 ) *Programs {
 	return &Programs{
 		tracer:             tracer,
@@ -62,7 +54,6 @@ func NewPrograms(
 		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
-		derivedTxnData:     derivedTxnData,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
 		dependencyStack:    newDependencyStack(),
 	}
@@ -86,7 +77,8 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.txnState.CommitParseRestricted(address)
+	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
+		address)
 	if err != nil {
 		return err
 	}
@@ -117,7 +109,7 @@ func (programs *Programs) set(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 
-	programs.derivedTxnData.SetProgram(address, &derived.Program{
+	programs.txnState.SetProgram(address, &derived.Program{
 		Program:      program,
 		Dependencies: dependencies,
 	}, state)
@@ -141,12 +133,12 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.derivedTxnData.GetProgram(address)
+	program, state, has := programs.txnState.GetProgram(address)
 	if has {
 		programs.cacheHit()
 
 		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommit(state)
+		err := programs.txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
 			panic(fmt.Sprintf(
 				"merge error while getting program, panic: %s",
@@ -174,6 +166,45 @@ func (programs *Programs) get(
 	}
 
 	return nil, false
+}
+
+// GetAndSetProgram gets the program from the cache,
+// or loads it (by calling load) if it is not in the cache.
+// When loading a program, this method will be re-entered
+// to load the dependencies of the program.
+//
+// TODO: this function currently just calls GetProgram and SetProgram in pair.
+// This method can be re-written in a far better way by removing the individual
+// GetProgram and SetProgram methods.
+func (programs *Programs) GetAndSetProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+
+	prog, err := programs.GetProgram(location)
+	if err != nil {
+		return nil, err
+	}
+	if prog != nil {
+		return prog, nil
+	}
+
+	prog, err = load()
+	if err != nil {
+		// if loading fails, we still need to call set with nil program
+		// to pop the loading stack.
+		setErr := programs.SetProgram(location, nil)
+		if setErr != nil {
+			err = multierror.Append(err, setErr).ErrorOrNil()
+		}
+		return nil, err
+	}
+	err = programs.SetProgram(location, prog)
+	if err != nil {
+		return nil, err
+	}
+
+	return prog, nil
 }
 
 func (programs *Programs) GetProgram(

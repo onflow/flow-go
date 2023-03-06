@@ -14,15 +14,21 @@ func StateInteractionsFixture() *delta.SpockSnapshot {
 	return delta.NewDeltaView(nil).Interactions()
 }
 
-func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
+func ComputationResultFixture(
+	parentBlockExecutionResultID flow.Identifier,
+	collectionsSignerIDs [][]flow.Identifier,
+) *execution.ComputationResult {
 	block := unittest.ExecutableBlockFixture(collectionsSignerIDs)
 	startState := unittest.StateCommitmentFixture()
 	block.StartState = &startState
 
-	return ComputationResultForBlockFixture(block)
+	return ComputationResultForBlockFixture(
+		parentBlockExecutionResultID,
+		block)
 }
 
 func ComputationResultForBlockFixture(
+	parentBlockExecutionResultID flow.Identifier,
 	completeBlock *entity.ExecutableBlock,
 ) *execution.ComputationResult {
 	collections := completeBlock.Collections()
@@ -78,6 +84,13 @@ func ComputationResultForBlockFixture(
 				TrieUpdate: nil,
 			})
 	}
+	executionResult := flow.NewExecutionResult(
+		parentBlockExecutionResultID,
+		completeBlock.ID(),
+		chunks,
+		nil,
+		flow.ZeroID)
+
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
 		ExecutableBlock:        completeBlock,
@@ -86,13 +99,16 @@ func ComputationResultForBlockFixture(
 		Proofs:                 proofs,
 		Events:                 events,
 		EventsHashes:           eventHashes,
-		SpockSignatures:        spockHashes,
-		Chunks:                 chunks,
 		ChunkDataPacks:         chunkDataPacks,
 		EndState:               *completeBlock.StartState,
 		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID:             completeBlock.ID(),
 			ChunkExecutionDatas: chunkExecutionDatas,
+		},
+		ExecutionReceipt: &flow.ExecutionReceipt{
+			ExecutionResult:   *executionResult,
+			Spocks:            spockHashes,
+			ExecutorSignature: crypto.Signature{},
 		},
 	}
 }
