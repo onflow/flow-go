@@ -2264,7 +2264,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 
                           transaction {
                               prepare(acct: AuthAccount) {
-                                  acct.linkAccount(/public/foo)
+                                  acct.linkAccount(/private/foo)
                               }
                           }
                         `,
