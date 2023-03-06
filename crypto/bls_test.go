@@ -51,6 +51,34 @@ func TestBLSMainMethods(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, valid)
 	})
+
+	t.Run("private key equal to 1 and -1", func(t *testing.T) {
+		sk1Bytes := make([]byte, PrKeyLenBLSBLS12381)
+		sk1Bytes[PrKeyLenBLSBLS12381-1] = 1
+		sk1, err := DecodePrivateKey(BLSBLS12381, sk1Bytes)
+		require.NoError(t, err)
+
+		skMinus1Bytes := make([]byte, PrKeyLenBLSBLS12381)
+		copy(skMinus1Bytes, BLS12381Order)
+		skMinus1Bytes[PrKeyLenBLSBLS12381-1] -= 1
+		skMinus1, err := DecodePrivateKey(BLSBLS12381, skMinus1Bytes)
+		require.NoError(t, err)
+
+		for _, sk := range []PrivateKey{sk1, skMinus1} {
+			input := make([]byte, 100)
+			_, err = mrand.Read(input)
+			require.NoError(t, err)
+			s, err := sk.Sign(input, hasher)
+			require.NoError(t, err)
+			pk := sk.PublicKey()
+
+			// test a valid signature
+			result, err := pk.Verify(s, input, hasher)
+			assert.NoError(t, err)
+			assert.True(t, result,
+				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk)
+		}
+	})
 }
 
 // Signing bench

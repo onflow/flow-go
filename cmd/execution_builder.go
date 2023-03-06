@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -219,15 +220,7 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 	}
 	var err error
-	exeNode.followerState, err = badgerState.NewFollowerState(
-		bState,
-		node.Storage.Index,
-		node.Storage.Payloads,
-		node.Storage.QuorumCertificates,
-		node.Tracer,
-		node.ProtocolEvents,
-		blocktimer.DefaultBlockTimer,
-	)
+	exeNode.followerState, err = badgerState.NewFollowerState(bState, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	return err
 }
 
@@ -1092,7 +1085,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 func getContractEpochCounter(
 	vm fvm.VM,
 	vmCtx fvm.Context,
-	snapshot delta.StorageSnapshot,
+	snapshot fvmState.StorageSnapshot,
 ) (
 	uint64,
 	error,

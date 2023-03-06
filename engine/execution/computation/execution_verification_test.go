@@ -707,9 +707,10 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
+	prevResultId := unittest.IdentifierFixture()
 	computationResult, err := blockComputer.ExecuteBlock(
 		context.Background(),
-		unittest.IdentifierFixture(),
+		prevResultId,
 		executableBlock,
 		state.NewLedgerStorageSnapshot(
 			ledger,
@@ -721,22 +722,27 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	for i, snapshot := range computationResult.StateSnapshots {
 		valid, err := crypto.SPOCKVerifyAgainstData(
 			myIdentity.StakingPubKey,
-			computationResult.SpockSignatures[i],
+			computationResult.Spocks[i],
 			snapshot.SpockSecret,
 			spockHasher)
 		require.NoError(t, err)
 		require.True(t, valid)
 	}
 
-	prevResultId := unittest.IdentifierFixture()
+	receipt := computationResult.ExecutionReceipt
+	receiptID := receipt.ID()
+	valid, err := myIdentity.StakingPubKey.Verify(
+		receipt.ExecutorSignature,
+		receiptID[:],
+		utils.NewExecutionReceiptHasher())
+
+	require.NoError(t, err)
+	require.True(t, valid)
+
+	require.Equal(t, len(computationResult.ChunkDataPacks), len(receipt.Spocks))
 
 	chdps := computationResult.ChunkDataPacks
-	er := flow.NewExecutionResult(
-		prevResultId,
-		executableBlock.ID(),
-		computationResult.Chunks,
-		computationResult.ConvertedServiceEvents,
-		computationResult.ExecutionDataID)
+	er := &computationResult.ExecutionResult
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 

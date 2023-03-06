@@ -92,15 +92,11 @@ func TestReExecuteBlock(t *testing.T) {
 			Events:             []flow.EventsList{blockEvents.Events},
 			ServiceEvents:      se.Events,
 			TransactionResults: tes,
+			ExecutionReceipt:   executionReceipt,
 		}
 
 		// save execution results
-		err = es.SaveExecutionResults(
-			context.Background(),
-			computationResult,
-			executionReceipt,
-		)
-
+		err = es.SaveExecutionResults(context.Background(), computationResult)
 		require.NoError(t, err)
 
 		batch := bstorage.NewBatch(db)
@@ -161,12 +157,7 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err2)
 
 		// re execute result
-		err = es.SaveExecutionResults(
-			context.Background(),
-			computationResult,
-			executionReceipt,
-		)
-
+		err = es.SaveExecutionResults(context.Background(), computationResult)
 		require.NoError(t, err)
 	})
 }
@@ -246,15 +237,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			Events:             []flow.EventsList{blockEvents.Events},
 			ServiceEvents:      se.Events,
 			TransactionResults: tes,
+			ExecutionReceipt:   executionReceipt,
 		}
 
 		// save execution results
-		err = es.SaveExecutionResults(
-			context.Background(),
-			computationResult,
-			executionReceipt,
-		)
-
+		err = es.SaveExecutionResults(context.Background(), computationResult)
 		require.NoError(t, err)
 
 		batch := bstorage.NewBatch(db)
@@ -315,15 +302,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			Events:             []flow.EventsList{blockEvents.Events},
 			ServiceEvents:      se.Events,
 			TransactionResults: tes,
+			ExecutionReceipt:   executionReceipt2,
 		}
 
 		// re execute result
-		err = es.SaveExecutionResults(
-			context.Background(),
-			computationResult2,
-			executionReceipt2,
-		)
-
+		err = es.SaveExecutionResults(context.Background(), computationResult2)
 		require.NoError(t, err)
 	})
 }

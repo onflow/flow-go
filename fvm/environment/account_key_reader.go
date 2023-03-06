@@ -32,12 +32,12 @@ type AccountKeyReader interface {
 }
 
 type ParseRestrictedAccountKeyReader struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountKeyReader
 }
 
 func NewParseRestrictedAccountKeyReader(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountKeyReader,
 ) AccountKeyReader {
 	return ParseRestrictedAccountKeyReader{

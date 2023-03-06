@@ -10,7 +10,7 @@ import (
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {
-	Compute(txnState *state.TransactionState, key TKey) (TVal, error)
+	Compute(txnState state.NestedTransaction, key TKey) (TVal, error)
 }
 
 type invalidatableEntry[TVal any] struct {
@@ -189,16 +189,6 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 			txn.executionTime)
 	}
 
-	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
-		(!txn.isSnapshotReadTransaction ||
-			txn.snapshotTime != EndOfBlockExecutionTime) {
-
-		return newNotRetryableError(
-			"invalid TableTransaction: missing commit range [%v, %v)",
-			table.latestCommitExecutionTime+1,
-			txn.snapshotTime)
-	}
-
 	for _, entry := range txn.readSet {
 		if entry.isInvalid {
 			return newRetryableError(
@@ -237,6 +227,16 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
+	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
+		(!txn.isSnapshotReadTransaction ||
+			txn.snapshotTime != EndOfBlockExecutionTime) {
+
+		return newNotRetryableError(
+			"invalid TableTransaction: missing commit range [%v, %v)",
+			table.latestCommitExecutionTime+1,
+			txn.snapshotTime)
+	}
+
 	// NOTE: Instead of throwing out all the write entries, we can commit
 	// the valid write entries then return error.
 	err := table.unsafeValidate(txn)
@@ -247,9 +247,9 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	for key, entry := range txn.writeSet {
 		_, ok := table.items[key]
 		if ok {
-			// A previous transaction already committed an equivalent TableTransaction
-			// entry.  Since both TableTransaction entry are valid, just reuse the
-			// existing one for future transactions.
+			// A previous transaction already committed an equivalent
+			// TableTransaction entry.  Since both TableTransaction entry are
+			// valid, just reuse the existing one for future transactions.
 			continue
 		}
 
@@ -396,7 +396,7 @@ func (txn *TableTransaction[TKey, TVal]) Set(
 // Note: valFunc must be an idempotent function and it must not modify
 // txnState's values.
 func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	key TKey,
 	computer ValueComputer[TKey, TVal],
 ) (
@@ -407,7 +407,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 
 	val, state, ok := txn.Get(key)
 	if ok {
-		err := txnState.AttachAndCommit(state)
+		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
 			return defaultVal, fmt.Errorf(
 				"failed to replay cached state: %w",
@@ -427,7 +427,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
-	committedState, err := txnState.Commit(nestedTxId)
+	committedState, err := txnState.CommitNestedTransaction(nestedTxId)
 	if err != nil {
 		return defaultVal, fmt.Errorf("failed to commit nested txn: %w", err)
 	}

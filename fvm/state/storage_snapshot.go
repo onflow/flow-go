@@ -1,4 +1,4 @@
-package delta
+package state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
@@ -48,4 +48,15 @@ type Peeker interface {
 
 func NewPeekerStorageSnapshot(peeker Peeker) StorageSnapshot {
 	return NewReadFuncStorageSnapshot(peeker.Peek)
+}
+
+type MapStorageSnapshot map[flow.RegisterID]flow.RegisterValue
+
+func (storage MapStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	return storage[id], nil
 }

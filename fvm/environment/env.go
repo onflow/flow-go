@@ -3,7 +3,6 @@ package environment
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
@@ -44,8 +43,8 @@ type Environment interface {
 
 	// SystemContracts
 	AccountsStorageCapacity(
-		addresses []common.Address,
-		payer common.Address,
+		addresses []flow.Address,
+		payer flow.Address,
 		maxTxFees uint64,
 	) (
 		cadence.Value,

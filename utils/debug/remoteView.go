@@ -2,13 +2,12 @@ package debug
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,7 +18,7 @@ import (
 // TODO implement register touches
 type RemoteView struct {
 	Parent             *RemoteView
-	Delta              map[string]flow.RegisterValue
+	Delta              map[flow.RegisterID]flow.RegisterValue
 	Cache              registerCache
 	BlockID            []byte
 	BlockHeader        *flow.Header
@@ -63,7 +62,7 @@ func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
 	view := &RemoteView{
 		connection:         conn,
 		executionAPIclient: execution.NewExecutionAPIClient(conn),
-		Delta:              make(map[string]flow.RegisterValue),
+		Delta:              make(map[flow.RegisterID]flow.RegisterValue),
 		Cache:              newMemRegisterCache(),
 	}
 
@@ -126,36 +125,39 @@ func (v *RemoteView) NewChild() state.View {
 		executionAPIclient: v.executionAPIclient,
 		connection:         v.connection,
 		Cache:              newMemRegisterCache(),
-		Delta:              make(map[string][]byte),
+		Delta:              make(map[flow.RegisterID][]byte),
 	}
 }
 
-func (v *RemoteView) MergeView(o state.View) error {
-	var other *RemoteView
-	var ok bool
-	if other, ok = o.(*RemoteView); !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:RemoteView)", o)
-	}
-
-	for k, value := range other.Delta {
-		v.Delta[k] = value
+func (v *RemoteView) Merge(other state.ExecutionSnapshot) error {
+	for _, entry := range other.UpdatedRegisters() {
+		v.Delta[entry.Key] = entry.Value
 	}
 	return nil
 }
 
-func (v *RemoteView) DropDelta() {
-	v.Delta = make(map[string]flow.RegisterValue)
+func (v *RemoteView) SpockSecret() []byte {
+	return nil
+}
+
+func (v *RemoteView) Meter() *meter.Meter {
+	return nil
+}
+
+func (v *RemoteView) DropChanges() error {
+	v.Delta = make(map[flow.RegisterID]flow.RegisterValue)
+	return nil
 }
 
 func (v *RemoteView) Set(id flow.RegisterID, value flow.RegisterValue) error {
-	v.Delta[id.Owner+"~"+id.Key] = value
+	v.Delta[id] = value
 	return nil
 }
 
 func (v *RemoteView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 
 	// first check the delta
-	value, found := v.Delta[id.Owner+"~"+id.Key]
+	value, found := v.Delta[id]
 	if found {
 		return value, nil
 	}
