@@ -87,6 +87,10 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
 	}
 	t.topicMeshMap[topic][p] = struct{}{}
+	meshSize := len(t.topicMeshMap[topic])
+	
+	t.metrics.OnLocalMeshSizeUpdated(topic, meshSize)
+	lg = lg.With().Int("mesh_size", meshSize).Logger()
 
 	id, exists := t.idProvider.ByPeerID(p)
 	if !exists {
@@ -97,7 +101,6 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
-	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -112,16 +115,20 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	}
 	delete(t.topicMeshMap[topic], p)
 
+	meshSize := len(t.topicMeshMap[topic])
+	t.metrics.OnLocalMeshSizeUpdated(topic, meshSize)
+	lg = lg.With().Int("mesh_size", meshSize).Logger()
+
 	id, exists := t.idProvider.ByPeerID(p)
 	if !exists {
 		lg.Warn().
 			Bool(logging.KeySuspicious, true).
 			Msg("pruned peer not found in identity provider")
+
 		return
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
-	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
