@@ -88,7 +88,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	}
 	t.topicMeshMap[topic][p] = struct{}{}
 	meshSize := len(t.topicMeshMap[topic])
-	
+
 	t.metrics.OnLocalMeshSizeUpdated(topic, meshSize)
 	lg = lg.With().Int("mesh_size", meshSize).Logger()
 
