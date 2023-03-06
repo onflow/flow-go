@@ -159,7 +159,6 @@ func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 func (t *GossipSubMeshTracer) logPeers() {
 	t.topicMeshMu.RLock()
 	defer t.topicMeshMu.RUnlock()
-
 	for topic := range t.topicMeshMap {
 		shouldWarn := false // whether we should warn about the mesh state
 		lg := t.logger.With().Dur("heartbeat_interval", t.loggerInterval).Str("topic", topic).Logger()
