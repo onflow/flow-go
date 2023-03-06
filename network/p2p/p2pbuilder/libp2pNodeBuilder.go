@@ -46,8 +46,9 @@ const (
 	defaultMemoryLimitRatio     = 0.2 // flow default
 	defaultFileDescriptorsRatio = 0.5 // libp2p default
 
-	// DefaultPeerScoringEnabled is the default value for enabling peer scoring.
-	defaultPeerScoringEnabled = true // enable peer scoring by default on node builder
+	// defaultPeerScoringEnabled is the default value for enabling peer scoring.
+	// peer scoring is enabled by default.
+	defaultPeerScoringEnabled = true
 
 	// defaultMeshTracerLoggingInterval is the default interval at which the mesh tracer logs the mesh
 	// topology. This is used for debugging and forensics purposes.
