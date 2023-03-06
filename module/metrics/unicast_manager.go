@@ -37,7 +37,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "attempts_to_create_stream_due_to_in_progress_dial_total",
-			Help:      "number of retry attempts before stream created successfully",
+			Help:      "the number of times a stream creation is retried due to a dial in progress",
 			Buckets:   []float64{1, 2, 3},
 		}, []string{LabelSuccess},
 	)
