@@ -12,9 +12,10 @@ import (
 func main() {
 	dataFlag := flag.String("data", "", "Path to bootstrap JSON data.")
 	dockerTagFlag := flag.String("dockerTag", "", "Docker image tag.")
+	dockerRegistry := flag.String("dockerRegistry", "", "Docker image registry base URL.")
 	flag.Parse()
 
-	if *dataFlag == "" || *dockerTagFlag == "" {
+	if *dataFlag == "" || *dockerTagFlag == "" || *dockerRegistry == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
