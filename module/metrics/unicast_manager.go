@@ -46,7 +46,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      uc.prefix + "create_stream_duration",
+			Name:      uc.prefix + "overall_time_to_create_stream_second",
 			Help:      "the amount of time it takes to create a stream successfully",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
 		}, []string{LabelSuccess},
