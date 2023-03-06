@@ -8,17 +8,15 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTransactionSequenceNumProcess(t *testing.T) {
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
-		ledger := utils.NewSimpleView()
-		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 
 		// create an account
@@ -45,8 +43,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Equal(t, key.SeqNumber, uint64(1))
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
-		ledger := utils.NewSimpleView()
-		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 
 		// create an account
@@ -75,8 +72,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
 	t.Run("invalid address", func(t *testing.T) {
-		ledger := utils.NewSimpleView()
-		txnState := state.NewTransactionState(ledger, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 
 		// create an account

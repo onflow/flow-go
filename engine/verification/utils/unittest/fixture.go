@@ -278,6 +278,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 
 		me := new(moduleMock.Local)
+		me.On("NodeID").Return(unittest.IdentifierFixture())
+		me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil)
 
