@@ -1,14 +1,14 @@
 package pending_tree
 
 import (
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slices"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -111,6 +111,7 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 	// 1/3 byzantine participants
 	conflictingBlock.Header.View = block.Header.View
 	_, err := s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
+	require.NoError(s.T(), err)
 	// adding same block should result in no-op
 	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)

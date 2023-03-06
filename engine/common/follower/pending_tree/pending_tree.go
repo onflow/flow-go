@@ -2,10 +2,11 @@ package pending_tree
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
-	"sync"
 )
 
 // CertifiedBlock holds a certified block, it consists of block itself and a QC which proofs validity of block.
