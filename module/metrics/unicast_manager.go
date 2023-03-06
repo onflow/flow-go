@@ -76,7 +76,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      uc.prefix + "create_raw_stream_attempts",
+			Name:      uc.prefix + "attempts_to_create_stream_on_connection_total",
 			Help:      "number of retry attempts before a stream is created on the available connection between two peers",
 			Buckets:   []float64{1, 2, 3},
 		}, []string{LabelSuccess},
