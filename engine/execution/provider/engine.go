@@ -358,7 +358,7 @@ func (e *Engine) ensureAuthorized(originID flow.Identifier) (*flow.Identity, err
 	}
 
 	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight requesting chunk data pack (%s)", originID)
+		return nil, engine.NewInvalidInputErrorf("node %s has zero weight requesting chunk data pack", originID)
 	}
 	return origin, nil
 }
