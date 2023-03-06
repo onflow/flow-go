@@ -8,7 +8,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -56,7 +55,7 @@ type BlockAwareStorage interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnBlockExecuted(block *flow.Header, delta delta.SpockSnapshot) error
+	OnBlockExecuted(block *flow.Header, result *execution.ComputationResult) error
 }
 
 type ReadOnlyRegisterStorage interface {
@@ -129,7 +128,6 @@ type ReadOnlyExecutionState interface {
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
-	ReadOnlyExecutionState
 	RegisterStorage
 	AttestationStorage
 }
@@ -156,7 +154,7 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-	// TODO(ramtin): properly implement the read done methods
+	// TODO(ramtin): properly implement the ready done methods
 	module.NoopReadyDoneAware
 }
 
@@ -459,7 +457,7 @@ func (s *state) OnSealedBlock(block *flow.Header) {
 	return
 }
 
-func (s *state) OnBlockExecuted(block *flow.Header, delta delta.SpockSnapshot) error {
+func (s *state) OnBlockExecuted(block *flow.Header, res *execution.ComputationResult) error {
 	// ramtin: currently we don't do anything here, the committer injected to the computer engine is doing the update right now
 	// no-op
 	return nil
