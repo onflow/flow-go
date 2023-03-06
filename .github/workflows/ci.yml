@@ -233,7 +233,7 @@ jobs:
       if: github.actor == 'bors[bot]'
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 15
+        timeout_minutes: 25
         max_attempts: 2
         command: ${{ matrix.make }}
 
