@@ -274,11 +274,6 @@ func (s *state) SaveExecutionResults(
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
 		}
-
-		err = s.headers.BatchIndexByChunkID(blockID, chunkDataPack.ChunkID, batch)
-		if err != nil {
-			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
-		}
 	}
 
 	err := s.commits.BatchStore(blockID, result.EndState, batch)
