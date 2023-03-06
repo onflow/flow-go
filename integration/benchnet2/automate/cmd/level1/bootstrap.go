@@ -21,5 +21,5 @@ func main() {
 	}
 
 	bootstrap := level1.NewBootstrap(*dataFlag)
-	bootstrap.GenTemplateData(true, *dockerTagFlag)
+	bootstrap.GenTemplateData(true, *dockerTagFlag, *dockerRegistry)
 }
