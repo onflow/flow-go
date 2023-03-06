@@ -18,6 +18,9 @@ import (
 const (
 	// MeshLogIntervalMsg is the message logged by the tracer every logInterval.
 	MeshLogIntervalMsg = "topic mesh peers of local node since last heartbeat"
+
+	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
+	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
 )
 
 // GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
@@ -175,7 +178,7 @@ func (t *GossipSubMeshTracer) logPeers() {
 		if shouldWarn {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
-				Msg(MeshLogIntervalMsg)
+				Msg(MeshLogIntervalWarnMsg)
 			continue
 		}
 		lg.Info().Msg(MeshLogIntervalMsg)
