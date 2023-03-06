@@ -47,7 +47,7 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "overall_time_to_create_stream_second",
-			Help:      "the amount of time it takes to create a stream successfully",
+			Help:      "the amount of time it takes to create a stream successfully in seconds including the time to create a connection when needed",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
 		}, []string{LabelSuccess},
 	)
