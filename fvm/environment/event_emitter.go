@@ -50,12 +50,12 @@ type EventEmitter interface {
 }
 
 type ParseRestrictedEventEmitter struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     EventEmitter
 }
 
 func NewParseRestrictedEventEmitter(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl EventEmitter,
 ) EventEmitter {
 	return ParseRestrictedEventEmitter{

@@ -17,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -166,9 +165,6 @@ func BenchmarkComputeBlock(b *testing.B) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-	blockView := view.NewChild()
-
 	b.SetParallelism(1)
 
 	parentBlock := &flow.Block{
@@ -192,7 +188,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 			b.StartTimer()
 			start := time.Now()
-			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			res, err := engine.ComputeBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				executableBlock,
+				ledger)
 			elapsed += time.Since(start)
 			b.StopTimer()
 

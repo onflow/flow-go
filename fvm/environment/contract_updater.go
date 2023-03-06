@@ -83,12 +83,12 @@ type ContractUpdater interface {
 }
 
 type ParseRestrictedContractUpdater struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     ContractUpdater
 }
 
 func NewParseRestrictedContractUpdater(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl ContractUpdater,
 ) ParseRestrictedContractUpdater {
 	return ParseRestrictedContractUpdater{

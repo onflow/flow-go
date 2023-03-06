@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -92,7 +93,7 @@ func (fcv *ChunkVerifier) Verify(
 }
 
 type partialLedgerStorageSnapshot struct {
-	snapshot delta.StorageSnapshot
+	snapshot fvmState.StorageSnapshot
 
 	unknownRegTouch map[flow.RegisterID]struct{}
 }
@@ -199,7 +200,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		serviceEvents = append(serviceEvents, tx.ConvertedServiceEvents...)
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
-		err = chunkView.MergeView(txView)
+		err = chunkView.Merge(txView)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}

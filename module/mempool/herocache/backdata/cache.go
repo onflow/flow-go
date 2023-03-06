@@ -147,7 +147,6 @@ func (c *Cache) Has(entityID flow.Identifier) bool {
 // Add adds the given entity to the backdata.
 func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	defer c.logTelemetry()
-
 	return c.put(entityID, entity)
 }
 
@@ -286,15 +285,15 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex, slotAvailable, ejectionHappened := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	entityIndex, slotAvailable, ejectedEntity := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	if !slotAvailable {
 		c.collector.OnKeyPutDrop()
 		return false
 	}
 
-	if ejectionHappened {
+	if ejectedEntity != nil {
 		// cache is at its full size and ejection happened to make room for this new entity.
-		c.collector.OnEntityEjectionDueToFullCapacity()
+		c.collector.OnEntityEjectionDueToFullCapacity(ejectedEntity)
 	}
 
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount

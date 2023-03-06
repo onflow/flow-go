@@ -80,11 +80,10 @@ const (
 	// Execution Node
 	//
 
-	EXEHandleBlock             SpanName = "exe.ingestion.handleBlock"
-	EXEHandleCollection        SpanName = "exe.ingestion.handleCollection"
-	EXEHandleComputationResult SpanName = "exe.ingestion.handleComputationResult"
-	EXEExecuteBlock            SpanName = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults    SpanName = "exe.ingestion.saveExecutionResults"
+	EXEHandleBlock          SpanName = "exe.ingestion.handleBlock"
+	EXEHandleCollection     SpanName = "exe.ingestion.handleCollection"
+	EXEExecuteBlock         SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults SpanName = "exe.ingestion.saveExecutionResults"
 
 	EXEUploadCollections         SpanName = "exe.manager.uploadCollections"
 	EXEAddToExecutionDataService SpanName = "exe.manager.addToExecutionDataService"
@@ -99,8 +98,6 @@ const (
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 

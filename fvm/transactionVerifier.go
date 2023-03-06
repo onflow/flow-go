@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -169,7 +169,7 @@ type TransactionVerifier struct {
 func (v *TransactionVerifier) CheckAuthorization(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	keyWeightThreshold int,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
@@ -189,7 +189,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 func (v *TransactionVerifier) verifyTransaction(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	keyWeightThreshold int,
 ) error {
 	span := tracer.StartChildSpan(trace.FVMVerifyTransaction)
@@ -264,7 +264,7 @@ func (v *TransactionVerifier) verifyTransaction(
 // getAccountKeys gets the signatures' account keys and populate the account
 // keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,
