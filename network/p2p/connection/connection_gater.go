@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -112,6 +113,7 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 // InterceptSecured a callback executed after the libp2p security handshake. It tests whether to accept or reject
 // an inbound connection based on its peer id.
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
+	fmt.Println("CONN GATER", p.String())
 	switch dir {
 	case network.DirInbound:
 		lg := c.log.With().

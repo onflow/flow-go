@@ -543,7 +543,6 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
-
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

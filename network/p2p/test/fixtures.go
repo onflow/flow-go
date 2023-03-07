@@ -129,6 +129,10 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.UnicastManagerFactoryFunc != nil {
+		builder.SetUnicastManagerFactoryFunc(parameters.UnicastManagerFactoryFunc)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -149,26 +153,33 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc            network.StreamHandler
-	Unicasts               []protocols.ProtocolName
-	Key                    crypto.PrivateKey
-	Address                string
-	DhtOptions             []dht.Option
-	Role                   flow.Role
-	Logger                 zerolog.Logger
-	PeerScoringEnabled     bool
-	IdProvider             module.IdentityProvider
-	AppSpecificScore       func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
-	ConnectionPruning      bool                  // peer manager parameter
-	UpdateInterval         time.Duration         // peer manager parameter
-	PeerProvider           p2p.PeersProvider     // peer manager parameter
-	ConnGater              connmgr.ConnectionGater
-	ConnManager            connmgr.ConnManager
-	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
-	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
-	Metrics                module.NetworkMetrics
-	ResourceManager        network.ResourceManager
-	CreateStreamRetryDelay time.Duration
+	HandlerFunc               network.StreamHandler
+	Unicasts                  []protocols.ProtocolName
+	Key                       crypto.PrivateKey
+	Address                   string
+	DhtOptions                []dht.Option
+	Role                      flow.Role
+	Logger                    zerolog.Logger
+	PeerScoringEnabled        bool
+	IdProvider                module.IdentityProvider
+	AppSpecificScore          func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning         bool                  // peer manager parameter
+	UpdateInterval            time.Duration         // peer manager parameter
+	PeerProvider              p2p.PeersProvider     // peer manager parameter
+	ConnGater                 connmgr.ConnectionGater
+	ConnManager               connmgr.ConnManager
+	GossipSubFactory          p2pbuilder.GossipSubFactoryFunc
+	GossipSubConfig           p2pbuilder.GossipSubAdapterConfigFunc
+	Metrics                   module.NetworkMetrics
+	ResourceManager           network.ResourceManager
+	CreateStreamRetryDelay    time.Duration
+	UnicastManagerFactoryFunc p2pbuilder.UnicastManagerFactoryFunc
+}
+
+func WithUnicastManagerFactoryFunc(f p2pbuilder.UnicastManagerFactoryFunc) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.UnicastManagerFactoryFunc = f
+	}
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {

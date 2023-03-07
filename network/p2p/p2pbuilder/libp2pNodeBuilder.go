@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -43,8 +44,9 @@ import (
 )
 
 const (
-	defaultMemoryLimitRatio     = 0.2 // flow default
-	defaultFileDescriptorsRatio = 0.5 // libp2p default
+	defaultMemoryLimitRatio          = 0.2 // flow default
+	defaultFileDescriptorsRatio      = 0.5 // libp2p default
+	defaultPeerBaseLimitConnsInbound = 10
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -55,6 +57,14 @@ type CreateNodeFunc func(logger zerolog.Logger,
 	pCache *p2pnode.ProtocolPeerCache,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
+
+// UnicastManagerFactoryFunc factory func that can be used to override the default unicast manager
+type UnicastManagerFactoryFunc func(logger zerolog.Logger,
+	streamFactory stream.Factory,
+	sporkId flow.Identifier,
+	createStreamRetryDelay time.Duration,
+	connStatus p2p.PeerConnections,
+	metrics module.UnicastManagerMetrics) p2p.UnicastManager
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -108,6 +118,7 @@ type NodeBuilder interface {
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
+	SetUnicastManagerFactoryFunc(UnicastManagerFactoryFunc) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -115,14 +126,16 @@ type NodeBuilder interface {
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	MemoryLimitRatio     float64 // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+	MemoryLimitRatio          float64 // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio      float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+	PeerBaseLimitConnsInbound int     // the maximum amount of allowed inbound connections per peer
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
 	return &ResourceManagerConfig{
-		MemoryLimitRatio:     defaultMemoryLimitRatio,
-		FileDescriptorsRatio: defaultFileDescriptorsRatio,
+		MemoryLimitRatio:          defaultMemoryLimitRatio,
+		FileDescriptorsRatio:      defaultFileDescriptorsRatio,
+		PeerBaseLimitConnsInbound: defaultPeerBaseLimitConnsInbound,
 	}
 }
 
@@ -148,6 +161,7 @@ type LibP2PNodeBuilder struct {
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
 	createStreamRetryInterval   time.Duration
+	uniMgrFactory               UnicastManagerFactoryFunc
 	rateLimiterDistributor      p2p.UnicastRateLimiterDistributor
 }
 
@@ -165,6 +179,7 @@ func NewNodeBuilder(logger zerolog.Logger,
 		createNode:          DefaultCreateNodeFunc,
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		uniMgrFactory:       defaultUnicastManagerFactory(),
 		metrics:             metrics,
 		resourceManagerCfg:  rCfg,
 	}
@@ -181,6 +196,22 @@ func defaultGossipSubAdapterConfig() GossipSubAdapterConfigFunc {
 		return p2pnode.NewGossipSubAdapterConfig(cfg)
 	}
 
+}
+
+func defaultUnicastManagerFactory() UnicastManagerFactoryFunc {
+	return func(logger zerolog.Logger,
+		streamFactory stream.Factory,
+		sporkId flow.Identifier,
+		createStreamRetryDelay time.Duration,
+		connStatus p2p.PeerConnections,
+		metrics module.UnicastManagerMetrics) p2p.UnicastManager {
+		return unicast.NewUnicastManager(logger,
+			streamFactory,
+			sporkId,
+			createStreamRetryDelay,
+			connStatus,
+			metrics)
+	}
 }
 
 // SetBasicResolver sets the DNS resolver for the node.
@@ -255,6 +286,11 @@ func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRet
 	return builder
 }
 
+func (builder *LibP2PNodeBuilder) SetUnicastManagerFactoryFunc(f UnicastManagerFactoryFunc) NodeBuilder {
+	builder.uniMgrFactory = f
+	return builder
+}
+
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	if builder.routingFactory == nil {
@@ -280,6 +316,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	} else {
 		// setting up default resource manager, by hooking in the resource manager metrics reporter.
 		limits := rcmgr.DefaultLimits
+
 		libp2p.SetDefaultServiceLimits(&limits)
 
 		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
@@ -290,7 +327,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}
-
+		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound //
 		l := limits.Scale(mem, fd)
 		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metrics))
 		if err != nil {
@@ -342,13 +379,13 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	node := builder.createNode(builder.logger, h, pCache, peerManager)
 
-	unicastManager := unicast.NewUnicastManager(builder.logger,
-		unicast.NewLibP2PStreamFactory(h),
+	uniMgr := builder.uniMgrFactory(builder.logger,
+		stream.NewLibP2PStreamFactory(h),
 		builder.sporkID,
 		builder.createStreamRetryInterval,
 		node,
 		builder.metrics)
-	node.SetUnicastManager(unicastManager)
+	node.SetUnicastManager(uniMgr)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

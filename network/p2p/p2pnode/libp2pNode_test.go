@@ -384,6 +384,68 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }
 
+// TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for PeerDefaultLimits.ConnsInbound restricts the number of inbound
+// connections created from a peer to the configured value.
+func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
+	idProvider := mockmodule.NewIdentityProvider(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+
+	uniMgrFactory := p2ptest.UnicastManagerFixtureFactory()
+
+	sender, id1 := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			return nil
+		})),
+		p2ptest.WithDefaultResourceManager(),
+		p2ptest.WithUnicastManagerFactoryFunc(uniMgrFactory),
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+
+	receiver, id2 := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithDefaultResourceManager(),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			return nil
+		})),
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+
+	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
+	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
+
+	fmt.Println("SENDER", sender.Host().ID())
+	fmt.Println("RECEIVER", receiver.Host().ID())
+
+	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
+
+	pInfo, err := utils.PeerAddressInfo(id2)
+	require.NoError(t, err)
+	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+
+	pInfo, err = utils.PeerAddressInfo(id1)
+	require.NoError(t, err)
+	receiver.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+
+	for i := 0; i < 20; i++ {
+		go func() {
+			_, err = sender.CreateStream(ctx, receiver.Host().ID())
+			require.NoError(t, err)
+		}()
+	}
+
+	time.Sleep(5 * time.Second)
+
+	fmt.Println("CONNS TO PEER", len(receiver.Host().Network().ConnsToPeer(sender.Host().ID())))
+}
+
 // createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
 func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList, n int, streams chan network.Stream, done chan struct{}) {
 	defer close(done)
@@ -422,6 +484,7 @@ func ensureSinglePairwiseConnection(t *testing.T, nodes []p2p.LibP2PNode) {
 			if this == other {
 				continue
 			}
+			fmt.Println(fmt.Sprintf("%s -> %s", this.Host().ID(), other.Host().ID()), this.Host().Network().ConnsToPeer(other.Host().ID()))
 			require.Len(t, this.Host().Network().ConnsToPeer(other.Host().ID()), 1)
 		}
 	}
