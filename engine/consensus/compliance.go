@@ -22,9 +22,9 @@ type Compliance interface {
 	// OnBlockProposal feeds a new block proposal into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnBlockProposal(proposal flow.Slashable[messages.BlockProposal])
+	OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 	// OnSyncedBlocks feeds a range of blocks obtained from sync into the processing pipeline.
 	// Incoming proposals will be queued and eventually dispatched by worker.
 	// This method is non-blocking.
-	OnSyncedBlocks(blocks flow.Slashable[[]messages.BlockProposal])
+	OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal])
 }

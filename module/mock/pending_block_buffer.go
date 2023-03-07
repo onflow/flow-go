@@ -27,14 +27,14 @@ func (_m *PendingBlockBuffer) Add(originID flow.Identifier, block *flow.Block) b
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[flow.Block], bool) {
+func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Block], bool) {
 	ret := _m.Called(blockID)
 
-	var r0 flow.Slashable[flow.Block]
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[flow.Block]); ok {
+	var r0 flow.Slashable[*flow.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*flow.Block]); ok {
 		r0 = rf(blockID)
 	} else {
-		r0 = ret.Get(0).(flow.Slashable[flow.Block])
+		r0 = ret.Get(0).(flow.Slashable[*flow.Block])
 	}
 
 	var r1 bool
@@ -48,15 +48,15 @@ func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[flow
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[flow.Block], bool) {
+func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Block], bool) {
 	ret := _m.Called(parentID)
 
-	var r0 []flow.Slashable[flow.Block]
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[flow.Block]); ok {
+	var r0 []flow.Slashable[*flow.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*flow.Block]); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Slashable[flow.Block])
+			r0 = ret.Get(0).([]flow.Slashable[*flow.Block])
 		}
 	}
 

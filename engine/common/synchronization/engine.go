@@ -300,20 +300,20 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	last := res.Blocks[len(res.Blocks)-1].Header.Height
 	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
-	filteredBlocks := make([]messages.BlockProposal, 0, len(res.Blocks))
+	filteredBlocks := make([]*messages.BlockProposal, 0, len(res.Blocks))
 	for _, block := range res.Blocks {
 		header := block.Header
 		if !e.core.HandleBlock(&header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredBlocks = append(filteredBlocks, messages.BlockProposal{Block: block})
+		filteredBlocks = append(filteredBlocks, &messages.BlockProposal{Block: block})
 	}
 
 	// forward the block to the compliance engine for validation and processing
-	e.comp.OnSyncedBlocks(flow.Slashable[[]messages.BlockProposal]{
+	e.comp.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: originID,
-		Message:  nil,
+		Message:  filteredBlocks,
 	})
 }
 

@@ -120,7 +120,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(flow.Slashable[messages.BlockProposal])
+			inBlock := msg.(flow.Slashable[*messages.BlockProposal])
 			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
 			e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
 			if err != nil {
@@ -148,7 +148,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 
 // OnBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
+func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
@@ -159,7 +159,7 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]
 
 // OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]messages.BlockProposal]) {
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()

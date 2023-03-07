@@ -29,14 +29,14 @@ func (_m *PendingClusterBlockBuffer) Add(originID flow.Identifier, block *cluste
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[cluster.Block], bool) {
+func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool) {
 	ret := _m.Called(blockID)
 
-	var r0 flow.Slashable[cluster.Block]
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[cluster.Block]); ok {
+	var r0 flow.Slashable[*cluster.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*cluster.Block]); ok {
 		r0 = rf(blockID)
 	} else {
-		r0 = ret.Get(0).(flow.Slashable[cluster.Block])
+		r0 = ret.Get(0).(flow.Slashable[*cluster.Block])
 	}
 
 	var r1 bool
@@ -50,15 +50,15 @@ func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashab
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[cluster.Block], bool) {
+func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool) {
 	ret := _m.Called(parentID)
 
-	var r0 []flow.Slashable[cluster.Block]
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[cluster.Block]); ok {
+	var r0 []flow.Slashable[*cluster.Block]
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*cluster.Block]); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Slashable[cluster.Block])
+			r0 = ret.Get(0).([]flow.Slashable[*cluster.Block])
 		}
 	}
 

@@ -193,7 +193,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.ClusterBlockFixture()
 
 		blockProposalMsg := messages.NewClusterBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[messages.ClusterBlockProposal]{
+		expectedComplianceMsg := flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}

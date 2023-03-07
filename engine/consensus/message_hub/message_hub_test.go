@@ -180,7 +180,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.BlockFixture()
 
 		blockProposalMsg := messages.NewBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[messages.BlockProposal]{
+		expectedComplianceMsg := flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}
