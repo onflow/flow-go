@@ -9,13 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/network"
-
-	"github.com/onflow/flow-go/network/message"
-
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -30,13 +27,15 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -105,9 +104,10 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 		sporkID,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
+			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(testutils.NewResourceManager(t))
+		SetResourceManager(testutils.NewResourceManager(t)).
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -357,7 +357,6 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
-
 			// runs the error checkers if any.
 			for _, check := range errorCheckers {
 				check(t, err)

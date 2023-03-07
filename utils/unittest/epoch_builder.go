@@ -22,6 +22,16 @@ type EpochHeights struct {
 	CommittedFinal uint64 // final height of the committed phase
 }
 
+// FirstHeight returns the height of the first block in the epoch.
+func (epoch EpochHeights) FirstHeight() uint64 {
+	return epoch.Staking
+}
+
+// FinalHeight returns the height of the first block in the epoch.
+func (epoch EpochHeights) FinalHeight() uint64 {
+	return epoch.CommittedFinal
+}
+
 // Range returns the range of all heights that are in this epoch.
 func (epoch EpochHeights) Range() []uint64 {
 	var heights []uint64
