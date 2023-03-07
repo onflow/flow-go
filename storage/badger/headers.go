@@ -17,10 +17,9 @@ import (
 
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
-	db           *badger.DB
-	cache        *Cache
-	heightCache  *Cache
-	chunkIDCache *Cache
+	db          *badger.DB
+	cache       *Cache
+	heightCache *Cache
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
