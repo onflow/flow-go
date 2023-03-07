@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -58,10 +59,9 @@ type transactionExecutor struct {
 	TransactionStorageLimiter
 	TransactionPayerBalanceChecker
 
-	ctx            Context
-	proc           *TransactionProcedure
-	txnState       *state.TransactionState
-	derivedTxnData *derived.DerivedTransactionData
+	ctx      Context
+	proc     *TransactionProcedure
+	txnState storage.Transaction
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -78,8 +78,7 @@ type transactionExecutor struct {
 func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) *transactionExecutor {
 	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
@@ -91,8 +90,7 @@ func newTransactionExecutor(
 	env := environment.NewTransactionEnvironment(
 		span,
 		ctx.EnvironmentParams,
-		txnState,
-		derivedTxnData)
+		txnState)
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
@@ -102,7 +100,6 @@ func newTransactionExecutor(
 		ctx:            ctx,
 		proc:           proc,
 		txnState:       txnState,
-		derivedTxnData: derivedTxnData,
 		span:           span,
 		env:            env,
 		errs:           errors.NewErrorsCollector(),
@@ -155,8 +152,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
-		executor.txnState,
-		executor.derivedTxnData)
+		executor.txnState)
 	if err != nil {
 		return fmt.Errorf("error gettng meter parameters: %w", err)
 	}
@@ -199,7 +195,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 
 	// Pause the transaction body's nested transaction in order to interleave
 	// auth and seq num checks.
-	pausedState, err := executor.txnState.Pause(txnId)
+	pausedState, err := executor.txnState.PauseNestedTransaction(txnId)
 	if err != nil {
 		return err
 	}
@@ -249,7 +245,7 @@ func (executor *transactionExecutor) abortPreprocessed() error {
 		return nil
 	}
 
-	executor.txnState.Resume(executor.pausedState)
+	executor.txnState.ResumeNestedTransaction(executor.pausedState)
 
 	// There shouldn't be any update, but drop all updates just in case.
 	err := executor.txnState.RestartNestedTransaction(executor.nestedTxnId)
@@ -259,12 +255,12 @@ func (executor *transactionExecutor) abortPreprocessed() error {
 
 	// We need to commit the aborted state unconditionally to include
 	// the touched registers in the execution receipt.
-	_, err = executor.txnState.Commit(executor.nestedTxnId)
+	_, err = executor.txnState.CommitNestedTransaction(executor.nestedTxnId)
 	return err
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	executor.txnState.Resume(executor.pausedState)
+	executor.txnState.ResumeNestedTransaction(executor.pausedState)
 
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
@@ -482,9 +478,10 @@ func (executor *transactionExecutor) commit(
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
-	executor.derivedTxnData.AddInvalidator(invalidator)
+	executor.txnState.AddInvalidator(invalidator)
 
-	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
+	_, commitErr := executor.txnState.CommitNestedTransaction(
+		executor.nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
 			"transaction invocation failed when merging state: %w",

@@ -138,12 +138,12 @@ type AccountKeyUpdater interface {
 }
 
 type ParseRestrictedAccountKeyUpdater struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountKeyUpdater
 }
 
 func NewParseRestrictedAccountKeyUpdater(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountKeyUpdater,
 ) ParseRestrictedAccountKeyUpdater {
 	return ParseRestrictedAccountKeyUpdater{
@@ -259,7 +259,7 @@ type accountKeyUpdater struct {
 	meter  Meter
 
 	accounts Accounts
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	env      Environment
 }
 
@@ -267,7 +267,7 @@ func NewAccountKeyUpdater(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{

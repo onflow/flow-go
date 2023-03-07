@@ -109,11 +109,33 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
     ep2_copy(elemsG2[1], (ep2_st*)pk);
+    ep2_new(&elemsG2[0]);
+
+    int ret = UNDEFINED;
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
-    ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded
+
+    // TODO: temporary fix to delete once a bug in Relic is fixed
+    // The DOUBLE_PAIRING is still preferred over non-buggy SINGLE_PAIRING as
+    // the verification is 1.5x faster
+    // if sig=h then ret <- pk == g2 
+    if (ep_cmp(elemsG1[0], elemsG1[1])==RLC_EQ && ep2_cmp(elemsG2[1], core_get()->ep2_g)==RLC_EQ) {
+        ret = VALID;
+        goto out;
+    } 
+    // if pk = -g2 then ret <- s == -h
+    if (ep2_cmp(elemsG2[0], elemsG2[1])==RLC_EQ) { 
+        ep_st sum; ep_new(&sum);
+        ep_add(&sum, elemsG1[0], elemsG1[1]);
+        if (ep_is_infty(&sum)) {
+            ep_free(&sum);
+            ret = VALID;
+            goto out;
+        }
+        ep_free(&sum);
+    }  
 
     fp12_t pair;
     fp12_new(&pair);
@@ -130,17 +152,24 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
-#endif
+#endif   
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) {
+            ret = VALID;
+            goto out;
+        } else {
+            ret = INVALID;
+            goto out;
+        }
+    }
+    
+out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
-    
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) return VALID;
-        return INVALID;
-    }
-    return UNDEFINED;
+
+    return ret;
 }
 
 

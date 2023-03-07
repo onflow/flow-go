@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	storageTxn "github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -28,12 +28,12 @@ type BlockInfo interface {
 }
 
 type ParseRestrictedBlockInfo struct {
-	txnState *state.TransactionState
+	txnState storageTxn.Transaction
 	impl     BlockInfo
 }
 
 func NewParseRestrictedBlockInfo(
-	txnState *state.TransactionState,
+	txnState storageTxn.Transaction,
 	impl BlockInfo,
 ) BlockInfo {
 	return ParseRestrictedBlockInfo{

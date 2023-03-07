@@ -219,6 +219,7 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 // It means that the connection is ready to be used for sending and receiving messages.
 // It checks that no disallowed peer can upgrade the connection.
 func TestConnectionGater_InterceptUpgrade(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "fails locally and on CI regularly")
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()

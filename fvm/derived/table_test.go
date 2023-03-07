@@ -1,13 +1,14 @@
 package derived
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -24,7 +25,9 @@ func TestDerivedDataTableWithTransactionOffset(t *testing.T) {
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnDerivedDataNormalTransactionInvalidExecutionTimeBound(t *testing.T) {
+func TestDerivedDataTableNormalTransactionInvalidExecutionTimeBound(
+	t *testing.T,
+) {
 	block := newEmptyTestBlock()
 
 	_, err := block.NewTableTransaction(-1, -1)
@@ -40,7 +43,7 @@ func TestTxnDerivedDataNormalTransactionInvalidExecutionTimeBound(t *testing.T) 
 	require.NoError(t, err)
 }
 
-func TestTxnDerivedDataNormalTransactionInvalidSnapshotTime(t *testing.T) {
+func TestDerivedDataTableNormalTransactionInvalidSnapshotTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	_, err := block.NewTableTransaction(10, 0)
@@ -56,7 +59,9 @@ func TestTxnDerivedDataNormalTransactionInvalidSnapshotTime(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testing.T) {
+func TestDerivedDataTableSnapshotReadTransactionInvalidExecutionTimeBound(
+	t *testing.T,
+) {
 	block := newEmptyTestBlock()
 
 	_, err := block.NewSnapshotReadTableTransaction(
@@ -76,7 +81,7 @@ func TestTxnDerivedDataSnapshotReadTransactionInvalidExecutionTimeBound(t *testi
 	require.NoError(t, err)
 }
 
-func TestTxnDerivedDataToValidateTime(t *testing.T) {
+func TestDerivedDataTableToValidateTime(t *testing.T) {
 	block := NewEmptyTableWithOffset[string, *string](8)
 	require.Equal(
 		t,
@@ -223,7 +228,53 @@ func TestTxnDerivedDataToValidateTime(t *testing.T) {
 	}
 }
 
-func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
+func TestDerivedDataTableOutOfOrderValidate(t *testing.T) {
+	block := newEmptyTestBlock()
+
+	testTxn1, err := block.NewTableTransaction(0, 0)
+	require.NoError(t, err)
+
+	testTxn2, err := block.NewTableTransaction(1, 1)
+	require.NoError(t, err)
+
+	testTxn3, err := block.NewTableTransaction(2, 2)
+	require.NoError(t, err)
+
+	testTxn4, err := block.NewTableTransaction(3, 3)
+	require.NoError(t, err)
+
+	// Validate can be called in any order as long as the transactions
+	// are committed in the correct order.
+
+	validateErr := testTxn4.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn2.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn3.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn1.Validate()
+	require.NoError(t, validateErr)
+
+	err = testTxn1.Commit()
+	require.NoError(t, err)
+
+	validateErr = testTxn2.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn3.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn4.Validate()
+	require.NoError(t, validateErr)
+
+	validateErr = testTxn2.Validate()
+	require.NoError(t, validateErr)
+}
+
+func TestDerivedDataTableValidateRejectOutOfOrderCommit(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testTxn, err := block.NewTableTransaction(0, 0)
@@ -243,7 +294,7 @@ func TestTxnDerivedDataValidateRejectOutOfOrderCommit(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnDerivedDataValidateRejectNonIncreasingExecutionTime(t *testing.T) {
+func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
@@ -260,47 +311,7 @@ func TestTxnDerivedDataValidateRejectNonIncreasingExecutionTime(t *testing.T) {
 	require.False(t, validateErr.IsRetryable())
 }
 
-func TestTxnDerivedDataValidateRejectCommitGapForNormalTxn(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewTableTransaction(10, 10)
-	require.NoError(t, err)
-
-	validateErr := testTxn.Validate()
-	require.ErrorContains(t, validateErr, "missing commit range [6, 10)")
-	require.False(t, validateErr.IsRetryable())
-}
-
-func TestTxnDerivedDataValidateRejectCommitGapForSnapshotRead(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := LogicalTime(5)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(10, 10)
-	require.NoError(t, err)
-
-	validateErr := testTxn.Validate()
-	require.ErrorContains(t, validateErr, "missing commit range [6, 10)")
-	require.False(t, validateErr.IsRetryable())
-}
-
-func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
+func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn1, err := block.NewTableTransaction(0, 0)
@@ -345,7 +356,7 @@ func TestTxnDerivedDataValidateRejectOutdatedReadSet(t *testing.T) {
 	require.True(t, validateErr.IsRetryable())
 }
 
-func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
+func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
@@ -369,7 +380,7 @@ func TestTxnDerivedDataValidateRejectOutdatedWriteSet(t *testing.T) {
 	require.True(t, validateErr.IsRetryable())
 }
 
-func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
+func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
@@ -391,7 +402,7 @@ func TestTxnDerivedDataValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T)
 	require.NoError(t, err)
 }
 
-func TestTxnDerivedDataCommitEndOfBlockSnapshotRead(t *testing.T) {
+func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(5)
@@ -414,7 +425,7 @@ func TestTxnDerivedDataCommitEndOfBlockSnapshotRead(t *testing.T) {
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
+func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	commitTime := LogicalTime(71)
@@ -439,7 +450,7 @@ func TestTxnDerivedDataCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnDerivedDataCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
+func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testTxn, err := block.NewTableTransaction(0, 0)
@@ -487,7 +498,7 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
 	require.Same(t, expectedState, entry.State)
 }
 
-func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
+func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testTxnTime := LogicalTime(47)
@@ -539,7 +550,7 @@ func TestTxnDerivedDataCommitWriteOnlyTransactionWithInvalidation(t *testing.T) 
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestTxnDerivedDataCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
+func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 11)
@@ -587,7 +598,7 @@ func TestTxnDerivedDataCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.
 	require.NotSame(t, otherState, actualEntry.State)
 }
 
-func TestTxnDerivedDataCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
+func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 0)
@@ -658,7 +669,7 @@ func TestTxnDerivedDataCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	require.Same(t, expectedState2, entry.State)
 }
 
-func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
+func TestDerivedDataTableCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn1Time := LogicalTime(2)
@@ -742,7 +753,7 @@ func TestTxnDerivedDataCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestTxnDerivedDataCommitValidateError(t *testing.T) {
+func TestDerivedDataTableCommitValidateError(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 10)
@@ -759,7 +770,59 @@ func TestTxnDerivedDataCommitValidateError(t *testing.T) {
 	require.False(t, commitErr.IsRetryable())
 }
 
-func TestTxnDerivedDataCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
+func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
+	block := newEmptyTestBlock()
+
+	commitTime := LogicalTime(5)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
+	require.NoError(t, err)
+
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		commitTime,
+		block.LatestCommitExecutionTimeForTestingOnly())
+
+	testTxn, err := block.NewTableTransaction(10, 10)
+	require.NoError(t, err)
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+
+	commitErr := testTxn.Commit()
+	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
+	require.False(t, commitErr.IsRetryable())
+}
+
+func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
+	block := newEmptyTestBlock()
+
+	commitTime := LogicalTime(5)
+	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
+	require.NoError(t, err)
+
+	err = testSetupTxn.Commit()
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		commitTime,
+		block.LatestCommitExecutionTimeForTestingOnly())
+
+	testTxn, err := block.NewSnapshotReadTableTransaction(10, 10)
+	require.NoError(t, err)
+
+	err = testTxn.Validate()
+	require.NoError(t, err)
+
+	commitErr := testTxn.Commit()
+	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
+	require.False(t, commitErr.IsRetryable())
+}
+
+func TestDerivedDataTableCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	expectedTime := LogicalTime(10)
@@ -781,7 +844,7 @@ func TestTxnDerivedDataCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) 
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
-func TestTxnDerivedDataCommitBadSnapshotReadInvalidator(t *testing.T) {
+func TestDerivedDataTableCommitBadSnapshotReadInvalidator(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testTxn, err := block.NewSnapshotReadTableTransaction(0, 42)
@@ -794,7 +857,7 @@ func TestTxnDerivedDataCommitBadSnapshotReadInvalidator(t *testing.T) {
 	require.False(t, commitErr.IsRetryable())
 }
 
-func TestTxnDerivedDataCommitFineGrainInvalidation(t *testing.T) {
+func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	// Setup the database with two read entries
@@ -973,12 +1036,12 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 }
 
 type testValueComputer struct {
-	value  int
-	called bool
+	valueFunc func() (int, error)
+	called    bool
 }
 
 func (computer *testValueComputer) Compute(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	key flow.RegisterID,
 ) (
 	int,
@@ -990,30 +1053,49 @@ func (computer *testValueComputer) Compute(
 		return 0, err
 	}
 
-	return computer.value, nil
+	return computer.valueFunc()
 }
 
-func TestTxnDerivedDataGetOrCompute(t *testing.T) {
+func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	blockDerivedData := NewEmptyTable[flow.RegisterID, int]()
 
 	key := flow.NewRegisterID("addr", "key")
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		// first attempt to compute the value returns an error.
+		// But it's perfectly safe to handle the error and try again with the same txnState.
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return 0, fmt.Errorf("compute error") },
+		}
+		_, err = txnDerivedData.GetOrCompute(txnState, key, computer)
+		assert.Error(t, err)
+		assert.Equal(t, 0, txnState.NumNestedTransactions())
+
+		// second attempt to compute the value succeeds.
+
+		computer = &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[key]
-		assert.True(t, ok)
+		found := false
+		for _, id := range view.AllRegisterIDs() {
+			if id == key {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
 
 		// Commit to setup the next test.
 		err = txnDerivedData.Commit()
@@ -1021,19 +1103,27 @@ func TestTxnDerivedDataGetOrCompute(t *testing.T) {
 	})
 
 	t.Run("get value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
-		_, ok := view.Ledger.RegisterTouches[key]
-		assert.True(t, ok)
+		found := false
+		for _, id := range view.AllRegisterIDs() {
+			if id == key {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
 	})
 }

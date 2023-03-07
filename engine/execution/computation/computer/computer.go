@@ -111,7 +111,7 @@ type BlockComputer interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot delta.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
@@ -130,6 +130,7 @@ type blockComputer struct {
 	executionDataProvider *provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
+	receiptHasher         hash.Hasher
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -173,6 +174,7 @@ func NewBlockComputer(
 		executionDataProvider: executionDataProvider,
 		signer:                signer,
 		spockHasher:           utils.NewSPOCKHasher(),
+		receiptHasher:         utils.NewExecutionReceiptHasher(),
 	}, nil
 }
 
@@ -181,7 +183,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -283,7 +285,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot delta.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -315,6 +317,7 @@ func (e *blockComputer) executeBlock(
 		e.signer,
 		e.executionDataProvider,
 		e.spockHasher,
+		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
 		len(collections))
@@ -526,5 +529,5 @@ func (e *blockComputer) mergeView(
 	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
 	defer mergeSpan.End()
 
-	return parent.MergeView(child)
+	return parent.Merge(child)
 }

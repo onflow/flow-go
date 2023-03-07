@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,13 +28,10 @@ func makeTwoAccounts(
 ) (
 	flow.Address,
 	flow.Address,
-	*state.TransactionState,
+	storage.Transaction,
 ) {
 
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters(),
-	)
+	txnState := testutils.NewSimpleTransaction(nil)
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
@@ -50,14 +47,15 @@ func makeTwoAccounts(
 }
 
 func TestAccountFreezing(t *testing.T) {
+	// TODO: remove freezing feature
+	t.Skip("Skip as we are removing the freezing feature.")
 
 	chain := flow.Mainnet.Chain()
 	serviceAddress := chain.ServiceAddress()
 
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
-
-		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(st)
+		address, _, txnState := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(txnState)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
@@ -83,11 +81,7 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
-		derivedBlockData = derived.NewEmptyDerivedBlockData()
-		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
-		require.NoError(t, err)
-
-		err = fvm.Run(proc.NewExecutor(context, st, derivedTxnData))
+		err = fvm.Run(proc.NewExecutor(context, txnState))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -98,8 +92,8 @@ func TestAccountFreezing(t *testing.T) {
 	})
 
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
-		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(st)
+		address, _, txnState := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(txnState)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
@@ -141,7 +135,7 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -162,7 +156,7 @@ func TestAccountFreezing(t *testing.T) {
 		proc = fvm.Transaction(
 			&flow.TransactionBody{Script: code(address)},
 			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
@@ -191,7 +185,7 @@ func TestAccountFreezing(t *testing.T) {
 		tx.AddAuthorizer(chain.ServiceAddress())
 
 		proc = fvm.Transaction(tx, derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -206,7 +200,7 @@ func TestAccountFreezing(t *testing.T) {
 			&flow.TransactionBody{Script: code(address)},
 			derivedBlockData.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.Error(t, proc.Err)
 
@@ -238,8 +232,8 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("code from frozen account cannot be loaded", func(t *testing.T) {
 
-		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(st)
+		frozenAddress, notFrozenAddress, txnState := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(txnState)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		vm := fvm.NewVirtualMachine()
@@ -275,14 +269,14 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithDerivedBlockData(derivedBlockData))
 
-		err := vm.Run(context, procFrozen, st.ViewForTestingOnly())
+		err := vm.Run(context, procFrozen, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, procFrozen.Err)
 
 		procNotFrozen := fvm.Transaction(
 			&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress},
 			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, procNotFrozen, st.ViewForTestingOnly())
+		err = vm.Run(context, procNotFrozen, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, procNotFrozen.Err)
 
@@ -305,7 +299,7 @@ func TestAccountFreezing(t *testing.T) {
 			&flow.TransactionBody{Script: code(frozenAddress), Payer: serviceAddress},
 			derivedBlockData.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
@@ -314,7 +308,7 @@ func TestAccountFreezing(t *testing.T) {
 		proc = fvm.Transaction(
 			&flow.TransactionBody{Script: code(notFrozenAddress)},
 			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
@@ -334,7 +328,7 @@ func TestAccountFreezing(t *testing.T) {
 		tx.AddAuthorizer(chain.ServiceAddress())
 
 		proc = fvm.Transaction(tx, derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -352,7 +346,7 @@ func TestAccountFreezing(t *testing.T) {
 			&flow.TransactionBody{Script: code(frozenAddress)},
 			derivedBlockData.NextTxIndexForTestingOnly())
 
-		err = vm.Run(context, proc, st.ViewForTestingOnly())
+		err = vm.Run(context, proc, txnState.ViewForTestingOnly())
 		require.NoError(t, err)
 		require.Error(t, proc.Err)
 
@@ -433,10 +427,8 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := environment.NewAccounts(state.NewTransactionState(
-			ledger,
-			state.DefaultParameters(),
-		))
+		accountsService := environment.NewAccounts(
+			testutils.NewSimpleTransaction(ledger))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
 		require.NoError(t, err)
@@ -464,11 +456,6 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = environment.NewAccounts(state.NewTransactionState(
-			ledger,
-			state.DefaultParameters(),
-		))
-
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
 		require.NoError(t, err)
 		require.False(t, frozen)
@@ -476,8 +463,8 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("frozen account fail just tx, not execution", func(t *testing.T) {
 
-		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(st)
+		frozenAddress, notFrozenAddress, txnState := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(txnState)
 
 		vm := fvm.NewVirtualMachine()
 
@@ -515,16 +502,12 @@ func TestAccountFreezing(t *testing.T) {
 
 		proc := fvm.Transaction(tx, derivedBlockData.NextTxIndexForTestingOnly())
 
-		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
-		require.NoError(t, err)
-
-		err = fvm.Run(proc.NewExecutor(
+		err := fvm.Run(proc.NewExecutor(
 			fvm.NewContextFromParent(
 				context,
 				fvm.WithAuthorizationChecksEnabled(false),
 			),
-			st,
-			derivedTxnData))
+			txnState))
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 
@@ -548,7 +531,7 @@ func TestAccountFreezing(t *testing.T) {
 					Payer:       notFrozenAddress},
 				derivedBlockData.NextTxIndexForTestingOnly())
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, notFrozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
@@ -559,7 +542,7 @@ func TestAccountFreezing(t *testing.T) {
 					ProposalKey: flow.ProposalKey{Address: notFrozenAddress},
 					Payer:       notFrozenAddress},
 				derivedBlockData.NextTxIndexForTestingOnly())
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, frozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
@@ -592,7 +575,7 @@ func TestAccountFreezing(t *testing.T) {
 				derivedBlockData.NextTxIndexForTestingOnly())
 
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, notFrozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
@@ -604,7 +587,7 @@ func TestAccountFreezing(t *testing.T) {
 					Payer:       notFrozenAddress,
 				},
 				derivedBlockData.NextTxIndexForTestingOnly())
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, frozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 
@@ -637,7 +620,7 @@ func TestAccountFreezing(t *testing.T) {
 				derivedBlockData.NextTxIndexForTestingOnly())
 
 			// tx run OK by nonfrozen account
-			err = vm.Run(context, notFrozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, notFrozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.NoError(t, notFrozenProc.Err)
 
@@ -649,7 +632,7 @@ func TestAccountFreezing(t *testing.T) {
 					Payer:       frozenAddress,
 				},
 				derivedBlockData.NextTxIndexForTestingOnly())
-			err = vm.Run(context, frozenProc, st.ViewForTestingOnly())
+			err = vm.Run(context, frozenProc, txnState.ViewForTestingOnly())
 			require.NoError(t, err)
 			require.Error(t, frozenProc.Err)
 

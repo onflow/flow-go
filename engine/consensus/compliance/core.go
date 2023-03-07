@@ -46,7 +46,7 @@ type Core struct {
 	cleaner           storage.Cleaner
 	headers           storage.Headers
 	payloads          storage.Payloads
-	state             protocol.MutableState
+	state             protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
@@ -69,7 +69,7 @@ func NewCore(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
 	validator hotstuff.Validator,

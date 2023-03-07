@@ -192,7 +192,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.MutableState
+	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
@@ -236,15 +236,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(
-			state,
-			node.Storage.Index,
-			node.Storage.Payloads,
-			node.Storage.QuorumCertificates,
-			node.Tracer,
-			node.ProtocolEvents,
-			blocktimer.DefaultBlockTimer,
-		)
+		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 		builder.FollowerState = followerState
 
 		return err
