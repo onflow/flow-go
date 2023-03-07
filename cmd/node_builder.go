@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -184,8 +183,8 @@ type NetworkConfig struct {
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning        bool
-	GossipSubConfig                 *p2pbuilder.GossipSubConfig
+	NetworkConnectionPruning bool
+	GossipSubConfig          *p2pbuilder.GossipSubConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
