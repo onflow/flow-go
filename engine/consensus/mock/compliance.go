@@ -38,8 +38,8 @@ func (_m *Compliance) OnBlockProposal(proposal flow.Slashable[messages.BlockProp
 }
 
 // OnSyncedBlock provides a mock function with given fields: block
-func (_m *Compliance) OnSyncedBlock(block flow.Slashable[messages.BlockProposal]) {
-	_m.Called(block)
+func (_m *Compliance) OnSyncedBlocks(blocks flow.Slashable[[]messages.BlockProposal]) {
+	_m.Called(blocks)
 }
 
 // Ready provides a mock function with given fields:

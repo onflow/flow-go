@@ -159,9 +159,9 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]
 
 // OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedBlock(syncedBlock flow.Slashable[messages.BlockProposal]) {
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]messages.BlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-	if e.pendingBlocks.Push(syncedBlock) {
+	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
 		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlock)

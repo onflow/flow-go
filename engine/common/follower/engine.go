@@ -146,13 +146,13 @@ func (e *Engine) OnBlockProposal(_ flow.Slashable[messages.BlockProposal]) {
 }
 
 // OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) OnSyncedBlock(synced flow.Slashable[messages.BlockProposal]) {
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 	// a block that is synced has to come locally, from the synchronization engine
 	// the block itself will contain the proposer to indicate who created it
 
 	// queue proposal
-	if e.pendingBlocks.Push(synced) {
+	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }

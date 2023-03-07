@@ -307,7 +307,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			continue
 		}
 		// forward the block to the compliance engine for validation and processing
-		e.comp.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
+		e.comp.OnSyncedBlocks(flow.Slashable[messages.BlockProposal]{
 			OriginID: originID,
 			Message: &messages.BlockProposal{
 				Block: block,

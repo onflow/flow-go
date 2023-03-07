@@ -303,7 +303,7 @@ func (s *Suite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[messages.BlockProposal]{
 		OriginID: unittest.IdentifierFixture(),
 		Message:  messages.NewBlockProposal(&block),
 	})
