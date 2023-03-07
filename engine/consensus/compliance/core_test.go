@@ -64,7 +64,7 @@ type CommonSuite struct {
 	cleaner           *storage.Cleaner
 	headers           *storage.Headers
 	payloads          *storage.Payloads
-	state             *protocol.MutableState
+	state             *protocol.ParticipantState
 	snapshot          *protocol.Snapshot
 	con               *mocknetwork.Conduit
 	net               *mocknetwork.Network
@@ -158,7 +158,7 @@ func (cs *CommonSuite) SetupTest() {
 	)
 
 	// set up protocol state mock
-	cs.state = &protocol.MutableState{}
+	cs.state = &protocol.ParticipantState{}
 	cs.state.On("Final").Return(
 		func() protint.Snapshot {
 			return cs.snapshot
@@ -431,7 +431,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
 		// we should notify VoteAggregator about the invalid block
@@ -451,7 +451,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("outdated block", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
 
@@ -469,7 +469,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("unexpected error", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		unexpectedErr := errors.New("unexpected generic error")
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(unexpectedErr)

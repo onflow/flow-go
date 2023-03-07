@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -49,10 +49,9 @@ type TransactionProcedure struct {
 
 func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) ProcedureExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
+	return newTransactionExecutor(ctx, proc, txnState)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {

@@ -45,6 +45,7 @@ const (
 	ComputationKindBLSVerifyPOP               = 2031
 	ComputationKindBLSAggregateSignatures     = 2032
 	ComputationKindBLSAggregatePublicKeys     = 2033
+	ComputationKindGetOrLoadProgram           = 2034
 )
 
 type Meter interface {
@@ -62,10 +63,10 @@ type Meter interface {
 }
 
 type meterImpl struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 }
 
-func NewMeter(txnState *state.TransactionState) Meter {
+func NewMeter(txnState state.NestedTransaction) Meter {
 	return &meterImpl{
 		txnState: txnState,
 	}
@@ -114,7 +115,7 @@ type cancellableMeter struct {
 
 func NewCancellableMeter(
 	ctx context.Context,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{

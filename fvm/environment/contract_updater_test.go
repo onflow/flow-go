@@ -11,8 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -53,9 +52,7 @@ func (p testContractUpdaterStubs) UseContractAuditVoucher(
 }
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")
 	err := accounts.Create(nil, address)
@@ -133,9 +130,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 
 	authAdd := flow.HexToAddress("01")
@@ -297,10 +292,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 }
 
 func TestContract_DeploymentVouchers(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 
 	addressWithVoucher := flow.HexToAddress("01")
@@ -350,10 +342,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 }
 
 func TestContract_ContractUpdate(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
@@ -447,10 +436,7 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 }
 
 func TestContract_ContractRemoval(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")

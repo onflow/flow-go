@@ -17,6 +17,7 @@ const (
 	LabelComputationKind     = "computationKind"
 	LabelConnectionDirection = "direction"
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
+	LabelSuccess             = "success"
 )
 
 const (

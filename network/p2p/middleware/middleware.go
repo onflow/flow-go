@@ -32,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
@@ -87,7 +87,7 @@ type Middleware struct {
 	// and worker routines.
 	wg                         sync.WaitGroup
 	libP2PNode                 p2p.LibP2PNode
-	preferredUnicasts          []unicast.ProtocolName
+	preferredUnicasts          []protocols.ProtocolName
 	me                         flow.Identifier
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
@@ -111,7 +111,7 @@ func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOpt
 	}
 }
 
-func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOption {
+func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.preferredUnicasts = unicasts
 	}

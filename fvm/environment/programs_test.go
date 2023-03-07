@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -109,12 +110,15 @@ func Test_Programs(t *testing.T) {
 
 	mainView := delta.NewDeltaView(nil)
 
-	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
-
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-	accounts := environment.NewAccounts(txnState)
+	accounts := environment.NewAccounts(
+		storage.SerialTransaction{
+			NestedTransaction: state.NewTransactionState(
+				mainView,
+				state.DefaultParameters()),
+		})
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)
@@ -190,7 +194,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		loadedCode := false
-		viewExecA := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				expectedId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -231,11 +235,11 @@ func Test_Programs(t *testing.T) {
 		txAView = viewExecA
 
 		// merge it back
-		err = mainView.MergeView(viewExecA)
+		err = mainView.Merge(viewExecA)
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecA2 := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA2 := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -260,7 +264,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecA, viewExecA2)
 
 		// merge it back
-		err = mainView.MergeView(viewExecA2)
+		err = mainView.Merge(viewExecA2)
 		require.NoError(t, err)
 	})
 
@@ -298,7 +302,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		viewExecB = delta.NewDeltaView(
-			delta.NewPeekerStorageSnapshot(mainView))
+			state.NewPeekerStorageSnapshot(mainView))
 
 		err = vm.Run(context, procCallB, viewExecB)
 		require.NoError(t, err)
@@ -345,13 +349,13 @@ func Test_Programs(t *testing.T) {
 		contractBView = deltaB
 
 		// merge it back
-		err = mainView.MergeView(viewExecB)
+		err = mainView.Merge(viewExecB)
 		require.NoError(t, err)
 
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecB2 := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecB2 := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				idA := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -378,7 +382,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecB, viewExecB2)
 
 		// merge it back
-		err = mainView.MergeView(viewExecB2)
+		err = mainView.Merge(viewExecB2)
 		require.NoError(t, err)
 	})
 
@@ -387,7 +391,7 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		viewExecA := delta.NewDeltaView(delta.NewReadFuncStorageSnapshot(
+		viewExecA := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -409,7 +413,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, txAView, viewExecA)
 
 		// merge it back
-		err = mainView.MergeView(viewExecA)
+		err = mainView.Merge(viewExecA)
 		require.NoError(t, err)
 	})
 
@@ -441,7 +445,7 @@ func Test_Programs(t *testing.T) {
 			derivedBlockData.NextTxIndexForTestingOnly())
 
 		viewExecC := delta.NewDeltaView(
-			delta.NewPeekerStorageSnapshot(mainView))
+			state.NewPeekerStorageSnapshot(mainView))
 
 		err = vm.Run(context, procCallC, viewExecC)
 		require.NoError(t, err)
@@ -484,6 +488,5 @@ func Test_Programs(t *testing.T) {
 func compareViews(t *testing.T, a, b *delta.View) {
 	require.Equal(t, a.Delta(), b.Delta())
 	require.Equal(t, a.Interactions(), b.Interactions())
-	require.Equal(t, a.ReadsCount(), b.ReadsCount())
 	require.Equal(t, a.SpockSecret(), b.SpockSecret())
 }
