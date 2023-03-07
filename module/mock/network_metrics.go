@@ -184,6 +184,11 @@ func (_m *NetworkMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
+func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+	_m.Called(topic, size)
+}
+
 // OnPeerDialFailure provides a mock function with given fields: duration, attempts
 func (_m *NetworkMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
@@ -192,11 +197,6 @@ func (_m *NetworkMetrics) OnPeerDialFailure(duration time.Duration, attempts int
 // OnPeerDialed provides a mock function with given fields: duration, attempts
 func (_m *NetworkMetrics) OnPeerDialed(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
-}
-
-// OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
-func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
-	_m.Called(topic, size)
 }
 
 // OnPruneReceived provides a mock function with given fields: count
