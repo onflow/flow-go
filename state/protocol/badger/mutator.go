@@ -200,6 +200,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
