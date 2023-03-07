@@ -1109,7 +1109,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 
