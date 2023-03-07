@@ -1704,6 +1704,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 	return &qc
 }
 
+// CertifyBlock returns a quorum certificate for the given block header
 func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 		qc.View = header.View

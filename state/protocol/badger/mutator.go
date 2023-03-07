@@ -104,7 +104,10 @@ func NewFullConsensusState(
 // the validity of the header; it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to
 // validate the full payload. Payload validity can be proved by a valid quorum certificate.
-// Certifying QC must match candidate block: candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
+// Certifying QC must match candidate block:
+//
+//	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
+//
 // NOTE: this function expects that `certifyingQC` has been validated.
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
@@ -157,7 +160,6 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
-
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
@@ -446,7 +448,6 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // If insert is called from ExtendCertified(by consensus follower) then certifyingQC must be not nil which proves payload validity.
 // No errors are expected during normal operations.
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, last *flow.Seal) error {
-
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
 	defer span.End()
 
