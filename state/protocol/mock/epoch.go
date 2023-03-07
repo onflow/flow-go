@@ -190,8 +190,50 @@ func (_m *Epoch) DKGPhase3FinalView() (uint64, error) {
 	return r0, r1
 }
 
+// FinalHeight provides a mock function with given fields:
+func (_m *Epoch) FinalHeight() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // FinalView provides a mock function with given fields:
 func (_m *Epoch) FinalView() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FirstHeight provides a mock function with given fields:
+func (_m *Epoch) FirstHeight() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64

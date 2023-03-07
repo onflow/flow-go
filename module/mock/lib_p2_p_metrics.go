@@ -119,6 +119,11 @@ func (_m *LibP2PMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
 }
 
+// OnEstablishStreamFailure provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
 // OnGraftReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnGraftReceived(count int) {
 	_m.Called(count)
@@ -154,6 +159,16 @@ func (_m *LibP2PMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
 }
 
+// OnPeerDialFailure provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnPeerDialed provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnPeerDialed(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
 // OnPruneReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnPruneReceived(count int) {
 	_m.Called(count)
@@ -162,6 +177,21 @@ func (_m *LibP2PMetrics) OnPruneReceived(count int) {
 // OnPublishedGossipMessagesReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnPublishedGossipMessagesReceived(count int) {
 	_m.Called(count)
+}
+
+// OnStreamCreated provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnStreamCreated(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamCreationFailure provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
+}
+
+// OnStreamEstablished provides a mock function with given fields: duration, attempts
+func (_m *LibP2PMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
+	_m.Called(duration, attempts)
 }
 
 // OutboundConnections provides a mock function with given fields: connectionCount

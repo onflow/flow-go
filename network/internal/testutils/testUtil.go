@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -136,6 +137,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		connectionGater: NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil
 		}),
+		createStreamRetryInterval: unicast.DefaultRetryDelay,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -159,6 +161,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
+		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
 
@@ -281,6 +284,13 @@ type optsConfig struct {
 	peerManagerFilters            []p2p.PeerFilter
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	connectionGater               connmgr.ConnectionGater
+	createStreamRetryInterval     time.Duration
+}
+
+func WithCreateStreamRetryInterval(delay time.Duration) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.createStreamRetryInterval = delay
+	}
 }
 
 func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
@@ -396,7 +406,7 @@ type nodeBuilderOption func(p2pbuilder.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
+			return p2pdht.NewDHT(c, h, pc.ID(protocols.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
 	}
 }
@@ -416,6 +426,12 @@ func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) n
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
 	return func(nb p2pbuilder.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
+	}
+}
+
+func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
+	return func(nb p2pbuilder.NodeBuilder) {
+		nb.SetStreamCreationRetryInterval(delay)
 	}
 }
 
@@ -439,7 +455,8 @@ func generateLibP2PNode(t *testing.T,
 		sporkID,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
-		SetResourceManager(NewResourceManager(t))
+		SetResourceManager(NewResourceManager(t)).
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
 
 	for _, opt := range opts {
 		opt(builder)

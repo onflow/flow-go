@@ -52,7 +52,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -107,7 +107,7 @@ type FollowerServiceBuilder struct {
 
 	// components
 	LibP2PNode              p2p.LibP2PNode
-	FollowerState           protocol.MutableState
+	FollowerState           protocol.FollowerState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
@@ -477,7 +477,7 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
+				pids := builder.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(builder.SporkID))
 				result := make(flow.IdentifierList, 0, len(pids))
 
 				for _, pid := range pids {
@@ -595,13 +595,14 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+				return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.Metrics.Network,
 					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
 			}).
+			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			Build()
 

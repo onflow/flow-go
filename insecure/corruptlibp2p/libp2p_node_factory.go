@@ -3,21 +3,18 @@ package corruptlibp2p
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
-
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -32,10 +29,9 @@ func NewCorruptLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval time.Duration,
+	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
+	peerManagerCfg *p2pbuilder.PeerManagerConfig,
+	uniCfg *p2pbuilder.UnicastConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -54,15 +50,14 @@ func NewCorruptLibP2PNodeFactory(
 			metrics,
 			resolver,
 			role,
-			onInterceptPeerDialFilters,
-			onInterceptSecuredFilters,
-			connectionPruning,
-			updateInterval,
+			peerScoringEnabled,
+			connGaterCfg,
+			peerManagerCfg,
 			&p2pbuilder.GossipSubConfig{
 				PeerScoring: peerScoringEnabled,
 			},
 			p2pbuilder.DefaultResourceManagerConfig(),
-			ratelimit.NewUnicastRateLimiterDistributor())
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

@@ -20,7 +20,7 @@ import (
 // value, then just use this module
 type ProtocolState struct {
 	sync.Mutex
-	protocol.MutableState
+	protocol.ParticipantState
 	blocks    map[flow.Identifier]*flow.Block
 	children  map[flow.Identifier][]flow.Identifier
 	heights   map[uint64]*flow.Block
