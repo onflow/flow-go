@@ -314,7 +314,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	service := b.createServiceAccount()
 
-	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
@@ -458,22 +457,6 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
 	return service
-}
-
-// deployContractAuditVouchers deploys audit vouchers contract to the service account
-func (b *bootstrapExecutor) deployContractAuditVouchers(service flow.Address) {
-	contract := contracts.FlowContractAudits()
-
-	txError, err := b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(
-			blueprints.DeployContractTransaction(
-				service,
-				contract,
-				"FlowContractAudits"),
-			0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy contract audit vouchers contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) createMinter(service, flowToken flow.Address) {
