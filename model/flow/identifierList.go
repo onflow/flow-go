@@ -57,8 +57,15 @@ func (il IdentifierList) Strings() []string {
 	return list
 }
 
-func (il IdentifierList) Fingerprint() Identifier {
-	return MerkleRoot(il...)
+// ID returns a cryptographic commitment to the list of identifiers.
+// Since an IdentifierList has no mutable fields, it is equal to the checksum.
+func (il IdentifierList) ID() Identifier {
+	return il.Checksum()
+}
+
+// Checksum returns a cryptographic commitment to the list of identifiers.
+func (il IdentifierList) Checksum() Identifier {
+	return MakeID(il)
 }
 
 func (il IdentifierList) Copy() IdentifierList {

@@ -10,7 +10,7 @@ import (
 // CanonicalClusterID returns the canonical chain ID for the given cluster in
 // the given epoch.
 func CanonicalClusterID(epoch uint64, participants flow.IdentifierList) flow.ChainID {
-	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.Fingerprint()))
+	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.ID()))
 }
 
 // these globals are filled by the static initializer
