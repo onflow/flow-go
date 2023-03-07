@@ -18,7 +18,6 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -33,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -121,8 +119,8 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetResourceManager(testutils.NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
-		SetGossipSubTracer(meshTracer).
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubTracer(meshTracer)
 
 	for _, opt := range opts {
 		opt(builder)
