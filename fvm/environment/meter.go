@@ -45,6 +45,7 @@ const (
 	ComputationKindBLSVerifyPOP               = 2031
 	ComputationKindBLSAggregateSignatures     = 2032
 	ComputationKindBLSAggregatePublicKeys     = 2033
+	ComputationKindGetOrLoadProgram           = 2034
 )
 
 type Meter interface {

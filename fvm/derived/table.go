@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -423,13 +425,17 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 	}
 
 	val, err = computer.Compute(txnState, key)
-	if err != nil {
-		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
+
+	// Commit the nested transaction, even if the computation fails.
+	committedState, commitErr := txnState.CommitNestedTransaction(nestedTxId)
+	if commitErr != nil {
+		err = multierror.Append(err,
+			fmt.Errorf("failed to commit nested txn: %w", commitErr),
+		).ErrorOrNil()
 	}
 
-	committedState, err := txnState.CommitNestedTransaction(nestedTxId)
 	if err != nil {
-		return defaultVal, fmt.Errorf("failed to commit nested txn: %w", err)
+		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
 	txn.Set(key, val, committedState)

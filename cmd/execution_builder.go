@@ -112,7 +112,7 @@ type ExecutionNode struct {
 
 	collector               module.ExecutionMetrics
 	executionState          state.ExecutionState
-	followerState           protocol.MutableState
+	followerState           protocol.FollowerState
 	committee               hotstuff.DynamicCommittee
 	ledgerStorage           *ledger.Ledger
 	events                  *storage.Events

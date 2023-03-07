@@ -85,7 +85,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 
 func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
-		followerState protocol.MutableState
+		followerState protocol.FollowerState
 
 		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests    // used in requester engine

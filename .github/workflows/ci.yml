@@ -10,7 +10,7 @@ on:
       - 'v[0-9]+.[0-9]+'
   pull_request:
     branches:
-      - master
+      - master*
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
@@ -116,7 +116,6 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
     - name: Run tests (${{ matrix.targets.name }})
-      if: github.actor != 'bors[bot]'
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
@@ -126,13 +125,6 @@ jobs:
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-    - name: Run tests (Bors)
-      if: github.actor == 'bors[bot]'
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 25
-        max_attempts: 3
-        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
       with:
@@ -171,19 +163,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Run tests (${{ matrix.name }})
-        if: github.actor != 'bors[bot]'
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-        # run `make1` target before running `make2` target inside each module's root
-        run: |
-          make ${{ matrix.make1 }}
-          VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
-      - name: Run tests (Bors)
-        if: github.actor == 'bors[bot]'
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 25
           max_attempts: ${{ matrix.retries }}
+          # run `make1` target before running `make2` target inside each module's root
           command: |
             make ${{ matrix.make1 }}
             VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
@@ -224,18 +210,14 @@ jobs:
     - name: Docker build
       run: make docker-build-flow docker-build-flow-corrupt
     - name: Run tests
-      if: github.actor != 'bors[bot]'
-      run: VERBOSE=1 ${{ matrix.make }}
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-    - name: Run tests (Bors)
-      if: github.actor == 'bors[bot]'
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
-        max_attempts: 2
-        command: ${{ matrix.make }}
+        max_attempts: 3
+        command: VERBOSE=1 ${{ matrix.make }}
 
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer
