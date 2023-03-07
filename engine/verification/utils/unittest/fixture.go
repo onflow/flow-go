@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
@@ -214,13 +213,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	spockSecrets := make([][]byte, 0)
-	chunks := make([]*flow.Chunk, 0)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
-
-	var payload flow.Payload
 	var referenceBlock flow.Block
-	var serviceEvents flow.ServiceEventList
+	var spockSecrets [][]byte
+	var chunkDataPacks []*flow.ChunkDataPack
+	var result *flow.ExecutionResult
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -320,7 +316,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			}
 		}
 
-		payload = flow.Payload{
+		payload := flow.Payload{
 			Guarantees: guarantees,
 		}
 		referenceBlock = flow.Block{
@@ -340,80 +336,16 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			snapshot,
 			derivedBlockData)
 		require.NoError(t, err)
-		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
-		for _, event := range computationResult.ServiceEvents {
-			converted, err := convert.ServiceEvent(referenceBlock.Header.ChainID, event)
-			require.NoError(t, err)
-			serviceEvents = append(serviceEvents, *converted)
-		}
-
-		startState := startStateCommitment
 
 		for i := range computationResult.StateCommitments {
-			endState := computationResult.StateCommitments[i]
-
-			// generates chunk and chunk data pack
-			var chunkDataPack *flow.ChunkDataPack
-			var chunk *flow.Chunk
-			if i < len(computationResult.StateCommitments)-1 {
-				// generates chunk data pack fixture for non-system chunk
-				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-				collection := completeCollection.Collection()
-
-				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
-				require.NoError(t, err)
-
-				chunk = flow.NewChunk(
-					executableBlock.ID(),
-					i,
-					startState,
-					len(completeCollection.Transactions),
-					eventsHash,
-					endState)
-				chunkDataPack = flow.NewChunkDataPack(
-					chunk.ID(),
-					chunk.StartState,
-					computationResult.Proofs[i],
-					&collection)
-			} else {
-				// generates chunk data pack fixture for system chunk
-				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
-				require.NoError(t, err)
-
-				chunk = flow.NewChunk(
-					executableBlock.ID(),
-					i,
-					startState,
-					1,
-					eventsHash,
-					endState)
-				chunkDataPack = flow.NewChunkDataPack(
-					chunk.ID(),
-					chunk.StartState,
-					computationResult.Proofs[i],
-					nil)
-			}
-
-			chunks = append(chunks, chunk)
-			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
-			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
-			startState = endState
+			spockSecrets = append(
+				spockSecrets,
+				computationResult.StateSnapshots[i].SpockSecret)
 		}
 
+		chunkDataPacks = computationResult.ChunkDataPacks
+		result = &computationResult.ExecutionResult
 	})
-
-	// makes sure all chunks are referencing the correct block id.
-	blockID := referenceBlock.ID()
-	for _, chunk := range chunks {
-		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
-	}
-
-	result := &flow.ExecutionResult{
-		BlockID:       blockID,
-		Chunks:        chunks,
-		ServiceEvents: serviceEvents,
-	}
 
 	return result, &ExecutionReceiptData{
 		ReferenceBlock: &referenceBlock,
