@@ -188,7 +188,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
-		if routed.Fingerprint() == target.Fingerprint() {
+		if routed.ID() == target.ID() {
 			break
 		}
 	}
