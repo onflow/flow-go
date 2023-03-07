@@ -149,6 +149,8 @@ verification:
 {{define "defaults"}}
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc
