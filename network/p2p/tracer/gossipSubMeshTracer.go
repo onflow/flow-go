@@ -23,8 +23,14 @@ const (
 	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
 )
 
-// GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
-// It also logs the mesh peers and updates the local mesh size metric.
+// The GossipSubMeshTracer component in the GossipSub pubsub.RawTracer that is designed to track the local
+// mesh peers for each topic. By logging the mesh peers and updating the local mesh size metric, the GossipSubMeshTracer
+// provides insights into the behavior of the topology.
+//
+// This component also provides real-time and historical visibility into the topology.
+// The GossipSubMeshTracer logs the mesh peers of the local node for each topic
+// at a regular interval, enabling users to monitor the state of the mesh network and take appropriate action.
+// Additionally, it allows users to configure the logging interval.
 type GossipSubMeshTracer struct {
 	component.Component
 	pubsub.RawTracer
