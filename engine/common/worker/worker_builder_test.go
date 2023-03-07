@@ -30,19 +30,19 @@ func TestWorkerPool_SingleEvent_SingleWorker(t *testing.T) {
 		close(processed)
 
 		return nil
-	})
-
-	workerLogic, submitLogic := pool.Build()
+	}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
-	cm := component.NewComponentManagerBuilder().AddWorker(workerLogic).Build()
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(pool.NewWorkerLogic()).
+		Build()
 	cm.Start(ctx)
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
-	require.True(t, submitLogic(event))
+	require.True(t, pool.SubmitLogic()(event))
 
 	unittest.RequireCloseBefore(t, processed, 100*time.Millisecond, "event not processed")
 	cancel()
@@ -64,19 +64,19 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 		<-blockingChannel
 
 		return nil
-	})
-
-	workerLogic, submitLogic := pool.Build()
+	}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
-	cm := component.NewComponentManagerBuilder().AddWorker(workerLogic).Build()
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(pool.NewWorkerLogic()).
+		Build()
 	cm.Start(ctx)
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
-	require.True(t, submitLogic("first-event-ever"))
+	require.True(t, pool.SubmitLogic()("first-event-ever"))
 
 	// wait for the first event to be picked by the single worker
 	unittest.RequireCloseBefore(t, firstEventArrived, 100*time.Millisecond, "first event not distributed")
@@ -84,13 +84,13 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	// now the worker is blocked, we submit the rest of the events so that the queue is full
 	for i := 0; i < size; i++ {
 		event := fmt.Sprintf("test-event-%d", i)
-		require.True(t, submitLogic(event))
+		require.True(t, pool.SubmitLogic()(event))
 		// we also check that re-submitting the same event fails as duplicate event already is in the queue.
-		require.False(t, submitLogic(event))
+		require.False(t, pool.SubmitLogic()(event))
 	}
 
 	// now the queue is full, so the next submission should fail
-	require.False(t, submitLogic("test-event"))
+	require.False(t, pool.SubmitLogic()("test-event"))
 
 	close(blockingChannel)
 	cancel()
@@ -124,21 +124,22 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 		allEventsDistributed.Done()
 
 		return nil
-	})
-
-	workerLogic, submitLogic := pool.Build()
+	}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
-	cm := component.NewComponentManagerBuilder().AddWorker(workerLogic).AddWorker(workerLogic).Build()
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(pool.NewWorkerLogic()).
+		AddWorker(pool.NewWorkerLogic()).
+		Build()
 	cm.Start(ctx)
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
 	for i := 0; i < size; i++ {
 		go func(i int) {
-			require.True(t, submitLogic(tc[i]))
+			require.True(t, pool.SubmitLogic()(tc[i]))
 		}(i)
 	}
 

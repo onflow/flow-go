@@ -8,6 +8,44 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// Pool is a worker pool that can be used by a higher-level component to manage a set of workers.
+// The workers are managed by the higher-level component, but the worker pool provides the logic for
+// submitting work to the workers and for processing the work. The worker pool is responsible for
+// storing the work until it is processed by a worker.
+type Pool[T any] struct {
+	// workerLogic is the logic that the worker executes. It is the responsibility of the higher-level
+	// component to add this logic to the component. The worker logic is responsible for processing
+	// the work that is submitted to the worker pool.
+	// The worker logic should only throw unexpected exceptions to its component. Sentinel errors expected during
+	// normal operations should be handled internally.
+	// The worker logic should not throw any exceptions that are not expected during normal operations.
+	// Any exceptions thrown by the worker logic will be caught by the higher-level component and will cause the
+	// component to crash.
+	// A pool may have multiple workers, but the worker logic is the same for all the workers.
+	workerLogic component.ComponentWorker
+
+	// submitLogic is the logic that the higher-level component executes to submit work to the worker pool.
+	// The submit logic is responsible for submitting the work to the worker pool. The submit logic should
+	// is responsible for storing the work until it is processed by a worker. The submit should handle
+	// any errors that occur during the submission of the work internally.
+	// The return value of the submit logic indicates whether the work was successfully submitted to the worker pool.
+	submitLogic func(event T) bool
+}
+
+// NewWorkerLogic returns a new worker logic that can be added to a component. The worker logic is responsible for
+// processing the work that is submitted to the worker pool.
+// A pool may have multiple workers, but the worker logic is the same for all the workers.
+// Workers are managed by the higher-level component, through component.AddWorker.
+func (p *Pool[T]) NewWorkerLogic() component.ComponentWorker {
+	return p.workerLogic
+}
+
+// SubmitLogic returns the logic that the higher-level component executes to submit work to the worker pool.
+// The submit logic is responsible for submitting the work to the worker pool.
+func (p *Pool[T]) SubmitLogic() func(event T) bool {
+	return p.submitLogic
+}
+
 // PoolBuilder is an auxiliary builder for constructing workers with a common inbound queue,
 // where the workers are managed by a higher-level component. The message store as well as the processing
 // function are specified by the caller.
@@ -40,8 +78,11 @@ func NewWorkerPoolBuilder[T any](
 //     `processingFunc` is concurrency safe)
 //   - [second return value] the logic for submitting work to the message store. This
 //     function yields true, if work was successfully submitted and false otherwise.
-func (b *PoolBuilder[T]) Build() (component.ComponentWorker, func(event T) bool) {
-	return b.workerLogic(), b.submitLogic()
+func (b *PoolBuilder[T]) Build() *Pool[T] {
+	return &Pool[T]{
+		workerLogic: b.workerLogic(),
+		submitLogic: b.submitLogic(),
+	}
 }
 
 // workerLogic return the worker logic itself
