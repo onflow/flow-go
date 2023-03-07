@@ -50,7 +50,6 @@ func NewCorruptLibP2PNodeFactory(
 			metrics,
 			resolver,
 			role,
-			peerScoringEnabled,
 			connGaterCfg,
 			peerManagerCfg,
 			&p2pbuilder.GossipSubConfig{
