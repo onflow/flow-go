@@ -32,18 +32,17 @@ type Pool[T any] struct {
 	submitLogic func(event T) bool
 }
 
-// NewWorkerLogic returns a new worker logic that can be added to a component. The worker logic is responsible for
+// WorkerLogic returns a new worker logic that can be added to a component. The worker logic is responsible for
 // processing the work that is submitted to the worker pool.
 // A pool may have multiple workers, but the worker logic is the same for all the workers.
 // Workers are managed by the higher-level component, through component.AddWorker.
-func (p *Pool[T]) NewWorkerLogic() component.ComponentWorker {
+func (p *Pool[T]) WorkerLogic() component.ComponentWorker {
 	return p.workerLogic
 }
 
-// SubmitLogic returns the logic that the higher-level component executes to submit work to the worker pool.
-// The submit logic is responsible for submitting the work to the worker pool.
-func (p *Pool[T]) SubmitLogic() func(event T) bool {
-	return p.submitLogic
+// Submit submits work to the worker pool. The submit logic is responsible for submitting the work to the worker pool.
+func (p *Pool[T]) Submit(event T) bool {
+	return p.submitLogic(event)
 }
 
 // PoolBuilder is an auxiliary builder for constructing workers with a common inbound queue,

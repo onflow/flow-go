@@ -36,13 +36,13 @@ func TestWorkerPool_SingleEvent_SingleWorker(t *testing.T) {
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(pool.NewWorkerLogic()).
+		AddWorker(pool.WorkerLogic()).
 		Build()
 	cm.Start(ctx)
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
-	require.True(t, pool.SubmitLogic()(event))
+	require.True(t, pool.Submit(event))
 
 	unittest.RequireCloseBefore(t, processed, 100*time.Millisecond, "event not processed")
 	cancel()
@@ -70,13 +70,13 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(pool.NewWorkerLogic()).
+		AddWorker(pool.WorkerLogic()).
 		Build()
 	cm.Start(ctx)
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
-	require.True(t, pool.SubmitLogic()("first-event-ever"))
+	require.True(t, pool.Submit("first-event-ever"))
 
 	// wait for the first event to be picked by the single worker
 	unittest.RequireCloseBefore(t, firstEventArrived, 100*time.Millisecond, "first event not distributed")
@@ -84,13 +84,13 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	// now the worker is blocked, we submit the rest of the events so that the queue is full
 	for i := 0; i < size; i++ {
 		event := fmt.Sprintf("test-event-%d", i)
-		require.True(t, pool.SubmitLogic()(event))
+		require.True(t, pool.Submit(event))
 		// we also check that re-submitting the same event fails as duplicate event already is in the queue.
-		require.False(t, pool.SubmitLogic()(event))
+		require.False(t, pool.Submit(event))
 	}
 
 	// now the queue is full, so the next submission should fail
-	require.False(t, pool.SubmitLogic()("test-event"))
+	require.False(t, pool.Submit("test-event"))
 
 	close(blockingChannel)
 	cancel()
@@ -130,8 +130,8 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 	defer cancel()
 	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(pool.NewWorkerLogic()).
-		AddWorker(pool.NewWorkerLogic()).
+		AddWorker(pool.WorkerLogic()).
+		AddWorker(pool.WorkerLogic()).
 		Build()
 	cm.Start(ctx)
 
@@ -139,7 +139,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 
 	for i := 0; i < size; i++ {
 		go func(i int) {
-			require.True(t, pool.SubmitLogic()(tc[i]))
+			require.True(t, pool.Submit(tc[i]))
 		}(i)
 	}
 
