@@ -328,6 +328,10 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
+	errInsufficientResults := status.Errorf(
+		codes.Internal,
+		"number of transaction results returned by execution node is less than the number of transactions in the block",
+	)
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
@@ -338,10 +342,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		for _, txID := range collection.Transactions {
 			// bounds check. this means the EN returned fewer transaction results than the transactions in the block
 			if i >= len(resp.TransactionResults) {
-				return nil, status.Errorf(
-					codes.Internal,
-					"number of transaction results returned by execution node is less than the number of transactions in the block",
-				)
+				return nil, errInsufficientResults
 			}
 			txResult := resp.TransactionResults[i]
 
@@ -362,9 +363,13 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				BlockHeight:   block.Header.Height,
 			})
 
-			i++ // i is the total tx count after this loop
+			i++
 		}
 	}
+
+	// after iterating through all transactions in each collection, i equals the total number of
+	// user transactions in the block
+	txCount := i
 
 	rootBlock, err := b.state.Params().Root()
 	if err != nil {
@@ -375,8 +380,13 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	if rootBlock.ID() != blockID {
 		// system chunk transaction
 
-		// make sure there are the same number of transactions as results. already checked > above
-		if i < len(resp.TransactionResults) {
+		// resp.TransactionResults includes the system tx result, so there should be exactly one
+		// more result than txCount
+		if txCount != len(resp.TransactionResults)-1 {
+			if txCount >= len(resp.TransactionResults) {
+				return nil, errInsufficientResults
+			}
+			// otherwise there are extra results
 			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
 		}
 
