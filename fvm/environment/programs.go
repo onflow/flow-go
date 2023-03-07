@@ -207,14 +207,6 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
-	// TODO: to be removed when freezing account feature is removed
-	freezeError := programs.accounts.CheckAccountNotFrozen(
-		flow.ConvertAddress(address.Address),
-	)
-	if freezeError != nil {
-		return nil, fmt.Errorf("get program failed: %w", freezeError)
-	}
-
 	// reading program from cache
 	program, programState, has := programs.txnState.GetProgram(address)
 	if has {
@@ -361,15 +353,6 @@ func (programs *Programs) GetProgram(
 	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.ConvertAddress(addressLocation.Address)
-
-		freezeError := programs.accounts.CheckAccountNotFrozen(address)
-		if freezeError != nil {
-			return nil, fmt.Errorf("get program failed: %w", freezeError)
-		}
 	}
 
 	program, has := programs.get(location)

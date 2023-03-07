@@ -475,7 +475,7 @@ func (executor *transactionExecutor) commit(
 	executor.proc.ServiceEvents = executor.env.ServiceEvents()
 	executor.proc.ConvertedServiceEvents = executor.env.ConvertedServiceEvents()
 
-	// Based on various (e.g., contract and frozen account) updates, we decide
+	// Based on various (e.g., contract) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
 	executor.txnState.AddInvalidator(invalidator)
