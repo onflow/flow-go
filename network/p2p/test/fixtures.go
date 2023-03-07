@@ -154,8 +154,27 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	PubSubTracer       p2p.PubSubTracer
+	HandlerFunc            network.StreamHandler
+	Unicasts               []protocols.ProtocolName
+	Key                    crypto.PrivateKey
+	Address                string
+	DhtOptions             []dht.Option
+	Role                   flow.Role
+	Logger                 zerolog.Logger
+	PeerScoringEnabled     bool
+	IdProvider             module.IdentityProvider
+	AppSpecificScore       func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning      bool                  // peer manager parameter
+	UpdateInterval         time.Duration         // peer manager parameter
+	PeerProvider           p2p.PeersProvider     // peer manager parameter
+	ConnGater              connmgr.ConnectionGater
+	ConnManager            connmgr.ConnManager
+	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
+	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
+	Metrics                module.NetworkMetrics
+	ResourceManager        network.ResourceManager
 	CreateStreamRetryDelay time.Duration
+	PubSubTracer           p2p.PubSubTracer
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
