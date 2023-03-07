@@ -391,7 +391,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			rsys, err := builder.routingFactory(ctx, h)
+			rsys, err := builder.buildRouting(ctx, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 			}
