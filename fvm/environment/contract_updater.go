@@ -353,10 +353,6 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("update account contract code failed: %w", err)
-	}
 
 	err = updater.SetContract(
 		address,
@@ -385,10 +381,6 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
 
 	err = updater.RemoveContract(
 		address,
