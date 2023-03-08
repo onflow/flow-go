@@ -100,7 +100,7 @@ func main() {
 		accessNodeIDS      []string
 
 		err                     error
-		mutableState            protocol.MutableState
+		mutableState            protocol.ParticipantState
 		beaconPrivateKey        *encodable.RandomBeaconPrivKey
 		guarantees              mempool.Guarantees
 		receipts                mempool.ExecutionTree

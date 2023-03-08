@@ -218,7 +218,6 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 			unittest.StateCommitmentFixture(),
 			unittest.StateCommitmentFixture(),
 		},
-		Proofs: nil,
 		Events: []flow.EventsList{
 			{
 				unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),

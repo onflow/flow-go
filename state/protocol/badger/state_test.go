@@ -165,6 +165,87 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	})
 }
 
+// TestBootstrap_EpochHeightBoundaries tests that epoch height indexes are indexed
+// when they are available in the input snapshot.
+func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
+	t.Parallel()
+	// start with a regular post-spork root snapshot
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
+
+	t.Run("root snapshot", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+		})
+	})
+
+	t.Run("with next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.BuildEpoch().CompleteEpoch()
+			heights, ok := builder.EpochHeights(1)
+			require.True(t, ok)
+			return state.AtHeight(heights.Committed)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch1FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			// first and final height of not started next epoch should be unknown
+			_, err = state.Final().Epochs().Next().FirstHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			_, err = state.Final().Epochs().Next().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+		})
+	})
+	t.Run("with previous epoch", func(t *testing.T) {
+		var epoch1FinalHeight uint64
+		var epoch2FirstHeight uint64
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, state)
+			builder.
+				BuildEpoch().CompleteEpoch(). // build epoch 2
+				BuildEpoch()                  // build epoch 3
+			heights, ok := builder.EpochHeights(2)
+			epoch2FirstHeight = heights.FirstHeight()
+			epoch1FinalHeight = epoch2FirstHeight - 1
+			require.True(t, ok)
+			// return snapshot from within epoch 2 (middle epoch)
+			return state.AtHeight(heights.Setup)
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			// first height of started current epoch should be known
+			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			assert.Equal(t, epoch2FirstHeight, firstHeight)
+			require.NoError(t, err)
+			// final height of not completed current epoch should be unknown
+			_, err = state.Final().Epochs().Current().FinalHeight()
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			// first and final height of completed previous epoch should be known
+			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
+			require.NoError(t, err)
+			assert.Equal(t, firstHeight, epoch1FirstHeight)
+			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			require.NoError(t, err)
+			assert.Equal(t, finalHeight, epoch1FinalHeight)
+		})
+	})
+}
+
 // TestBootstrapNonRoot tests bootstrapping the protocol state from arbitrary states.
 //
 // NOTE: for all these cases, we build a final child block (CHILD). This is
@@ -442,7 +523,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.FollowerState) {
 		snap := f(state)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
@@ -452,13 +533,13 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 }
 
 // buildBlock extends the protocol state by the given block
-func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	require.NoError(t, state.Extend(context.Background(), block))
+func buildBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
 }
 
 // buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
-func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	require.NoError(t, state.Extend(context.Background(), block))
+func buildFinalizedBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
 	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }
 

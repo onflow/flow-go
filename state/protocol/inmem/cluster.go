@@ -3,11 +3,14 @@ package inmem
 import (
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type Cluster struct {
 	enc EncodableCluster
 }
+
+var _ protocol.Cluster = (*Cluster)(nil)
 
 func (c Cluster) Index() uint                     { return c.enc.Index }
 func (c Cluster) ChainID() flow.ChainID           { return c.enc.RootBlock.Header.ChainID }
