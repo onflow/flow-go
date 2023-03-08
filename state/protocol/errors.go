@@ -22,13 +22,9 @@ var (
 	// in the EpochCommitted phase.
 	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 
-	// ErrEpochNotStarted is a sentinel returned when a query for the first block
-	// of an epoch is made about an epoch that has not yet started.
-	ErrEpochNotStarted = fmt.Errorf("epoch not started")
-
-	// ErrEpochNotEnded is a sentinel error returned when a query for the final block
-	// of an epoch is made about an epoch that has not yet ended.
-	ErrEpochNotEnded = fmt.Errorf("epoch not ended")
+	// ErrEpochTransitionNotFinalized is a sentinel returned when a query is made
+	// for a block at an epoch boundary which has not yet been finalized.
+	ErrEpochTransitionNotFinalized = fmt.Errorf("cannot query block at un-finalized epoch transition")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block (local history cutoff).

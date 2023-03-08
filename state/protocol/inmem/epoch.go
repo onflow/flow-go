@@ -80,14 +80,14 @@ func (e Epoch) FinalHeight() (uint64, error) {
 	if e.enc.FinalHeight != nil {
 		return *e.enc.FinalHeight, nil
 	}
-	return 0, protocol.ErrEpochNotEnded
+	return 0, protocol.ErrEpochTransitionNotFinalized
 }
 
 func (e Epoch) FirstHeight() (uint64, error) {
 	if e.enc.FirstHeight != nil {
 		return *e.enc.FirstHeight, nil
 	}
-	return 0, protocol.ErrEpochNotStarted
+	return 0, protocol.ErrEpochTransitionNotFinalized
 }
 
 type Epochs struct {
@@ -178,11 +178,11 @@ func (es *setupEpoch) DKG() (protocol.DKG, error) {
 }
 
 func (es *setupEpoch) FirstHeight() (uint64, error) {
-	return 0, protocol.ErrEpochNotStarted
+	return 0, protocol.ErrEpochTransitionNotFinalized
 }
 
 func (es *setupEpoch) FinalHeight() (uint64, error) {
-	return 0, protocol.ErrEpochNotEnded
+	return 0, protocol.ErrEpochTransitionNotFinalized
 }
 
 // committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup

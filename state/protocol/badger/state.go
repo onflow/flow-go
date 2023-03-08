@@ -24,6 +24,7 @@ type State struct {
 	db      *badger.DB
 	headers storage.Headers
 	blocks  storage.Blocks
+	qcs     storage.QuorumCertificates
 	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
@@ -36,6 +37,8 @@ type State struct {
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
 }
+
+var _ protocol.State = (*State)(nil)
 
 type BootstrapConfig struct {
 	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
@@ -62,6 +65,7 @@ func Bootstrap(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -82,7 +86,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
@@ -111,7 +115,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = transaction.WithTx(operation.InsertRootQuorumCertificate(qc))(tx)
+		err = qcs.StoreTx(qc)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
@@ -539,6 +543,7 @@ func OpenState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -550,7 +555,7 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -636,6 +641,7 @@ func newState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -647,6 +653,7 @@ func newState(
 		results: results,
 		seals:   seals,
 		blocks:  blocks,
+		qcs:     qcs,
 		epoch: struct {
 			setups   storage.EpochSetups
 			commits  storage.EpochCommits

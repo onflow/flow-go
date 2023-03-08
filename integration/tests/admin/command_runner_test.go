@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/onflow/flow-go/admin"
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -39,8 +40,8 @@ import (
 type CommandRunnerSuite struct {
 	suite.Suite
 
-	runner          *CommandRunner
-	bootstrapper    *CommandRunnerBootstrapper
+	runner          *admin.CommandRunner
+	bootstrapper    *admin.CommandRunnerBootstrapper
 	httpAddress     string
 	grpcAddressSock string
 
@@ -56,7 +57,7 @@ func TestCommandRunner(t *testing.T) {
 
 func (suite *CommandRunnerSuite) SetupTest() {
 	suite.httpAddress = unittest.IPPort(testingdock.RandomPort(suite.T()))
-	suite.bootstrapper = NewCommandRunnerBootstrapper()
+	suite.bootstrapper = admin.NewCommandRunnerBootstrapper()
 }
 
 func (suite *CommandRunnerSuite) TearDownTest() {
@@ -72,21 +73,21 @@ func (suite *CommandRunnerSuite) TearDownTest() {
 	<-suite.runner.Done()
 }
 
-func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption) {
+func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...admin.CommandRunnerOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
-	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock), WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
+	opts = append(opts, admin.WithGRPCAddress(suite.grpcAddressSock), admin.WithMaxMsgSize(grpcutils.DefaultMaxMsgSize))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
 	suite.runner.Start(signalerCtx)
 	<-suite.runner.Ready()
 
-	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	conn, err := grpc.Dial("unix:///"+suite.runner.GrpcAddress(), grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	suite.NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)
@@ -95,7 +96,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 func (suite *CommandRunnerSuite) TestHandler() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -153,7 +154,7 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 func (suite *CommandRunnerSuite) TestValidator() {
 	calls := 0
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -165,8 +166,8 @@ func (suite *CommandRunnerSuite) TestValidator() {
 		return "ok", nil
 	})
 
-	validatorErr := NewInvalidAdminReqErrorf("unexpected value")
-	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
+	validatorErr := admin.NewInvalidAdminReqErrorf("unexpected value")
+	suite.bootstrapper.RegisterValidator("foo", func(req *admin.CommandRequest) error {
 		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
 		}
@@ -203,7 +204,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 func (suite *CommandRunnerSuite) TestHandlerError() {
 	handlerErr := errors.New("handler error")
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -233,7 +234,7 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 }
 
 func (suite *CommandRunnerSuite) TestTimeout() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	})
@@ -259,7 +260,7 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 func (suite *CommandRunnerSuite) TestHTTPServer() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -305,13 +306,13 @@ func (suite *CommandRunnerSuite) TestHTTPPProf() {
 }
 
 func (suite *CommandRunnerSuite) TestListCommands() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		return nil, nil
 	})
-	suite.bootstrapper.RegisterHandler("bar", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("bar", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		return nil, nil
 	})
-	suite.bootstrapper.RegisterHandler("baz", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("baz", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		return nil, nil
 	})
 
@@ -444,7 +445,7 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 func (suite *CommandRunnerSuite) TestTLS() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -470,7 +471,7 @@ func (suite *CommandRunnerSuite) TestTLS() {
 		RootCAs:      serverCertPool,
 	}
 
-	suite.SetupCommandRunner(WithTLS(serverConfig))
+	suite.SetupCommandRunner(admin.WithTLS(serverConfig))
 
 	client := &http.Client{
 		Transport: &http.Transport{

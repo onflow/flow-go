@@ -71,7 +71,7 @@ func (epoch EpochHeights) CommittedRange() []uint64 {
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
-	states     []protocol.MutableState
+	states     []protocol.FollowerState
 	blocksByID map[flow.Identifier]*flow.Block
 	blocks     []*flow.Block
 	built      map[uint64]*EpochHeights
@@ -82,7 +82,7 @@ type EpochBuilder struct {
 // NewEpochBuilder returns a new EpochBuilder which will build epochs using the
 // given states. At least one state must be provided. If more than one are
 // provided they must have the same initial state.
-func NewEpochBuilder(t *testing.T, states ...protocol.MutableState) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, states ...protocol.FollowerState) *EpochBuilder {
 	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
@@ -384,7 +384,7 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err := state.Extend(context.Background(), block)
+		err := state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
 		require.NoError(builder.t, err)
 
 		err = state.Finalize(context.Background(), blockID)

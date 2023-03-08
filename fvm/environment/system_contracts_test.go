@@ -77,7 +77,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
-						return flow.Address{}
+						return flow.EmptyAddress
 					},
 					FunctionName: "functionName",
 				},

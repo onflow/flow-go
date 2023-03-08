@@ -64,7 +64,18 @@ func TestBootstrapAndOpen(t *testing.T) {
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(
+			complianceMetrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+		)
 		require.NoError(t, err)
 
 		complianceMetrics.AssertExpectations(t)
@@ -133,7 +144,18 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
-		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		state, err := bprotocol.OpenState(
+			complianceMetrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+		)
 		require.NoError(t, err)
 
 		// assert update final view was called
@@ -159,7 +181,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 		})
 	})
 
@@ -180,12 +202,12 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			require.NoError(t, err)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 			// first and final height of not started next epoch should be unknown
 			_, err = state.Final().Epochs().Next().FirstHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotStarted)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 			_, err = state.Final().Epochs().Next().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 		})
 	})
 	t.Run("with previous epoch", func(t *testing.T) {
@@ -212,7 +234,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			require.NoError(t, err)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochNotEnded)
+			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
 			// first and final height of completed previous epoch should be known
 			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
 			require.NoError(t, err)
@@ -488,8 +510,8 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	headers, _, seals, _, _, blocks, qcs, setups, commits, statuses, results := storutil.StorageLayer(t, db)
+	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	f(state, err)
 }
 
@@ -511,13 +533,13 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 }
 
 // buildBlock extends the protocol state by the given block
-func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	require.NoError(t, state.Extend(context.Background(), block))
+func buildBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
 }
 
 // buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
-func buildFinalizedBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	require.NoError(t, state.Extend(context.Background(), block))
+func buildFinalizedBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
+	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
 	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }
 

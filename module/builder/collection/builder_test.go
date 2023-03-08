@@ -50,7 +50,7 @@ type BuilderSuite struct {
 	state cluster.MutableState
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.MutableState
+	protoState protocol.FollowerState
 
 	pool    mempool.Transactions
 	builder *builder.Builder
@@ -73,7 +73,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
 	suite.headers = headers
 	suite.blocks = blocks
@@ -98,7 +98,7 @@ func (suite *BuilderSuite) SetupTest() {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
 	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
@@ -261,7 +261,8 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	suite.Require().NoError(err)
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
 	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), unfinalizedReferenceBlock)
+	err = suite.protoState.ExtendCertified(context.Background(), unfinalizedReferenceBlock,
+		unittest.CertifyBlock(unfinalizedReferenceBlock.Header))
 	suite.Require().NoError(err)
 
 	// add a transaction with unfinalized reference block to the pool
@@ -297,12 +298,12 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which will be orphaned
 	orphan := unittest.BlockWithParentFixture(genesis)
 	orphan.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), orphan)
+	err = suite.protoState.ExtendCertified(context.Background(), orphan, unittest.CertifyBlock(orphan.Header))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), block1)
+	err = suite.protoState.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
 	suite.Require().NoError(err)
@@ -611,7 +612,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
 		block.Header.PayloadHash = block.Payload.Hash()
-		err = suite.protoState.Extend(context.Background(), block)
+		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)
@@ -978,7 +979,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, _, _, _, blocks, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
+		headers, _, _, _, _, blocks, _, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)

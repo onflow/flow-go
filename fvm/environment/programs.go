@@ -3,6 +3,8 @@ package environment
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
@@ -11,17 +13,11 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// TODO(patrick): remove and switch to *programs.DerivedTransactionData once
-// https://github.com/onflow/flow-emulator/pull/229 is integrated.
-type DerivedTransactionData interface {
-	GetProgram(loc common.AddressLocation) (*derived.Program, *state.State, bool)
-	SetProgram(loc common.AddressLocation, prog *derived.Program, state *state.State)
-}
 
 // Programs manages operations around cadence program parsing.
 //
@@ -34,10 +30,8 @@ type Programs struct {
 	meter   Meter
 	metrics MetricsReporter
 
-	txnState *state.TransactionState
+	txnState storage.Transaction
 	accounts Accounts
-
-	derivedTxnData DerivedTransactionData
 
 	// NOTE: non-address programs are not reusable across transactions, hence
 	// they are kept out of the derived data database.
@@ -52,9 +46,8 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	accounts Accounts,
-	derivedTxnData DerivedTransactionData,
 ) *Programs {
 	return &Programs{
 		tracer:             tracer,
@@ -62,7 +55,6 @@ func NewPrograms(
 		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
-		derivedTxnData:     derivedTxnData,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
 		dependencyStack:    newDependencyStack(),
 	}
@@ -86,7 +78,8 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.txnState.CommitParseRestricted(address)
+	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
+		address)
 	if err != nil {
 		return err
 	}
@@ -117,7 +110,7 @@ func (programs *Programs) set(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 
-	programs.derivedTxnData.SetProgram(address, &derived.Program{
+	programs.txnState.SetProgram(address, &derived.Program{
 		Program:      program,
 		Dependencies: dependencies,
 	}, state)
@@ -141,12 +134,12 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.derivedTxnData.GetProgram(address)
+	program, state, has := programs.txnState.GetProgram(address)
 	if has {
 		programs.cacheHit()
 
 		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommit(state)
+		err := programs.txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
 			panic(fmt.Sprintf(
 				"merge error while getting program, panic: %s",
@@ -176,6 +169,187 @@ func (programs *Programs) get(
 	return nil, false
 }
 
+// GetAndSetProgram gets the program from the cache,
+// or loads it (by calling load) if it is not in the cache.
+// When loading a program, this method will be re-entered
+// to load the dependencies of the program.
+//
+// TODO: this function currently just calls GetProgram and SetProgram in pair.
+// This method can be re-written in a far better way by removing the individual
+// GetProgram and SetProgram methods.
+func (programs *Programs) GetAndSetProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+	// TODO: check why this exists and try to remove.
+	// ignore empty locations
+	if location == nil {
+		return nil, nil
+	}
+
+	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
+	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
+
+	// non-address location program is not reusable across transactions.
+	switch location := location.(type) {
+	case common.AddressLocation:
+		return programs.getOrLoadAddressProgram(location, load)
+	default:
+		return programs.getOrLoadNonAddressProgram(location, load)
+	}
+}
+
+func (programs *Programs) getOrLoadAddressProgram(
+	address common.AddressLocation,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+
+	// TODO: to be removed when freezing account feature is removed
+	freezeError := programs.accounts.CheckAccountNotFrozen(
+		flow.ConvertAddress(address.Address),
+	)
+	if freezeError != nil {
+		return nil, fmt.Errorf("get program failed: %w", freezeError)
+	}
+
+	// reading program from cache
+	program, programState, has := programs.txnState.GetProgram(address)
+	if has {
+		programs.cacheHit()
+
+		programs.dependencyStack.addDependencies(program.Dependencies)
+		err := programs.txnState.AttachAndCommitNestedTransaction(programState)
+		if err != nil {
+			panic(fmt.Sprintf(
+				"merge error while getting program, panic: %s",
+				err))
+		}
+
+		return program.Program, nil
+	}
+	programs.cacheMiss()
+
+	interpreterProgram, programState, dependencies, err :=
+		programs.loadWithDependencyTracking(address, load)
+
+	if err != nil {
+		return nil, fmt.Errorf("load program failed: %w", err)
+	}
+
+	// update program cache
+	programs.txnState.SetProgram(address, &derived.Program{
+		Program:      interpreterProgram,
+		Dependencies: dependencies,
+	}, programState)
+
+	return interpreterProgram, nil
+}
+
+func (programs *Programs) loadWithDependencyTracking(
+	address common.AddressLocation,
+	load func() (*interpreter.Program, error),
+) (
+	*interpreter.Program,
+	*state.State,
+	derived.ProgramDependencies,
+	error,
+) {
+	// this program is not in cache, so we need to load it into the cache.
+	// tho have proper invalidation, we need to track the dependencies of the program.
+	// If this program depends on another program,
+	// that program will be loaded before this one finishes loading (calls set).
+	// That is why this is a stack.
+	programs.dependencyStack.push(address)
+
+	program, programState, err := programs.loadInNestedStateTransaction(address, load)
+
+	// Get collected dependencies of the loaded program.
+	// Pop the dependencies from the stack even if loading errored.
+	stackLocation, dependencies, depErr := programs.dependencyStack.pop()
+	if depErr != nil {
+		err = multierror.Append(err, depErr).ErrorOrNil()
+	}
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if stackLocation != address {
+		// This should never happen, and indicates an implementation error.
+		// GetProgram and SetProgram should be always called in pair, this check depends on this assumption.
+		// Get pushes the stack and set pops the stack.
+		// Example: if loading B that depends on A (and none of them are in cache yet),
+		//   - get(A): pushes A
+		//   - get(B): pushes B
+		//   - set(B): pops B
+		//   - set(A): pops A
+		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
+		return nil, nil, nil, fmt.Errorf(
+			"cannot set program. Popped dependencies are for an unexpeced address"+
+				" (expected %s, got %s)", address, stackLocation)
+	}
+	return program, programState, dependencies, nil
+}
+
+func (programs *Programs) loadInNestedStateTransaction(
+	address common.AddressLocation,
+	load func() (*interpreter.Program, error),
+) (
+	*interpreter.Program,
+	*state.State,
+	error,
+) {
+	// Address location program is reusable across transactions.  Create
+	// a nested transaction here in order to capture the states read to
+	// parse the program.
+	_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
+		address)
+	if err != nil {
+		panic(err)
+	}
+	program, err := load()
+
+	// Commit even if loading errored.
+	programState, commitErr := programs.txnState.CommitParseRestrictedNestedTransaction(address)
+	if commitErr != nil {
+		err = multierror.Append(err, commitErr).ErrorOrNil()
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if programState.BytesWritten() > 0 {
+		// This should never happen. Loading a program should not write to the state.
+		// If this happens, it indicates an implementation error.
+		return nil, nil, fmt.Errorf(
+			"cannot set program to address %v. "+
+				"State was written to during program parsing", address)
+	}
+
+	return program, programState, nil
+}
+
+func (programs *Programs) getOrLoadNonAddressProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+	program, ok := programs.nonAddressPrograms[location]
+	if ok {
+		return program, nil
+	}
+
+	program, err := load()
+	if err != nil {
+		return nil, err
+	}
+
+	programs.nonAddressPrograms[location] = program
+	return program, nil
+}
+
 func (programs *Programs) GetProgram(
 	location common.Location,
 ) (
@@ -190,7 +364,7 @@ func (programs *Programs) GetProgram(
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.Address(addressLocation.Address)
+		address := flow.ConvertAddress(addressLocation.Address)
 
 		freezeError := programs.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
@@ -288,7 +462,7 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	dependencies := make(derived.ProgramDependencies, 1)
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(loc.Address)
+	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,

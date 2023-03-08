@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -76,7 +77,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		view1 := es.NewView(sc1)
+		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
 
 		err = view1.Set(registerID1, flow.RegisterValue("apple"))
 		assert.NoError(t, err)
@@ -121,7 +122,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
 		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
 
-		view2 := es.NewView(sc2)
+		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
 
 		b1, err := view2.Get(registerID1)
 		assert.NoError(t, err)
@@ -137,7 +138,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		view1 := es.NewView(sc1)
+		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
 
 		err = view1.Set(registerID1, []byte("apple"))
 		assert.NoError(t, err)
@@ -145,7 +146,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		view2 := es.NewView(sc2)
+		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
 		err = view2.Set(registerID1, []byte("orange"))
 		assert.NoError(t, err)
 
@@ -153,10 +154,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// create a view for previous state version
-		view3 := es.NewView(sc2)
+		view3 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
 
 		// create a view for new state version
-		view4 := es.NewView(sc3)
+		view4 := delta.NewDeltaView(es.NewStorageSnapshot(sc3))
 
 		// fetch the value at both versions
 		b1, err := view3.Get(registerID1)
@@ -175,7 +176,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		view1 := es.NewView(sc1)
+		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
 		err = view1.Set(registerID1, []byte("apple"))
 		assert.NoError(t, err)
 		err = view1.Set(registerID2, []byte("apple"))
@@ -185,7 +186,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		view2 := es.NewView(sc2)
+		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
 		err = view2.Set(registerID1, nil)
 		assert.NoError(t, err)
 
@@ -193,10 +194,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// create a view for previous state version
-		view3 := es.NewView(sc2)
+		view3 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
 
 		// create a view for new state version
-		view4 := es.NewView(sc3)
+		view4 := delta.NewDeltaView(es.NewStorageSnapshot(sc3))
 
 		// fetch the value at both versions
 		b1, err := view3.Get(registerID1)
@@ -215,7 +216,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		view1 := es.NewView(sc1)
+		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
 		err = view1.Set(registerID1, flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 		err = view1.Set(registerID2, flow.RegisterValue("apple"))

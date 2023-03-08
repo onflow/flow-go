@@ -3,8 +3,6 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,20 +15,20 @@ import (
 // compliance with the environment interface.
 type AccountFreezer interface {
 	// Note that the script variant will return OperationNotSupportedError.
-	SetAccountFrozen(address common.Address, frozen bool) error
+	SetAccountFrozen(address flow.Address, frozen bool) error
 
-	FrozenAccounts() []common.Address
+	FrozenAccounts() []flow.Address
 
 	Reset()
 }
 
 type ParseRestrictedAccountFreezer struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountFreezer
 }
 
 func NewParseRestrictedAccountFreezer(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountFreezer,
 ) AccountFreezer {
 	return ParseRestrictedAccountFreezer{
@@ -40,7 +38,7 @@ func NewParseRestrictedAccountFreezer(
 }
 
 func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
-	address common.Address,
+	address flow.Address,
 	frozen bool,
 ) error {
 	return parseRestrict2Arg(
@@ -51,7 +49,7 @@ func (freezer ParseRestrictedAccountFreezer) SetAccountFrozen(
 		frozen)
 }
 
-func (freezer ParseRestrictedAccountFreezer) FrozenAccounts() []common.Address {
+func (freezer ParseRestrictedAccountFreezer) FrozenAccounts() []flow.Address {
 	return freezer.impl.FrozenAccounts()
 }
 
@@ -61,11 +59,11 @@ func (freezer ParseRestrictedAccountFreezer) Reset() {
 
 type NoAccountFreezer struct{}
 
-func (NoAccountFreezer) FrozenAccounts() []common.Address {
+func (NoAccountFreezer) FrozenAccounts() []flow.Address {
 	return nil
 }
 
-func (NoAccountFreezer) SetAccountFrozen(_ common.Address, _ bool) error {
+func (NoAccountFreezer) SetAccountFrozen(_ flow.Address, _ bool) error {
 	return errors.NewOperationNotSupportedError("SetAccountFrozen")
 }
 
@@ -78,7 +76,7 @@ type accountFreezer struct {
 	accounts        Accounts
 	transactionInfo TransactionInfo
 
-	frozenAccounts []common.Address
+	frozenAccounts []flow.Address
 }
 
 func NewAccountFreezer(
@@ -99,21 +97,19 @@ func (freezer *accountFreezer) Reset() {
 	freezer.frozenAccounts = nil
 }
 
-func (freezer *accountFreezer) FrozenAccounts() []common.Address {
+func (freezer *accountFreezer) FrozenAccounts() []flow.Address {
 	return freezer.frozenAccounts
 }
 
 func (freezer *accountFreezer) SetAccountFrozen(
-	address common.Address,
+	address flow.Address,
 	frozen bool,
 ) error {
-	flowAddress := flow.Address(address)
-
-	if flowAddress == freezer.serviceAddress {
+	if address == freezer.serviceAddress {
 		return fmt.Errorf(
 			"setting account frozen failed: %w",
 			errors.NewValueErrorf(
-				flowAddress.String(),
+				address.String(),
 				"cannot freeze service account"))
 	}
 
@@ -126,7 +122,7 @@ func (freezer *accountFreezer) SetAccountFrozen(
 					"the service account"))
 	}
 
-	err := freezer.accounts.SetAccountFrozen(flowAddress, frozen)
+	err := freezer.accounts.SetAccountFrozen(address, frozen)
 	if err != nil {
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}

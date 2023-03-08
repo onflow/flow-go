@@ -213,14 +213,22 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 			testTransactionResult,
 		},
 		StateCommitments: []flow.StateCommitment{testStateCommit},
-		TrieUpdates: []*ledger.TrieUpdate{
-			{
-				RootHash: testTrieUpdateRootHash,
+		BlockExecutionData: &execution_data.BlockExecutionData{
+			BlockID: testBlockID,
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				&execution_data.ChunkExecutionData{
+					TrieUpdate: &ledger.TrieUpdate{
+						RootHash: testTrieUpdateRootHash,
+					},
+				},
 			},
 		},
 	}
 
-	assert.DeepEqual(t, reconstructedComputationResult, expectedComputationResult,
+	assert.DeepEqual(
+		t,
+		expectedComputationResult,
+		reconstructedComputationResult,
 		cmpopts.IgnoreUnexported(entity.ExecutableBlock{}))
 }
 

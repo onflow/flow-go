@@ -1,13 +1,12 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -16,7 +15,7 @@ import (
 
 // TODO(patrick): rm unaccessed fields
 type ComputationResult struct {
-	ExecutableBlock        *entity.ExecutableBlock
+	*entity.ExecutableBlock
 	StateSnapshots         []*delta.SpockSnapshot
 	StateCommitments       []flow.StateCommitment
 	Proofs                 [][]byte
@@ -27,12 +26,11 @@ type ComputationResult struct {
 	TransactionResults     []flow.TransactionResult
 	TransactionResultIndex []int
 	ComputationIntensities meter.MeteredComputationIntensities
-	TrieUpdates            []*ledger.TrieUpdate
-	ExecutionDataID        flow.Identifier
-	SpockSignatures        []crypto.Signature
-	Chunks                 []*flow.Chunk
 	ChunkDataPacks         []*flow.ChunkDataPack
 	EndState               flow.StateCommitment
+
+	*execution_data.BlockExecutionData
+	*flow.ExecutionReceipt
 }
 
 func NewEmptyComputationResult(
@@ -51,11 +49,15 @@ func NewEmptyComputationResult(
 		TransactionResults:     make([]flow.TransactionResult, 0),
 		TransactionResultIndex: make([]int, 0),
 		ComputationIntensities: make(meter.MeteredComputationIntensities),
-		TrieUpdates:            make([]*ledger.TrieUpdate, 0, numCollections),
-		SpockSignatures:        make([]crypto.Signature, 0, numCollections),
-		Chunks:                 make([]*flow.Chunk, 0, numCollections),
 		ChunkDataPacks:         make([]*flow.ChunkDataPack, 0, numCollections),
 		EndState:               *block.StartState,
+		BlockExecutionData: &execution_data.BlockExecutionData{
+			BlockID: block.ID(),
+			ChunkExecutionDatas: make(
+				[]*execution_data.ChunkExecutionData,
+				0,
+				numCollections),
+		},
 	}
 }
 

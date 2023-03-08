@@ -44,12 +44,15 @@ func main() {
 		panic(err)
 	}
 
-	account := sdk.NewAccountKey().
+	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(sk).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	signer := crypto.NewInMemorySigner(sk, account.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(sk, accountKey.HashAlgo)
+	if err != nil {
+		panic(err)
+	}
 
 	addr := sdk.NewAddressGenerator(sdk.Testnet).NextAddress()
 
@@ -78,7 +81,7 @@ func main() {
             		}
         		`)).
 				SetGasLimit(100).
-				SetProposalKey(addr, account.ID, nonce).
+				SetProposalKey(addr, accountKey.Index, nonce).
 				SetReferenceBlockID(latest.ID).
 				SetPayer(addr).
 				AddAuthorizer(addr)

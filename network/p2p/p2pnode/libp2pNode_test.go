@@ -3,14 +3,20 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -19,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -241,4 +249,180 @@ func TestNode_HasSubscription(t *testing.T) {
 	// create topic with no subscription
 	topic = channels.TopicFromChannel(channels.ConsensusCommittee, unittest.IdentifierFixture())
 	require.False(t, node.HasSubscription(topic))
+}
+
+// TestCreateStream_SinglePairwiseConnection ensures that despite the number of concurrent streams created from peer -> peer, only a single
+// connection will ever be created between two peers on initial peer dialing and subsequent streams will reuse that connection.
+func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	nodeCount := 3
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	nodes, ids := p2ptest.NodesFixture(t,
+		sporkId,
+		"test_create_stream_single_pairwise_connection",
+		nodeCount,
+		p2ptest.WithDefaultResourceManager())
+
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	numOfStreamsPerNode := 100 // create large number of streams per node per connection to ensure the resource manager does not cause starvation of resources
+	expectedTotalNumOfStreams := 600
+
+	// create a number of streams concurrently between each node
+	streams := make(chan network.Stream, expectedTotalNumOfStreams)
+
+	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streams, done)
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streams on time")
+	require.Len(t, streams, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streams created got %d", expectedTotalNumOfStreams, len(streams)))
+
+	// ensure only a single connection exists between all nodes
+	ensureSinglePairwiseConnection(t, nodes)
+	close(streams)
+	for s := range streams {
+		_ = s.Close()
+	}
+}
+
+// TestCreateStream_SinglePeerDial ensures that the unicast manager only attempts to dial a peer once, retries dialing a peer the expected max amount of times when an
+// error is encountered and retries creating the stream the expected max amount of times when unicast.ErrDialInProgress is encountered.
+func TestCreateStream_SinglePeerDial(t *testing.T) {
+	createStreamRetries := atomic.NewInt64(0)
+	dialPeerRetries := atomic.NewInt64(0)
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			switch {
+			case strings.Contains(message, "retrying create stream, dial to peer in progress"):
+				createStreamRetries.Inc()
+			case strings.Contains(message, "retrying peer dialing"):
+				dialPeerRetries.Inc()
+			}
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+	idProvider := mockmodule.NewIdentityProvider(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+
+	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
+	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
+	m := mockmodule.NewNetworkMetrics(t)
+	m.On("OnPeerDialFailure", mock.Anything, 3).Once()
+	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
+		attempts := args.Get(1).(int)
+		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
+		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
+		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
+		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
+		// we expect attempts to be 3. Thus we only expect this method to be called twice with either 1 or 3 attempts.
+		require.False(t, attempts != 1 && attempts != 3, fmt.Sprintf("expected either 1 or 3 attempts got %d", attempts))
+	})
+
+	sender, id1 := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			// avoid connection gating outbound messages on sender
+			return nil
+		})),
+		// add very small delay so that when the sender attempts to create multiple streams
+		// the func fails fast before the first routine can finish the peer dialing retries
+		// this prevents us from making another call to dial peer
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
+		p2ptest.WithLogger(logger),
+		p2ptest.WithMetricsCollector(m))
+
+	receiver, id2 := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			// connection gate all incoming connections forcing the senders unicast manager to perform retries
+			return fmt.Errorf("gate keep")
+		})),
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
+		p2ptest.WithLogger(logger))
+
+	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
+	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
+
+	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	// attempt to create two concurrent streams
+	go func() {
+		defer wg.Done()
+		_, err := sender.CreateStream(ctx, receiver.Host().ID())
+		require.Error(t, err)
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := sender.CreateStream(ctx, receiver.Host().ID())
+		require.Error(t, err)
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
+
+	// we expect a single routine to start attempting to dial thus the number of retries
+	// before failure should be at most p2pnode.MaxConnectAttempt
+	expectedNumOfDialRetries := int64(p2pnode.MaxConnectAttempt)
+	// we expect the second routine to retry creating a stream p2pnode.MaxConnectAttempt when dialing is in progress
+	expectedCreateStreamRetries := int64(p2pnode.MaxConnectAttempt)
+	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
+	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
+}
+
+// createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
+func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, ids flow.IdentityList, n int, streams chan network.Stream, done chan struct{}) {
+	defer close(done)
+	var wg sync.WaitGroup
+	for _, this := range nodes {
+		for i, other := range nodes {
+			if this == other {
+				continue
+			}
+
+			pInfo, err := utils.PeerAddressInfo(*ids[i])
+			require.NoError(t, err)
+			this.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+
+			for j := 0; j < n; j++ {
+				wg.Add(1)
+				go func(sender p2p.LibP2PNode) {
+					defer wg.Done()
+					s, err := sender.CreateStream(ctx, pInfo.ID)
+					require.NoError(t, err)
+					streams <- s
+				}(this)
+			}
+		}
+		// brief sleep to prevent sender and receiver dialing each other at the same time if separate goroutines resulting
+		// in 2 connections 1 created by each node, this happens because we are calling CreateStream concurrently.
+		time.Sleep(500 * time.Millisecond)
+	}
+	wg.Wait()
+}
+
+// ensureSinglePairwiseConnection ensure each node in the list has exactly one connection to every other node in the list.
+func ensureSinglePairwiseConnection(t *testing.T, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			require.Len(t, this.Host().Network().ConnsToPeer(other.Host().ID()), 1)
+		}
+	}
 }

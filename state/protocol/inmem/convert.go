@@ -189,7 +189,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	// convert height bounds
 	firstHeight, err := from.FirstHeight()
-	if errors.Is(err, protocol.ErrEpochNotStarted) {
+	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
 		// if this epoch hasn't been started yet, return the epoch as-is
 		return &Epoch{epoch}, nil
 	}
@@ -198,7 +198,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	}
 	epoch.FirstHeight = &firstHeight
 	finalHeight, err := from.FinalHeight()
-	if errors.Is(err, protocol.ErrEpochNotEnded) {
+	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
 		// if this epoch hasn't ended yet, return the epoch as-is
 		return &Epoch{epoch}, nil
 	}

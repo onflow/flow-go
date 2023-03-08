@@ -1,4 +1,4 @@
-package unicast
+package protocols
 
 import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"

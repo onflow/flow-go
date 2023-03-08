@@ -3,19 +3,18 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/state"
-
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage"
 )
 
 type TransactionPayerBalanceChecker struct{}
 
 func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	env environment.Environment,
 ) (uint64, error) {
 	if !env.TransactionFeesEnabled() {
