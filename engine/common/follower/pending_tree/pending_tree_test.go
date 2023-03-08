@@ -74,8 +74,9 @@ func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
 // TestInsertingMissingBlockToFinalized tests that adding blocks that don't connect to the finalized block result
 // in empty list of connected blocks. After adding missing block all connected blocks across all forks are correctly collected
 // and returned.
-// Having: <- B2 <- B3
-// F <- B1 <- B4 <- B5 <- B6 <- B7
+// Having:
+//         ↙ B2 ← B3
+//  F ← B1 ← B4 ← B5 ← B6 ← B7
 // Add [B2, B3], expect to get []
 // Add [B4, B5, B6, B7], expect to get []
 // Add [B1], expect to get [B1, B2, B3, B4, B5, B6, B7]
@@ -236,7 +237,8 @@ func (s *PendingTreeSuite) TestConcurrentAddBlocks() {
 				blocks[i], blocks[j] = blocks[j], blocks[i]
 			})
 			for batch := 0; batch < batchesPerWorker; batch++ {
-				connectedBlocks, _ := s.pendingTree.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
+				connectedBlocks, err := s.pendingTree.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
+				require.NoError(t, err)
 				connectedBlocksLock.Lock()
 				for _, block := range connectedBlocks {
 					connectedBlocksByID[block.ID()] = block

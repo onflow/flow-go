@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// CertifiedBlock holds a certified block, it consists of block itself and a QC which proofs validity of block.
+// CertifiedBlock holds a certified block, it consists of a block and a QC which proves validity of block (QC.BlockID = Block.ID())
 // This is used to compactly store and transport block and certifying QC in one structure.
 type CertifiedBlock struct {
 	Block *flow.Block
@@ -160,6 +160,7 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 
 // FinalizeForkAtLevel takes last finalized block and prunes levels below the finalized view.
 // When a block is finalized we don't care for all blocks below it since they were already finalized.
+// No errors are expected during normal operation.
 func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 	blockID := finalized.ID()
 	t.lock.Lock()
@@ -176,8 +177,18 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 	return nil
 }
 
-// updateAndCollectFork recursively traverses leveled forest using parent-children(effectively traversing a subtree), marks each of traversed vertices as connected
-// to the finalized state and collects in a list which is returned as result.
+// updateAndCollectFork marks the subtree rooted at `vertex.Block` as connected to the finalized state
+// and returns all blocks in this subtree. No parents of `vertex.Block` are modified or included in the output.
+// The output list will be ordered so that parents appear before children.
+// The caller must ensure that `vertex.Block` is connected to the finalized state.
+// 
+//  A ← B ← C ←D
+//        ↖ E
+//
+// For example, suppose B is the input vertex. Then:
+//  - A must already be connected to the finalized state
+//  - B, E, C, D are marked as connected to the finalized state and included in the output list
+// CAUTION: not safe for concurrent use; caller must hold the lock.
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
 	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}
 	vertex.connectedToFinalized = true
