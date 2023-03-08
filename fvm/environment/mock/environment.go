@@ -600,8 +600,8 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 	return r0, r1
 }
 
-// GetAndSetProgram provides a mock function with given fields: location, load
-func (_m *Environment) GetAndSetProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+// GetOrLoadProgram provides a mock function with given fields: location, load
+func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
 	ret := _m.Called(location, load)
 
 	var r0 *interpreter.Program
