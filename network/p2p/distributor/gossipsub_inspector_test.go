@@ -23,10 +23,10 @@ import (
 // notification distributor component and sending a random set of notifications to the notification component. The test
 // verifies that the consumers receive the notifications.
 func TestGossipSubInspectorNotification(t *testing.T) {
-	g := distributor.DefaultGossipSubInspectorNotification(unittest.Logger())
+	g := distributor.DefaultGossipSubInspectorNotificationDistributor(unittest.Logger())
 
-	c1 := mockp2p.NewGossipSubRpcInspectorConsumer(t)
-	c2 := mockp2p.NewGossipSubRpcInspectorConsumer(t)
+	c1 := mockp2p.NewEventConsumer[p2p.InvalidControlMessageNotification](t)
+	c2 := mockp2p.NewEventConsumer[p2p.InvalidControlMessageNotification](t)
 
 	g.AddConsumer(c1)
 	g.AddConsumer(c2)
@@ -36,7 +36,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c1Done := sync.WaitGroup{}
 	c1Done.Add(len(tt))
 	c1Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
-	c1.On("OnInvalidControlMessage", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	c1.On("ConsumeEvent", mock.Anything).Run(func(args mock.Arguments) {
 		notification, ok := args.Get(0).(p2p.InvalidControlMessageNotification)
 		require.True(t, ok)
 
@@ -52,7 +52,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c2Done := sync.WaitGroup{}
 	c2Done.Add(len(tt))
 	c2Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
-	c2.On("OnInvalidControlMessage", mock.Anything).Run(func(args mock.Arguments) {
+	c2.On("ConsumeEvent", mock.Anything).Run(func(args mock.Arguments) {
 		notification, ok := args.Get(0).(p2p.InvalidControlMessageNotification)
 		require.True(t, ok)
 
@@ -73,7 +73,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			g.OnInvalidControlMessage(tt[i])
+			require.NoError(t, g.DistributeEvent(tt[i]))
 		}(i)
 	}
 

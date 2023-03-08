@@ -38,8 +38,8 @@ type NodeBlocklistWrapper struct {
 	db *badger.DB
 
 	identityProvider module.IdentityProvider
-	blocklist        IdentifierSet                                 // `IdentifierSet` is a map, hence efficient O(1) lookup
-	distributor      p2p.DisallowListUpdateNotificationDistributor // distributor for the blocklist update notifications
+	blocklist        IdentifierSet                           // `IdentifierSet` is a map, hence efficient O(1) lookup
+	distributor      p2p.DisallowListNotificationDistributor // distributor for the blocklist update notifications
 }
 
 var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
@@ -49,7 +49,7 @@ var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 func NewNodeBlocklistWrapper(
 	identityProvider module.IdentityProvider,
 	db *badger.DB,
-	distributor p2p.DisallowListUpdateNotificationDistributor) (*NodeBlocklistWrapper, error) {
+	distributor p2p.DisallowListNotificationDistributor) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)

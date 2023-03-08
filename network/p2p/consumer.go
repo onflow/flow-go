@@ -44,14 +44,14 @@ type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList
 }
 
-type DisallowListUpdateNotificationConsumer interface {
+type DisallowListNotificationConsumer interface {
 	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
 	OnDisallowListNotification(*DisallowListUpdateNotification)
 }
 
-type DisallowListUpdateNotificationDistributor interface {
+type DisallowListNotificationDistributor interface {
 	// DistributeBlockListNotification distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
@@ -60,5 +60,5 @@ type DisallowListUpdateNotificationDistributor interface {
 	// AddConsumer adds a consumer to the distributor. The consumer will be called when distributor receives a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
-	AddConsumer(DisallowListUpdateNotificationConsumer)
+	AddConsumer(DisallowListNotificationConsumer)
 }

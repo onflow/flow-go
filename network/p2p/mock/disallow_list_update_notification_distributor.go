@@ -15,7 +15,7 @@ type DisallowListUpdateNotificationDistributor struct {
 }
 
 // AddConsumer provides a mock function with given fields: _a0
-func (_m *DisallowListUpdateNotificationDistributor) AddConsumer(_a0 p2p.DisallowListUpdateNotificationConsumer) {
+func (_m *DisallowListUpdateNotificationDistributor) AddConsumer(_a0 p2p.DisallowListNotificationConsumer) {
 	_m.Called(_a0)
 }
 
