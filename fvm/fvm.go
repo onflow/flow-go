@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -21,20 +23,67 @@ const (
 	ScriptProcedureType      = ProcedureType("script")
 )
 
+type ProcedureOutput struct {
+	// Output by both transaction and script.
+	Logs                   []string
+	Events                 flow.EventsList
+	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
+
+	// Output only by script.
+	Value cadence.Value
+
+	// TODO(patrick): rm after updating emulator to use ComputationUsed
+	GasUsed uint64
+}
+
+func (output *ProcedureOutput) PopulateEnvironmentValues(
+	env environment.Environment,
+) error {
+	output.Logs = env.Logs()
+
+	computationUsed, err := env.ComputationUsed()
+	if err != nil {
+		return fmt.Errorf("error getting computation used: %w", err)
+	}
+	output.ComputationUsed = computationUsed
+	// TODO(patrick): rm after updating emulator to use ComputationUsed
+	output.GasUsed = computationUsed
+
+	memoryUsed, err := env.MemoryUsed()
+	if err != nil {
+		return fmt.Errorf("error getting memory used: %w", err)
+	}
+	output.MemoryEstimate = memoryUsed
+
+	output.ComputationIntensities = env.ComputationIntensities()
+
+	// if tx failed this will only contain fee deduction events
+	output.Events = env.Events()
+	output.ServiceEvents = env.ServiceEvents()
+	output.ConvertedServiceEvents = env.ConvertedServiceEvents()
+
+	return nil
+}
+
 type ProcedureExecutor interface {
 	Preprocess() error
 	Execute() error
 	Cleanup()
+
+	Output() ProcedureOutput
 }
 
 func Run(executor ProcedureExecutor) error {
 	defer executor.Cleanup()
-
 	err := executor.Preprocess()
 	if err != nil {
 		return err
 	}
-
 	return executor.Execute()
 }
 
@@ -63,6 +112,9 @@ type Procedure interface {
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
 	ExecutionTime() derived.LogicalTime
+
+	// TODO(patrick): deprecated this.
+	SetOutput(output ProcedureOutput)
 }
 
 // VM runs procedures
@@ -124,10 +176,13 @@ func (vm *VirtualMachine) Run(
 		DerivedTransactionCommitter: derivedTxnData,
 	}
 
-	err = Run(proc.NewExecutor(ctx, txnState))
+	executor := proc.NewExecutor(ctx, txnState)
+	err = Run(executor)
 	if err != nil {
 		return err
 	}
+
+	proc.SetOutput(executor.Output())
 
 	// Note: it is safe to skip committing derived data for non-normal
 	// transactions (i.e., bootstrap and script) since these do not invalidate
