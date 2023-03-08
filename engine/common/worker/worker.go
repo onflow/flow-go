@@ -3,6 +3,8 @@ package worker
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -53,6 +55,7 @@ func (p *Pool[T]) Submit(event T) bool {
 // It is the callers responsibility to make sure that the number of workers concurrently accessing `processingFunc`
 // is compatible with its implementation.
 type PoolBuilder[T any] struct {
+	logger   zerolog.Logger
 	store    engine.MessageStore // temporarily store inbound events till they are processed.
 	notifier engine.Notifier
 
@@ -69,10 +72,12 @@ type PoolBuilder[T any] struct {
 // Returns:
 // The function returns a `PoolBuilder` instance.
 func NewWorkerPoolBuilder[T any](
+	logger zerolog.Logger,
 	store engine.MessageStore,
 	processingFunc func(input T) error,
 ) *PoolBuilder[T] {
 	return &PoolBuilder[T]{
+		logger:         logger.With().Str("component", "worker-pool").Logger(),
 		store:          store,
 		notifier:       engine.NewNotifier(),
 		processingFunc: processingFunc,
@@ -105,20 +110,25 @@ func (b *PoolBuilder[T]) workerLogic() component.ComponentWorker {
 		for {
 			select {
 			case <-ctx.Done():
+				b.logger.Trace().Msg("worker logic shutting down")
 				return
 			case <-notifier:
 				for { // on single notification, commence processing items in store until none left
 					select {
 					case <-ctx.Done():
+						b.logger.Trace().Msg("worker logic shutting down")
 						return
 					default:
 					}
 
 					msg, ok := store.Get()
 					if !ok {
+						b.logger.Trace().Msg("store is empty, waiting for next notification")
 						break // store is empty; go back to outer for loop
 					}
+					b.logger.Trace().Msg("processing queued work item")
 					err := processingFunc(msg.Payload.(T))
+					b.logger.Trace().Msg("finished processing queued work item")
 					if err != nil {
 						ctx.Throw(fmt.Errorf("unexpected error processing queued work item: %w", err))
 						return
