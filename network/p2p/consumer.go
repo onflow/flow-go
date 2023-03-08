@@ -39,15 +39,26 @@ type InvalidControlMessageNotification struct {
 	Count uint64
 }
 
-// GossipSubRpcInspectorConsumer is the interface for a consumer of inspection result for GossipSub RPC messages.
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-type GossipSubRpcInspectorConsumer interface {
-	// OnInvalidControlMessage is called when a control message is received that is invalid according to the
-	// Flow protocol specification.
-	// The int parameter is the count of invalid messages received from the peer.
-	// Prerequisites:
-	// Implementation must be concurrency safe and non-blocking.
-	OnInvalidControlMessage(InvalidControlMessageNotification)
+// DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
+type DisallowListUpdateNotification struct {
+	DisallowList flow.IdentifierList
+}
+
+type DisallowListUpdateNotificationConsumer interface {
+	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe, but can be blocking.
+	OnDisallowListNotification(*DisallowListUpdateNotification)
+}
+
+type DisallowListUpdateNotificationDistributor interface {
+	// DistributeBlockListNotification distributes the event to all the consumers.
+	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
+	// Implementation must be concurrency safe, and non-blocking.
+	DistributeBlockListNotification(list flow.IdentifierList) error
+
+	// AddConsumer adds a consumer to the distributor. The consumer will be called when distributor receives a new event.
+	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
+	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
+	AddConsumer(DisallowListUpdateNotificationConsumer)
 }
