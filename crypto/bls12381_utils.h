@@ -131,7 +131,7 @@ void        ep2_write_bin_compact(byte *, const ep2_t,  const int);
 void     ep_mult_gen_bench(ep_t, const Fr*);
 void     ep_mult_generic_bench(ep_t, const Fr*);
 void     ep_mult(ep_t, const ep_t, const Fr*);
-void     ep2_mult_gen(ep2_t, const Fr*);
+void     G2_mult_gen(ep2_t, const Fr*);
 void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo); 
 
 void     ep_sum_vector(ep_t, ep_st*, const int);

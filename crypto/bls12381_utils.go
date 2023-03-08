@@ -21,7 +21,7 @@ import (
 // Go wrappers around BLST C types
 // Go wrappers around Relic C types
 type pointG1 C.ep_st
-type pointG2 C.ep2_st
+type pointG2 C.G2
 type scalar C.Fr
 
 // BLS12-381 related lengths
@@ -96,7 +96,7 @@ func genericScalarMultG1(res *pointG1, expo *scalar) {
 
 // Exponentiation of g2 in G2
 func generatorScalarMultG2(res *pointG2, expo *scalar) {
-	C.ep2_mult_gen((*C.ep2_st)(res), (*C.Fr)(expo))
+	C.G2_mult_gen((*C.G2)(res), (*C.Fr)(expo))
 }
 
 // comparison in Fr where r is the group order of G1/G2

@@ -182,6 +182,10 @@ static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
     }
 }
 
+static void pow256_from_Fr(pow256 ret, const Fr* in) {
+    le_bytes_from_limbs(ret, (limb_t*)in, Fr_BYTES);
+}
+
 // reads a scalar in `a` and checks it is a valid Fr element (a < r).
 // input bytes are big endian.
 // returns:
@@ -388,11 +392,10 @@ void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
 }
 
 // Exponentiation of generator g2 in G2
-void ep2_mult_gen(ep2_t res, const Fr* expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using precomputed table of size 4
-    g2_mul_gen(res, tmp_expo);
-    free(tmp_expo);
+void G2_mult_gen(G2* res, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE2_sign(res, &BLS12_381_G2, tmp);
 }
 
 // DEBUG printing functions 
