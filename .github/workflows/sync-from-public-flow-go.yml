@@ -11,7 +11,7 @@ on:
 # GH_TOKEN needed to enable GitHub CLI commands
 env:
   GH_TOKEN: ${{ secrets.REPO_SYNC }}
-  GITHUB_TOKEN: ${{ secrets.REPO_SYNC }}
+#  GITHUB_TOKEN: ${{ secrets.REPO_SYNC }}
 
 jobs:
   flow-go-sync:
@@ -34,6 +34,7 @@ jobs:
         with:
           # checkout entire history - necessary when pushing to multiple origin branches after syncing with public flow-go repo
           fetch-depth: 0
+          token: ${{ secrets.REPO_SYNC }}
 
       - name: Run sync
         run: sh tools/repo_sync/sync-from-public-flow-go.sh
