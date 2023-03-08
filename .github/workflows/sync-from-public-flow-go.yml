@@ -11,6 +11,7 @@ on:
 # GH_TOKEN needed to enable GitHub CLI commands
 env:
   GH_TOKEN: ${{ secrets.REPO_SYNC }}
+  GITHUB_TOKEN: ${{ secrets.REPO_SYNC }}
 
 jobs:
   flow-go-sync:
