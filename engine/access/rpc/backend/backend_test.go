@@ -162,7 +162,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -224,7 +224,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 
 		// building 2 epochs allows us to take a snapshot at a point in time where
@@ -295,7 +295,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -358,7 +358,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -433,7 +433,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
 
 		// get heights of each phase in built epochs

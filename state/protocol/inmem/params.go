@@ -2,11 +2,14 @@ package inmem
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type Params struct {
 	enc EncodableParams
 }
+
+var _ protocol.GlobalParams = (*Params)(nil)
 
 func (p Params) ChainID() (flow.ChainID, error) {
 	return p.enc.ChainID, nil

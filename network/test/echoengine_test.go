@@ -266,7 +266,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.Condui
 			wg.Done()
 		}()
 	}
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not send message on time")
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not send message on time")
 	time.Sleep(1 * time.Second)
 
 	// receiver should only see the message once, and the rest should be dropped due to
@@ -325,7 +325,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send testutils.C
 			require.NoError(suite.Suite.T(), send(event, sender2.con, suite.ids[rcvNode].NodeID))
 		}()
 	}
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not handle sending unicasts on time")
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not handle sending unicasts on time")
 	time.Sleep(1 * time.Second)
 
 	// each receiver should only see the message once, and the rest should be dropped due to

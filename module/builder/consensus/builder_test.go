@@ -68,7 +68,7 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state      *protocol.MutableState
+	state      *protocol.ParticipantState
 	headerDB   *storage.Headers
 	sealDB     *storage.Seals
 	indexDB    *storage.Index
@@ -266,7 +266,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
-	bs.state = &protocol.MutableState{}
+	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(1).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)

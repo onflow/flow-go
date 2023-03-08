@@ -73,7 +73,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 // a receipt for the block (BR), the second (BS) containing a seal for the block.
 // B <- BR(Result_B) <- BS(Seal_B)
 // Returns the two generated blocks.
-func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Header, bs *flow.Header) {
+func SealBlock(t *testing.T, st protocol.ParticipantState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Header, bs *flow.Header) {
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
@@ -94,7 +94,7 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 }
 
 // InsertAndFinalize inserts, then finalizes, the input block.
-func InsertAndFinalize(t *testing.T, st protocol.MutableState, block *flow.Block) {
+func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.Block) {
 	err := st.Extend(context.Background(), block)
 	require.NoError(t, err)
 	err = st.Finalize(context.Background(), block.ID())
