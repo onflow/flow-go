@@ -36,7 +36,6 @@ func ComputationResultForBlockFixture(
 	numChunks := len(collections) + 1
 	stateViews := make([]*delta.SpockSnapshot, numChunks)
 	stateCommitments := make([]flow.StateCommitment, numChunks)
-	proofs := make([][]byte, numChunks)
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
 	spockHashes := make([]crypto.Signature, numChunks)
@@ -49,7 +48,6 @@ func ComputationResultForBlockFixture(
 	for i := 0; i < numChunks; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
-		proofs[i] = unittest.RandomBytes(6)
 		events[i] = make(flow.EventsList, 0)
 		eventHashes[i] = unittest.IdentifierFixture()
 
@@ -73,7 +71,7 @@ func ComputationResultForBlockFixture(
 			flow.NewChunkDataPack(
 				chunk.ID(),
 				*completeBlock.StartState,
-				proofs[i],
+				unittest.RandomBytes(6),
 				collection))
 
 		chunkExecutionDatas = append(
@@ -96,7 +94,6 @@ func ComputationResultForBlockFixture(
 		ExecutableBlock:        completeBlock,
 		StateSnapshots:         stateViews,
 		StateCommitments:       stateCommitments,
-		Proofs:                 proofs,
 		Events:                 events,
 		EventsHashes:           eventHashes,
 		ChunkDataPacks:         chunkDataPacks,
