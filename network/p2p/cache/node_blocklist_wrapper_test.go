@@ -26,7 +26,7 @@ type NodeBlocklistWrapperTestSuite struct {
 	provider *mocks.IdentityProvider
 
 	wrapper     *cache.NodeBlocklistWrapper
-	distributor *mockp2p.DisallowListUpdateNotificationDistributor
+	distributor *mockp2p.DisallowListNotificationDistributor
 }
 
 func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
@@ -34,7 +34,7 @@ func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error
-	s.distributor = &mockp2p.DisallowListUpdateNotificationDistributor{}
+	s.distributor = mockp2p.NewDisallowListNotificationDistributor(s.T())
 	s.wrapper, err = cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
 	require.NoError(s.T(), err)
 }
@@ -105,8 +105,8 @@ func (s *NodeBlocklistWrapperTestSuite) TestDenylistedNode() {
 			originalIdentity := blocklist[index.Inc()]
 			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, expectedfound)
 
-			var expectedIdentity flow.Identity = *originalIdentity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true                        // with the `Ejected` flag set to true
+			var expectedIdentity = *originalIdentity // expected Identity is a copy of the original
+			expectedIdentity.Ejected = true          // with the `Ejected` flag set to true
 
 			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.Equal(s.T(), expectedfound, found)
@@ -121,8 +121,8 @@ func (s *NodeBlocklistWrapperTestSuite) TestDenylistedNode() {
 			peerID := (peer.ID)(originalIdentity.NodeID.String())
 			s.provider.On("ByPeerID", peerID).Return(originalIdentity, expectedfound)
 
-			var expectedIdentity flow.Identity = *originalIdentity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true                        // with the `Ejected` flag set to true
+			var expectedIdentity = *originalIdentity // expected Identity is a copy of the original
+			expectedIdentity.Ejected = true          // with the `Ejected` flag set to true
 
 			i, found := s.wrapper.ByPeerID(peerID)
 			require.Equal(s.T(), expectedfound, found)
