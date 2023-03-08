@@ -987,7 +987,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
 
-		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationConsumer(fnb.Logger, heroStoreOpts...)
+		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
 
 		return fnb.NodeDisallowListDistributor, nil
 	})

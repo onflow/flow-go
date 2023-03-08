@@ -728,7 +728,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
 
-		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationConsumer(builder.Logger, heroStoreOpts...)
+		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
 
 		return builder.NodeDisallowListDistributor, nil
 	})
