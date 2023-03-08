@@ -52,7 +52,7 @@ const (
 	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
 	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	//Follower Engine
+	// Follower Engine
 	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
 	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
 	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
@@ -98,8 +98,6 @@ const (
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 
@@ -170,6 +168,7 @@ const (
 	FVMEnvGetAccountContractNames    SpanName = "fvm.env.getAccountContractNames"
 	FVMEnvGetProgram                 SpanName = "fvm.env.getCachedProgram"
 	FVMEnvSetProgram                 SpanName = "fvm.env.cacheProgram"
+	FVMEnvGetOrLoadProgram           SpanName = "fvm.env.getOrLoadCachedProgram"
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"
 	FVMEnvGenerateUUID               SpanName = "fvm.env.generateUUID"

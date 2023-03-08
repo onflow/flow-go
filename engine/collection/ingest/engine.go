@@ -261,8 +261,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	localClusterFingerPrint := localCluster.StaticID()
-	txClusterFingerPrint := txCluster.StaticID()
+	localClusterFingerPrint := localCluster.ID()
+	txClusterFingerPrint := txCluster.ID()
 	log = log.With().
 		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
 		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
