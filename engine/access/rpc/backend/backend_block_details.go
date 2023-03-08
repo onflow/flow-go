@@ -34,7 +34,8 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	block, err := b.blocks.ByID(header.ID())
+	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
+	block, err := b.blocks.ByHeight(header.Height)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}

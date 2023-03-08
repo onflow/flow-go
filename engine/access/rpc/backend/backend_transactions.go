@@ -387,6 +387,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, errInsufficientResults
 			}
 			// otherwise there are extra results
+			// TODO(bft): slashable offense
 			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
 		}
 
