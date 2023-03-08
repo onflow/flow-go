@@ -1,13 +1,14 @@
 package distributor
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/distributor"
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
@@ -28,8 +29,9 @@ type DisallowListUpdateNotificationDistributor struct {
 	cm     *component.ComponentManager
 	logger zerolog.Logger
 
-	// AsyncEventDistributor that will distribute the notifications asynchronously.
-	asyncDistributor *distributor.AsyncEventDistributor[DisallowListUpdateNotification]
+	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
+	consumers    []p2p.DisallowListConsumer
+	workerPool   *worker.Pool[DisallowListUpdateNotification]
 }
 
 // DisallowListUpdateNotificationConsumer is an adapter that allows the DisallowListUpdateNotificationDistributor to be used as an
@@ -61,32 +63,38 @@ func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queu
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListUpdateNotificationDistributor {
 	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
-	h := distributor.NewAsyncEventDistributor[DisallowListUpdateNotification](
-		lg,
-		store,
-		disallowListDistributorWorkerCount)
-
 	d := &DisallowListUpdateNotificationDistributor{
-		logger:           lg,
-		asyncDistributor: h,
+		logger: lg,
 	}
 
+	pool := worker.NewWorkerPoolBuilder[DisallowListUpdateNotification](
+		lg,
+		store,
+		d.distribute).Build()
+
+	d.workerPool = pool
+
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-
-		h.Start(ctx)
-		<-h.Ready()
-		d.logger.Info().Msg("node disallow list distributor started")
-
-		<-ctx.Done()
-		d.logger.Debug().Msg("node disallow list distributor shutting down")
-	})
+	cm.AddWorker(d.workerPool.WorkerLogic())
 
 	d.cm = cm.Build()
 	d.Component = d.cm
 
 	return d
+}
+
+// distribute is called by the workers to process the event. It calls the OnNodeDisallowListUpdate method on all registered
+// consumers.
+// It does not return an error because the event is already in the store, so it will be retried.
+func (d *DisallowListUpdateNotificationDistributor) distribute(msg DisallowListUpdateNotification) error {
+	d.consumerLock.RLock()
+	defer d.consumerLock.RUnlock()
+
+	for _, consumer := range d.consumers {
+		consumer.OnNodeDisallowListUpdate(msg.DisallowList)
+	}
+
+	return nil
 }
 
 // DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
@@ -97,17 +105,20 @@ type DisallowListUpdateNotification struct {
 // AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
 // method when the node disallow list is updated.
 func (d *DisallowListUpdateNotificationDistributor) AddConsumer(consumer p2p.DisallowListConsumer) {
-	d.asyncDistributor.RegisterConsumer(&DisallowListUpdateNotificationConsumer{consumer: consumer})
+	d.consumerLock.Lock()
+	defer d.consumerLock.Unlock()
+
+	d.consumers = append(d.consumers, consumer)
 }
 
 // OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the distributor to be
 // processed asynchronously.
 func (d *DisallowListUpdateNotificationDistributor) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
-	err := d.asyncDistributor.Submit(DisallowListUpdateNotification{
+	ok := d.workerPool.Submit(DisallowListUpdateNotification{
 		DisallowList: disallowList,
 	})
 
-	if err != nil {
-		d.logger.Fatal().Err(err).Msg("failed to submit disallow list update event to distributor")
+	if !ok {
+		d.logger.Fatal().Msg("failed to submit disallow list update event to distributor")
 	}
 }
