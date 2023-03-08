@@ -1,12 +1,13 @@
 package distributor
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/distributor"
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
@@ -26,8 +27,9 @@ type GossipSubInspectorNotificationDistributor struct {
 	cm     *component.ComponentManager
 	logger zerolog.Logger
 
-	// AsyncEventDistributor that will distribute the notifications asynchronously.
-	asyncDistributor *distributor.AsyncEventDistributor[p2p.InvalidControlMessageNotification]
+	workerPool   *worker.Pool[p2p.InvalidControlMessageNotification]
+	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
+	consumers    []p2p.GossipSubRpcInspectorConsumer
 }
 
 // GossipSubInspectorNotificationConsumer is an adapter that allows the GossipSubInspectorNotificationDistributor to be used as an
@@ -64,32 +66,38 @@ func DefaultGossipSubInspectorNotification(logger zerolog.Logger, opts ...queue.
 func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageStore) *GossipSubInspectorNotificationDistributor {
 	lg := log.With().Str("component", "gossipsub_rpc_inspector_distributor").Logger()
 
-	h := distributor.NewAsyncEventDistributor[p2p.InvalidControlMessageNotification](
-		log,
-		store,
-		defaultGossipSubInspectorNotificationQueueWorkerCount)
-
-	g := &GossipSubInspectorNotificationDistributor{
-		logger:           lg,
-		asyncDistributor: h,
+	d := &GossipSubInspectorNotificationDistributor{
+		logger: lg,
 	}
 
+	pool := worker.NewWorkerPoolBuilder[p2p.InvalidControlMessageNotification](lg, store, d.Distribute).Build()
+	d.workerPool = pool
+
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
 
-		h.Start(ctx)
-		<-h.Ready()
-		g.logger.Info().Msg("node disallow list notification distributor started")
+	for i := 0; i < defaultGossipSubInspectorNotificationQueueWorkerCount; i++ {
+		cm.AddWorker(pool.WorkerLogic())
+	}
 
-		<-ctx.Done()
-		g.logger.Debug().Msg("node disallow list distributor shutting down")
-	})
+	d.cm = cm.Build()
+	d.Component = d.cm
 
-	g.cm = cm.Build()
-	g.Component = g.cm
+	return d
+}
 
-	return g
+// Distribute distributes the gossipsub rpc inspector notification to all registered consumers.
+// It will be called by the workers of the worker pool.
+// It will call the consumer's OnInvalidControlMessage method.
+// It does not return an error.
+func (g *GossipSubInspectorNotificationDistributor) Distribute(msg p2p.InvalidControlMessageNotification) error {
+	g.consumerLock.RLock()
+	defer g.consumerLock.RUnlock()
+
+	for _, consumer := range g.consumers {
+		consumer.OnInvalidControlMessage(msg)
+	}
+
+	return nil
 }
 
 // OnInvalidControlMessage is called when a control message is received that is invalid according to the
@@ -97,14 +105,17 @@ func NewGossipSubInspectorNotification(log zerolog.Logger, store engine.MessageS
 // Prerequisites:
 // Implementation must be concurrency safe and non-blocking.
 func (g *GossipSubInspectorNotificationDistributor) OnInvalidControlMessage(notification p2p.InvalidControlMessageNotification) {
-	err := g.asyncDistributor.Submit(notification)
-	if err != nil {
-		g.logger.Fatal().Err(err).Msg("failed to submit invalid control message event to distributor")
+	ok := g.workerPool.Submit(notification)
+	if !ok {
+		g.logger.Fatal().Msg("failed to submit invalid control message event to distributor")
 	}
 }
 
 // AddConsumer adds a consumer to the GossipSubInspectorNotificationDistributor. The consumer will be called when a new
 // notification is received. The consumer must be concurrency safe.
 func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubRpcInspectorConsumer) {
-	g.asyncDistributor.RegisterConsumer(&GossipSubInspectorNotificationConsumer{consumer: consumer})
+	g.consumerLock.Lock()
+	defer g.consumerLock.Unlock()
+
+	g.consumers = append(g.consumers, consumer)
 }
