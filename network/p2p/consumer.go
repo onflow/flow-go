@@ -28,17 +28,6 @@ const (
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
 
-// InvalidControlMessageNotification is the notification sent to the consumer when an invalid control message is received.
-// It models the information that is available to the consumer about a misbehaving peer.
-type InvalidControlMessageNotification struct {
-	// PeerID is the ID of the peer that sent the invalid control message.
-	PeerID peer.ID
-	// MsgType is the type of control message that was received.
-	MsgType ControlMessageType
-	// Count is the number of invalid control messages received from the peer that is reported in this notification.
-	Count uint64
-}
-
 // DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
 type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList
@@ -75,14 +64,25 @@ type GossipSubInspectorNotificationDistributor interface {
 	// AddConsumer adds a consumer to the distributor. The consumer will be called when distributor receives a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
-	AddConsumer(InvalidControlMessageNotificationConsumer)
+	AddConsumer(GossipSubInvalidControlMessageNotificationConsumer)
 }
 
-// InvalidControlMessageNotificationConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
+// InvalidControlMessageNotification is the notification sent to the consumer when an invalid control message is received.
+// It models the information that is available to the consumer about a misbehaving peer.
+type InvalidControlMessageNotification struct {
+	// PeerID is the ID of the peer that sent the invalid control message.
+	PeerID peer.ID
+	// MsgType is the type of control message that was received.
+	MsgType ControlMessageType
+	// Count is the number of invalid control messages received from the peer that is reported in this notification.
+	Count uint64
+}
+
+// GossipSubInvalidControlMessageNotificationConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
 // It is used to consume notifications in an asynchronous manner.
 // The implementation must be concurrency safe, but can be blocking. This is due to the fact that the consumer is called
 // asynchronously by the distributor.
-type InvalidControlMessageNotificationConsumer interface {
+type GossipSubInvalidControlMessageNotificationConsumer interface {
 	// OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
