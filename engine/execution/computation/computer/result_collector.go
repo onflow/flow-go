@@ -71,8 +71,9 @@ type resultCollector struct {
 
 	result *execution.ComputationResult
 
-	chunks          []*flow.Chunk
-	spockSignatures []crypto.Signature
+	chunks                 []*flow.Chunk
+	spockSignatures        []crypto.Signature
+	convertedServiceEvents flow.ServiceEventList
 }
 
 func newResultCollector(
@@ -135,7 +136,6 @@ func (collector *resultCollector) runCollectionCommitter() {
 		collector.result.StateCommitments = append(
 			collector.result.StateCommitments,
 			endState)
-		collector.result.Proofs = append(collector.result.Proofs, proof)
 
 		eventsHash, err := flow.EventsMerkleRootHash(
 			collector.result.Events[collection.collectionIndex])
@@ -202,7 +202,13 @@ func (collector *resultCollector) runSnapshotHasher() {
 	for collection := range collector.snapshotHasherInputChan {
 
 		snapshot := collection.View.(*delta.View).Interactions()
-		collector.result.AddCollection(snapshot)
+
+		collector.result.TransactionResultIndex = append(
+			collector.result.TransactionResultIndex,
+			len(collector.result.TransactionResults))
+		collector.result.StateSnapshots = append(
+			collector.result.StateSnapshots,
+			snapshot)
 
 		collector.metrics.ExecutionCollectionExecuted(
 			time.Since(collection.startTime),
@@ -227,7 +233,33 @@ func (collector *resultCollector) AddTransactionResult(
 	collectionIndex int,
 	txn *fvm.TransactionProcedure,
 ) {
-	collector.result.AddTransactionResult(collectionIndex, txn)
+	collector.convertedServiceEvents = append(
+		collector.convertedServiceEvents,
+		txn.ConvertedServiceEvents...)
+
+	collector.result.Events[collectionIndex] = append(
+		collector.result.Events[collectionIndex],
+		txn.Events...)
+	collector.result.ServiceEvents = append(
+		collector.result.ServiceEvents,
+		txn.ServiceEvents...)
+
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: txn.ComputationUsed,
+		MemoryUsed:      txn.MemoryEstimate,
+	}
+	if txn.Err != nil {
+		txnResult.ErrorMessage = txn.Err.Error()
+	}
+
+	collector.result.TransactionResults = append(
+		collector.result.TransactionResults,
+		txnResult)
+
+	for computationKind, intensity := range txn.ComputationIntensities {
+		collector.result.ComputationIntensities[computationKind] += intensity
+	}
 }
 
 func (collector *resultCollector) CommitCollection(
@@ -264,8 +296,6 @@ func (collector *resultCollector) Stop() {
 	})
 }
 
-// TODO(patrick): refactor execution receipt generation from ingress engine
-// to here to improve benchmarking.
 func (collector *resultCollector) Finalize(
 	ctx context.Context,
 ) (
@@ -302,7 +332,7 @@ func (collector *resultCollector) Finalize(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
 		collector.chunks,
-		collector.result.ConvertedServiceEvents,
+		collector.convertedServiceEvents,
 		executionDataID)
 
 	executionReceipt, err := GenerateExecutionReceipt(
