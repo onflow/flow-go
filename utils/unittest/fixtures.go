@@ -1691,14 +1691,6 @@ func QuorumCertificatesFromAssignments(assignment flow.AssignmentList) []*flow.Q
 	return qcs
 }
 
-func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
-	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
-		qc.View = header.View
-		qc.BlockID = header.ID()
-	})
-	return qc
-}
-
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:          uint64(rand.Uint32()),
