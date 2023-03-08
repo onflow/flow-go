@@ -18,6 +18,7 @@ jobs:
     permissions:
       actions: write # This is needed to update a workflow file
       contents: write # This is needed to push changes to the repository
+      workflows: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
