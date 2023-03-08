@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
@@ -84,33 +86,31 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // This function performs processing of incoming certified blocks, implementation is split into a few different sections
 // but tries to be optimal in terms of performance to avoid doing extra work as much as possible.
 // This function follows next implementation:
-//  1. Filters out blocks that are already finalized.
-//  2. Finds block with the lowest height. Since blocks can be submitted in random order we need to find block with
-//     the lowest height since it's the candidate for being connected to the finalized state.
+//  1. Sorts incoming batch by height. Since blocks can be submitted in random order we need to find blocks with
+//     the lowest height since they are candidates for being connected to the finalized state.
+//  2. Filters out blocks that are already finalized.
 //  3. Deduplicates incoming blocks. We don't store additional vertices in tree if we have that block already stored.
 //  4. Checks for exceeding byzantine threshold. Only one certified block per view is allowed.
-//  5. Finally, block with the lowest height from incoming batch connects to the finalized state we will
+//  5. Finally, blocks with the lowest height from incoming batch that connect to the finalized state we will
 //     mark all descendants as connected, collect them and return as result of invocation.
 //
-// This function is designed to collect all connected blocks to the finalized state if lowest block(by height) connects to it.
+// This function is designed to perform resolution of connected blocks(resolved block is the one that connects to the finalized state)
+// using incoming batch. Each block that was connected to the finalized state is reported once.
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
 func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBlock, error) {
+	// sort blocks by height, so we can identify if there are candidates for being connected to the finalized state.
+	slices.SortFunc(certifiedBlocks, func(lhs CertifiedBlock, rhs CertifiedBlock) bool {
+		return lhs.Height() < rhs.Height()
+	})
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	var connectedBlocks []CertifiedBlock
-	firstBlockIndex := -1
-	for i, block := range certifiedBlocks {
+	var allConnectedBlocks []CertifiedBlock
+	for _, block := range certifiedBlocks {
 		// skip blocks lower than finalized view
 		if block.View() <= t.forest.LowestLevel {
 			continue
-		}
-
-		// We need to find the lowest block by height since it has the possibility to be connected to finalized block.
-		// We can't use view here, since when chain forks we might have view > height.
-		if firstBlockIndex < 0 || certifiedBlocks[firstBlockIndex].Height() > block.Height() {
-			firstBlockIndex = i
 		}
 
 		iter := t.forest.GetVerticesAtLevel(block.View())
@@ -137,21 +137,14 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 			return nil, fmt.Errorf("failed to store certified block into the tree: %w", err)
 		}
 		t.forest.AddVertex(vertex)
+
+		if t.connectsToFinalizedBlock(block) {
+			connectedBlocks := t.updateAndCollectFork(vertex)
+			allConnectedBlocks = append(allConnectedBlocks, connectedBlocks...)
+		}
 	}
 
-	// all blocks were below finalized height, and we have nothing to do.
-	if firstBlockIndex < 0 {
-		return nil, nil
-	}
-
-	// check if the lowest block(by height) connects to the finalized state
-	firstBlock := certifiedBlocks[firstBlockIndex]
-	if t.connectsToFinalizedBlock(firstBlock) {
-		vertex, _ := t.forest.GetVertex(firstBlock.ID())
-		connectedBlocks = t.updateAndCollectFork(vertex.(*PendingBlockVertex))
-	}
-
-	return connectedBlocks, nil
+	return allConnectedBlocks, nil
 }
 
 // connectsToFinalizedBlock checks if candidate block connects to the finalized state.
@@ -190,8 +183,12 @@ func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []Certifi
 	vertex.connectedToFinalized = true
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
-		blocks := t.updateAndCollectFork(iter.NextVertex().(*PendingBlockVertex))
-		certifiedBlocks = append(certifiedBlocks, blocks...)
+		nextVertex := iter.NextVertex().(*PendingBlockVertex)
+		// if it's already connected then it was already reported
+		if !nextVertex.connectedToFinalized {
+			blocks := t.updateAndCollectFork(nextVertex)
+			certifiedBlocks = append(certifiedBlocks, blocks...)
+		}
 	}
 	return certifiedBlocks
 }

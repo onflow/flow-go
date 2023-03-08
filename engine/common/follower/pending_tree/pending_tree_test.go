@@ -161,23 +161,52 @@ func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 
 // TestAddingBlockAfterFinalization tests that adding a batch of blocks which includes finalized block correctly returns
 // a chain of connected blocks without finalized one.
-// Having F <- A <- B <- C.
+// Having F <- A <- B <- D.
 // Adding [A, B, C] returns [A, B, C].
 // Finalize A.
-// Adding [A, B, C] returns [B, C] since A is already finalized and B connects to A.
+// Adding [A, B, C, D] returns [D] since A is already finalized, [B, C] are already stored and connected to the finalized state.
 func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
-	blocks := certifiedBlocksFixture(3, s.finalized)
+	blocks := certifiedBlocksFixture(4, s.finalized)
 
-	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks[:3])
 	require.NoError(s.T(), err)
-	assert.Equal(s.T(), blocks, connectedBlocks)
+	assert.Equal(s.T(), blocks[:3], connectedBlocks)
 
 	err = s.pendingTree.FinalizeForkAtLevel(blocks[0].Block.Header)
 	require.NoError(s.T(), err)
 
 	connectedBlocks, err = s.pendingTree.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	assert.Equal(s.T(), blocks[1:], connectedBlocks)
+	assert.Equal(s.T(), blocks[3:], connectedBlocks)
+}
+
+// TestAddingBlocksWithSameHeight tests that adding blocks with same height(which results in multiple forks) that are connected
+// to finalized state are properly marked and returned as connected blocks.
+// / Having F <- A <- C
+// /          <- B <- D <- E
+// Adding [A, B, D] returns [A, B, D]
+// Adding [C, E] returns [C, E].
+func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
+	A := unittest.BlockWithParentFixture(s.finalized)
+	B := unittest.BlockWithParentFixture(s.finalized)
+	B.Header.View = A.Header.View + 1
+	C := unittest.BlockWithParentFixture(A.Header)
+	C.Header.View = B.Header.View + 1
+	D := unittest.BlockWithParentFixture(B.Header)
+	D.Header.View = C.Header.View + 1
+	E := unittest.BlockWithParentFixture(D.Header)
+	E.Header.View = D.Header.View + 1
+
+	firstBatch := []CertifiedBlock{certifiedBlockFixture(A), certifiedBlockFixture(B), certifiedBlockFixture(D)}
+	secondBatch := []CertifiedBlock{certifiedBlockFixture(C), certifiedBlockFixture(E)}
+
+	actual, err := s.pendingTree.AddBlocks(firstBatch)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), firstBatch, actual)
+
+	actual, err = s.pendingTree.AddBlocks(secondBatch)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), secondBatch, actual)
 }
 
 // TestConcurrentAddBlocks simulates multiple workers adding batches of blocks out of order.
