@@ -38,15 +38,18 @@ type NodeBlocklistWrapper struct {
 	db *badger.DB
 
 	identityProvider module.IdentityProvider
-	blocklist        IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
-	notifier         p2p.DisallowListConsumer
+	blocklist        IdentifierSet                                 // `IdentifierSet` is a map, hence efficient O(1) lookup
+	distributor      p2p.DisallowListUpdateNotificationDistributor // distributor for the blocklist update notifications
 }
 
 var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
 
 // NewNodeBlocklistWrapper wraps the given `IdentityProvider`. The blocklist is
 // loaded from the database (or assumed to be empty if no database entry is present).
-func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badger.DB, notifier p2p.DisallowListConsumer) (*NodeBlocklistWrapper, error) {
+func NewNodeBlocklistWrapper(
+	identityProvider module.IdentityProvider,
+	db *badger.DB,
+	distributor p2p.DisallowListUpdateNotificationDistributor) (*NodeBlocklistWrapper, error) {
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)
@@ -56,7 +59,7 @@ func NewNodeBlocklistWrapper(identityProvider module.IdentityProvider, db *badge
 		db:               db,
 		identityProvider: identityProvider,
 		blocklist:        blocklist,
-		notifier:         notifier,
+		distributor:      distributor,
 	}, nil
 }
 
@@ -76,7 +79,11 @@ func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
 	w.blocklist = b
-	w.notifier.OnNodeDisallowListUpdate(blocklist)
+	err = w.distributor.DistributeBlockListNotification(blocklist)
+
+	if err != nil {
+		return fmt.Errorf("failed to distribute blocklist update notification: %w", err)
+	}
 
 	return nil
 }
