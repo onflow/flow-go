@@ -31,7 +31,7 @@ type RandomBeaconKeyStore interface {
 	// ByView returns the node's locally computed beacon private key for the epoch containing the given view.
 	// It returns:
 	//   - (key, nil) if the node has beacon keys in the epoch of the view
-        //   - (nil, model.ErrViewForUnknownEpoch) if no epoch found for given view
+	//   - (nil, model.ErrViewForUnknownEpoch) if no epoch found for given view
 	//   - (nil, module.ErrNoBeaconKeyForEpoch) if beacon key for epoch is unavailable
 	//   - (nil, error) if there is any exception
 	ByView(view uint64) (crypto.PrivateKey, error)
