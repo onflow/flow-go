@@ -46,10 +46,12 @@ func (p *Pool[T]) Submit(event T) bool {
 }
 
 // PoolBuilder is an auxiliary builder for constructing workers with a common inbound queue,
-// where the workers are managed by a higher-level component. The message store as well as the processing
-// function are specified by the caller.
-// WorkerPoolBuilder does not add any concurrency handling. It is the callers responsibility to make sure
-// that the number of workers concurrently accessing `processingFunc` is compatible with its implementation.
+// where the workers are managed by a higher-level component.
+//
+// The message store as well as the processing function are specified by the caller.
+// WorkerPoolBuilder does not add any concurrency handling.
+// It is the callers responsibility to make sure that the number of workers concurrently accessing `processingFunc`
+// is compatible with its implementation.
 type PoolBuilder[T any] struct {
 	store    engine.MessageStore // temporarily store inbound events till they are processed.
 	notifier engine.Notifier
@@ -59,7 +61,13 @@ type PoolBuilder[T any] struct {
 	processingFunc func(T) error
 }
 
-// NewWorkerPoolBuilder instantiates a new WorkerPoolBuilder
+// NewWorkerPoolBuilder creates a new PoolBuilder, which is an auxiliary builder
+// for constructing workers with a common inbound queue.
+// Arguments:
+// -`processingFunc`: the function for processing the input tasks.
+// -`store`: temporarily stores inbound events until they are processed.
+// Returns:
+// The function returns a `PoolBuilder` instance.
 func NewWorkerPoolBuilder[T any](
 	store engine.MessageStore,
 	processingFunc func(input T) error,
@@ -71,12 +79,7 @@ func NewWorkerPoolBuilder[T any](
 	}
 }
 
-// Build creates
-//   - [first return value] the logic that the worker executes (can be added as multiple
-//     times to Component via Component.AddWorker or Component.AddWorkers as long as
-//     `processingFunc` is concurrency safe)
-//   - [second return value] the logic for submitting work to the message store. This
-//     function yields true, if work was successfully submitted and false otherwise.
+// Build builds a new worker pool. The worker pool is responsible for storing the work until it is processed by a worker.
 func (b *PoolBuilder[T]) Build() *Pool[T] {
 	return &Pool[T]{
 		workerLogic: b.workerLogic(),
@@ -84,7 +87,13 @@ func (b *PoolBuilder[T]) Build() *Pool[T] {
 	}
 }
 
-// workerLogic return the worker logic itself
+// workerLogic returns an abstract function for processing work from the message store.
+// The worker logic picks up work from the message store and processes it.
+// The worker logic should only throw unexpected exceptions to its component. Sentinel errors expected during
+// normal operations should be handled internally.
+// The worker logic should not throw any exceptions that are not expected during normal operations.
+// Any exceptions thrown by the worker logic will be caught by the higher-level component and will cause the
+// component to crash.
 func (b *PoolBuilder[T]) workerLogic() component.ComponentWorker {
 	notifier := b.notifier.Channel()
 	processingFunc := b.processingFunc
@@ -120,8 +129,10 @@ func (b *PoolBuilder[T]) workerLogic() component.ComponentWorker {
 	}
 }
 
-// submitLogic workerLogic return an abstract function for submitting work to the message store.
-// The returned function yields true, if work was successfully submitted and false otherwise.
+// submitLogic returns an abstract function for submitting work to the message store.
+// The submit logic is responsible for submitting the work to the worker pool. The submit logic should
+// is responsible for storing the work until it is processed by a worker. The submit should handle
+// any errors that occur during the submission of the work internally.
 func (b *PoolBuilder[T]) submitLogic() func(event T) bool {
 	store := b.store
 
