@@ -24,8 +24,8 @@ import (
 func TestDisallowListNotificationDistributor(t *testing.T) {
 	d := distributor.DefaultDisallowListNotificationDistributor(unittest.Logger())
 
-	c1 := mockp2p.NewDisallowListUpdateNotificationConsumer(t)
-	c2 := mockp2p.NewDisallowListUpdateNotificationConsumer(t)
+	c1 := mockp2p.NewDisallowListNotificationConsumer(t)
+	c2 := mockp2p.NewDisallowListNotificationConsumer(t)
 
 	d.AddConsumer(c1)
 	d.AddConsumer(c2)
