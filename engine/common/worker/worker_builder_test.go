@@ -25,12 +25,15 @@ func TestWorkerPool_SingleEvent_SingleWorker(t *testing.T) {
 	q := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	processed := make(chan struct{})
 
-	pool := worker.NewWorkerPoolBuilder[string](q, func(input string) error {
-		require.Equal(t, event, event)
-		close(processed)
+	pool := worker.NewWorkerPoolBuilder[string](
+		unittest.Logger(),
+		q,
+		func(input string) error {
+			require.Equal(t, event, event)
+			close(processed)
 
-		return nil
-	}).Build()
+			return nil
+		}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -58,13 +61,16 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	blockingChannel := make(chan struct{})
 	firstEventArrived := make(chan struct{})
 
-	pool := worker.NewWorkerPoolBuilder[string](q, func(input string) error {
-		close(firstEventArrived)
-		// we block the consumer to make sure that the queue is eventually full.
-		<-blockingChannel
+	pool := worker.NewWorkerPoolBuilder[string](
+		unittest.Logger(),
+		q,
+		func(input string) error {
+			close(firstEventArrived)
+			// we block the consumer to make sure that the queue is eventually full.
+			<-blockingChannel
 
-		return nil
-	}).Build()
+			return nil
+		}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -113,18 +119,21 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 	allEventsDistributed := sync.WaitGroup{}
 	allEventsDistributed.Add(size)
 
-	pool := worker.NewWorkerPoolBuilder[string](q, func(event string) error {
-		// check if the event is in the test case
-		require.Contains(t, tc, event)
+	pool := worker.NewWorkerPoolBuilder[string](
+		unittest.Logger(),
+		q,
+		func(event string) error {
+			// check if the event is in the test case
+			require.Contains(t, tc, event)
 
-		// check if the event is distributed only once
-		require.False(t, distributedEvents.Has(event))
-		distributedEvents.Add(event, struct{}{})
+			// check if the event is distributed only once
+			require.False(t, distributedEvents.Has(event))
+			distributedEvents.Add(event, struct{}{})
 
-		allEventsDistributed.Done()
+			allEventsDistributed.Done()
 
-		return nil
-	}).Build()
+			return nil
+		}).Build()
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
