@@ -21,6 +21,7 @@ const (
 )
 
 type NetworkCollector struct {
+	*UnicastManagerMetrics
 	*LibP2PResourceManagerMetrics
 	*GossipSubMetrics
 	outboundMessageSize          *prometheus.HistogramVec
@@ -66,6 +67,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 		opt(nc)
 	}
 
+	nc.UnicastManagerMetrics = NewUnicastManagerMetrics(nc.prefix)
 	nc.LibP2PResourceManagerMetrics = NewLibP2PResourceManagerMetrics(logger, nc.prefix)
 	nc.GossipSubMetrics = NewGossipSubMetrics(nc.prefix)
 

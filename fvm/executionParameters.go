@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/utils"
 )
 
 // getBasicMeterParameters returns the set of meter parameters used for
@@ -214,9 +213,10 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 		return nil, err
 	}
 
-	weightsRaw, ok := utils.CadenceValueToWeights(value)
+	weightsRaw, ok := cadenceValueToWeights(value)
 	if !ok {
-		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
+		// this is a non-fatal error. It is expected if the weights are not
+		// set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			path.String())
@@ -236,6 +236,32 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	}
 
 	return weights, nil
+}
+
+// cadenceValueToWeights converts a cadence value to a map of weights used for
+// metering
+func cadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
+	dict, ok := value.(cadence.Dictionary)
+	if !ok {
+		return nil, false
+	}
+
+	result := make(map[uint]uint64, len(dict.Pairs))
+	for _, p := range dict.Pairs {
+		key, ok := p.Key.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		value, ok := p.Value.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		result[uint(key.ToGoValue().(uint64))] = uint64(value)
+	}
+
+	return result, true
 }
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account

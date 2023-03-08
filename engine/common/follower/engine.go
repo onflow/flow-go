@@ -47,7 +47,7 @@ type Engine struct {
 	cleaner               storage.Cleaner
 	headers               storage.Headers
 	payloads              storage.Payloads
-	state                 protocol.MutableState
+	state                 protocol.FollowerState
 	pending               module.PendingBlockBuffer
 	follower              module.HotStuffFollower
 	validator             hotstuff.Validator
@@ -89,7 +89,7 @@ func New(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.MutableState,
+	state protocol.FollowerState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
@@ -401,10 +401,11 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *flow.
 	}
 
 	// check whether the block is a valid extension of the chain.
-	// it only checks the block header, since checking block body is expensive.
-	// The full block check is done by the consensus participants.
-	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
-	err = e.state.Extend(ctx, proposal)
+	// The follower engine only checks the block's header. The more expensive payload validation
+	// is only done by the consensus committee. For safety, we require that a QC for the extending
+	// block is provided while inserting the block. This ensures that all stored blocks are fully validated
+	// by the consensus committee before being stored here.
+	err = e.state.ExtendCertified(ctx, proposal, nil)
 	if err != nil {
 		// block is outdated by the time we started processing it
 		// => some other node generating the proposal is probably behind is catching up.

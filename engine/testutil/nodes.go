@@ -539,7 +539,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
-	protoState, ok := node.State.(*badgerstate.MutableState)
+	protoState, ok := node.State.(*badgerstate.ParticipantState)
 	require.True(t, ok)
 
 	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
@@ -730,7 +730,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
-		MutableState:        followerState,
+		FollowerState:       followerState,
 		IngestionEngine:     ingestionEngine,
 		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,

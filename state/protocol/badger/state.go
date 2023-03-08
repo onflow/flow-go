@@ -38,6 +38,8 @@ type State struct {
 	sporkRootBlockHeight uint64
 }
 
+var _ protocol.State = (*State)(nil)
+
 type BootstrapConfig struct {
 	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
 	// an unstaked node
@@ -359,9 +361,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
-
 			if err := isValidEpochCommit(commit, setup); err != nil {
-				return fmt.Errorf("invalid commit")
+				return fmt.Errorf("invalid commit: %w", err)
+			}
+
+			err = indexFirstHeight(previous)(tx.DBTxn)
+			if err != nil {
+				return fmt.Errorf("could not index epoch first height: %w", err)
 			}
 
 			setups = append(setups, setup)
@@ -385,9 +391,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
-
 		if err := isValidEpochCommit(commit, setup); err != nil {
-			return fmt.Errorf("invalid commit")
+			return fmt.Errorf("invalid commit: %w", err)
+		}
+
+		err = indexFirstHeight(current)(tx.DBTxn)
+		if err != nil {
+			return fmt.Errorf("could not index epoch first height: %w", err)
 		}
 
 		setups = append(setups, setup)
@@ -501,6 +511,27 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
 
+		return nil
+	}
+}
+
+// indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
+// The input epoch must have been started (the first block of the epoch has been finalized).
+// No errors are expected during normal operation.
+func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		counter, err := epoch.Counter()
+		if err != nil {
+			return fmt.Errorf("could not get epoch counter: %w", err)
+		}
+		firstHeight, err := epoch.FirstHeight()
+		if err != nil {
+			return fmt.Errorf("could not get epoch first height: %w", err)
+		}
+		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
+		}
 		return nil
 	}
 }
