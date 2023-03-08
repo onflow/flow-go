@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,10 +22,10 @@ import (
 // notification distributor component and sending a random set of notifications to the notification component. The test
 // verifies that the consumers receive the notifications and that each consumer sees each notification only once.
 func TestDisallowListNotificationDistributor(t *testing.T) {
-	d := distributor.DefaultDisallowListNotificationConsumer(unittest.Logger())
+	d := distributor.DefaultDisallowListNotificationDistributor(unittest.Logger())
 
-	c1 := mockp2p.NewDisallowListConsumer(t)
-	c2 := mockp2p.NewDisallowListConsumer(t)
+	c1 := mockp2p.NewDisallowListUpdateNotificationConsumer(t)
+	c2 := mockp2p.NewDisallowListUpdateNotificationConsumer(t)
 
 	d.AddConsumer(c1)
 	d.AddConsumer(c2)
@@ -34,14 +35,14 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	c1Done := sync.WaitGroup{}
 	c1Done.Add(len(tt))
 	c1Seen := unittest.NewProtectedMap[flow.Identifier, struct{}]()
-	c1.On("OnNodeDisallowListUpdate", mock.Anything).Run(func(args mock.Arguments) {
-		disallowList, ok := args.Get(0).(flow.IdentifierList)
+	c1.On("OnDisallowListNotification", mock.Anything).Run(func(args mock.Arguments) {
+		n, ok := args.Get(0).(*p2p.DisallowListUpdateNotification)
 		require.True(t, ok)
 
-		require.Contains(t, tt, &distributor.DisallowListUpdateNotification{DisallowList: disallowList})
+		require.Contains(t, tt, n)
 
 		// ensure consumer see each peer once
-		hash := flow.MerkleRoot(disallowList...)
+		hash := flow.MerkleRoot(n.DisallowList...)
 		require.False(t, c1Seen.Has(hash))
 		c1Seen.Add(hash, struct{}{})
 
@@ -51,14 +52,14 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	c2Done := sync.WaitGroup{}
 	c2Done.Add(len(tt))
 	c2Seen := unittest.NewProtectedMap[flow.Identifier, struct{}]()
-	c2.On("OnNodeDisallowListUpdate", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		disallowList, ok := args.Get(0).(flow.IdentifierList)
+	c2.On("OnDisallowListNotification", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		n, ok := args.Get(0).(*p2p.DisallowListUpdateNotification)
 		require.True(t, ok)
 
-		require.Contains(t, tt, &distributor.DisallowListUpdateNotification{DisallowList: disallowList})
+		require.Contains(t, tt, n)
 
 		// ensure consumer see each peer once
-		hash := flow.MerkleRoot(disallowList...)
+		hash := flow.MerkleRoot(n.DisallowList...)
 		require.False(t, c2Seen.Has(hash))
 		c2Seen.Add(hash, struct{}{})
 
@@ -74,7 +75,7 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			d.OnNodeDisallowListUpdate(tt[i].DisallowList)
+			require.NoError(t, d.DistributeBlockListNotification(tt[i].DisallowList))
 		}(i)
 	}
 
@@ -84,16 +85,16 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	unittest.RequireCloseBefore(t, d.Done(), 100*time.Millisecond, "could not stop distributor")
 }
 
-func disallowListUpdateNotificationsFixture(n int) []*distributor.DisallowListUpdateNotification {
-	tt := make([]*distributor.DisallowListUpdateNotification, n)
+func disallowListUpdateNotificationsFixture(n int) []*p2p.DisallowListUpdateNotification {
+	tt := make([]*p2p.DisallowListUpdateNotification, n)
 	for i := 0; i < n; i++ {
 		tt[i] = disallowListUpdateNotificationFixture()
 	}
 	return tt
 }
 
-func disallowListUpdateNotificationFixture() *distributor.DisallowListUpdateNotification {
-	return &distributor.DisallowListUpdateNotification{
+func disallowListUpdateNotificationFixture() *p2p.DisallowListUpdateNotification {
+	return &p2p.DisallowListUpdateNotification{
 		DisallowList: unittest.IdentifierListFixture(rand.Int()%100 + 1),
 	}
 }

@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// disallowListDistributorWorkerCount is the number of workers used to process disallow list updates.
-	disallowListDistributorWorkerCount = 1
-
 	// DefaultDisallowListNotificationQueueCacheSize is the default size of the disallow list notification queue.
 	DefaultDisallowListNotificationQueueCacheSize = 100
 )
@@ -30,23 +27,13 @@ type DisallowListUpdateNotificationDistributor struct {
 	logger zerolog.Logger
 
 	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
-	consumers    []p2p.DisallowListConsumer
-	workerPool   *worker.Pool[DisallowListUpdateNotification]
+	consumers    []p2p.DisallowListUpdateNotificationConsumer
+	workerPool   *worker.Pool[*p2p.DisallowListUpdateNotification]
 }
 
-// DisallowListUpdateNotificationConsumer is an adapter that allows the DisallowListUpdateNotificationDistributor to be used as an
-// EventConsumer.
-type DisallowListUpdateNotificationConsumer struct {
-	consumer p2p.DisallowListConsumer
-}
+var _ p2p.DisallowListUpdateNotificationDistributor = (*DisallowListUpdateNotificationDistributor)(nil)
 
-func (d *DisallowListUpdateNotificationConsumer) ConsumeEvent(msg DisallowListUpdateNotification) {
-	d.consumer.OnNodeDisallowListUpdate(msg.DisallowList)
-}
-
-var _ p2p.DisallowListConsumer = (*DisallowListUpdateNotificationDistributor)(nil)
-
-func DefaultDisallowListNotificationConsumer(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListUpdateNotificationDistributor {
+func DefaultDisallowListNotificationDistributor(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListUpdateNotificationDistributor {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultDisallowListNotificationQueueCacheSize,
 		Collector: metrics.NewNoopCollector(),
@@ -67,7 +54,7 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 		logger: lg,
 	}
 
-	pool := worker.NewWorkerPoolBuilder[DisallowListUpdateNotification](
+	pool := worker.NewWorkerPoolBuilder[*p2p.DisallowListUpdateNotification](
 		lg,
 		store,
 		d.distribute).Build()
@@ -83,42 +70,40 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 	return d
 }
 
-// distribute is called by the workers to process the event. It calls the OnNodeDisallowListUpdate method on all registered
+// distribute is called by the workers to process the event. It calls the OnDisallowListNotification method on all registered
 // consumers.
 // It does not return an error because the event is already in the store, so it will be retried.
-func (d *DisallowListUpdateNotificationDistributor) distribute(msg DisallowListUpdateNotification) error {
+func (d *DisallowListUpdateNotificationDistributor) distribute(notification *p2p.DisallowListUpdateNotification) error {
 	d.consumerLock.RLock()
 	defer d.consumerLock.RUnlock()
 
 	for _, consumer := range d.consumers {
-		consumer.OnNodeDisallowListUpdate(msg.DisallowList)
+		consumer.OnDisallowListNotification(notification)
 	}
 
 	return nil
 }
 
-// DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
-type DisallowListUpdateNotification struct {
-	DisallowList flow.IdentifierList
-}
-
 // AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
 // method when the node disallow list is updated.
-func (d *DisallowListUpdateNotificationDistributor) AddConsumer(consumer p2p.DisallowListConsumer) {
+func (d *DisallowListUpdateNotificationDistributor) AddConsumer(consumer p2p.DisallowListUpdateNotificationConsumer) {
 	d.consumerLock.Lock()
 	defer d.consumerLock.Unlock()
 
 	d.consumers = append(d.consumers, consumer)
 }
 
-// OnNodeDisallowListUpdate is called when the node disallow list is updated. It submits the event to the distributor to be
-// processed asynchronously.
-func (d *DisallowListUpdateNotificationDistributor) OnNodeDisallowListUpdate(disallowList flow.IdentifierList) {
-	ok := d.workerPool.Submit(DisallowListUpdateNotification{
-		DisallowList: disallowList,
-	})
-
+// DistributeBlockListNotification distributes the event to all the consumers.
+// Implementation is non-blocking, it submits the event to the worker pool and returns immediately.
+// The event will be distributed to the consumers in the order it was submitted but asynchronously.
+// If the worker pool is full, the event will be dropped and a warning will be logged.
+// This implementation returns no error.
+func (d *DisallowListUpdateNotificationDistributor) DistributeBlockListNotification(disallowList flow.IdentifierList) error {
+	ok := d.workerPool.Submit(&p2p.DisallowListUpdateNotification{DisallowList: disallowList})
 	if !ok {
-		d.logger.Fatal().Msg("failed to submit disallow list update event to distributor")
+		// we use a queue to buffer the events, so this may happen if the queue is full or the event is duplicate. In this case, we log a warning.
+		d.logger.Warn().Msg("node disallow list update notification queue is full or the event is duplicate, dropping event")
 	}
+
+	return nil
 }
