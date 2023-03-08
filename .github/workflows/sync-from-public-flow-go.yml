@@ -8,6 +8,9 @@ on:
     branches:
       - master-private
 
+permissions:
+  workflows: write
+
 # GH_TOKEN needed to enable GitHub CLI commands
 env:
   GH_TOKEN: ${{ github.token }}
