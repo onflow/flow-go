@@ -46,7 +46,7 @@ import (
 const (
 	defaultMemoryLimitRatio          = 0.2 // flow default
 	defaultFileDescriptorsRatio      = 0.5 // libp2p default
-	defaultPeerBaseLimitConnsInbound = 10
+	defaultPeerBaseLimitConnsInbound = 1
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.

@@ -420,19 +420,12 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
 	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
 
-	fmt.Println("SENDER", sender.Host().ID())
-	fmt.Println("RECEIVER", receiver.Host().ID())
-
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
 
 	pInfo, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
 	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-
-	pInfo, err = utils.PeerAddressInfo(id1)
-	require.NoError(t, err)
-	receiver.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
 	for i := 0; i < 20; i++ {
 		go func() {
@@ -441,9 +434,7 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		}()
 	}
 
-	time.Sleep(5 * time.Second)
-
-	fmt.Println("CONNS TO PEER", len(receiver.Host().Network().ConnsToPeer(sender.Host().ID())))
+	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.Host().ID()), 1)
 }
 
 // createStreams will attempt to create n number of streams concurrently between each combination of node pairs.

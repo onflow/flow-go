@@ -2,8 +2,6 @@ package p2ptest
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"time"
 
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
@@ -46,8 +44,6 @@ func UnicastManagerFixtureFactory() p2pbuilder.UnicastManagerFactoryFunc {
 
 // CreateStream override the CreateStream func and create streams without retries and without enforcing a single pairwise connection.
 func (m *UnicastManagerFixture) CreateStream(ctx context.Context, peerID peer.ID, _ int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	v := rand.Int()
-	fmt.Println("RANDOM NUMBER START", v)
 	protocol := m.Protocols()[0]
 	streamFactory := m.StreamFactory()
 
@@ -70,6 +66,5 @@ func (m *UnicastManagerFixture) CreateStream(ctx context.Context, peerID peer.ID
 	if err != nil {
 		return nil, dialAddr, err
 	}
-	fmt.Println("RANDOM NUMBER END", v)
 	return s, dialAddr, nil
 }
