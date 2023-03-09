@@ -123,15 +123,19 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 
 	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
-		if errors.Is(err, module.DKGFailError) {
-			// if the node failed DKG, then using the staking key to sign the block as a
-			// fallback
+		// if the node failed DKG, then using the staking key to sign the block as a fallback
+		if errors.Is(err, module.ErrNoBeaconKeyForEpoch) {
 			stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
 			if err != nil {
 				return nil, fmt.Errorf("could not generate staking signature: %w", err)
 			}
 
 			return msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig), nil
+		}
+		// in order to sign a block or vote, we must know the view's epoch to know the leader
+		// reaching this point for an unknown epoch indicates a critical validation failure earlier on
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			return nil, fmt.Errorf("will not sign entity referencing view for unknown epoch: %v", err)
 		}
 		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)
 	}

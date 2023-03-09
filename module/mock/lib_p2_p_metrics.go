@@ -154,6 +154,11 @@ func (_m *LibP2PMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
+func (_m *LibP2PMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+	_m.Called(topic, size)
+}
+
 // OnPeerDialFailure provides a mock function with given fields: duration, attempts
 func (_m *LibP2PMetrics) OnPeerDialFailure(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
