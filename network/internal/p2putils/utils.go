@@ -14,13 +14,13 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 // FlowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
 func FlowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
-		if unicast.IsFlowProtocolStream(s) {
+		if protocols.IsFlowProtocolStream(s) {
 			return s
 		}
 	}

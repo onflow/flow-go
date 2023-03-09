@@ -34,9 +34,10 @@ func TestSafetyCheck(t *testing.T) {
 
 		txnState := testutils.NewSimpleTransaction(nil)
 
-		err := fvm.Run(proc.NewExecutor(context, txnState))
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
 		require.Nil(t, err)
-		require.Error(t, proc.Err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -59,9 +60,10 @@ func TestSafetyCheck(t *testing.T) {
 
 		txnState := testutils.NewSimpleTransaction(nil)
 
-		err := fvm.Run(proc.NewExecutor(context, txnState))
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
 		require.Nil(t, err)
-		require.Error(t, proc.Err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")

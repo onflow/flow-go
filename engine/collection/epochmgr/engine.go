@@ -107,36 +107,115 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 	// (2) Retrieve protocol state as of latest finalized block. We use this state
 	// to catch up on events, whose execution was missed during crash-restart.
 	finalSnapshot := e.state.Final()
-	currentEpoch := finalSnapshot.Epochs().Current()
-	currentEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		ctx.Throw(fmt.Errorf("could not get epoch counter: %w", err))
-	}
 
 	// (3) check if we should attempt to vote after startup
-	err = e.checkShouldVoteOnStartup(finalSnapshot)
+	err := e.checkShouldVoteOnStartup(finalSnapshot)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not vote on startup: %w", err))
 	}
 
 	// (4) start epoch-scoped components:
-	// set up epoch-scoped epoch managed by this engine for the current epoch
+	// (a) set up epoch-scoped epoch managed by this engine for the current epoch
+	err = e.checkShouldStartCurrentEpochComponentsOnStartup(ctx, finalSnapshot)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not check or start current epoch components: %w", err))
+	}
+
+	// (b) set up epoch-scoped epoch components for the previous epoch
+	err = e.checkShouldStartPreviousEpochComponentsOnStartup(ctx, finalSnapshot)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not check or start previous epoch components: %w", err))
+	}
+}
+
+// checkShouldStartCurrentEpochComponentsOnStartup checks whether we should instantiate
+// consensus components for the current epoch upon startup, and if so, starts them.
+// We always start current epoch consensus components, unless this node is not an
+// authorized participant in the current epoch.
+// No errors are expected during normal operation.
+func (e *Engine) checkShouldStartCurrentEpochComponentsOnStartup(ctx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
+	currentEpoch := finalSnapshot.Epochs().Current()
+	currentEpochCounter, err := currentEpoch.Counter()
+	if err != nil {
+		return fmt.Errorf("could not get epoch counter: %w", err)
+	}
+
 	components, err := e.createEpochComponents(currentEpoch)
 	if err != nil {
 		if errors.Is(err, ErrNotAuthorizedForEpoch) {
 			// don't set up consensus components if we aren't authorized in current epoch
 			e.log.Info().Msg("node is not authorized for current epoch - skipping initializing cluster consensus")
-			return
+			return nil
 		}
-		ctx.Throw(fmt.Errorf("could not create epoch components: %w", err))
+		return fmt.Errorf("could not create epoch components: %w", err)
 	}
 	err = e.startEpochComponents(ctx, currentEpochCounter, components)
 	if err != nil {
 		// all failures to start epoch components are critical
-		ctx.Throw(fmt.Errorf("could not start epoch components: %w", err))
+		return fmt.Errorf("could not start epoch components: %w", err)
+	}
+	return nil
+}
+
+// checkShouldStartPreviousEpochComponentsOnStartup checks whether we should re-instantiate
+// consensus components for the previous epoch upon startup, and if so, starts them.
+// One cluster is responsible for a portion of transactions with reference blocks
+// with one epoch. Since transactions may use reference blocks up to flow.DefaultTransactionExpiry
+// many heights old, clusters don't shut down until this many blocks have been finalized
+// past the final block of the cluster's epoch.
+// No errors are expected during normal operation.
+func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
+	finalHeader, err := finalSnapshot.Head()
+	if err != nil {
+		return fmt.Errorf("[unexpected] could not get finalized header: %w", err)
+	}
+	finalizedHeight := finalHeader.Height
+
+	prevEpoch := finalSnapshot.Epochs().Previous()
+	prevEpochCounter, err := prevEpoch.Counter()
+	if err != nil {
+		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil
+		}
+		return fmt.Errorf("[unexpected] could not get previous epoch counter: %w", err)
+	}
+	prevEpochFinalHeight, err := prevEpoch.FinalHeight()
+	if err != nil {
+		// no expected errors because we are querying finalized snapshot
+		return fmt.Errorf("[unexpected] could not get previous epoch final height: %w", err)
+	}
+	prevEpochClusterConsensusStopHeight := prevEpochFinalHeight + flow.DefaultTransactionExpiry + 1
+
+	log := e.log.With().
+		Uint64("finalized_height", finalizedHeight).
+		Uint64("prev_epoch_counter", prevEpochCounter).
+		Uint64("prev_epoch_final_height", prevEpochFinalHeight).
+		Uint64("prev_epoch_cluster_stop_height", prevEpochClusterConsensusStopHeight).
+		Logger()
+
+	if finalizedHeight >= prevEpochClusterConsensusStopHeight {
+		log.Debug().Msg("not re-starting previous epoch cluster consensus on startup - past stop height")
+		return nil
 	}
 
-	// TODO if we are within the first 600 blocks of an epoch, we should resume the previous epoch's cluster consensus here https://github.com/dapperlabs/flow-go/issues/5659
+	components, err := e.createEpochComponents(prevEpoch)
+	if err != nil {
+		if errors.Is(err, ErrNotAuthorizedForEpoch) {
+			// don't set up consensus components if we aren't authorized in previous epoch
+			log.Info().Msg("node is not authorized for previous epoch - skipping re-initializing last epoch cluster consensus")
+			return nil
+		}
+		return fmt.Errorf("[unexpected] could not create previous epoch components: %w", err)
+	}
+	err = e.startEpochComponents(engineCtx, prevEpochCounter, components)
+	if err != nil {
+		// all failures to start epoch components are critical
+		return fmt.Errorf("[unexpected] could not epoch components: %w", err)
+	}
+	e.prepareToStopEpochComponents(prevEpochCounter, prevEpochFinalHeight)
+
+	log.Info().Msgf("re-started last epoch cluster consensus - will stop at height %d", prevEpochClusterConsensusStopHeight)
+	return nil
 }
 
 // checkShouldVoteOnStartup checks whether we should vote, and if so, sends a signal
@@ -194,9 +273,13 @@ func (e *Engine) Done() <-chan struct{} {
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
+	counter, err := epoch.Counter()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch counter: %w", err)
+	}
 	state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub, err := e.factory.Create(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
+		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", counter, err)
 	}
 
 	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub)

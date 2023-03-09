@@ -32,11 +32,11 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 	}
 }
 
-func (d *Distributor) BlockProcessable(block *flow.Header) {
+func (d *Distributor) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.BlockProcessable(block)
+		sub.BlockProcessable(block, certifyingQC)
 	}
 }
 
