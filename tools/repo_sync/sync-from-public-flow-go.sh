@@ -45,5 +45,5 @@ git checkout master-sync
 gh repo set-default dapperlabs/flow-go
 
 # create PR to merge from master-sync to master-public branch
-gh pr create --base master-public --title "Public flow-go master sync" --body "Automated PR that merges updates from https://github.com/onflow/flow-go `master` branch into https://github.com/dapperlabs/flow-go `master-public` branch"
+gh pr create --base master-public --title "Public flow-go master sync" --body "Automated PR that merges updates from https://github.com/onflow/flow-go ``master`` branch into https://github.com/dapperlabs/flow-go ``master-public`` branch"
 
