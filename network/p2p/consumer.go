@@ -46,7 +46,7 @@ type DisallowListNotificationDistributor interface {
 	// Implementation must be concurrency safe, and non-blocking.
 	DistributeBlockListNotification(list flow.IdentifierList) error
 
-	// AddConsumer adds a consumer to the distributor. The consumer will be called when distributor receives a new event.
+	// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
 	AddConsumer(DisallowListNotificationConsumer)
@@ -61,7 +61,7 @@ type GossipSubInspectorNotificationDistributor interface {
 	// Implementation must be concurrency safe, and non-blocking.
 	DistributeInvalidControlMessageNotification(notification *InvalidControlMessageNotification) error
 
-	// AddConsumer adds a consumer to the distributor. The consumer will be called when distributor receives a new event.
+	// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
 	AddConsumer(GossipSubInvalidControlMessageNotificationConsumer)
