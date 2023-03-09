@@ -9,13 +9,12 @@ on:
       - master-private
 
 # GH_TOKEN needed to enable GitHub CLI commands
-env:
-  GH_TOKEN: ${{ secrets.REPO_SYNC }}
+#env:
+#  GH_TOKEN: ${{ secrets.REPO_SYNC }}
 
 jobs:
   flow-go-sync:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
