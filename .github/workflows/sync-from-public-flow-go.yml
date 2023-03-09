@@ -8,8 +8,9 @@ on:
     branches:
       - master-private
 
-# GH_TOKEN needed to enable GitHub CLI commands
-#env:
+# GH_TOKEN needed to enable GitHub CLI commands from scripts
+env:
+  GH_TOKEN: ${{ github.token }}
 #  GH_TOKEN: ${{ secrets.REPO_SYNC }}
 
 jobs:
