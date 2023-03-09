@@ -279,7 +279,11 @@ func (e *Manager) ExecuteScript(
 	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
+	e.metrics.ExecutionScriptExecuted(
+		time.Since(startedAt),
+		script.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		script.MemoryEstimate)
 
 	return encodedValue, nil
 }
