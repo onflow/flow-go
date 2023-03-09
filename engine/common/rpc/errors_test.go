@@ -43,10 +43,7 @@ func TestConvertError(t *testing.T) {
 	})
 
 	t.Run("derived code", func(t *testing.T) {
-		err := ConvertError(storage.ErrNotFound, "", defaultCode)
-		assert.Equal(t, codes.NotFound, status.Code(err))
-
-		err = ConvertError(context.Canceled, "", defaultCode)
+		err := ConvertError(context.Canceled, "", defaultCode)
 		assert.Equal(t, codes.Canceled, status.Code(err))
 
 		err = ConvertError(context.DeadlineExceeded, "some prefix", defaultCode)
@@ -55,7 +52,10 @@ func TestConvertError(t *testing.T) {
 	})
 
 	t.Run("unhandled code", func(t *testing.T) {
-		err := ConvertError(status.Error(codes.Unknown, "Unknown"), "", defaultCode)
+		err := ConvertError(storage.ErrNotFound, "", defaultCode)
+		assert.Equal(t, codes.Internal, status.Code(err))
+
+		err = ConvertError(status.Error(codes.Unknown, "Unknown"), "", defaultCode)
 		assert.Equal(t, codes.Internal, status.Code(err))
 
 		err = ConvertError(status.Error(codes.Internal, "Internal"), "", defaultCode)

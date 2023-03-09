@@ -11,7 +11,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ConvertError converts a generic error into a grpc status error
+// ConvertError converts a generic error into a grpc status error. The input may either
+// be a status.Error already, or standard error type. Any error that matches on of the
+// common status code mappings will be converted, all unmatched errors will be converted
+// to the provided defaultCode.
 func ConvertError(err error, msg string, defaultCode codes.Code) error {
 	if err == nil {
 		return nil
@@ -33,8 +36,6 @@ func ConvertError(err error, msg string, defaultCode codes.Code) error {
 
 	var returnCode codes.Code
 	switch {
-	case errors.Is(err, storage.ErrNotFound):
-		returnCode = codes.NotFound
 	case errors.Is(err, context.Canceled):
 		returnCode = codes.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
@@ -53,10 +54,11 @@ func ConvertStorageError(err error) error {
 		return nil
 	}
 
+	// Already converted
 	if status.Code(err) == codes.NotFound {
-		// Already converted
 		return err
 	}
+
 	if errors.Is(err, storage.ErrNotFound) {
 		return status.Errorf(codes.NotFound, "not found: %v", err)
 	}

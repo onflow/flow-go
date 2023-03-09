@@ -314,8 +314,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
-		if isInsufficientExecReceipts {
+		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -371,13 +370,13 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	// user transactions in the block
 	txCount := i
 
-	rootBlock, err := b.state.Params().Root()
+	sporkRootBlockHeight, err := b.state.Params().SporkRootBlockHeight()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
 	}
 
 	// root block has no system transaction result
-	if rootBlock.ID() != blockID {
+	if block.Header.Height > sporkRootBlockHeight {
 		// system chunk transaction
 
 		// resp.TransactionResults includes the system tx result, so there should be exactly one
@@ -435,8 +434,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
-		if isInsufficientExecReceipts {
+		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -661,7 +659,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
-		if errors.As(err, &InsufficientExecutionReceipts{}) {
+		if IsInsufficientExecutionReceipts(err) {
 			return nil, 0, "", status.Errorf(codes.NotFound, err.Error())
 		}
 		return nil, 0, "", err
