@@ -73,6 +73,8 @@ type transactionExecutor struct {
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
+
+	output ProcedureOutput
 }
 
 func newTransactionExecutor(
@@ -112,6 +114,10 @@ func (executor *transactionExecutor) Cleanup() {
 	executor.span.End()
 }
 
+func (executor *transactionExecutor) Output() ProcedureOutput {
+	return executor.output
+}
+
 func (executor *transactionExecutor) handleError(
 	err error,
 	step string,
@@ -126,7 +132,7 @@ func (executor *transactionExecutor) handleError(
 	}
 
 	if txErr != nil {
-		executor.proc.Err = txErr
+		executor.output.Err = txErr
 	}
 
 	return nil
@@ -453,27 +459,10 @@ func (executor *transactionExecutor) commit(
 				"nested transactions.")
 	}
 
-	// if tx failed this will only contain fee deduction logs
-	executor.proc.Logs = executor.env.Logs()
-
-	computationUsed, err := executor.env.ComputationUsed()
+	err := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return fmt.Errorf("error getting computation used: %w", err)
+		return err
 	}
-	executor.proc.ComputationUsed = computationUsed
-
-	memoryUsed, err := executor.env.MemoryUsed()
-	if err != nil {
-		return fmt.Errorf("error getting memory used: %w", err)
-	}
-	executor.proc.MemoryEstimate = memoryUsed
-
-	executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
-
-	// if tx failed this will only contain fee deduction events
-	executor.proc.Events = executor.env.Events()
-	executor.proc.ServiceEvents = executor.env.ServiceEvents()
-	executor.proc.ConvertedServiceEvents = executor.env.ConvertedServiceEvents()
 
 	// Based on various (e.g., contract and frozen account) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
