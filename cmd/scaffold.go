@@ -1003,7 +1003,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize disallow list wrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
 		node.IdentityProvider = disallowListWrapper
 
