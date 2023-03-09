@@ -11,22 +11,10 @@ on:
 # GH_TOKEN needed to enable GitHub CLI commands
 env:
   GH_TOKEN: ${{ secrets.REPO_SYNC }}
-#  GITHUB_TOKEN: ${{ secrets.REPO_SYNC }}
 
 jobs:
   flow-go-sync:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write # This is needed to update a workflow file
-      contents: write # This is needed to push changes to the repository
-      checks: write
-      deployments: write
-      issues: write
-      packages: write
-      pull-requests: write
-      repository-projects: write
-      security-events: write
-      statuses: write
 
     steps:
       - name: Checkout repo
