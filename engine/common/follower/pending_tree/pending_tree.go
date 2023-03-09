@@ -2,6 +2,7 @@ package pending_tree
 
 import (
 	"fmt"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
