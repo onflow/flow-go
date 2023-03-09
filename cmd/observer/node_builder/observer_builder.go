@@ -722,15 +722,16 @@ func (builder *ObserverServiceBuilder) initNodeInfo() error {
 }
 
 func (builder *ObserverServiceBuilder) InitIDProviders() {
+	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
+	if builder.HeroCacheMetricsEnable {
+		collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
+		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+	}
+
+	builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
+
 	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(node.DisallowListNotificationCacheSize)}
-		if node.HeroCacheMetricsEnable {
-			collector := metrics.DisallowListNotificationQueueMetricFactory(node.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
-
-		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
-
+		// distributor is returned as a component to be started and stopped.
 		return builder.NodeDisallowListDistributor, nil
 	})
 

@@ -981,15 +981,18 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
+	// initializes disallow list notification distributor
+	// this distributor is used to distribute disallow list notifications to all subscribed components.
+	// this should be done at the initialization of the node and not in the component initialization.
+	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
+	if fnb.HeroCacheMetricsEnable {
+		collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
+		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+	}
+	fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
+
 	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(node.DisallowListNotificationCacheSize)}
-		if node.HeroCacheMetricsEnable {
-			collector := metrics.DisallowListNotificationQueueMetricFactory(node.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
-
-		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
-
+		// distributor is returned as a component to be started and stopped.
 		return fnb.NodeDisallowListDistributor, nil
 	})
 
