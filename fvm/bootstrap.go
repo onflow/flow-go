@@ -259,10 +259,6 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return 0
-}
-
 func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
 	return 0
 }
