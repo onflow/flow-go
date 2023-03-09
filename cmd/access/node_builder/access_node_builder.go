@@ -692,17 +692,21 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 }
 
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
+	// initializes disallow list notification distributor
+	// this distributor is used to distribute disallow list notifications to all subscribed components.
+	// this should be done at the initialization of the node and not in the component initialization.
+	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
+	if builder.HeroCacheMetricsEnable {
+		collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
+		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+	}
+	builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
+
 	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(node.DisallowListNotificationCacheSize)}
-		if node.HeroCacheMetricsEnable {
-			collector := metrics.DisallowListNotificationQueueMetricFactory(node.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
-
-		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
-
+		// distributor is returned as a component to be started and stopped.
 		return builder.NodeDisallowListDistributor, nil
 	})
+
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
