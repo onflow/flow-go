@@ -4,6 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 )
 
 // DisallowListConsumer consumes notifications from the cache.NodeBlocklistWrapper whenever the block list is updated.
@@ -41,6 +42,7 @@ type DisallowListNotificationConsumer interface {
 }
 
 type DisallowListNotificationDistributor interface {
+	component.Component
 	// DistributeBlockListNotification distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
@@ -56,6 +58,7 @@ type DisallowListNotificationDistributor interface {
 // It is used to distribute notifications to the consumers in an asynchronous manner and non-blocking manner.
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
 type GossipSubInspectorNotificationDistributor interface {
+	component.Component
 	// DistributeInvalidControlMessageNotification distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
