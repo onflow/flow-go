@@ -70,6 +70,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -1065,6 +1066,12 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			return nil, fmt.Errorf("could not create connection manager: %w", err)
 		}
 
+		meshTracer := tracer.NewGossipSubMeshTracer(
+			builder.Logger,
+			networkMetrics,
+			builder.IdentityProvider,
+			builder.GossipSubConfig.LocalMeshLogInterval)
+
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
 			networkMetrics,
@@ -1092,6 +1099,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			// disable connection pruning for the access node which supports the observer
 			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+			SetGossipSubTracer(meshTracer).
 			Build()
 
 		if err != nil {
