@@ -27,11 +27,11 @@ func NewCorruptLibP2PNodeFactory(
 	idProvider module.IdentityProvider,
 	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
-	peerScoringEnabled bool,
 	role string,
 	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
 	peerManagerCfg *p2pbuilder.PeerManagerConfig,
 	uniCfg *p2pbuilder.UnicastConfig,
+	gossipSubCfg *p2pbuilder.GossipSubConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -52,9 +52,7 @@ func NewCorruptLibP2PNodeFactory(
 			role,
 			connGaterCfg,
 			peerManagerCfg,
-			&p2pbuilder.GossipSubConfig{
-				PeerScoring: peerScoringEnabled,
-			},
+			gossipSubCfg,
 			p2pbuilder.DefaultResourceManagerConfig(),
 			uniCfg)
 
