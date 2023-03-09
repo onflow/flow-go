@@ -43,6 +43,11 @@ func (_m *PubSubAdapterConfig) WithSubscriptionFilter(_a0 p2p.SubscriptionFilter
 	_m.Called(_a0)
 }
 
+// WithTracer provides a mock function with given fields: t
+func (_m *PubSubAdapterConfig) WithTracer(t p2p.PubSubTracer) {
+	_m.Called(t)
+}
+
 type mockConstructorTestingTNewPubSubAdapterConfig interface {
 	mock.TestingT
 	Cleanup(func())

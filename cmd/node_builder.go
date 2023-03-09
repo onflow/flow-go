@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -185,9 +184,7 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-
-	// PeerScoringEnabled enables peer scoring on pubsub
-	PeerScoringEnabled bool
+	GossipSubConfig          *p2pbuilder.GossipSubConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -293,18 +290,18 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 			// By default we let networking layer trim connections to all nodes that
 			// are no longer part of protocol state.
-			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:                         scoring.DefaultPeerScoringEnabled,
-			UnicastMessageRateLimit:                    0,
-			UnicastBandwidthRateLimit:                  0,
-			UnicastBandwidthBurstLimit:                 middleware.LargeMsgMaxUnicastMsgSize,
-			UnicastRateLimitLockoutDuration:            10,
-			UnicastRateLimitDryRun:                     true,
-			DNSCacheTTL:                                dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
-			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
+			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
+			GossipSubConfig:                 p2pbuilder.DefaultGossipSubConfig(),
+			UnicastMessageRateLimit:         0,
+			UnicastBandwidthRateLimit:       0,
+			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
+			UnicastRateLimitLockoutDuration: 10,
+			UnicastRateLimitDryRun:          true,
+			DNSCacheTTL:                     dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
 			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
+			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

@@ -131,6 +131,10 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.PubSubTracer != nil {
+		builder.SetGossipSubTracer(parameters.PubSubTracer)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -145,6 +149,7 @@ func NodeFixture(
 	if parameters.PeerProvider != nil {
 		n.WithPeersProvider(parameters.PeerProvider)
 	}
+
 	return n, *identity
 }
 
@@ -171,6 +176,7 @@ type NodeFixtureParameters struct {
 	Metrics                module.NetworkMetrics
 	ResourceManager        network.ResourceManager
 	CreateStreamRetryDelay time.Duration
+	PubSubTracer           p2p.PubSubTracer
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
@@ -183,6 +189,12 @@ func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParam
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
 		p.IdProvider = idProvider
+	}
+}
+
+func WithGossipSubTracer(tracer p2p.PubSubTracer) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.PubSubTracer = tracer
 	}
 }
 
