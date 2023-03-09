@@ -182,8 +182,6 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 // For example, suppose B is the input vertex. Then:
 //   - A must already be connected to the finalized state
 //   - B, E, C, D are marked as connected to the finalized state and included in the output list
-//
-// CAUTION: not safe for concurrent use; caller must hold the lock.
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
 	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}
 	vertex.connectedToFinalized = true
