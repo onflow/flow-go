@@ -2,8 +2,6 @@ package pending_tree
 
 import (
 	"fmt"
-	"sync"
-
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -62,7 +60,7 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // PendingTree is a mempool holding certified blocks that eventually might be connected to the finalized state.
 // As soon as a valid fork of certified blocks descending from the latest finalized block we pass this information to caller.
 // Internally, the mempool utilizes the LevelledForest.
-// PendingTree is safe to use in concurrent environment.
+// PendingTree is NOT safe to use in concurrent environment.
 // NOTE: PendingTree relies on notion of `CertifiedBlock` which is a valid block which is certified by corresponding QC.
 // This works well for consensus follower as it is designed to work with certified blocks. To use this structure for consensus
 // participant we can abstract out CertifiedBlock or replace it with a generic argument that satisfies some contract(returns View, Height, BlockID).
@@ -70,7 +68,6 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // having QC but relying on payload validation.
 type PendingTree struct {
 	forest          *forest.LevelledForest
-	lock            sync.RWMutex
 	lastFinalizedID flow.Identifier
 }
 
@@ -103,8 +100,6 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 	slices.SortFunc(certifiedBlocks, func(lhs CertifiedBlock, rhs CertifiedBlock) bool {
 		return lhs.Height() < rhs.Height()
 	})
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	var allConnectedBlocks []CertifiedBlock
 	for _, block := range certifiedBlocks {
@@ -163,8 +158,6 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 // No errors are expected during normal operation.
 func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 	blockID := finalized.ID()
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	if t.forest.LowestLevel >= finalized.View {
 		return nil
 	}
@@ -181,13 +174,14 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 // and returns all blocks in this subtree. No parents of `vertex.Block` are modified or included in the output.
 // The output list will be ordered so that parents appear before children.
 // The caller must ensure that `vertex.Block` is connected to the finalized state.
-// 
-//  A ← B ← C ←D
-//        ↖ E
+//
+//	A ← B ← C ←D
+//	      ↖ E
 //
 // For example, suppose B is the input vertex. Then:
-//  - A must already be connected to the finalized state
-//  - B, E, C, D are marked as connected to the finalized state and included in the output list
+//   - A must already be connected to the finalized state
+//   - B, E, C, D are marked as connected to the finalized state and included in the output list
+//
 // CAUTION: not safe for concurrent use; caller must hold the lock.
 func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
 	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}

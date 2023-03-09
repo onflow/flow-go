@@ -2,7 +2,6 @@ package pending_tree
 
 import (
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -75,8 +74,10 @@ func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
 // in empty list of connected blocks. After adding missing block all connected blocks across all forks are correctly collected
 // and returned.
 // Having:
-//         ↙ B2 ← B3
-//  F ← B1 ← B4 ← B5 ← B6 ← B7
+//
+//	       ↙ B2 ← B3
+//	F ← B1 ← B4 ← B5 ← B6 ← B7
+//
 // Add [B2, B3], expect to get []
 // Add [B4, B5, B6, B7], expect to get []
 // Add [B1], expect to get [B1, B2, B3, B4, B5, B6, B7]
@@ -208,53 +209,6 @@ func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 	actual, err = s.pendingTree.AddBlocks(secondBatch)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), secondBatch, actual)
-}
-
-// TestConcurrentAddBlocks simulates multiple workers adding batches of blocks out of order.
-// We use next setup:
-// Number of workers - workers
-// Number of batches submitted by worker - batchesPerWorker
-// Number of blocks in each batch submitted by worker - blocksPerBatch
-// Each worker submits batchesPerWorker*blocksPerBatch blocks
-// In total we will submit workers*batchesPerWorker*blocksPerBatch
-// After submitting all blocks we expect that all blocks that were submitted would be returned to caller.
-func (s *PendingTreeSuite) TestConcurrentAddBlocks() {
-	workers := 10
-	batchesPerWorker := 10
-	blocksPerBatch := 10
-	blocksPerWorker := blocksPerBatch * batchesPerWorker
-	blocks := certifiedBlocksFixture(workers*blocksPerWorker, s.finalized)
-
-	var wg sync.WaitGroup
-	wg.Add(workers)
-
-	var connectedBlocksLock sync.Mutex
-	connectedBlocksByID := make(map[flow.Identifier]CertifiedBlock, len(blocks))
-	for i := 0; i < workers; i++ {
-		go func(blocks []CertifiedBlock) {
-			defer wg.Done()
-			rand.Shuffle(len(blocks), func(i, j int) {
-				blocks[i], blocks[j] = blocks[j], blocks[i]
-			})
-			for batch := 0; batch < batchesPerWorker; batch++ {
-				connectedBlocks, err := s.pendingTree.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
-				require.NoError(t, err)
-				connectedBlocksLock.Lock()
-				for _, block := range connectedBlocks {
-					connectedBlocksByID[block.ID()] = block
-				}
-				connectedBlocksLock.Unlock()
-			}
-		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
-	}
-
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
-	require.Equal(s.T(), len(blocks), len(connectedBlocksByID))
-	allConnectedBlocks := make([]CertifiedBlock, 0, len(connectedBlocksByID))
-	for _, block := range connectedBlocksByID {
-		allConnectedBlocks = append(allConnectedBlocks, block)
-	}
-	require.ElementsMatch(s.T(), blocks, allConnectedBlocks)
 }
 
 // certifiedBlocksFixture builds a chain of certified blocks starting at some block.
