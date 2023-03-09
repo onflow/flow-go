@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -256,7 +255,7 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 		impl.logger.Logger().Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
-	addresses, ok := utils.CadenceValueToAddressSlice(value)
+	addresses, ok := cadenceValueToAddressSlice(value)
 	if !ok {
 		impl.logger.Logger().Warn().Msg(warningMsg)
 		return defaultAccounts
@@ -553,4 +552,24 @@ func (updater *ContractUpdaterImpl) isAuthorized(
 		}
 	}
 	return false
+}
+
+func cadenceValueToAddressSlice(value cadence.Value) (
+	[]flow.Address,
+	bool,
+) {
+	v, ok := value.(cadence.Array)
+	if !ok {
+		return nil, false
+	}
+
+	addresses := make([]flow.Address, 0, len(v.Values))
+	for _, value := range v.Values {
+		a, ok := value.(cadence.Address)
+		if !ok {
+			return nil, false
+		}
+		addresses = append(addresses, flow.ConvertAddress(a))
+	}
+	return addresses, true
 }

@@ -98,7 +98,7 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): &col2,
 	}
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// signed by the only collector
 	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
@@ -259,7 +259,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
@@ -294,7 +294,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
@@ -326,7 +326,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
