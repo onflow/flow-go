@@ -39,7 +39,7 @@ type EngineSuite struct {
 	me         *module.Local
 	net        *mocknetwork.Network
 	payloads   *storage.ClusterPayloads
-	protoState *protocol.MutableState
+	protoState *protocol.State
 	con        *mocknetwork.Conduit
 
 	payloadDB map[flow.Identifier]*cluster.Payload
@@ -77,7 +77,7 @@ func (cs *EngineSuite) SetupTest() {
 		nil,
 	)
 
-	cs.protoState = &protocol.MutableState{}
+	cs.protoState = &protocol.State{}
 	cs.protoState.On("Final").Return(protoSnapshot)
 
 	cs.clusterID = "cluster-id"
