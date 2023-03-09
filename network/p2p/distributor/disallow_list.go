@@ -33,6 +33,7 @@ type DisallowListNotificationDistributor struct {
 
 var _ p2p.DisallowListNotificationDistributor = (*DisallowListNotificationDistributor)(nil)
 
+// DefaultDisallowListNotificationDistributor creates a new disallow list notification distributor with default configuration.
 func DefaultDisallowListNotificationDistributor(logger zerolog.Logger, opts ...queue.HeroStoreConfigOption) *DisallowListNotificationDistributor {
 	cfg := &queue.HeroStoreConfig{
 		SizeLimit: DefaultDisallowListNotificationQueueCacheSize,
@@ -47,6 +48,9 @@ func DefaultDisallowListNotificationDistributor(logger zerolog.Logger, opts ...q
 	return NewDisallowListConsumer(logger, store)
 }
 
+// NewDisallowListConsumer creates a new disallow list notification distributor.
+// It takes a message store as a parameter, which is used to store the events that are distributed to the consumers.
+// The message store is used to ensure that DistributeBlockListNotification is non-blocking.
 func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *DisallowListNotificationDistributor {
 	lg := logger.With().Str("component", "node_disallow_distributor").Logger()
 
@@ -84,8 +88,9 @@ func (d *DisallowListNotificationDistributor) distribute(notification *p2p.Disal
 	return nil
 }
 
-// AddConsumer registers a consumer with the distributor. The distributor will call the consumer's OnNodeDisallowListUpdate
-// method when the node disallow list is updated.
+// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
+// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
+// There is no guarantee that the consumer will be called for events that were already received by the distributor.
 func (d *DisallowListNotificationDistributor) AddConsumer(consumer p2p.DisallowListNotificationConsumer) {
 	d.consumerLock.Lock()
 	defer d.consumerLock.Unlock()
