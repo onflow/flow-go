@@ -192,22 +192,19 @@ func (collector *resultCollector) hashCollection(
 	startTime time.Time,
 	collectionExecutionSnapshot state.ExecutionSnapshot,
 ) error {
-	// TODO(patrick): fix this ...
-	snapshot := collectionExecutionSnapshot.(*delta.View).Interactions()
-
 	collector.result.TransactionResultIndex = append(
 		collector.result.TransactionResultIndex,
 		len(collector.result.TransactionResults))
 	collector.result.StateSnapshots = append(
 		collector.result.StateSnapshots,
-		snapshot)
+		collectionExecutionSnapshot)
 
 	collector.metrics.ExecutionCollectionExecuted(
 		time.Since(startTime),
 		collector.result.CollectionStats(collection.collectionIndex))
 
 	spock, err := collector.signer.SignFunc(
-		snapshot.SpockSecret,
+		collectionExecutionSnapshot.SpockSecret(),
 		collector.spockHasher,
 		SPOCKProve)
 	if err != nil {
