@@ -115,7 +115,7 @@ const (
 	MessageRangeRequest        = "range"
 	MessageBatchRequest        = "batch"
 	MessageBlockResponse       = "block"
-	MessageSyncedBlock         = "synced_block"
+	MessageSyncedBlocks        = "synced_blocks"
 	MessageSyncedClusterBlock  = "synced_cluster_block"
 	MessageTransaction         = "transaction"
 	MessageSubmitGuarantee     = "submit_guarantee"

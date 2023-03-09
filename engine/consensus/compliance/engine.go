@@ -120,11 +120,13 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(flow.Slashable[*messages.BlockProposal])
-			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
-			e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
-			if err != nil {
-				return fmt.Errorf("could not handle block proposal: %w", err)
+			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			for _, block := range batch.Message {
+				err := e.core.OnBlockProposal(batch.OriginID, block)
+				e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
 			}
 			continue
 		}
@@ -150,21 +152,25 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-	if e.pendingBlocks.Push(proposal) {
+	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message:  []*messages.BlockProposal{proposal.Message},
+	}
+	if e.pendingBlocks.Push(proposalAsList) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
 		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	}
 }
 
-// OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
+// OnSyncedBlocks feeds a range of blocks obtained from sync into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
-	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlocks)
 	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
-		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlocks)
 	}
 }
 

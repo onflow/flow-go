@@ -145,10 +145,10 @@ func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
 	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
-// OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
+// OnSyncedBlocks performs processing of incoming blocks by pushing into queue and notifying worker.
 func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
-	// a block that is synced has to come locally, from the synchronization engine
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
+	// a blocks batch that is synced has to come locally, from the synchronization engine
 	// the block itself will contain the proposer to indicate who created it
 
 	// queue proposal
@@ -205,12 +205,14 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			in := msg.(flow.Slashable[*messages.BlockProposal])
-			err := e.processBlockProposal(in.OriginID, in.Message)
-			if err != nil {
-				return fmt.Errorf("could not handle block proposal: %w", err)
+			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			for _, block := range batch.Message {
+				err := e.processBlockProposal(batch.OriginID, block)
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
+				e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			}
-			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
 
@@ -223,8 +225,12 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 // onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) onBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message:  []*messages.BlockProposal{proposal.Message},
+	}
 	// queue proposal
-	if e.pendingBlocks.Push(proposal) {
+	if e.pendingBlocks.Push(proposalAsList) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }
