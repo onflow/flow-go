@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
-
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -21,12 +19,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -52,15 +51,15 @@ const (
 type Node struct {
 	component.Component
 	sync.RWMutex
-	uniMgr           *unicast.Manager
-	host             host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub           p2p.PubSubAdapter
-	logger           zerolog.Logger                      // used to provide logging
-	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
-	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
-	routing          routing.Routing
-	pCache           *ProtocolPeerCache
-	peerManager      *connection.PeerManager
+	uniMgr      p2p.UnicastManager
+	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub      p2p.PubSubAdapter
+	logger      zerolog.Logger                      // used to provide logging
+	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
+	routing     routing.Routing
+	pCache      *ProtocolPeerCache
+	peerManager *connection.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
 }
 
@@ -69,11 +68,9 @@ func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
 	pCache *ProtocolPeerCache,
-	uniMgr *unicast.Manager,
 	peerManager *connection.PeerManager,
 ) *Node {
 	return &Node{
-		uniMgr:      uniMgr,
 		host:        host,
 		logger:      logger.With().Str("component", "libp2p-node").Logger(),
 		topics:      make(map[channels.Topic]p2p.Topic),
@@ -197,6 +194,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			lg.Debug().Msg("address not found in peer store, but found in routing system search")
 		}
 	}
+
 	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
 	if err != nil {
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
@@ -334,7 +332,7 @@ func (n *Node) Host() host.Host {
 }
 
 // WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
-func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
+func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error {
 	n.uniMgr.WithDefaultHandler(defaultHandler)
 	for _, p := range preferred {
 		err := n.uniMgr.Register(p)
@@ -366,10 +364,21 @@ func (n *Node) RequestPeerUpdate() {
 	}
 }
 
-// IsConnected returns true is address is a direct peer of this node else false
+// IsConnected returns true if address is a direct peer of this node else false.
+// Peers are considered not connected if the underlying libp2p host reports the
+// peers as not connected and there are no connections in the connection list.
+// error returns:
+//   - network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
+//     to the peer is not empty. This would normally indicate a bug within libp2p. Although the network.ErrIllegalConnectionState a bug in libp2p there is a small chance that this error will be returned due
+//     to a race condition between the time we check Connectedness and ConnsToPeer. There is a chance that a connection could be established
+//     after we check Connectedness but right before we check ConnsToPeer.
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
-	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
-	return isConnected, nil
+	isConnected := n.host.Network().Connectedness(peerID)
+	numOfConns := len(n.host.Network().ConnsToPeer(peerID))
+	if isConnected == libp2pnet.NotConnected && numOfConns > 0 {
+		return true, flownet.NewConnectionStatusErr(peerID, numOfConns)
+	}
+	return isConnected == libp2pnet.Connected && numOfConns > 0, nil
 }
 
 // SetRouting sets the node's routing implementation.
@@ -421,4 +430,13 @@ func (n *Node) SetComponentManager(cm *component.ComponentManager) {
 	}
 
 	n.Component = cm
+}
+
+// SetUnicastManager sets the unicast manager for the node.
+// SetUnicastManager may be called at most once.
+func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
+	if n.uniMgr != nil {
+		n.logger.Fatal().Msg("unicast manager already set")
+	}
+	n.uniMgr = uniMgr
 }

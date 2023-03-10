@@ -38,7 +38,7 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.MutableState
+		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
 	}
@@ -73,7 +73,7 @@ func (suite *Suite) SetupTest() {
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.MutableState)
+	suite.proto.state = new(protocol.FollowerState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)

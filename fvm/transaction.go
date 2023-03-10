@@ -2,9 +2,7 @@ package fvm
 
 import (
 	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,7 +25,6 @@ func NewTransaction(
 		Transaction:            txnBody,
 		InitialSnapshotTxIndex: txnIndex,
 		TxIndex:                txnIndex,
-		ComputationIntensities: make(meter.MeteredComputationIntensities),
 	}
 }
 
@@ -37,22 +34,19 @@ type TransactionProcedure struct {
 	InitialSnapshotTxIndex uint32
 	TxIndex                uint32
 
-	Logs                   []string
-	Events                 flow.EventsList
-	ServiceEvents          flow.EventsList
-	ConvertedServiceEvents flow.ServiceEventList
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
-	Err                    errors.CodedError
+	// TODO(patrick): remove
+	ProcedureOutput
 }
 
 func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) ProcedureExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
+	return newTransactionExecutor(ctx, proc, txnState)
+}
+
+func (proc *TransactionProcedure) SetOutput(output ProcedureOutput) {
+	proc.ProcedureOutput = output
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -109,12 +110,15 @@ func Test_Programs(t *testing.T) {
 
 	mainView := delta.NewDeltaView(nil)
 
-	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
-
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-	accounts := environment.NewAccounts(txnState)
+	accounts := environment.NewAccounts(
+		storage.SerialTransaction{
+			NestedTransaction: state.NewTransactionState(
+				mainView,
+				state.DefaultParameters()),
+		})
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)
@@ -231,7 +235,7 @@ func Test_Programs(t *testing.T) {
 		txAView = viewExecA
 
 		// merge it back
-		err = mainView.MergeView(viewExecA)
+		err = mainView.Merge(viewExecA)
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
@@ -260,7 +264,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecA, viewExecA2)
 
 		// merge it back
-		err = mainView.MergeView(viewExecA2)
+		err = mainView.Merge(viewExecA2)
 		require.NoError(t, err)
 	})
 
@@ -345,7 +349,7 @@ func Test_Programs(t *testing.T) {
 		contractBView = deltaB
 
 		// merge it back
-		err = mainView.MergeView(viewExecB)
+		err = mainView.Merge(viewExecB)
 		require.NoError(t, err)
 
 		// rerun transaction
@@ -378,7 +382,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecB, viewExecB2)
 
 		// merge it back
-		err = mainView.MergeView(viewExecB2)
+		err = mainView.Merge(viewExecB2)
 		require.NoError(t, err)
 	})
 
@@ -409,7 +413,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, txAView, viewExecA)
 
 		// merge it back
-		err = mainView.MergeView(viewExecA)
+		err = mainView.Merge(viewExecA)
 		require.NoError(t, err)
 	})
 
@@ -484,6 +488,5 @@ func Test_Programs(t *testing.T) {
 func compareViews(t *testing.T, a, b *delta.View) {
 	require.Equal(t, a.Delta(), b.Delta())
 	require.Equal(t, a.Interactions(), b.Interactions())
-	require.Equal(t, a.ReadsCount(), b.ReadsCount())
 	require.Equal(t, a.SpockSecret(), b.SpockSecret())
 }

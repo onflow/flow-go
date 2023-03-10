@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/flow-go/fvm/state"
 )
 
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {
-	Compute(txnState *state.TransactionState, key TKey) (TVal, error)
+	Compute(txnState state.NestedTransaction, key TKey) (TVal, error)
 }
 
 type invalidatableEntry[TVal any] struct {
@@ -396,7 +398,7 @@ func (txn *TableTransaction[TKey, TVal]) Set(
 // Note: valFunc must be an idempotent function and it must not modify
 // txnState's values.
 func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	key TKey,
 	computer ValueComputer[TKey, TVal],
 ) (
@@ -407,7 +409,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 
 	val, state, ok := txn.Get(key)
 	if ok {
-		err := txnState.AttachAndCommit(state)
+		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
 			return defaultVal, fmt.Errorf(
 				"failed to replay cached state: %w",
@@ -423,13 +425,17 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 	}
 
 	val, err = computer.Compute(txnState, key)
-	if err != nil {
-		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
+
+	// Commit the nested transaction, even if the computation fails.
+	committedState, commitErr := txnState.CommitNestedTransaction(nestedTxId)
+	if commitErr != nil {
+		err = multierror.Append(err,
+			fmt.Errorf("failed to commit nested txn: %w", commitErr),
+		).ErrorOrNil()
 	}
 
-	committedState, err := txnState.Commit(nestedTxId)
 	if err != nil {
-		return defaultVal, fmt.Errorf("failed to commit nested txn: %w", err)
+		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
 	txn.Set(key, val, committedState)

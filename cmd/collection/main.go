@@ -74,7 +74,7 @@ func main() {
 		startupTime                       time.Time
 
 		mainConsensusCommittee  *committees.Consensus
-		followerState           protocol.MutableState
+		followerState           protocol.FollowerState
 		ingestConf              = ingest.DefaultConfig()
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
@@ -180,15 +180,7 @@ func main() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(
-				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Storage.QuorumCertificates,
-				node.Tracer,
-				node.ProtocolEvents,
-				blocktimer.DefaultBlockTimer,
-			)
+			followerState, err = badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {

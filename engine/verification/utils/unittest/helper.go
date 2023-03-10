@@ -376,7 +376,7 @@ func EvenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList,
-	state protocol.MutableState) []*flow.Block {
+	state protocol.ParticipantState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks

@@ -112,7 +112,7 @@ type ExecutionNode struct {
 
 	collector               module.ExecutionMetrics
 	executionState          state.ExecutionState
-	followerState           protocol.MutableState
+	followerState           protocol.FollowerState
 	committee               hotstuff.DynamicCommittee
 	ledgerStorage           *ledger.Ledger
 	events                  *storage.Events
@@ -220,15 +220,7 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 	}
 	var err error
-	exeNode.followerState, err = badgerState.NewFollowerState(
-		bState,
-		node.Storage.Index,
-		node.Storage.Payloads,
-		node.Storage.QuorumCertificates,
-		node.Tracer,
-		node.ProtocolEvents,
-		blocktimer.DefaultBlockTimer,
-	)
+	exeNode.followerState, err = badgerState.NewFollowerState(bState, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	return err
 }
 

@@ -22,10 +22,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGossipSubMeshTracer tests the GossipSub mesh tracer. It creates three nodes, one with a mesh tracer and two without.
+// TestGossipSubMeshTracer tests the GossipSub mesh tracer. It creates four nodes, one with a mesh tracer and three without.
 // It then subscribes the nodes to the same topic and checks that the mesh tracer is able to detect the event of
 // a node joining the mesh.
 // It then checks that the mesh tracer is able to detect the event of a node leaving the mesh.
+// One of the nodes is running with an unknown peer id, which the identity provider is mocked to return an error and
+// the mesh tracer should log a warning message.
 func TestGossipSubMeshTracer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -37,12 +39,19 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	topic2 := channels.TopicFromChannel(channels.PushReceipts, sporkId)
 
 	loggerCycle := atomic.NewInt32(0)
+	warnLoggerCycle := atomic.NewInt32(0)
 
 	// logger hook to count the number of times the meshTracer logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.InfoLevel {
 			if message == tracer.MeshLogIntervalMsg {
 				loggerCycle.Inc()
+			}
+		}
+
+		if level == zerolog.WarnLevel {
+			if message == tracer.MeshLogIntervalWarnMsg {
+				warnLoggerCycle.Inc()
 			}
 		}
 	})
@@ -76,8 +85,16 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", otherNode2.Host().ID()).Return(&otherId2, true).Maybe()
 
-	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2}
-	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2}
+	// create a node that does not have a valid flow identity to test whether mesh tracer logs a warning.
+	unknownNode, unknownId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus))
+	idProvider.On("ByPeerID", unknownNode.Host().ID()).Return(nil, false).Maybe()
+
+	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
+	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
@@ -85,48 +102,32 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// all nodes subscribe to topic1
-	// for topic 1 expect the meshTracer to be notified of the local mesh size being 1 and 2 (when otherNode1 and otherNode2 join the mesh).
+	// for topic 1 expect the meshTracer to be notified of the local mesh size being 1, 2, and 3 (when unknownNode, otherNode1, and otherNode2 join the mesh).
 	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 1).Twice() // 1 for the first subscription, 1 for the first leave
-	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 2).Once()  // 2 for the second subscription.
+	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 2).Twice() // 1 for the second subscription, 1 for the second leave
+	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 3).Once()  // 3 for the third subscription.
 
-	_, err := tracerNode.Subscribe(
-		topic1,
-		validator.TopicValidator(
-			unittest.Logger(),
-			unittest.AllowAllPeerFilter()))
-	require.NoError(t, err)
-
-	_, err = otherNode1.Subscribe(
-		topic1,
-		validator.TopicValidator(
-			unittest.Logger(),
-			unittest.AllowAllPeerFilter()))
-	require.NoError(t, err)
-
-	_, err = otherNode2.Subscribe(
-		topic1,
-		validator.TopicValidator(
-			unittest.Logger(),
-			unittest.AllowAllPeerFilter()))
-	require.NoError(t, err)
+	for _, node := range nodes {
+		_, err := node.Subscribe(
+			topic1,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+	}
 
 	// the tracerNode and otherNode1 subscribe to topic2
 	// for topic 2 expect the meshTracer to be notified of the local mesh size being 1 (when otherNode1 join the mesh).
 	collector.On("OnLocalMeshSizeUpdated", topic2.String(), 1).Once()
 
-	_, err = tracerNode.Subscribe(
-		topic2,
-		validator.TopicValidator(
-			unittest.Logger(),
-			unittest.AllowAllPeerFilter()))
-	require.NoError(t, err)
-
-	_, err = otherNode1.Subscribe(
-		topic2,
-		validator.TopicValidator(
-			unittest.Logger(),
-			unittest.AllowAllPeerFilter()))
-	require.NoError(t, err)
+	for _, node := range []p2p.LibP2PNode{tracerNode, otherNode1} {
+		_, err := node.Subscribe(
+			topic2,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+	}
 
 	// eventually, the meshTracer should have the other nodes in its mesh.
 	assert.Eventually(t, func() bool {
@@ -149,21 +150,22 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	// eventually, we expect the meshTracer to log the mesh at least once.
 	assert.Eventually(t, func() bool {
-		return loggerCycle.Load() > 0
+		return loggerCycle.Load() > 0 && warnLoggerCycle.Load() > 0
 	}, 2*time.Second, 10*time.Millisecond)
 
-	// expect the meshTracer to be notified of the local mesh size being (when both nodes leave the mesh).
+	// expect the meshTracer to be notified of the local mesh size being (when all nodes leave the mesh).
 	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 0).Once()
 
-	// otherNode1 unsubscribes from the topic1 which triggers sending a PRUNE to the tracerNode.
-	// We expect the tracerNode to remove the otherNode1 and otherNode2 from its mesh.
+	// all nodes except the tracerNode unsubscribe from the topic1, which triggers sending a PRUNE to the tracerNode for each unsubscription.
+	// We expect the tracerNode to remove the otherNode1, otherNode2, and unknownNode from its mesh.
 	require.NoError(t, otherNode1.UnSubscribe(topic1))
 	require.NoError(t, otherNode2.UnSubscribe(topic1))
+	require.NoError(t, unknownNode.UnSubscribe(topic1))
 
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
 		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.Host().ID() || peer == otherNode2.Host().ID() {
+			if peer == otherNode1.Host().ID() || peer == otherNode2.Host().ID() || peer == unknownNode.Host().ID() {
 				return false
 			}
 		}

@@ -1,13 +1,14 @@
 package derived
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -1035,12 +1036,12 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 }
 
 type testValueComputer struct {
-	value  int
-	called bool
+	valueFunc func() (int, error)
+	called    bool
 }
 
 func (computer *testValueComputer) Compute(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	key flow.RegisterID,
 ) (
 	int,
@@ -1052,7 +1053,7 @@ func (computer *testValueComputer) Compute(
 		return 0, err
 	}
 
-	return computer.value, nil
+	return computer.valueFunc()
 }
 
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
@@ -1062,15 +1063,28 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		// first attempt to compute the value returns an error.
+		// But it's perfectly safe to handle the error and try again with the same txnState.
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return 0, fmt.Errorf("compute error") },
+		}
+		_, err = txnDerivedData.GetOrCompute(txnState, key, computer)
+		assert.Error(t, err)
+		assert.Equal(t, 0, txnState.NumNestedTransactions())
+
+		// second attempt to compute the value succeeds.
+
+		computer = &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
@@ -1089,15 +1103,17 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	})
 
 	t.Run("get value", func(t *testing.T) {
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 		txnState := state.NewTransactionState(view, state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		computer := &testValueComputer{value: value}
+		computer := &testValueComputer{
+			valueFunc: func() (int, error) { return value, nil },
+		}
 		val, err := txnDerivedData.GetOrCompute(txnState, key, computer)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 

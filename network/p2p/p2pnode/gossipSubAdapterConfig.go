@@ -46,6 +46,10 @@ func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(f func(peer.ID, *pu
 	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(f))
 }
 
+func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
+	g.options = append(g.options, pubsub.WithRawTracer(tracer))
+}
+
 func (g *GossipSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {
 	g.options = append(g.options, pubsub.WithPeerScoreInspect(func(snapshot map[peer.ID]*pubsub.PeerScoreSnapshot) {
 		tracer.UpdatePeerScoreSnapshots(convertPeerScoreSnapshots(snapshot))

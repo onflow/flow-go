@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 const (
@@ -77,7 +78,6 @@ type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.P
 type CreateNodeFunc func(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
-	uniMgr *unicast.Manager,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
@@ -91,12 +91,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval time.Duration,
+	connGaterCfg *ConnectionGaterConfig,
+	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
+	uniCfg *UnicastConfig,
 ) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -107,13 +106,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			metrics,
 			resolver,
 			role,
-			onInterceptPeerDialFilters,
-			onInterceptSecuredFilters,
-			connectionPruning,
-			updateInterval,
+			connGaterCfg,
+			peerManagerCfg,
 			gossipCfg,
 			rCfg,
-			unicastRateLimiterDistributor)
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -134,6 +131,7 @@ type NodeBuilder interface {
 	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder
@@ -192,6 +190,7 @@ type LibP2PNodeBuilder struct {
 	peerManagerUpdateInterval   time.Duration
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	createNode                  CreateNodeFunc
+	createStreamRetryInterval   time.Duration
 	rateLimiterDistributor      p2p.UnicastRateLimiterDistributor
 }
 
@@ -299,6 +298,11 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf GossipSubFactoryFunc, c
 	return builder
 }
 
+func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder {
+	builder.createStreamRetryInterval = createStreamRetryInterval
+	return builder
+}
+
 func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder {
 	builder.gossipSubScoreTracerInterval = interval
 	return builder
@@ -375,8 +379,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 
-	unicastManager := unicast.NewUnicastManager(builder.logger, unicast.NewLibP2PStreamFactory(h), builder.sporkID)
-
 	var peerManager *connection.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
 		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
@@ -391,42 +393,23 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 	}
 
-	node := builder.createNode(builder.logger, h, pCache, unicastManager, peerManager)
+	node := builder.createNode(builder.logger, h, pCache, peerManager)
+
+	unicastManager := unicast.NewUnicastManager(builder.logger,
+		unicast.NewLibP2PStreamFactory(h),
+		builder.sporkID,
+		builder.createStreamRetryInterval,
+		node,
+		builder.metrics)
+	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			rsys, err := builder.routingFactory(ctx, h)
+			rsys, err := builder.buildRouting(ctx, h)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
+				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 			}
-
 			node.SetRouting(rsys)
-
-			gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
-				MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
-			})
-			gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
-			gossipSubConfigs.WithRoutingDiscovery(rsys)
-			if builder.subscriptionFilter != nil {
-				gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
-			}
-
-			var scoreOpt *scoring.ScoreOption
-			if builder.gossipSubPeerScoring {
-				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
-				gossipSubConfigs.WithScoreOption(scoreOpt)
-			}
-
-			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
-			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
-			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
-				gossipSubMetrics.ObserveRPC(from, rpc)
-				return nil
-			})
-
-			if builder.gossipSubTracer != nil {
-				gossipSubConfigs.WithTracer(builder.gossipSubTracer)
-			}
 
 			if builder.gossipSubScoreTracerInterval > 0 {
 				scoreTracer := tracer.NewGossipSubScoreTracer(
@@ -439,15 +422,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				builder.logger.Debug().Msg("starting gossipsub score tracer")
 				scoreTracer.Start(ctx)
 			}
-
-			// builds GossipSub with the given factory
-			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
+			gossipSub, err := builder.buildGossipSub(ctx, rsys, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-			}
-
-			if scoreOpt != nil {
-				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
 			}
 			node.SetPubSub(gossipSub)
 
@@ -539,9 +516,8 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 func DefaultCreateNodeFunc(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
-	uniMgr *unicast.Manager,
 	peerManager *connection.PeerManager) p2p.LibP2PNode {
-	return p2pnode.NewNode(logger, host, pCache, uniMgr, peerManager)
+	return p2pnode.NewNode(logger, host, pCache, peerManager)
 }
 
 // DefaultNodeBuilder returns a node builder.
@@ -553,12 +529,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	onInterceptPeerDialFilters, onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval time.Duration,
+	connGaterCfg *ConnectionGaterConfig,
+	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor) (NodeBuilder, error) {
+	uniCfg *UnicastConfig) (NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -571,19 +546,20 @@ func DefaultNodeBuilder(log zerolog.Logger,
 
 	connGater := connection.NewConnGater(log,
 		idProvider,
-		connection.WithOnInterceptPeerDialFilters(append(peerFilters, onInterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, onInterceptSecuredFilters...)))
+		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, unicast.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
 		}).
-		SetPeerManagerOptions(connectionPruning, updateInterval).
+		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
+		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(unicastRateLimiterDistributor)
+		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if gossipCfg.PeerScoring {
 		builder.EnableGossipSubPeerScoring(idProvider)
@@ -599,4 +575,75 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	}
 
 	return builder, nil
+}
+
+// buildGossipSub creates a new GossipSub pubsub system for a libp2p node using the provided routing system, and host.
+// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - rsys: a routing.Routing object used to configure the GossipSub pubsub system.
+// - h: a libp2p host.Host object used to initialize the GossipSub pubsub system.
+//
+// Returns:
+// - p2p.PubSubAdapter: a GossipSub pubsub system for the libp2p node.
+// - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildGossipSub(ctx context.Context, rsys routing.Routing, h host.Host) (p2p.PubSubAdapter, error) {
+	gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
+		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
+	})
+	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
+	gossipSubConfigs.WithRoutingDiscovery(rsys)
+	if builder.subscriptionFilter != nil {
+		gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
+	}
+
+	var scoreOpt *scoring.ScoreOption
+	if builder.gossipSubPeerScoring {
+		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
+		gossipSubConfigs.WithScoreOption(scoreOpt)
+	}
+
+	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+	gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+		gossipSubMetrics.ObserveRPC(from, rpc)
+		return nil
+	})
+
+	if builder.gossipSubTracer != nil {
+		gossipSubConfigs.WithTracer(builder.gossipSubTracer)
+	}
+
+	gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+
+	if scoreOpt != nil {
+		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
+	}
+
+	return gossipSub, nil
+}
+
+// buildRouting creates a new routing system for a libp2p node using the provided host.
+// It returns the newly created routing system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - h: a libp2p host.Host object used to initialize the routing system.
+//
+// Returns:
+// - routing.Routing: a routing system for the libp2p node.
+// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
+	rsys, err := builder.routingFactory(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node routing: %w", err)
+	}
+	return rsys, nil
 }

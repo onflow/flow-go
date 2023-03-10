@@ -13,9 +13,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 // LibP2PNode represents a flow libp2p node. It provides the network layer with the necessary interface to
@@ -23,6 +22,8 @@ import (
 // us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
 type LibP2PNode interface {
 	module.ReadyDoneAware
+	// PeerConnections connection status information per peer.
+	PeerConnections
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -50,7 +51,7 @@ type LibP2PNode interface {
 	// Host returns pointer to host object of node.
 	Host() host.Host
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
-	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 	// WithPeersProvider sets the PeersProvider for the peer manager.
 	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 	WithPeersProvider(peersProvider PeersProvider)
@@ -58,8 +59,6 @@ type LibP2PNode interface {
 	PeerManagerComponent() component.Component
 	// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
 	RequestPeerUpdate()
-	// IsConnected returns true is address is a direct peer of this node else false.
-	IsConnected(peerID peer.ID) (bool, error)
 	// SetRouting sets the node's routing implementation.
 	// SetRouting may be called at most once.
 	SetRouting(r routing.Routing)
@@ -73,10 +72,23 @@ type LibP2PNode interface {
 	SetComponentManager(cm *component.ComponentManager)
 	// HasSubscription returns true if the node currently has an active subscription to the topic.
 	HasSubscription(topic channels.Topic) bool
+	// SetUnicastManager sets the unicast manager for the node.
+	SetUnicastManager(uniMgr UnicastManager)
 	// SetPeerScoreExposer sets the node's peer score exposer implementation.
 	// SetPeerScoreExposer may be called at most once. It is an error to call this
 	// method if the node's peer score exposer has already been set.
 	SetPeerScoreExposer(e PeerScoreExposer)
 	// PeerScoreExposer returns the node's peer score exposer implementation.
 	PeerScoreExposer() PeerScoreExposer
+}
+
+// PeerConnections subset of funcs related to underlying libp2p host connections.
+type PeerConnections interface {
+	// IsConnected returns true if address is a direct peer of this node else false.
+	// Peers are considered not connected if the underlying libp2p host reports the
+	// peers as not connected and there are no connections in the connection list.
+	// The following error returns indicate a bug in the code:
+	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
+	// 	  to the peer is not empty. This indicates a bug within libp2p.
+	IsConnected(peerID peer.ID) (bool, error)
 }

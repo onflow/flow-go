@@ -18,10 +18,26 @@ import (
 const (
 	// MeshLogIntervalMsg is the message logged by the tracer every logInterval.
 	MeshLogIntervalMsg = "topic mesh peers of local node since last heartbeat"
+<<<<<<< HEAD
 )
 
 // GossipSubMeshTracer is a tracer that tracks the local mesh peers for each topic.
 // It also logs the mesh peers and updates the local mesh size metric.
+=======
+
+	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
+	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
+)
+
+// The GossipSubMeshTracer component in the GossipSub pubsub.RawTracer that is designed to track the local
+// mesh peers for each topic. By logging the mesh peers and updating the local mesh size metric, the GossipSubMeshTracer
+// provides insights into the behavior of the topology.
+//
+// This component also provides real-time and historical visibility into the topology.
+// The GossipSubMeshTracer logs the mesh peers of the local node for each topic
+// at a regular interval, enabling users to monitor the state of the mesh network and take appropriate action.
+// Additionally, it allows users to configure the logging interval.
+>>>>>>> master
 type GossipSubMeshTracer struct {
 	component.Component
 	pubsub.RawTracer
@@ -84,6 +100,13 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
 	}
 	t.topicMeshMap[topic][p] = struct{}{}
+<<<<<<< HEAD
+=======
+	meshSize := len(t.topicMeshMap[topic])
+
+	t.metrics.OnLocalMeshSizeUpdated(topic, meshSize)
+	lg = lg.With().Int("mesh_size", meshSize).Logger()
+>>>>>>> master
 
 	id, exists := t.idProvider.ByPeerID(p)
 	if !exists {
@@ -94,7 +117,10 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
+<<<<<<< HEAD
 	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
+=======
+>>>>>>> master
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -109,16 +135,30 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	}
 	delete(t.topicMeshMap[topic], p)
 
+<<<<<<< HEAD
+=======
+	meshSize := len(t.topicMeshMap[topic])
+	t.metrics.OnLocalMeshSizeUpdated(topic, meshSize)
+	lg = lg.With().Int("mesh_size", meshSize).Logger()
+
+>>>>>>> master
 	id, exists := t.idProvider.ByPeerID(p)
 	if !exists {
 		lg.Warn().
 			Bool(logging.KeySuspicious, true).
 			Msg("pruned peer not found in identity provider")
+<<<<<<< HEAD
+=======
+
+>>>>>>> master
 		return
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+<<<<<<< HEAD
 	t.metrics.OnLocalMeshSizeUpdated(topic, len(t.topicMeshMap[topic]))
+=======
+>>>>>>> master
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
@@ -149,7 +189,10 @@ func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 func (t *GossipSubMeshTracer) logPeers() {
 	t.topicMeshMu.RLock()
 	defer t.topicMeshMu.RUnlock()
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
 	for topic := range t.topicMeshMap {
 		shouldWarn := false // whether we should warn about the mesh state
 		lg := t.logger.With().Dur("heartbeat_interval", t.loggerInterval).Str("topic", topic).Logger()
@@ -162,7 +205,10 @@ func (t *GossipSubMeshTracer) logPeers() {
 					Str("flow_id", "unknown").
 					Str("role", "unknown").
 					Logger()
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
 				continue
 			}
 
@@ -176,7 +222,11 @@ func (t *GossipSubMeshTracer) logPeers() {
 		if shouldWarn {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
+<<<<<<< HEAD
 				Msg(MeshLogIntervalMsg)
+=======
+				Msg(MeshLogIntervalWarnMsg)
+>>>>>>> master
 			continue
 		}
 		lg.Info().Msg(MeshLogIntervalMsg)

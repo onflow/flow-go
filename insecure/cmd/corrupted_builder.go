@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -70,6 +71,21 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
+		uniCfg := &p2pbuilder.UnicastConfig{
+			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
+			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
+		}
+
+		connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
+			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
+		}
+
+		peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+			ConnectionPruning: cnb.NetworkConnectionPruning,
+			UpdateInterval:    cnb.PeerUpdateInterval,
+		}
+
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
@@ -80,13 +96,12 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.IdentityProvider,
 			cnb.Metrics.Network,
 			cnb.Resolver,
-			cnb.GossipSubConfig.PeerScoring,
 			cnb.BaseConfig.NodeRole,
-			[]p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
-			[]p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
+			connGaterCfg,
 			// run peer manager with the specified interval and let it also prune connections
-			cnb.NetworkConnectionPruning,
-			cnb.PeerUpdateInterval,
+			peerManagerCfg,
+			uniCfg,
+			cnb.GossipSubConfig,
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,
