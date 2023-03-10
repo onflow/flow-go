@@ -41,23 +41,23 @@ func (_m *AccountInfo) GetAccount(address flow.Address) (*flow.Account, error) {
 	return r0, r1
 }
 
-// GetAccountAvailableBalance provides a mock function with given fields: address
-func (_m *AccountInfo) GetAccountAvailableBalance(address common.Address) (uint64, error) {
-	ret := _m.Called(address)
+// GetAccountAvailableBalance provides a mock function with given fields: runtimeAddress
+func (_m *AccountInfo) GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error) {
+	ret := _m.Called(runtimeAddress)
 
 	var r0 uint64
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
-		return rf(address)
+		return rf(runtimeAddress)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(address)
+		r0 = rf(runtimeAddress)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(address)
+		r1 = rf(runtimeAddress)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -65,23 +65,23 @@ func (_m *AccountInfo) GetAccountAvailableBalance(address common.Address) (uint6
 	return r0, r1
 }
 
-// GetAccountBalance provides a mock function with given fields: address
-func (_m *AccountInfo) GetAccountBalance(address common.Address) (uint64, error) {
-	ret := _m.Called(address)
+// GetAccountBalance provides a mock function with given fields: runtimeAddress
+func (_m *AccountInfo) GetAccountBalance(runtimeAddress common.Address) (uint64, error) {
+	ret := _m.Called(runtimeAddress)
 
 	var r0 uint64
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
-		return rf(address)
+		return rf(runtimeAddress)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(address)
+		r0 = rf(runtimeAddress)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(address)
+		r1 = rf(runtimeAddress)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -89,23 +89,23 @@ func (_m *AccountInfo) GetAccountBalance(address common.Address) (uint64, error)
 	return r0, r1
 }
 
-// GetStorageCapacity provides a mock function with given fields: address
-func (_m *AccountInfo) GetStorageCapacity(address common.Address) (uint64, error) {
-	ret := _m.Called(address)
+// GetStorageCapacity provides a mock function with given fields: runtimeAddress
+func (_m *AccountInfo) GetStorageCapacity(runtimeAddress common.Address) (uint64, error) {
+	ret := _m.Called(runtimeAddress)
 
 	var r0 uint64
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
-		return rf(address)
+		return rf(runtimeAddress)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(address)
+		r0 = rf(runtimeAddress)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(address)
+		r1 = rf(runtimeAddress)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -113,23 +113,23 @@ func (_m *AccountInfo) GetStorageCapacity(address common.Address) (uint64, error
 	return r0, r1
 }
 
-// GetStorageUsed provides a mock function with given fields: address
-func (_m *AccountInfo) GetStorageUsed(address common.Address) (uint64, error) {
-	ret := _m.Called(address)
+// GetStorageUsed provides a mock function with given fields: runtimeaddress
+func (_m *AccountInfo) GetStorageUsed(runtimeaddress common.Address) (uint64, error) {
+	ret := _m.Called(runtimeaddress)
 
 	var r0 uint64
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
-		return rf(address)
+		return rf(runtimeaddress)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(address)
+		r0 = rf(runtimeaddress)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(address)
+		r1 = rf(runtimeaddress)
 	} else {
 		r1 = ret.Error(1)
 	}
