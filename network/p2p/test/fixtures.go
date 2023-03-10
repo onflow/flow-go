@@ -3,6 +3,7 @@ package p2ptest
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	mh "github.com/multiformats/go-multihash"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -129,6 +131,10 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.PubSubTracer != nil {
+		builder.SetGossipSubTracer(parameters.PubSubTracer)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -143,6 +149,7 @@ func NodeFixture(
 	if parameters.PeerProvider != nil {
 		n.WithPeersProvider(parameters.PeerProvider)
 	}
+
 	return n, *identity
 }
 
@@ -169,6 +176,7 @@ type NodeFixtureParameters struct {
 	Metrics                module.NetworkMetrics
 	ResourceManager        network.ResourceManager
 	CreateStreamRetryDelay time.Duration
+	PubSubTracer           p2p.PubSubTracer
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
@@ -181,6 +189,12 @@ func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParam
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
 		p.IdProvider = idProvider
+	}
+}
+
+func WithGossipSubTracer(tracer p2p.PubSubTracer) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.PubSubTracer = tracer
 	}
 }
 
@@ -412,4 +426,17 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
 		cancel()
 	}
+}
+
+// PeerIdFixture returns a random peer ID for testing.
+// peer ID is the identifier of a node on the libp2p network.
+func PeerIdFixture(t *testing.T) peer.ID {
+	buf := make([]byte, 16)
+	n, err := rand.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, 16, n)
+	h, err := mh.Sum(buf, mh.SHA2_256, -1)
+	require.NoError(t, err)
+
+	return peer.ID(h)
 }

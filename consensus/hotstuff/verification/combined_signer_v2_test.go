@@ -3,6 +3,7 @@ package verification
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -11,22 +12,22 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Test that when DKG key is available for a view, a signed block can pass the validation
+// Test that when beacon key is available for a view, a signed block can pass the validation
 // the sig include both staking sig and random beacon sig.
-func TestCombinedSignWithDKGKey(t *testing.T) {
+func TestCombinedSignWithBeaconKey(t *testing.T) {
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
@@ -35,15 +36,8 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
-	epochCounter := uint64(3)
-	epochLookup := &modulemock.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
-
-	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
-	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
-
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -76,7 +70,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
 
-	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
+	beaconSig, err := beaconKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
@@ -122,12 +116,12 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
-// Test that when DKG key is not available for a view, a signed block can pass the validation
+// Test that when beacon key is not available for a view, a signed block can pass the validation
 // the sig only include staking sig
-func TestCombinedSignWithNoDKGKey(t *testing.T) {
+func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
@@ -135,15 +129,8 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
-	epochCounter := uint64(3)
-	epochLookup := &modulemock.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
-
-	keys := &storagemock.SafeBeaconKeys{}
-	// there is no DKG key for this epoch
-	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
-
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -202,4 +189,27 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 
 	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
+}
+
+// TestCombinedSign_BeaconKeyStore_ViewForUnknownEpoch tests that if the beacon
+// key store reports the view of the entity to sign has no known epoch, an
+// exception should be raised.
+func TestCombinedSign_BeaconKeyStore_ViewForUnknownEpoch(t *testing.T) {
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+
+	stakingPriv := unittest.StakingPrivKeyFixture()
+	nodeID := unittest.IdentityFixture()
+	nodeID.StakingPubKey = stakingPriv.PublicKey()
+
+	me, err := local.New(nodeID, stakingPriv)
+	require.NoError(t, err)
+	signer := NewCombinedSigner(me, beaconKeyStore)
+
+	fblock := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(fblock)
+
+	vote, err := signer.CreateVote(block)
+	require.Error(t, err)
+	assert.Nil(t, vote)
 }
