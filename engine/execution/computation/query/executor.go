@@ -51,14 +51,14 @@ type Executor interface {
 	)
 }
 
-type Config struct {
+type QueryConfig struct {
 	LogTimeThreshold    time.Duration
 	ExecutionTimeLimit  time.Duration
 	MaxErrorMessageSize int
 }
 
-func NewDefaultConfig() Config {
-	return Config{
+func NewDefaultConfig() QueryConfig {
+	return QueryConfig{
 		LogTimeThreshold:    DefaultLogTimeThreshold,
 		ExecutionTimeLimit:  DefaultExecutionTimeLimit,
 		MaxErrorMessageSize: DefaultMaxErrorMessageSize,
@@ -66,7 +66,7 @@ func NewDefaultConfig() Config {
 }
 
 type QueryExecutor struct {
-	config           Config
+	config           QueryConfig
 	logger           zerolog.Logger
 	metrics          module.ExecutionMetrics
 	vm               fvm.VM
@@ -79,7 +79,7 @@ type QueryExecutor struct {
 var _ Executor = &QueryExecutor{}
 
 func NewQueryExecutor(
-	config Config,
+	config QueryConfig,
 	logger zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	vm fvm.VM,

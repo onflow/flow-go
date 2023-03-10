@@ -60,7 +60,7 @@ type ComputationManager interface {
 }
 
 type ComputationConfig struct {
-	QueryConfig          query.Config
+	query.QueryConfig
 	CadenceTracing       bool
 	ExtensiveTracing     bool
 	DerivedDataCacheSize uint

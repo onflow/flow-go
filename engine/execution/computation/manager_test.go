@@ -425,7 +425,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			QueryConfig: query.Config{
+			QueryConfig: query.QueryConfig{
 				LogTimeThreshold:   1 * time.Millisecond,
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
@@ -477,7 +477,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			QueryConfig: query.Config{
+			QueryConfig: query.QueryConfig{
 				LogTimeThreshold:   1 * time.Second,
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
@@ -573,7 +573,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			QueryConfig: query.Config{
+			QueryConfig: query.QueryConfig{
 				LogTimeThreshold:   query.DefaultLogTimeThreshold,
 				ExecutionTimeLimit: timeout,
 			},
@@ -619,7 +619,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			QueryConfig: query.Config{
+			QueryConfig: query.QueryConfig{
 				LogTimeThreshold:   query.DefaultLogTimeThreshold,
 				ExecutionTimeLimit: timeout,
 			},
@@ -823,7 +823,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			QueryConfig: query.Config{
+			QueryConfig: query.QueryConfig{
 				LogTimeThreshold:   query.DefaultLogTimeThreshold,
 				ExecutionTimeLimit: timeout,
 			},
