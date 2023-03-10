@@ -81,10 +81,6 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
 	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
-	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
-		"threshold for logging script execution")
-	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
-		"script execution time limit")
 	flags.StringVar(&exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 	flags.BoolVar(&exeConf.syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")

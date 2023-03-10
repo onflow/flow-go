@@ -1160,7 +1160,7 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.GetAccount(addr, block, blockSnapshot)
+	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
 }
 
 // save the execution result of a block

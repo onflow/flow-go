@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -638,9 +639,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		committer,
 		prov,
 		computation.ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)

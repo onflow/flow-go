@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -28,9 +29,10 @@ import (
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr        string
-	MaxMsgSize        uint // In bytes
-	RpcMetricsEnabled bool // enable GRPC metrics reporting
+	ListenAddr             string
+	MaxMsgSize             uint // In bytes
+	RpcMetricsEnabled      bool // enable GRPC metrics reporting
+	ScriptExecutionTimeout time.Duration
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.

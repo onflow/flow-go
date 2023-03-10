@@ -160,8 +160,6 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           tracer,
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
