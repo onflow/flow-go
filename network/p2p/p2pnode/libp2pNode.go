@@ -51,15 +51,15 @@ const (
 type Node struct {
 	component.Component
 	sync.RWMutex
-	uniMgr      p2p.UnicastManager
-	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub      p2p.PubSubAdapter
-	logger      zerolog.Logger                      // used to provide logging
-	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
-	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
-	routing     routing.Routing
-	pCache      *ProtocolPeerCache
-	peerManager *connection.PeerManager
+	uniMgr           p2p.UnicastManager
+	host             host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub           p2p.PubSubAdapter
+	logger           zerolog.Logger                      // used to provide logging
+	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
+	routing          routing.Routing
+	pCache           *ProtocolPeerCache
+	peerManager      *connection.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
 }
 
