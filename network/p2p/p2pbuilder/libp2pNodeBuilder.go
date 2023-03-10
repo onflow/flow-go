@@ -411,21 +411,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			}
 			node.SetRouting(rsys)
 
-			if builder.gossipSubScoreTracerInterval > 0 {
-				scoreTracer := tracer.NewGossipSubScoreTracer(
-					builder.logger,
-					builder.idProvider,
-					builder.metrics,
-					builder.gossipSubScoreTracerInterval)
-				gossipSubConfigs.WithScoreTracer(scoreTracer)
-				node.SetPeerScoreExposer(scoreTracer)
-				builder.logger.Debug().Msg("starting gossipsub score tracer")
-				scoreTracer.Start(ctx)
-			}
-			gossipSub, err := builder.buildGossipSub(ctx, rsys, h)
+			gossipSub, socreTracer, err := builder.buildGossipSub(ctx, rsys, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
+			if socreTracer != nil {
+				node.SetPeerScoreExposer(socreTracer)
+			}
+
 			node.SetPubSub(gossipSub)
 
 			ready()
@@ -587,10 +580,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 //
 // Returns:
 // - p2p.PubSubAdapter: a GossipSub pubsub system for the libp2p node.
+// - p2p.PeerScoreTracer: a peer score tracer for the GossipSub pubsub system (if enabled, otherwise nil).
 // - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 // Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
 // and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildGossipSub(ctx context.Context, rsys routing.Routing, h host.Host) (p2p.PubSubAdapter, error) {
+func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerContext, rsys routing.Routing, h host.Host) (p2p.PubSubAdapter, p2p.PeerScoreTracer, error) {
 	gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
 		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
 	})
@@ -616,16 +610,30 @@ func (builder *LibP2PNodeBuilder) buildGossipSub(ctx context.Context, rsys routi
 		gossipSubConfigs.WithTracer(builder.gossipSubTracer)
 	}
 
+	var scoreTracer p2p.PeerScoreTracer
+	if builder.gossipSubScoreTracerInterval > 0 {
+		scoreTracer = tracer.NewGossipSubScoreTracer(
+			builder.logger,
+			builder.idProvider,
+			builder.metrics,
+			builder.gossipSubScoreTracerInterval)
+		gossipSubConfigs.WithScoreTracer(scoreTracer)
+		builder.logger.Debug().Msg("starting gossipsub score tracer")
+		scoreTracer.Start(ctx)
+		<-scoreTracer.Ready()
+		builder.logger.Debug().Msg("gossipsub score tracer started")
+	}
+
 	gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
 	if err != nil {
-		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+		return nil, nil, fmt.Errorf("could not create gossipsub: %w", err)
 	}
 
 	if scoreOpt != nil {
 		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
 	}
 
-	return gossipSub, nil
+	return gossipSub, scoreTracer, nil
 }
 
 // buildRouting creates a new routing system for a libp2p node using the provided host.
