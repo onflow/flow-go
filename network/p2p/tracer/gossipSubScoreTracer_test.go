@@ -161,50 +161,53 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
-		score, ok := tracerNode.PeerScoreExposer().GetAppScore(consensusNode.Host().ID())
+		exposer, ok := tracerNode.PeerScoreExposer()
+		require.True(t, ok)
+
+		score, ok := exposer.GetAppScore(consensusNode.Host().ID())
 		if !ok || score != consensusScore {
 			return false
 		}
 
-		score, ok = tracerNode.PeerScoreExposer().GetAppScore(accessNode.Host().ID())
+		score, ok = exposer.GetAppScore(accessNode.Host().ID())
 		if !ok || score != accessScore {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with a non-zero score.
-		score, ok = tracerNode.PeerScoreExposer().GetScore(consensusNode.Host().ID())
+		score, ok = exposer.GetScore(consensusNode.Host().ID())
 		if !ok || score == 0 {
 			return false
 		}
 
-		score, ok = tracerNode.PeerScoreExposer().GetScore(accessNode.Host().ID())
+		score, ok = exposer.GetScore(accessNode.Host().ID())
 		if !ok || score == 0 {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing behaviour score and ip score.
-		_, ok = tracerNode.PeerScoreExposer().GetBehaviourPenalty(consensusNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(consensusNode.Host().ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = tracerNode.PeerScoreExposer().GetIPColocationFactor(consensusNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(consensusNode.Host().ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = tracerNode.PeerScoreExposer().GetBehaviourPenalty(accessNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(accessNode.Host().ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = tracerNode.PeerScoreExposer().GetIPColocationFactor(accessNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(accessNode.Host().ID())
 		if !ok {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing mesh score.
-		consensusMeshScores, ok := tracerNode.PeerScoreExposer().GetTopicScores(consensusNode.Host().ID())
+		consensusMeshScores, ok := exposer.GetTopicScores(consensusNode.Host().ID())
 		if !ok {
 			return false
 		}
@@ -213,7 +216,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			return false
 		}
 
-		accessMeshScore, ok := tracerNode.PeerScoreExposer().GetTopicScores(accessNode.Host().ID())
+		accessMeshScore, ok := exposer.GetTopicScores(accessNode.Host().ID())
 		if !ok {
 			return false
 		}
