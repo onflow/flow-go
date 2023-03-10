@@ -3,8 +3,10 @@
 package mockp2p
 
 import (
-	p2p "github.com/onflow/flow-go/network/p2p"
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
+
+	p2p "github.com/onflow/flow-go/network/p2p"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
@@ -30,6 +32,11 @@ func (_m *BasicRateLimiter) Allow(peerID peer.ID, msgSize int) bool {
 	return r0
 }
 
+// CleanupLoop provides a mock function with given fields: ctx
+func (_m *BasicRateLimiter) CleanupLoop(ctx irrecoverable.SignalerContext) {
+	_m.Called(ctx)
+}
+
 // Now provides a mock function with given fields:
 func (_m *BasicRateLimiter) Now() time.Time {
 	ret := _m.Called()
@@ -47,16 +54,6 @@ func (_m *BasicRateLimiter) Now() time.Time {
 // SetTimeNowFunc provides a mock function with given fields: now
 func (_m *BasicRateLimiter) SetTimeNowFunc(now p2p.GetTimeNow) {
 	_m.Called(now)
-}
-
-// Start provides a mock function with given fields:
-func (_m *BasicRateLimiter) Start() {
-	_m.Called()
-}
-
-// Stop provides a mock function with given fields:
-func (_m *BasicRateLimiter) Stop() {
-	_m.Called()
 }
 
 type mockConstructorTestingTNewBasicRateLimiter interface {

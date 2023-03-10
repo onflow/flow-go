@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -72,15 +73,10 @@ func (r *RateLimiter) IsRateLimited(peerID peer.ID) bool {
 	return time.Since(metadata.LastRateLimit()) < r.rateLimitLockoutDuration
 }
 
-// Start starts cleanup loop for underlying cache.
-func (r *RateLimiter) Start() {
-	go r.limiters.CleanupLoop()
-}
-
-// Stop sends cleanup signal to underlying rate limiters and rate limited peers map. After the rate limiter
-// is closed it can not be reused.
-func (r *RateLimiter) Stop() {
-	r.limiters.Close()
+// CleanupLoop starts cleanup loop for underlying cache.
+// This func blocks until the signaler context is canceled.
+func (r *RateLimiter) CleanupLoop(ctx irrecoverable.SignalerContext) {
+	r.limiters.CleanupLoop(ctx)
 }
 
 // SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.

@@ -43,6 +43,9 @@ func (c CtrlMsgValidationLimits) RateLimit() int {
 	return c[RateLimitMapKey]
 }
 
+// CtrlMsgValidationConfigs list of *CtrlMsgValidationConfig
+type CtrlMsgValidationConfigs []*CtrlMsgValidationConfig
+
 // CtrlMsgValidationConfig configuration values for upper, lower threshold and rate limit.
 type CtrlMsgValidationConfig struct {
 	// ControlMsg the type of RPC control message.

@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
@@ -45,46 +47,8 @@ func TestLimiterMap_cleanup(t *testing.T) {
 
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
-	m := utils.NewLimiterMap(ttl, time.Second)
 
-	start := time.Now()
-
-	// Store some peerID's
-	peerID1 := peer.ID("id1")
-	m.Store(peerID1, rate.NewLimiter(0, 0))
-
-	peerID2 := peer.ID("id2")
-	m.Store(peerID2, rate.NewLimiter(0, 0))
-
-	peerID3 := peer.ID("id3")
-	m.Store(peerID3, rate.NewLimiter(0, 0))
-
-	// manually set lastAccessed on 2 items so that they are removed during Cleanup
-	limiter, _ := m.Get(peerID2)
-	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
-
-	limiter, _ = m.Get(peerID3)
-	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
-
-	// light clean up will only Remove expired keys
-	m.Cleanup()
-
-	_, ok := m.Get(peerID1)
-	require.True(t, ok)
-	_, ok = m.Get(peerID2)
-	require.False(t, ok)
-	_, ok = m.Get(peerID3)
-	require.False(t, ok)
-}
-
-// TestLimiterMap_cleanupLoopDone checks that the Cleanup loop runs when signal is sent on done channel.
-func TestLimiterMap_cleanupLoopDone(t *testing.T) {
-	t.Parallel()
-
-	// set fake ttl to 10 minutes
-	ttl := 10 * time.Minute
-
-	// set short tick to kick of Cleanup
+	// set short tick to kick of cleanup
 	tick := 10 * time.Millisecond
 
 	m := utils.NewLimiterMap(ttl, tick)
@@ -111,11 +75,65 @@ func TestLimiterMap_cleanupLoopDone(t *testing.T) {
 	limiter, _ = m.Get(peerID3)
 	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
 
-	// kick off clean up process, tick should happen immediately
-	go m.CleanupLoop()
-	time.Sleep(100 * time.Millisecond)
-	m.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	// kick off clean up process, tick should happen immediately
+	go m.CleanupLoop(signalerCtx)
+	time.Sleep(100 * time.Millisecond)
+	_, ok := m.Get(peerID1)
+	require.False(t, ok)
+	_, ok = m.Get(peerID2)
+	require.False(t, ok)
+	_, ok = m.Get(peerID3)
+	require.False(t, ok)
+}
+
+// TestLimiterMap_cleanupLoopCtxCanceled checks that the Cleanup loop runs when ctx is canceled before cleanup loop exits.
+func TestLimiterMap_cleanupLoopCtxCanceled(t *testing.T) {
+	t.Parallel()
+
+	// set fake ttl to 10 minutes
+	ttl := 10 * time.Minute
+
+	// set long tick so that clean up is only done when ctx is canceled
+	tick := time.Hour
+
+	m := utils.NewLimiterMap(ttl, tick)
+
+	start := time.Now()
+
+	// Store some peerID's
+	peerID1 := peer.ID("id1")
+	m.Store(peerID1, rate.NewLimiter(0, 0))
+
+	peerID2 := peer.ID("id2")
+	m.Store(peerID2, rate.NewLimiter(0, 0))
+
+	peerID3 := peer.ID("id3")
+	m.Store(peerID3, rate.NewLimiter(0, 0))
+
+	// manually set lastAccessed on 2 items so that they are removed during Cleanup
+	limiter, _ := m.Get(peerID1)
+	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
+
+	limiter, _ = m.Get(peerID2)
+	limiter.SetLastAccessed(start.Add(-10 * time.Minute))
+
+	limiter, _ = m.Get(peerID3)
+	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	// kick off clean up loop
+	go m.CleanupLoop(signalerCtx)
+
+	// clean up should be kicked off when SignalerContext is canceled
+	cancel()
+	// sleep for 100ms
+	time.Sleep(100 * time.Millisecond)
 	_, ok := m.Get(peerID1)
 	require.False(t, ok)
 	_, ok = m.Get(peerID2)

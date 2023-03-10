@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // RateLimiter rate limiter with lockout feature that can be used via the IsRateLimited method.
@@ -25,12 +27,9 @@ type BasicRateLimiter interface {
 	// Now returns the time using the configured GetTimeNow func.
 	Now() time.Time
 
-	// Stop sends cleanup signal to underlying rate limiters and rate limited peers maps. After the rate limiter
-	// is stopped it can not be reused.
-	Stop()
-
-	// Start starts cleanup loop for underlying rate limiters and rate limited peers maps.
-	Start()
+	// CleanupLoop starts cleanup loop for underlying rate limiters and rate limited peers maps.
+	// This func blocks until the signaler context is canceled.
+	CleanupLoop(ctx irrecoverable.SignalerContext)
 }
 
 // GetTimeNow callback used to get the current time. This allows us to improve testing by manipulating the current time

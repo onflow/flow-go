@@ -4,9 +4,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/time/rate"
 
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type RateLimiterMetadata struct {
@@ -77,8 +78,6 @@ type RateLimiterMap struct {
 	cleanupInterval time.Duration
 	// limiters map that stores rate limiter metadata for each peer.
 	limiters map[peer.ID]*RateLimiterMetadata
-	// done channel used to stop the cleanup loop.
-	done chan struct{}
 }
 
 func NewLimiterMap(ttl, cleanupInterval time.Duration) *RateLimiterMap {
@@ -87,7 +86,6 @@ func NewLimiterMap(ttl, cleanupInterval time.Duration) *RateLimiterMap {
 		limiters:        make(map[peer.ID]*RateLimiterMetadata),
 		ttl:             ttl,
 		cleanupInterval: cleanupInterval,
-		done:            make(chan struct{}),
 	}
 }
 
@@ -128,8 +126,8 @@ func (r *RateLimiterMap) removeUnlocked(peerID peer.ID) {
 	delete(r.limiters, peerID)
 }
 
-// Cleanup check the TTL for all keys in map and Remove isExpired keys.
-func (r *RateLimiterMap) Cleanup() {
+// cleanup check the TTL for all keys in map and Remove isExpired keys.
+func (r *RateLimiterMap) cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for peerID, item := range r.limiters {
@@ -140,20 +138,24 @@ func (r *RateLimiterMap) Cleanup() {
 }
 
 // CleanupLoop starts a loop that periodically removes stale peers.
-func (r *RateLimiterMap) CleanupLoop() {
+// This func blocks until the signaler context is canceled, when context
+// is canceled the limiter map is cleaned up before the cleanup loop exits.
+func (r *RateLimiterMap) CleanupLoop(ctx irrecoverable.SignalerContext) {
 	ticker := time.NewTicker(r.cleanupInterval)
 	defer ticker.Stop()
+	defer r.cleanup()
 	for {
 		select {
-		case <-ticker.C:
-			r.Cleanup()
-		case <-r.done:
+		case <-ctx.Done():
 			return
+		default:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.cleanup()
 		}
 	}
-}
-
-// Close will Close the done channel starting the final full Cleanup and stopping the Cleanup loop.
-func (r *RateLimiterMap) Close() {
-	close(r.done)
 }

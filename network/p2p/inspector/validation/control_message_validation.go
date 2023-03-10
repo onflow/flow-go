@@ -47,14 +47,19 @@ func (conf *ControlMsgValidationInspectorConfig) config(controlMsg ControlMsg) (
 	}
 }
 
+// configs returns all control message validation configs in a list.
+func (conf *ControlMsgValidationInspectorConfig) configs() CtrlMsgValidationConfigs {
+	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg}
+}
+
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
 // when some validation rule is broken feedback is given via the peer scoring notifier.
 type ControlMsgValidationInspector struct {
 	component.Component
 	logger          zerolog.Logger
 	inspectMessageQ chan *inspectMsgReq
-	// validationConfigs control message validation configurations.
-	validationConfigs *ControlMsgValidationInspectorConfig
+	// validationConfig control message validation configurations.
+	validationConfig *ControlMsgValidationInspectorConfig
 	// placeholder for peer scoring notifier that will be used to provide scoring feedback for failed validations.
 	peerScoringNotifier struct{}
 }
@@ -62,33 +67,22 @@ type ControlMsgValidationInspector struct {
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
-func NewControlMsgValidationInspector(logger zerolog.Logger, config *ControlMsgValidationInspectorConfig) *ControlMsgValidationInspector {
+func NewControlMsgValidationInspector(logger zerolog.Logger, validationConfig *ControlMsgValidationInspectorConfig) *ControlMsgValidationInspector {
 	c := &ControlMsgValidationInspector{
 		logger:              logger.With().Str("component", "gossip-sub-rpc-validation-inspector").Logger(),
 		inspectMessageQ:     make(chan *inspectMsgReq),
-		validationConfigs:   config,
+		validationConfig:    validationConfig,
 		peerScoringNotifier: struct{}{},
 	}
-	builder := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// start rate limiter cleanup loops
-			c.validationConfigs.GraftValidationCfg.RateLimiter.Start()
-			c.validationConfigs.PruneValidationCfg.RateLimiter.Start()
-
+	builder := component.NewComponentManagerBuilder()
+	// start rate limiters cleanup loop in workers
+	for _, config := range c.validationConfig.configs() {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-
-			<-ctx.Done()
-			c.logger.Info().Msg("stopping subroutines")
-
-			// clean up rate limiter resources
-			c.validationConfigs.GraftValidationCfg.RateLimiter.Stop()
-			c.validationConfigs.PruneValidationCfg.RateLimiter.Stop()
-
-			c.logger.Info().Msg("cleaned up rate limiter resources")
-
-			c.logger.Info().Msg("stopped subroutines")
+			config.RateLimiter.CleanupLoop(ctx)
 		})
-	for i := 0; i < config.NumberOfWorkers; i++ {
+	}
+	for i := 0; i < c.validationConfig.NumberOfWorkers; i++ {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			c.inspectMessageLoop(ctx)
@@ -122,7 +116,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // inspect performs initial inspection of RPC control message and queues up message for further inspection if required.
 // All errors returned from this function can be considered benign.
 func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType ControlMsg, ctrlMsg *pubsub_pb.ControlMessage) error {
-	validationConfig, ok := c.validationConfigs.config(ctrlMsgType)
+	validationConfig, ok := c.validationConfig.config(ctrlMsgType)
 	if !ok {
 		return fmt.Errorf("failed to get validation configuration for control message %s", ctrlMsg)
 	}

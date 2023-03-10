@@ -3,9 +3,8 @@ package ratelimit
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 var (
@@ -66,6 +65,11 @@ func NewRateLimiters(opts ...RateLimitersOption) *RateLimiters {
 	return r
 }
 
+// Limiters returns list of all underlying rate limiters.
+func (r *RateLimiters) Limiters() []p2p.RateLimiter {
+	return []p2p.RateLimiter{r.MessageRateLimiter, r.BandWidthRateLimiter}
+}
+
 // MessageAllowed will return result from MessageRateLimiter.Allow. It will invoke the OnRateLimitedPeerFunc
 // callback each time a peer is not allowed.
 func (r *RateLimiters) MessageAllowed(peerID peer.ID) bool {
@@ -98,26 +102,4 @@ func (r *RateLimiters) BandwidthAllowed(peerID peer.ID, originRole string, msgSi
 	}
 
 	return true
-}
-
-// Start starts the cleanup loop for all limiters
-func (r *RateLimiters) Start() {
-	if r.MessageRateLimiter != nil {
-		go r.MessageRateLimiter.Start()
-	}
-
-	if r.BandWidthRateLimiter != nil {
-		go r.BandWidthRateLimiter.Start()
-	}
-}
-
-// Stop stops all limiters.
-func (r *RateLimiters) Stop() {
-	if r.MessageRateLimiter != nil {
-		r.MessageRateLimiter.Stop()
-	}
-
-	if r.BandWidthRateLimiter != nil {
-		r.BandWidthRateLimiter.Stop()
-	}
 }
