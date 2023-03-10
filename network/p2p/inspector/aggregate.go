@@ -17,6 +17,7 @@ type AggregateRPCInspector struct {
 	inspectors []p2p.GossipSubRPCInspector
 }
 
+var _ p2p.GossipSubRPCInspector = (*AggregateRPCInspector)(nil)
 // NewAggregateRPCInspector returns new aggregate RPC inspector.
 func NewAggregateRPCInspector() *AggregateRPCInspector {
 	return &AggregateRPCInspector{
