@@ -27,16 +27,6 @@ const (
 )
 
 type ComputationManager interface {
-	ComputeBlock(
-		ctx context.Context,
-		parentBlockExecutionResultID flow.Identifier,
-		block *entity.ExecutableBlock,
-		snapshot state.StorageSnapshot,
-	) (
-		*execution.ComputationResult,
-		error,
-	)
-
 	ExecuteScript(
 		ctx context.Context,
 		script []byte,
@@ -45,6 +35,16 @@ type ComputationManager interface {
 		snapshot state.StorageSnapshot,
 	) (
 		[]byte,
+		error,
+	)
+
+	ComputeBlock(
+		ctx context.Context,
+		parentBlockExecutionResultID flow.Identifier,
+		block *entity.ExecutableBlock,
+		snapshot state.StorageSnapshot,
+	) (
+		*execution.ComputationResult,
 		error,
 	)
 
