@@ -692,27 +692,19 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 }
 
 func (builder *FlowAccessNodeBuilder) InitIDProviders() {
-	// initializes disallow list notification distributor
-	// this distributor is used to distribute disallow list notifications to all subscribed components.
-	// this should be done at the initialization of the node and not in the component initialization.
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
-	if builder.HeroCacheMetricsEnable {
-		collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-	builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
-
-	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return builder.NodeDisallowListDistributor, nil
-	})
-
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
+		if builder.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -740,6 +732,11 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 		return nil
+	})
+
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return builder.NodeDisallowListDistributor, nil
 	})
 }
 

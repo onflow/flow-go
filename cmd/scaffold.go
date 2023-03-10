@@ -981,16 +981,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	// initializes disallow list notification distributor
-	// this distributor is used to distribute disallow list notifications to all subscribed components.
-	// this should be done at the initialization of the node and not in the component initialization.
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
-	if fnb.HeroCacheMetricsEnable {
-		collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-	fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
-
 	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// distributor is returned as a component to be started and stopped.
 		return fnb.NodeDisallowListDistributor, nil
@@ -1002,6 +992,13 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		node.IDTranslator = idCache
+
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
+		if fnb.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true

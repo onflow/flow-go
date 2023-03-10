@@ -461,25 +461,20 @@ func (builder *FollowerServiceBuilder) initNodeInfo() error {
 }
 
 func (builder *FollowerServiceBuilder) InitIDProviders() {
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
-	if builder.HeroCacheMetricsEnable {
-		collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-
-	builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
-
-	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return builder.NodeDisallowListDistributor, nil
-	})
-
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
+		if builder.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+
+		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of the disallow-listed nodes to true
@@ -513,6 +508,11 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		}
 
 		return nil
+	})
+
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
