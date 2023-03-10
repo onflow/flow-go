@@ -24,17 +24,17 @@ func Test_Programs(t *testing.T) {
 	addressC := flow.HexToAddress("0c")
 
 	contractALocation := common.AddressLocation{
-		Address: common.Address(addressA),
+		Address: common.MustBytesToAddress(addressA.Bytes()),
 		Name:    "A",
 	}
 
 	contractBLocation := common.AddressLocation{
-		Address: common.Address(addressB),
+		Address: common.MustBytesToAddress(addressB.Bytes()),
 		Name:    "B",
 	}
 
 	contractCLocation := common.AddressLocation{
-		Address: common.Address(addressC),
+		Address: common.MustBytesToAddress(addressC.Bytes()),
 		Name:    "C",
 	}
 
@@ -56,7 +56,7 @@ func Test_Programs(t *testing.T) {
 
 	contractBCode := `
 		import A from 0xa
-	
+
 		pub contract B {
 			pub fun hello(): String {
        		return "hello from B but also ".concat(A.hello())
@@ -66,7 +66,7 @@ func Test_Programs(t *testing.T) {
 
 	contractCCode := `
 		import B from 0xb
-	
+
 		pub contract C {
 			pub fun hello(): String {
 	   		return "hello from C, ".concat(B.hello())

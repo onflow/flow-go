@@ -200,7 +200,11 @@ func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
 ) ReusableCadenceRuntimePool {
-	return newReusableCadenceRuntimePool(poolSize, config, nil)
+	return newReusableCadenceRuntimePool(
+		poolSize,
+		config,
+		nil,
+	)
 }
 
 func NewCustomReusableCadenceRuntimePool(
