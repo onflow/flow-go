@@ -1,9 +1,6 @@
 package validation
 
 import (
-	"errors"
-	"fmt"
-
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/network/p2p"
@@ -44,28 +41,6 @@ func (c CtrlMsgValidationLimits) SafetyThreshold() int {
 
 func (c CtrlMsgValidationLimits) RateLimit() int {
 	return c[RateLimitMapKey]
-}
-
-// ErrValidationLimit indicates the validation limit is < 0.
-type ErrValidationLimit struct {
-	controlMsg ControlMsg
-	limit      int
-	limitStr   string
-}
-
-func (e ErrValidationLimit) Error() string {
-	return fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", e.controlMsg, e.limitStr, e.limit)
-}
-
-// NewValidationLimitErr returns a new ErrValidationLimit.
-func NewValidationLimitErr(controlMsg ControlMsg, limitStr string, limit int) ErrValidationLimit {
-	return ErrValidationLimit{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
-}
-
-// IsErrValidationLimit returns whether an error is ErrValidationLimit
-func IsErrValidationLimit(err error) bool {
-	var e ErrValidationLimit
-	return errors.As(err, &e)
 }
 
 // CtrlMsgValidationConfig configuration values for upper, lower threshold and rate limit.

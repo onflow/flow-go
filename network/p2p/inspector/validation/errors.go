@@ -70,3 +70,25 @@ func IsErrUnknownTopicChannel(err error) bool {
 	var e ErrMalformedTopic
 	return errors.As(err, &e)
 }
+
+// ErrValidationLimit indicates the validation limit is < 0.
+type ErrValidationLimit struct {
+	controlMsg ControlMsg
+	limit      int
+	limitStr   string
+}
+
+func (e ErrValidationLimit) Error() string {
+	return fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", e.controlMsg, e.limitStr, e.limit)
+}
+
+// NewValidationLimitErr returns a new ErrValidationLimit.
+func NewValidationLimitErr(controlMsg ControlMsg, limitStr string, limit int) ErrValidationLimit {
+	return ErrValidationLimit{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
+}
+
+// IsErrValidationLimit returns whether an error is ErrValidationLimit
+func IsErrValidationLimit(err error) bool {
+	var e ErrValidationLimit
+	return errors.As(err, &e)
+}
