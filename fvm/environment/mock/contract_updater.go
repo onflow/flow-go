@@ -40,13 +40,13 @@ func (_m *ContractUpdater) Commit() ([]environment.ContractUpdateKey, error) {
 	return r0, r1
 }
 
-// RemoveAccountContractCode provides a mock function with given fields: address, name
-func (_m *ContractUpdater) RemoveAccountContractCode(address common.Address, name string) error {
-	ret := _m.Called(address, name)
+// RemoveAccountContractCode provides a mock function with given fields: runtimeAddress, name
+func (_m *ContractUpdater) RemoveAccountContractCode(runtimeAddress common.Address, name string) error {
+	ret := _m.Called(runtimeAddress, name)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(common.Address, string) error); ok {
-		r0 = rf(address, name)
+		r0 = rf(runtimeAddress, name)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -59,13 +59,13 @@ func (_m *ContractUpdater) Reset() {
 	_m.Called()
 }
 
-// UpdateAccountContractCode provides a mock function with given fields: address, name, code
-func (_m *ContractUpdater) UpdateAccountContractCode(address common.Address, name string, code []byte) error {
-	ret := _m.Called(address, name, code)
+// UpdateAccountContractCode provides a mock function with given fields: runtimeAddress, name, code
+func (_m *ContractUpdater) UpdateAccountContractCode(runtimeAddress common.Address, name string, code []byte) error {
+	ret := _m.Called(runtimeAddress, name, code)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(common.Address, string, []byte) error); ok {
-		r0 = rf(address, name, code)
+		r0 = rf(runtimeAddress, name, code)
 	} else {
 		r0 = ret.Error(0)
 	}

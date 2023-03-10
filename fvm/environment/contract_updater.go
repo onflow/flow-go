@@ -67,14 +67,14 @@ type ContractUpdater interface {
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
 	UpdateAccountContractCode(
-		address common.Address,
+		runtimeAddress common.Address,
 		name string,
 		code []byte,
 	) error
 
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
-	RemoveAccountContractCode(address common.Address, name string) error
+	RemoveAccountContractCode(runtimeAddress common.Address, name string) error
 
 	Commit() ([]ContractUpdateKey, error)
 
@@ -97,7 +97,7 @@ func NewParseRestrictedContractUpdater(
 }
 
 func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
-	address common.Address,
+	runtimeAddress common.Address,
 	name string,
 	code []byte,
 ) error {
@@ -105,20 +105,20 @@ func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
 		updater.txnState,
 		trace.FVMEnvUpdateAccountContractCode,
 		updater.impl.UpdateAccountContractCode,
-		address,
+		runtimeAddress,
 		name,
 		code)
 }
 
 func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
-	address common.Address,
+	runtimeAddress common.Address,
 	name string,
 ) error {
 	return parseRestrict2Arg(
 		updater.txnState,
 		trace.FVMEnvRemoveAccountContractCode,
 		updater.impl.RemoveAccountContractCode,
-		address,
+		runtimeAddress,
 		name)
 }
 
@@ -136,7 +136,7 @@ func (updater ParseRestrictedContractUpdater) Reset() {
 type NoContractUpdater struct{}
 
 func (NoContractUpdater) UpdateAccountContractCode(
-	address common.Address,
+	runtimeAddress common.Address,
 	name string,
 	code []byte,
 ) error {
@@ -144,7 +144,7 @@ func (NoContractUpdater) UpdateAccountContractCode(
 }
 
 func (NoContractUpdater) RemoveAccountContractCode(
-	address common.Address,
+	runtimeAddress common.Address,
 	name string,
 ) error {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
@@ -195,13 +195,13 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 	restricted bool,
 	defined bool,
 ) {
-	service := common.Address(impl.chain.ServiceAddress())
+	service := impl.chain.ServiceAddress()
 
 	runtime := impl.runtime.BorrowCadenceRuntime()
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		service,
+		common.MustBytesToAddress(service.Bytes()),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
 		impl.logger.Logger().
@@ -246,7 +246,9 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	runtime := impl.runtime.BorrowCadenceRuntime()
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
-	value, err := runtime.ReadStored(common.Address(service), path)
+	value, err := runtime.ReadStored(
+		common.MustBytesToAddress(service.Bytes()),
+		path)
 
 	const warningMsg = "failed to read contract authorized accounts from " +
 		"service account. using default behaviour instead."

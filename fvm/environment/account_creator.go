@@ -52,7 +52,7 @@ func NewParseRestrictedAccountCreator(
 }
 
 func (creator ParseRestrictedAccountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -61,18 +61,18 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 		creator.txnState,
 		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
-		payer)
+		runtimePayer)
 }
 
 type AccountCreator interface {
-	CreateAccount(payer common.Address) (common.Address, error)
+	CreateAccount(runtimePayer common.Address) (common.Address, error)
 }
 
 type NoAccountCreator struct {
 }
 
 func (NoAccountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -279,14 +279,14 @@ func (creator *accountCreator) createAccount(
 	flow.Address,
 	error,
 ) {
-	flowAddress, err := creator.createBasicAccount(nil)
+	address, err := creator.createBasicAccount(nil)
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
 
 	if creator.isServiceAccountEnabled {
 		_, invokeErr := creator.systemContracts.SetupNewAccount(
-			flowAddress,
+			address,
 			payer)
 		if invokeErr != nil {
 			return flow.EmptyAddress, invokeErr
@@ -294,5 +294,5 @@ func (creator *accountCreator) createAccount(
 	}
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
-	return flowAddress, nil
+	return address, nil
 }
