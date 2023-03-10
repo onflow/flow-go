@@ -10,6 +10,8 @@ import (
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/debug"
-	"github.com/rs/zerolog"
 )
 
 const (
