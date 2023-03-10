@@ -5,7 +5,7 @@ FLOW_GO_TAG = v0.28.15
 DOCKER_TAG := $(FLOW_GO_TAG)
 
 # default value of the Docker base registry URL which can be overriden when invoking the Makefile
-DOCKER_REGISTRY := gcr.io/flow-container-registry
+DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 
 # default values that callers can override when calling target
 ACCESS = 1
