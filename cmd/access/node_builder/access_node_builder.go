@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
@@ -67,6 +68,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -697,18 +699,24 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
-		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
+		if builder.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
-		builder.IdentityProvider = blocklistWrapper
+		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
 
-		// register the blocklist for dynamic configuration via admin command
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+		}
+		builder.IdentityProvider = disallowListWrapper
+
+		// register the wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
 		if err != nil {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
@@ -724,6 +732,11 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 		return nil
+	})
+
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -1131,7 +1144,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		slashingViolationsConsumer,
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }
