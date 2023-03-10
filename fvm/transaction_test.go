@@ -54,8 +54,8 @@ func TestAccountFreezing(t *testing.T) {
 	serviceAddress := chain.ServiceAddress()
 
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
-		address, _, st := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(st)
+		address, _, txnState := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(txnState)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
