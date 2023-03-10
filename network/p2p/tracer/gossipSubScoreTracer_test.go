@@ -28,6 +28,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestGossipSubScoreTracer tests the functionality of the GossipSubScoreTracer, which logs the scores
+// of the libp2p nodes using the GossipSub protocol. The test sets up three nodes with the same role,
+// and subscribes them to a common topic. One of these three nodes is furnished with the score tracer, and the test
+// examines whether the tracer node is able to trace the local score of other two nodes properly.
+// The test also checks that the correct metrics are being called for each score update.
+//
+//
+// The test performs the following steps:
+// 1. Creates a logger hook to count the number of times the score logs at the interval specified.
+// 2. Creates a mockPeerScoreMetrics object and sets it as a metrics collector for the tracer node.
+// 3. Creates three nodes with same roles and sets their roles as consensus, access, and tracer, respectively.
+// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
+// 5. Starts the nodes and lets them discover each other.
+// 6. Subscribes the nodes to a common topic.
+// 7. Expects the tracer node to have the correct app scores, a non-zero score, an existing behaviour score, an existing
+// IP score, and an existing mesh score.
+// 8. Expects the score tracer to log the scores at least once.
+// 9. Checks that the correct metrics are being called for each score update.
 func TestGossipSubScoreTracer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -37,7 +55,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	loggerCycle := atomic.NewInt32(0)
 
-	// logger hook to count the number of times the score logs at the interval specified.
+	// 1. Creates a logger hook to count the number of times the score logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.InfoLevel {
 			if message == tracer.PeerScoreLogMessage {
@@ -51,9 +69,11 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	consensusScore := float64(87)
 	accessScore := float64(77)
 
+	// 2. Creates a mockPeerScoreMetrics object and sets it as a metrics collector for the tracer node.
 	scoreMetrics := mockmodule.NewGossipSubScoringMetrics(t)
 	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
+	// 3. Creates three nodes with different roles and sets their roles as consensus, access, and tracer, respectively.
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -81,6 +101,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 					}
 					return 0
 				})),
+		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
 		p2ptest.WithPeerScoreParamsOption(scoring.WithTopicScoreParams(topic1, &pubsub.TopicScoreParams{
 			// set the topic score params to some fixed values for sake of testing.
 			// Note that these values are not realistic and should not be used in production.
@@ -122,11 +143,13 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	nodes := []p2p.LibP2PNode{tracerNode, consensusNode, accessNode}
 	ids := flow.IdentityList{&tracerId, &consensusId, &accessId}
 
+	// 5. Starts the nodes and lets them discover each other.
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
+	// 9. Checks that the correct metrics are being called for each score update.
 	scoreMetrics.On("OnOverallPeerScoreUpdated", mock.Anything).Return()
 	scoreMetrics.On("OnAppSpecificScoreUpdated", mock.Anything).Return()
 	scoreMetrics.On("OnIPColocationFactorUpdated", mock.Anything).Return()
@@ -138,6 +161,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	scoreMetrics.On("OnInvalidMessageDeliveredUpdated", topic1, mock.Anything).Return()
 	scoreMetrics.On("SetWarningStateCount", uint(0)).Return()
 
+	// 6. Subscribes the nodes to a common topic.
 	_, err := tracerNode.Subscribe(
 		topic1,
 		validator.TopicValidator(
@@ -159,6 +183,8 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
+	// 7. Expects the tracer node to have the correct app scores, a non-zero score, an existing behaviour score, an existing
+	// IP score, and an existing mesh score.
 	assert.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
 		exposer, ok := tracerNode.PeerScoreExposer()
@@ -226,7 +252,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	// eventually, we expect the score tracer to log the score at least once.
+	// 8. Expects the score tracer to log the scores at least once.
 	assert.Eventually(t, func() bool {
 		return loggerCycle.Load() > 0
 	}, 2*time.Second, 10*time.Millisecond)
