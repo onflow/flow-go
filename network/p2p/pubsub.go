@@ -176,6 +176,7 @@ func (s TopicScoreSnapshot) IsWarning() bool {
 
 // PeerScoreTracer is the interface for the tracer that is used to trace the peer score.
 type PeerScoreTracer interface {
+	component.Component
 	PeerScoreExposer
 	// UpdatePeerScoreSnapshots updates the peer score snapshot/
 	UpdatePeerScoreSnapshots(map[peer.ID]*PeerScoreSnapshot)
