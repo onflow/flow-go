@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -45,7 +46,26 @@ import (
 const (
 	defaultMemoryLimitRatio     = 0.2 // flow default
 	defaultFileDescriptorsRatio = 0.5 // libp2p default
+
+	// defaultPeerScoringEnabled is the default value for enabling peer scoring.
+	// peer scoring is enabled by default.
+	defaultPeerScoringEnabled = true
+
+	// defaultMeshTracerLoggingInterval is the default interval at which the mesh tracer logs the mesh
+	// topology. This is used for debugging and forensics purposes.
+	// Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
+	// mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
+	// topology as a whole specially when there are no updates to the mesh topology for a long time.
+	defaultMeshTracerLoggingInterval = 1 * time.Minute
 )
+
+// DefaultGossipSubConfig returns the default configuration for the gossipsub protocol.
+func DefaultGossipSubConfig() *GossipSubConfig {
+	return &GossipSubConfig{
+		PeerScoring:          defaultPeerScoringEnabled,
+		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
+	}
+}
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
@@ -65,10 +85,10 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	idProvider module.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
-	peerScoringEnabled bool,
 	role string,
 	connGaterCfg *ConnectionGaterConfig,
 	peerManagerCfg *PeerManagerConfig,
+	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	uniCfg *UnicastConfig,
 ) LibP2PFactoryFunc {
@@ -81,9 +101,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			metrics,
 			resolver,
 			role,
-			peerScoringEnabled,
 			connGaterCfg,
 			peerManagerCfg,
+			gossipCfg,
 			rCfg,
 			uniCfg)
 
@@ -108,6 +128,7 @@ type NodeBuilder interface {
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
+	SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
 }
 
@@ -119,6 +140,14 @@ type ResourceManagerConfig struct {
 	FileDescriptorsRatio float64 // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
+// GossipSubConfig is the configuration for the GossipSub pubsub implementation.
+type GossipSubConfig struct {
+	// LocalMeshLogInterval is the interval at which the local mesh is logged.
+	LocalMeshLogInterval time.Duration
+	// PeerScoring is whether to enable GossipSub peer scoring.
+	PeerScoring bool
+}
+
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
 	return &ResourceManagerConfig{
 		MemoryLimitRatio:     defaultMemoryLimitRatio,
@@ -127,21 +156,26 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID                     flow.Identifier
-	addr                        string
-	networkKey                  fcrypto.PrivateKey
-	logger                      zerolog.Logger
-	metrics                     module.LibP2PMetrics
-	basicResolver               madns.BasicResolver
-	subscriptionFilter          pubsub.SubscriptionFilter
-	resourceManager             network.ResourceManager
-	resourceManagerCfg          *ResourceManagerConfig
-	connManager                 connmgr.ConnManager
-	connGater                   connmgr.ConnectionGater
-	idProvider                  module.IdentityProvider
-	gossipSubFactory            GossipSubFactoryFunc
-	gossipSubConfigFunc         GossipSubAdapterConfigFunc
-	gossipSubPeerScoring        bool // whether to enable gossipsub peer scoring
+	sporkID              flow.Identifier
+	addr                 string
+	networkKey           fcrypto.PrivateKey
+	logger               zerolog.Logger
+	metrics              module.LibP2PMetrics
+	basicResolver        madns.BasicResolver
+	subscriptionFilter   pubsub.SubscriptionFilter
+	resourceManager      network.ResourceManager
+	resourceManagerCfg   *ResourceManagerConfig
+	connManager          connmgr.ConnManager
+	connGater            connmgr.ConnectionGater
+	idProvider           module.IdentityProvider
+	gossipSubFactory     GossipSubFactoryFunc
+	gossipSubConfigFunc  GossipSubAdapterConfigFunc
+	gossipSubPeerScoring bool // whether to enable gossipsub peer scoring
+
+	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
+	// certain events. Currently, we use it to log and observe the local mesh of the node.
+	gossipSubTracer p2p.PubSubTracer
+
 	routingFactory              func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning    bool
 	peerManagerUpdateInterval   time.Duration
@@ -231,6 +265,11 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder {
 	builder.peerManagerEnablePruning = connectionPruning
 	builder.peerManagerUpdateInterval = updateInterval
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder {
+	builder.gossipSubTracer = tracer
 	return builder
 }
 
@@ -352,43 +391,15 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			rsys, err := builder.routingFactory(ctx, h)
+			rsys, err := builder.buildRouting(ctx, h)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create libp2p node routing: %w", err))
+				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 			}
-
 			node.SetRouting(rsys)
 
-			gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
-				MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
-			})
-			gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
-			gossipSubConfigs.WithRoutingDiscovery(rsys)
-			if builder.subscriptionFilter != nil {
-				gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
-			}
-
-			var scoreOpt *scoring.ScoreOption
-			if builder.gossipSubPeerScoring {
-				scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
-				gossipSubConfigs.WithScoreOption(scoreOpt)
-			}
-
-			// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC.
-			gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
-			gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
-				gossipSubMetrics.ObserveRPC(from, rpc)
-				return nil
-			})
-
-			// builds GossipSub with the given factory
-			gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
+			gossipSub, err := builder.buildGossipSub(ctx, rsys, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-			}
-
-			if scoreOpt != nil {
-				scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
 			}
 			node.SetPubSub(gossipSub)
 
@@ -402,10 +413,20 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
 				}
 			}
-		}).
-		Build()
+		})
+	cm = cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		if builder.gossipSubTracer == nil {
+			builder.logger.Warn().Msg("libp2p tracer is not set")
+			ready()
+			return
+		}
 
-	node.SetComponentManager(cm)
+		builder.logger.Debug().Msg("starting libp2p tracer")
+		builder.gossipSubTracer.Start(ctx)
+		ready()
+	})
+
+	node.SetComponentManager(cm.Build())
 
 	return node, nil
 }
@@ -483,9 +504,9 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	metrics module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	peerScoringEnabled bool,
 	connGaterCfg *ConnectionGaterConfig,
 	peerManagerCfg *PeerManagerConfig,
+	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	uniCfg *UnicastConfig) (NodeBuilder, error) {
 
@@ -515,9 +536,12 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
-	if peerScoringEnabled {
+	if gossipCfg.PeerScoring {
 		builder.EnableGossipSubPeerScoring(idProvider)
 	}
+
+	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	builder.SetGossipSubTracer(meshTracer)
 
 	if role != "ghost" {
 		r, _ := flow.ParseRole(role)
@@ -525,4 +549,75 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	}
 
 	return builder, nil
+}
+
+// buildGossipSub creates a new GossipSub pubsub system for a libp2p node using the provided routing system, and host.
+// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - rsys: a routing.Routing object used to configure the GossipSub pubsub system.
+// - h: a libp2p host.Host object used to initialize the GossipSub pubsub system.
+//
+// Returns:
+// - p2p.PubSubAdapter: a GossipSub pubsub system for the libp2p node.
+// - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildGossipSub(ctx context.Context, rsys routing.Routing, h host.Host) (p2p.PubSubAdapter, error) {
+	gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
+		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
+	})
+	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
+	gossipSubConfigs.WithRoutingDiscovery(rsys)
+	if builder.subscriptionFilter != nil {
+		gossipSubConfigs.WithSubscriptionFilter(builder.subscriptionFilter)
+	}
+
+	var scoreOpt *scoring.ScoreOption
+	if builder.gossipSubPeerScoring {
+		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
+		gossipSubConfigs.WithScoreOption(scoreOpt)
+	}
+
+	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
+	gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
+		gossipSubMetrics.ObserveRPC(from, rpc)
+		return nil
+	})
+
+	if builder.gossipSubTracer != nil {
+		gossipSubConfigs.WithTracer(builder.gossipSubTracer)
+	}
+
+	gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+
+	if scoreOpt != nil {
+		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(builder.logger, gossipSub))
+	}
+
+	return gossipSub, nil
+}
+
+// buildRouting creates a new routing system for a libp2p node using the provided host.
+// It returns the newly created routing system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - h: a libp2p host.Host object used to initialize the routing system.
+//
+// Returns:
+// - routing.Routing: a routing system for the libp2p node.
+// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
+	rsys, err := builder.routingFactory(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node routing: %w", err)
+	}
+	return rsys, nil
 }

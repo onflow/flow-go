@@ -114,7 +114,9 @@ func NewTransactionInfo(
 		len(params.TxBody.Authorizers))
 
 	for _, auth := range params.TxBody.Authorizers {
-		runtimeAddresses = append(runtimeAddresses, common.Address(auth))
+		runtimeAddresses = append(
+			runtimeAddresses,
+			common.MustBytesToAddress(auth.Bytes()))
 		if auth == serviceAccount {
 			isServiceAccountAuthorizer = true
 		}
