@@ -34,7 +34,6 @@ import (
 // examines whether the tracer node is able to trace the local score of other two nodes properly.
 // The test also checks that the correct metrics are being called for each score update.
 //
-//
 // The test performs the following steps:
 // 1. Creates a logger hook to count the number of times the score logs at the interval specified.
 // 2. Creates a mockPeerScoreMetrics object and sets it as a metrics collector for the tracer node.
