@@ -22,13 +22,13 @@ type BlockComputer struct {
 	mock.Mock
 }
 
-// ExecuteBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, view, derivedBlockData
-func (_m *BlockComputer) ExecuteBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, view state.View, derivedBlockData *derived.DerivedBlockData) (*execution.ComputationResult, error) {
-	ret := _m.Called(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
+// ExecuteBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, snapshot, derivedBlockData
+func (_m *BlockComputer) ExecuteBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, snapshot state.StorageSnapshot, derivedBlockData *derived.DerivedBlockData) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, parentBlockExecutionResultID, block, snapshot, derivedBlockData)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) *execution.ComputationResult); ok {
-		r0 = rf(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.StorageSnapshot, *derived.DerivedBlockData) *execution.ComputationResult); ok {
+		r0 = rf(ctx, parentBlockExecutionResultID, block, snapshot, derivedBlockData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -36,8 +36,8 @@ func (_m *BlockComputer) ExecuteBlock(ctx context.Context, parentBlockExecutionR
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View, *derived.DerivedBlockData) error); ok {
-		r1 = rf(ctx, parentBlockExecutionResultID, block, view, derivedBlockData)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.StorageSnapshot, *derived.DerivedBlockData) error); ok {
+		r1 = rf(ctx, parentBlockExecutionResultID, block, snapshot, derivedBlockData)
 	} else {
 		r1 = ret.Error(1)
 	}

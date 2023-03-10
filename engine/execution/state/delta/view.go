@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +17,6 @@ import (
 type View struct {
 	delta       Delta
 	regTouchSet map[flow.RegisterID]struct{} // contains all the registers that have been touched (either read or written to)
-	readsCount  uint64                       // contains the total number of reads
 	// spockSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing spockSecret
 	// for views other than collection views to improve performance
@@ -24,7 +24,7 @@ type View struct {
 	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
 
-	storage StorageSnapshot
+	storage state.StorageSnapshot
 }
 
 type Snapshot struct {
@@ -49,7 +49,7 @@ func NewView(
 	readFunc func(owner string, key string) (flow.RegisterValue, error),
 ) *View {
 	return NewDeltaView(
-		ReadFuncStorageSnapshot{
+		state.ReadFuncStorageSnapshot{
 			ReadFunc: func(id flow.RegisterID) (flow.RegisterValue, error) {
 				return readFunc(id.Owner, id.Key)
 			},
@@ -57,9 +57,9 @@ func NewView(
 }
 
 // NewDeltaView instantiates a new ledger view with the provided read function.
-func NewDeltaView(storage StorageSnapshot) *View {
+func NewDeltaView(storage state.StorageSnapshot) *View {
 	if storage == nil {
-		storage = EmptyStorageSnapshot{}
+		storage = state.EmptyStorageSnapshot{}
 	}
 	return &View{
 		delta:             NewDelta(),
@@ -121,11 +121,16 @@ func (r *Snapshot) AllRegisterIDs() []flow.RegisterID {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (v *View) NewChild() state.View {
-	return NewDeltaView(NewPeekerStorageSnapshot(v))
+	return NewDeltaView(state.NewPeekerStorageSnapshot(v))
 }
 
-func (v *View) DropDelta() {
+func (v *View) Meter() *meter.Meter {
+	return nil
+}
+
+func (v *View) DropChanges() error {
 	v.delta = NewDelta()
+	return nil
 }
 
 func (v *View) AllRegisterIDs() []flow.RegisterID {
@@ -158,7 +163,6 @@ func (v *View) Get(registerID flow.RegisterID) (flow.RegisterValue, error) {
 		// capture register touch
 		v.regTouchSet[registerID] = struct{}{}
 		// increase reads
-		v.readsCount++
 	}
 	// every time we read a value (order preserving) we update the secret
 	// with the registerID only (value is not required)
@@ -206,33 +210,24 @@ func (v *View) Delta() Delta {
 	return v.delta
 }
 
-// MergeView applies the changes from a the given view to this view.
-// TODO rename this, this is not actually a merge as we can't merge
-// readFunc s.
+// TODO(patrick): remove after updating emulator
+func (view *View) MergeView(child state.ExecutionSnapshot) error {
+	return view.Merge(child)
+}
 
-func (v *View) MergeView(ch state.View) error {
-
-	child, ok := ch.(*View)
-	if !ok {
-		return fmt.Errorf("can not merge view: view type mismatch (given: %T, expected:delta.View)", ch)
+func (view *View) Merge(child state.ExecutionSnapshot) error {
+	for _, id := range child.AllRegisterIDs() {
+		view.regTouchSet[id] = struct{}{}
 	}
 
-	for id := range child.Interactions().RegisterTouches() {
-		v.regTouchSet[id] = struct{}{}
-	}
-
-	// SpockSecret is order aware
-	// TODO return the error and handle it properly on other places
-
-	spockSecret := child.SpockSecret()
-
-	_, err := v.spockSecretHasher.Write(spockSecret)
+	_, err := view.spockSecretHasher.Write(child.SpockSecret())
 	if err != nil {
 		return fmt.Errorf("merging SPoCK secrets failed: %w", err)
 	}
-	v.delta.MergeWith(child.delta)
 
-	v.readsCount += child.readsCount
+	for _, entry := range child.UpdatedRegisters() {
+		view.delta.Data[entry.Key] = entry.Value
+	}
 
 	return nil
 }
@@ -244,11 +239,6 @@ func (r *Snapshot) RegisterTouches() map[flow.RegisterID]struct{} {
 		ret[k] = struct{}{}
 	}
 	return ret
-}
-
-// ReadsCount returns the total number of reads performed on this view including all child views
-func (v *View) ReadsCount() uint64 {
-	return v.readsCount
 }
 
 // SpockSecret returns the secret value for SPoCK

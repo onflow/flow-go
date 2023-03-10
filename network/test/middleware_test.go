@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -203,7 +204,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// message should fail to send because no address is known yet
 	// for the new identity
 	err = m.mws[0].SendDirect(outMsg)
-	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+	require.True(m.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
@@ -253,7 +254,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		if messageRateLimiter.IsRateLimited(pid) {
 			return fmt.Errorf("rate-limited peer")
 		}
-
 		return nil
 	})
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
@@ -316,9 +316,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// that connections to peers that are rate limited are completely prune. IsConnected will
 	// return true only if the node is a direct peer of the other, after rate limiting this direct
 	// peer should be removed by the peer manager.
-	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
-	require.NoError(m.T(), err)
-
+	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
 	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
 
 	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
@@ -334,11 +332,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
-
 		err = m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
 	}
-
 	// wait for all rate limits before shutting down middleware
 	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop rate limit test ch on time")
 
@@ -384,7 +380,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.NoError(m.T(), err)
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 3)
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 4)
 
 	// the onRateLimit call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
@@ -394,7 +390,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		require.Equal(m.T(), reason, ratelimit.ReasonBandwidth.String())
 
 		// we only expect messages from the first middleware on the test suite
-		expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
 		require.Equal(m.T(), expectedPID, peerID)
 		// update hook calls
@@ -483,14 +478,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// that connections to peers that are rate limited are completely prune. IsConnected will
 	// return true only if the node is a direct peer of the other, after rate limiting this direct
 	// peer should be removed by the peer manager.
-	err = libP2PNodes[0].AddPeer(ctx, m.nodes[0].Host().Peerstore().PeerInfo(expectedPID))
-	require.NoError(m.T(), err)
-	p2ptest.EnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
+	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
 
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
 	for i := 0; i < 3; i++ {
-		err := m.mws[0].SendDirect(msg)
+		err = m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
 	}
 
@@ -506,7 +499,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
-		msg, err := network.NewOutgoingScope(
+		msg, err = network.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{

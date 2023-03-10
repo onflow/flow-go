@@ -217,7 +217,7 @@ func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)          
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
-func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)           {}
 func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
@@ -245,6 +245,12 @@ func (nc *NoopCollector) AddInflightRequests(context.Context, httpmetrics.HTTPPr
 func (nc *NoopCollector) AddTotalRequests(context.Context, string, string)                     {}
 func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 }
+func (nc *NoopCollector) OnStreamCreated(duration time.Duration, attempts int)          {}
+func (nc *NoopCollector) OnStreamCreationFailure(duration time.Duration, attempts int)  {}
+func (nc *NoopCollector) OnPeerDialed(duration time.Duration, attempts int)             {}
+func (nc *NoopCollector) OnPeerDialFailure(duration time.Duration, attempts int)        {}
+func (nc *NoopCollector) OnStreamEstablished(duration time.Duration, attempts int)      {}
+func (nc *NoopCollector) OnEstablishStreamFailure(duration time.Duration, attempts int) {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

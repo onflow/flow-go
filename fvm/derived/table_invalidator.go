@@ -23,12 +23,12 @@ type tableInvalidatorAtTime[TKey comparable, TVal any] struct {
 type chainedTableInvalidators[TKey comparable, TVal any] []tableInvalidatorAtTime[TKey, TVal]
 
 func (chained chainedTableInvalidators[TKey, TVal]) ApplicableInvalidators(
-	snapshotTime LogicalTime,
+	toValidateTime LogicalTime,
 ) chainedTableInvalidators[TKey, TVal] {
 	// NOTE: switch to bisection search (or reverse iteration) if the list
 	// is long.
 	for idx, entry := range chained {
-		if snapshotTime <= entry.executionTime {
+		if toValidateTime <= entry.executionTime {
 			return chained[idx:]
 		}
 	}

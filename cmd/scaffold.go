@@ -58,7 +58,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
@@ -217,11 +217,14 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Graft, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Graft, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Prune, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Prune, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+
+	// unicast manager options
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
+		pingLibP2PProtocolID := protocols.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
@@ -345,6 +348,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
+	uniCfg := &p2pbuilder.UnicastConfig{
+		StreamRetryInterval:    fnb.UnicastCreateStreamRetryDelay,
+		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
+	}
+
+	connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+		InterceptPeerDialFilters: connGaterPeerDialFilters,
+		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
+	}
+
+	peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+		ConnectionPruning: fnb.NetworkConnectionPruning,
+		UpdateInterval:    fnb.PeerUpdateInterval,
+	}
+
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
@@ -367,14 +385,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Resolver,
 			fnb.PeerScoringEnabled,
 			fnb.BaseConfig.NodeRole,
-			connGaterPeerDialFilters,
-			connGaterInterceptSecureFilters,
+			connGaterCfg,
+			peerManagerCfg,
 			// run peer manager with the specified interval and let it also prune connections
-			fnb.NetworkConnectionPruning,
-			fnb.PeerUpdateInterval,
 			fnb.LibP2PResourceManagerConfig,
 			controlMsgRPCInspectorCfg,
 			fnb.UnicastRateLimiterDistributor,
+			uniCfg,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -415,7 +432,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
 
 	mwOpts = append(mwOpts,
-		middleware.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		middleware.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
 	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
@@ -1023,6 +1040,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
+			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
@@ -1073,6 +1091,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
+			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,

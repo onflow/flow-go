@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -56,8 +57,10 @@ type resultCollector struct {
 	committerDoneChan  chan struct{}
 	committerError     error
 
-	signer                  module.Local
-	spockHasher             hash.Hasher
+	signer        module.Local
+	spockHasher   hash.Hasher
+	receiptHasher hash.Hasher
+
 	snapshotHasherInputChan chan collectionResult
 	snapshotHasherDoneChan  chan struct{}
 	snapshotHasherError     error
@@ -67,6 +70,10 @@ type resultCollector struct {
 	parentBlockExecutionResultID flow.Identifier
 
 	result *execution.ComputationResult
+
+	chunks                 []*flow.Chunk
+	spockSignatures        []crypto.Signature
+	convertedServiceEvents flow.ServiceEventList
 }
 
 func newResultCollector(
@@ -77,6 +84,7 @@ func newResultCollector(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	spockHasher hash.Hasher,
+	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numCollections int,
@@ -90,11 +98,14 @@ func newResultCollector(
 		committerDoneChan:            make(chan struct{}),
 		signer:                       signer,
 		spockHasher:                  spockHasher,
+		receiptHasher:                receiptHasher,
 		snapshotHasherInputChan:      make(chan collectionResult, numCollections),
 		snapshotHasherDoneChan:       make(chan struct{}),
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
+		chunks:                       make([]*flow.Chunk, 0, numCollections),
+		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 	}
 
 	go collector.runCollectionCommitter()
@@ -125,7 +136,6 @@ func (collector *resultCollector) runCollectionCommitter() {
 		collector.result.StateCommitments = append(
 			collector.result.StateCommitments,
 			endState)
-		collector.result.Proofs = append(collector.result.Proofs, proof)
 
 		eventsHash, err := flow.EventsMerkleRootHash(
 			collector.result.Events[collection.collectionIndex])
@@ -147,7 +157,7 @@ func (collector *resultCollector) runCollectionCommitter() {
 			len(collection.transactions),
 			eventsHash,
 			endState)
-		collector.result.Chunks = append(collector.result.Chunks, chunk)
+		collector.chunks = append(collector.chunks, chunk)
 
 		collectionStruct := collection.Collection()
 
@@ -192,7 +202,13 @@ func (collector *resultCollector) runSnapshotHasher() {
 	for collection := range collector.snapshotHasherInputChan {
 
 		snapshot := collection.View.(*delta.View).Interactions()
-		collector.result.AddCollection(snapshot)
+
+		collector.result.TransactionResultIndex = append(
+			collector.result.TransactionResultIndex,
+			len(collector.result.TransactionResults))
+		collector.result.StateSnapshots = append(
+			collector.result.StateSnapshots,
+			snapshot)
 
 		collector.metrics.ExecutionCollectionExecuted(
 			time.Since(collection.startTime),
@@ -209,9 +225,7 @@ func (collector *resultCollector) runSnapshotHasher() {
 			return
 		}
 
-		collector.result.SpockSignatures = append(
-			collector.result.SpockSignatures,
-			spock)
+		collector.spockSignatures = append(collector.spockSignatures, spock)
 	}
 }
 
@@ -219,7 +233,33 @@ func (collector *resultCollector) AddTransactionResult(
 	collectionIndex int,
 	txn *fvm.TransactionProcedure,
 ) {
-	collector.result.AddTransactionResult(collectionIndex, txn)
+	collector.convertedServiceEvents = append(
+		collector.convertedServiceEvents,
+		txn.ConvertedServiceEvents...)
+
+	collector.result.Events[collectionIndex] = append(
+		collector.result.Events[collectionIndex],
+		txn.Events...)
+	collector.result.ServiceEvents = append(
+		collector.result.ServiceEvents,
+		txn.ServiceEvents...)
+
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: txn.ComputationUsed,
+		MemoryUsed:      txn.MemoryEstimate,
+	}
+	if txn.Err != nil {
+		txnResult.ErrorMessage = txn.Err.Error()
+	}
+
+	collector.result.TransactionResults = append(
+		collector.result.TransactionResults,
+		txnResult)
+
+	for computationKind, intensity := range txn.ComputationIntensities {
+		collector.result.ComputationIntensities[computationKind] += intensity
+	}
 }
 
 func (collector *resultCollector) CommitCollection(
@@ -256,8 +296,6 @@ func (collector *resultCollector) Stop() {
 	})
 }
 
-// TODO(patrick): refactor execution receipt generation from ingress engine
-// to here to improve benchmarking.
 func (collector *resultCollector) Finalize(
 	ctx context.Context,
 ) (
@@ -290,13 +328,50 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	collector.result.ExecutionDataID = executionDataID
-
-	collector.result.ExecutionResult = flow.NewExecutionResult(
+	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
-		collector.result.Chunks,
-		collector.result.ConvertedServiceEvents,
-		collector.result.ExecutionDataID)
+		collector.chunks,
+		collector.convertedServiceEvents,
+		executionDataID)
+
+	executionReceipt, err := GenerateExecutionReceipt(
+		collector.signer,
+		collector.receiptHasher,
+		executionResult,
+		collector.spockSignatures)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign execution result: %w", err)
+	}
+
+	collector.result.ExecutionReceipt = executionReceipt
 	return collector.result, nil
+}
+
+func GenerateExecutionReceipt(
+	signer module.Local,
+	receiptHasher hash.Hasher,
+	result *flow.ExecutionResult,
+	spockSignatures []crypto.Signature,
+) (
+	*flow.ExecutionReceipt,
+	error,
+) {
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult:   *result,
+		Spocks:            spockSignatures,
+		ExecutorSignature: crypto.Signature{},
+		ExecutorID:        signer.NodeID(),
+	}
+
+	// generates a signature over the execution result
+	id := receipt.ID()
+	sig, err := signer.Sign(id[:], receiptHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign execution result: %w", err)
+	}
+
+	receipt.ExecutorSignature = sig
+
+	return receipt, nil
 }

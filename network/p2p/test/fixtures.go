@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
@@ -64,6 +65,7 @@ func NodeFixture(
 		Metrics:                               metrics.NewNoopCollector(),
 		ResourceManager:                       testutils.NewResourceManager(t),
 		GossipSubRPCValidationInspectorConfig: p2pbuilder.DefaultRPCValidationConfig(),
+		CreateStreamRetryDelay:                unicast.DefaultRetryDelay,
 	}
 
 	for _, opt := range opts {
@@ -90,14 +92,16 @@ func NodeFixture(
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
-				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
 				parameters.Metrics,
 				parameters.DhtOptions...,
 			)
 		}).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
-		SetRPCValidationInspectorConfig(parameters.GossipSubRPCValidationInspectorConfig)
+		SetRPCValidationInspectorConfig(parameters.GossipSubRPCValidationInspectorConfig).
+		SetResourceManager(parameters.ResourceManager).
+		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -149,7 +153,7 @@ type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc                           network.StreamHandler
-	Unicasts                              []unicast.ProtocolName
+	Unicasts                              []protocols.ProtocolName
 	Key                                   crypto.PrivateKey
 	Address                               string
 	DhtOptions                            []dht.Option
@@ -168,6 +172,13 @@ type NodeFixtureParameters struct {
 	Metrics                               module.LibP2PMetrics
 	ResourceManager                       network.ResourceManager
 	GossipSubRPCValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig
+	CreateStreamRetryDelay                time.Duration
+}
+
+func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.CreateStreamRetryDelay = delay
+	}
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
@@ -191,7 +202,7 @@ func WithPeerManagerEnabled(connectionPruning bool, updateInterval time.Duration
 	}
 }
 
-func WithPreferredUnicasts(unicasts []unicast.ProtocolName) NodeFixtureParameterOption {
+func WithPreferredUnicasts(unicasts []protocols.ProtocolName) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Unicasts = unicasts
 	}
@@ -245,7 +256,7 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	}
 }
 
-func WithMetricsCollector(metrics module.LibP2PMetrics) NodeFixtureParameterOption {
+func WithMetricsCollector(metrics module.NetworkMetrics) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Metrics = metrics
 	}

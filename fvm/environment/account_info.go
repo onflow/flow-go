@@ -22,12 +22,12 @@ type AccountInfo interface {
 }
 
 type ParseRestrictedAccountInfo struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountInfo
 }
 
 func NewParseRestrictedAccountInfo(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountInfo,
 ) AccountInfo {
 	return ParseRestrictedAccountInfo{
@@ -171,7 +171,7 @@ func (info *accountInfo) GetStorageCapacity(
 	}
 
 	result, invokeErr := info.systemContracts.AccountStorageCapacity(
-		runtimeAddress)
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -195,7 +195,8 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(runtimeAddress)
+	result, invokeErr := info.systemContracts.AccountBalance(
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -219,7 +220,7 @@ func (info *accountInfo) GetAccountAvailableBalance(
 	}
 
 	result, invokeErr := info.systemContracts.AccountAvailableBalance(
-		runtimeAddress)
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}

@@ -20,13 +20,13 @@ type ComputationManager struct {
 	mock.Mock
 }
 
-// ComputeBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, view
-func (_m *ComputationManager) ComputeBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, view state.View) (*execution.ComputationResult, error) {
-	ret := _m.Called(ctx, parentBlockExecutionResultID, block, view)
+// ComputeBlock provides a mock function with given fields: ctx, parentBlockExecutionResultID, block, snapshot
+func (_m *ComputationManager) ComputeBlock(ctx context.Context, parentBlockExecutionResultID flow.Identifier, block *entity.ExecutableBlock, snapshot state.StorageSnapshot) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, parentBlockExecutionResultID, block, snapshot)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View) *execution.ComputationResult); ok {
-		r0 = rf(ctx, parentBlockExecutionResultID, block, view)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.StorageSnapshot) *execution.ComputationResult); ok {
+		r0 = rf(ctx, parentBlockExecutionResultID, block, snapshot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -34,8 +34,8 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, parentBlockExecu
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.View) error); ok {
-		r1 = rf(ctx, parentBlockExecutionResultID, block, view)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, *entity.ExecutableBlock, state.StorageSnapshot) error); ok {
+		r1 = rf(ctx, parentBlockExecutionResultID, block, snapshot)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -43,13 +43,13 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, parentBlockExecu
 	return r0, r1
 }
 
-// ExecuteScript provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
-func (_m *ComputationManager) ExecuteScript(_a0 context.Context, _a1 []byte, _a2 [][]byte, _a3 *flow.Header, _a4 state.View) ([]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
+// ExecuteScript provides a mock function with given fields: ctx, script, arguments, blockHeader, snapshot
+func (_m *ComputationManager) ExecuteScript(ctx context.Context, script []byte, arguments [][]byte, blockHeader *flow.Header, snapshot state.StorageSnapshot) ([]byte, error) {
+	ret := _m.Called(ctx, script, arguments, blockHeader, snapshot)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, *flow.Header, state.View) []byte); ok {
-		r0 = rf(_a0, _a1, _a2, _a3, _a4)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, *flow.Header, state.StorageSnapshot) []byte); ok {
+		r0 = rf(ctx, script, arguments, blockHeader, snapshot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -57,8 +57,8 @@ func (_m *ComputationManager) ExecuteScript(_a0 context.Context, _a1 []byte, _a2
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, *flow.Header, state.View) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3, _a4)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, *flow.Header, state.StorageSnapshot) error); ok {
+		r1 = rf(ctx, script, arguments, blockHeader, snapshot)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -66,13 +66,13 @@ func (_m *ComputationManager) ExecuteScript(_a0 context.Context, _a1 []byte, _a2
 	return r0, r1
 }
 
-// GetAccount provides a mock function with given fields: addr, header, view
-func (_m *ComputationManager) GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error) {
-	ret := _m.Called(addr, header, view)
+// GetAccount provides a mock function with given fields: addr, header, snapshot
+func (_m *ComputationManager) GetAccount(addr flow.Address, header *flow.Header, snapshot state.StorageSnapshot) (*flow.Account, error) {
+	ret := _m.Called(addr, header, snapshot)
 
 	var r0 *flow.Account
-	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, state.View) *flow.Account); ok {
-		r0 = rf(addr, header, view)
+	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, state.StorageSnapshot) *flow.Account); ok {
+		r0 = rf(addr, header, snapshot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
@@ -80,8 +80,8 @@ func (_m *ComputationManager) GetAccount(addr flow.Address, header *flow.Header,
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Address, *flow.Header, state.View) error); ok {
-		r1 = rf(addr, header, view)
+	if rf, ok := ret.Get(1).(func(flow.Address, *flow.Header, state.StorageSnapshot) error); ok {
+		r1 = rf(addr, header, snapshot)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -186,15 +187,19 @@ type NetworkConfig struct {
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
 
-	PeerScoringEnabled              bool // enables peer scoring on pubsub
+	// PeerScoringEnabled enables peer scoring on pubsub
+	PeerScoringEnabled bool
+	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
 
-	PeerUpdateInterval            time.Duration
-	UnicastMessageTimeout         time.Duration
-	DNSCacheTTL                   time.Duration
-	LibP2PResourceManagerConfig   *p2pbuilder.ResourceManagerConfig
-	ConnectionManagerConfig       *connection.ManagerConfig
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	ConnectionManagerConfig     *connection.ManagerConfig
+	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
+	UnicastCreateStreamRetryDelay time.Duration
 	UnicastRateLimitersConfig     *UnicastRateLimitersConfig
 	GossipSubRPCValidationConfigs *GossipSubRPCValidationConfigs
 }
@@ -290,6 +295,7 @@ func DefaultBaseConfig() *BaseConfig {
 
 	return &BaseConfig{
 		NetworkConfig: NetworkConfig{
+			UnicastCreateStreamRetryDelay:   unicast.DefaultRetryDelay,
 			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
 			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,

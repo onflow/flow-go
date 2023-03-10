@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -140,20 +141,26 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		fvm.WithDerivedBlockData(derivedBlockData))
 
 	v := view.NewChild()
-	txnState := state.NewTransactionState(v, state.DefaultParameters())
-	accounts := environment.NewAccounts(txnState)
 
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	env := environment.NewScriptEnvironment(
+	txnState := storage.SerialTransaction{
+		NestedTransaction: state.NewTransactionState(
+			v,
+			state.DefaultParameters()),
+		DerivedTransactionCommitter: derivedTxnData,
+	}
+
+	accounts := environment.NewAccounts(txnState)
+
+	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
-		txnState,
-		derivedTxnData)
+		txnState)
 
 	return &balanceProcessor{
 		vm:       vm,

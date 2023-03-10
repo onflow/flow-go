@@ -24,7 +24,6 @@ import (
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
@@ -293,21 +292,14 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		On("ComputeBlock", mock.Anything, previousExecutionResultID, &eb, mock.Anything).
 		Return(computationResult, nil).Once()
 
-	ctx.executionState.On("NewView", newStateCommitment).Return(new(delta.View))
+	ctx.executionState.On("NewStorageSnapshot", newStateCommitment).Return(nil)
 
 	ctx.executionState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
 	mocked := ctx.executionState.
-		On("SaveExecutionResults",
-			mock.Anything,
-			computationResult,
-			mock.MatchedBy(func(executionReceipt *flow.ExecutionReceipt) bool {
-				return executionReceipt.ExecutionResult.BlockID == executableBlock.Block.ID() &&
-					executionReceipt.ExecutionResult.PreviousResultID == previousExecutionResultID
-			}),
-		).
+		On("SaveExecutionResults", mock.Anything, computationResult).
 		Return(nil)
 
 	mocked.RunFn =
@@ -328,27 +320,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		On(
 			"BroadcastExecutionReceipt",
 			mock.Anything,
-			mock.MatchedBy(func(er *flow.ExecutionReceipt) bool {
-				return er.ExecutionResult.BlockID == executableBlock.Block.ID() &&
-					er.ExecutionResult.PreviousResultID == previousExecutionResultID
-			}),
+			mock.Anything,
 		).
 		Run(func(args mock.Arguments) {
 			receipt := args[1].(*flow.ExecutionReceipt)
-
-			executor, err := ctx.snapshot.Identity(receipt.ExecutorID)
-			assert.NoError(ctx.t, err, "could not find executor in protocol state")
-
-			// verify the signature
-			id := receipt.ID()
-			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], ctx.engine.receiptHasher)
-			assert.NoError(ctx.t, err)
-
-			assert.True(ctx.t, validSig, "execution receipt signature invalid")
-
-			spocks := receipt.Spocks
-
-			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
 
 			ctx.mu.Lock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
@@ -1133,12 +1108,12 @@ func TestStopAtHeight(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsPaused())
 
 		wg.Add(1)
-		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		wg.Add(1)
-		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
-		ctx.engine.BlockProcessable(blocks["C"].Block.Header)
-		ctx.engine.BlockProcessable(blocks["D"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["C"].Block.Header, nil)
+		ctx.engine.BlockProcessable(blocks["D"].Block.Header, nil)
 
 		// wait until all 4 blocks have been executed
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
@@ -1264,8 +1239,8 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsPaused())
 
 		executionWg.Add(1)
-		ctx.engine.BlockProcessable(blocks["A"].Block.Header)
-		ctx.engine.BlockProcessable(blocks["B"].Block.Header)
+		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
+		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
 		assert.False(t, ctx.stopControl.IsPaused())
 
@@ -1322,11 +1297,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	// mock execution state conversion and signing of
-
-	me.EXPECT().NodeID()
-	me.EXPECT().Sign(gomock.Any(), gomock.Any())
-
 	cr := executionUnittest.ComputationResultFixture(
 		previousExecutionResultID,
 		nil)
@@ -1335,7 +1305,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	cr.ExecutableBlock.StartState = &startState
 
 	execState.
-		On("SaveExecutionResults", mock.Anything, cr, mock.Anything).
+		On("SaveExecutionResults", mock.Anything, cr).
 		Return(nil)
 
 	e := Engine{
@@ -1345,10 +1315,8 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		me:        me,
 	}
 
-	er, err := e.saveExecutionResults(context.Background(), cr)
+	err := e.saveExecutionResults(context.Background(), cr)
 	assert.NoError(t, err)
-
-	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)
 
 	execState.AssertExpectations(t)
 }
@@ -1373,13 +1341,13 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
 			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-			view := new(delta.View)
-			ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState).Return(nil)
+
 			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
 
 			// Successful call to computation manager
 			ctx.computationManager.
-				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
+				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, nil).
 				Return(scriptResult, nil)
 
 			// Execute our script and expect no error

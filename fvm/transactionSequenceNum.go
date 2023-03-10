@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -16,7 +16,7 @@ type TransactionSequenceNumberChecker struct{}
 func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
@@ -34,7 +34,7 @@ func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 ) error {
 
 	defer tracer.StartChildSpan(trace.FVMSeqNumCheckTransaction).End()
@@ -45,7 +45,7 @@ func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	defer func() {
-		_, commitError := txnState.Commit(nestedTxnId)
+		_, commitError := txnState.CommitNestedTransaction(nestedTxnId)
 		if commitError != nil {
 			panic(commitError)
 		}

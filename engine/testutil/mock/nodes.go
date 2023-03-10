@@ -21,7 +21,6 @@ import (
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -33,7 +32,6 @@ import (
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
-	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/entity"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
@@ -61,7 +58,7 @@ type StateFixture struct {
 	SecretsDB      *badger.DB
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
-	State          protocol.MutableState
+	State          protocol.ParticipantState
 }
 
 // GenericNode implements a generic in-process node for tests.
@@ -82,7 +79,7 @@ type GenericNode struct {
 	Payloads           storage.Payloads
 	Blocks             storage.Blocks
 	QuorumCertificates storage.QuorumCertificates
-	State              protocol.MutableState
+	State              protocol.ParticipantState
 	Index              storage.Index
 	Me                 module.Local
 	Net                *stub.Network
@@ -185,33 +182,12 @@ func (cn ConsensusNode) Done() {
 	<-cn.SealingEngine.Done()
 }
 
-type ComputerWrap struct {
-	*computation.Manager
-	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view fvmState.View)
-}
-
-func (c *ComputerWrap) ComputeBlock(
-	ctx context.Context,
-	parentBlockExecutionResultID flow.Identifier,
-	block *entity.ExecutableBlock,
-	view fvmState.View,
-) (*execution.ComputationResult, error) {
-	if c.OnComputeBlock != nil {
-		c.OnComputeBlock(ctx, block, view)
-	}
-	return c.Manager.ComputeBlock(
-		ctx,
-		parentBlockExecutionResultID,
-		block,
-		view)
-}
-
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState        protocol.MutableState
+	FollowerState       protocol.FollowerState
 	IngestionEngine     *ingestion.Engine
-	ExecutionEngine     *ComputerWrap
+	ExecutionEngine     *computation.Manager
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
 	FollowerCore        module.HotStuffFollower
