@@ -31,6 +31,14 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 
 	if err != nil {
 		// node should always have the latest block
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block header: %v", err)
 	}
 
@@ -70,6 +78,14 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height u
 func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 

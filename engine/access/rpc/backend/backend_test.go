@@ -64,6 +64,7 @@ func (suite *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
+	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -672,7 +673,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(head, nil)
+	suite.snapshot.On("Head").Return(head, nil).Maybe()
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()

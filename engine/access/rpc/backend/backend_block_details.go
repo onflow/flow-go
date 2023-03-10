@@ -31,13 +31,22 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 
 	if err != nil {
 		// node should always have the latest block
+
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 	block, err := b.blocks.ByHeight(header.Height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
 	status, err := b.getBlockStatus(block)
@@ -76,6 +85,14 @@ func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64)
 func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 
