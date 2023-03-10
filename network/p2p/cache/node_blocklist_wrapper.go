@@ -54,11 +54,7 @@ func NewNodeBlocklistWrapper(
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)
 	}
-
-	if distributor == nil {
-		panic("WARNING: NodeBlocklistWrapper created without a distributor. This is a bug.")
-	}
-
+	
 	return &NodeBlocklistWrapper{
 		db:               db,
 		identityProvider: identityProvider,
