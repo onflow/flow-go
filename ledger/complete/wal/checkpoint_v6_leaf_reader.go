@@ -59,13 +59,13 @@ func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *z
 	bufSize := 1000
 	leafNodesCh := make(chan LeafNodeResult, bufSize)
 	allLeafNodesCh = leafNodesCh
-	defer func() {
-		close(leafNodesCh)
-	}()
 
 	// push leaf nodes to allLeafNodesCh
 	// TODO: allow cancellation
 	go func() {
+		defer func() {
+			close(leafNodesCh)
+		}()
 		for i, checksum := range subtrieChecksums {
 			readCheckpointSubTrieLeafNodes(leafNodesCh, dir, fileName, i, checksum, logger)
 		}
