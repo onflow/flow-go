@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
-	"github.com/rs/zerolog"
 )
 
 type LeafNode struct {
