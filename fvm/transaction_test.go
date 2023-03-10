@@ -47,13 +47,15 @@ func makeTwoAccounts(
 }
 
 func TestAccountFreezing(t *testing.T) {
+	// TODO: remove freezing feature
+	t.Skip("Skip as we are removing the freezing feature.")
 
 	chain := flow.Mainnet.Chain()
 	serviceAddress := chain.ServiceAddress()
 
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
-		address, _, txnState := makeTwoAccounts(t, nil, nil)
-		accounts := environment.NewAccounts(txnState)
+		address, _, st := makeTwoAccounts(t, nil, nil)
+		accounts := environment.NewAccounts(st)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		// account should no be frozen
