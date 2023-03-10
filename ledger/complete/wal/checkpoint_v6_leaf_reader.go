@@ -64,9 +64,12 @@ func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *z
 	}()
 
 	// push leaf nodes to allLeafNodesCh
-	for i, checksum := range subtrieChecksums {
-		readCheckpointSubTrieLeafNodes(leafNodesCh, dir, fileName, i, checksum, logger)
-	}
+	// TODO: allow cancellation
+	go func() {
+		for i, checksum := range subtrieChecksums {
+			readCheckpointSubTrieLeafNodes(leafNodesCh, dir, fileName, i, checksum, logger)
+		}
+	}()
 
 	return allLeafNodesCh, nil
 }
