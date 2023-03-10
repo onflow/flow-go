@@ -62,9 +62,9 @@ func NewCore(log zerolog.Logger,
 	}
 }
 
-// processBlockProposal handles incoming block proposals.
+// OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operations.
-func (c *Core) processBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 	block := proposal.Block.ToInternal()
 	header := block.Header
 	blockID := header.ID()

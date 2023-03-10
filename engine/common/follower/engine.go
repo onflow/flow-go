@@ -169,7 +169,7 @@ func (c *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		if ok {
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
 			for _, block := range batch.Message {
-				err := c.core.processBlockProposal(batch.OriginID, block)
+				err := c.core.OnBlockProposal(batch.OriginID, block)
 				if err != nil {
 					return fmt.Errorf("could not handle block proposal: %w", err)
 				}

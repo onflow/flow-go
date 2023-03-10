@@ -100,7 +100,7 @@ func (s *CoreSuite) TestHandlePendingBlock() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := s.core.processBlockProposal(originID, proposal)
+	err := s.core.OnBlockProposal(originID, proposal)
 	require.NoError(s.T(), err)
 
 	s.follower.AssertNotCalled(s.T(), "SubmitProposal", mock.Anything)
@@ -138,7 +138,7 @@ func (s *CoreSuite) TestHandleProposal() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := s.core.processBlockProposal(originID, proposal)
+	err := s.core.OnBlockProposal(originID, proposal)
 	require.NoError(s.T(), err)
 }
 
@@ -159,7 +159,7 @@ func (s *CoreSuite) TestHandleProposalSkipProposalThreshold() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := s.core.processBlockProposal(originID, proposal)
+	err := s.core.OnBlockProposal(originID, proposal)
 	require.NoError(s.T(), err)
 
 	// block should be dropped - not added to state or cache
@@ -212,6 +212,6 @@ func (s *CoreSuite) TestHandleProposalWithPendingChildren() {
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(block)
-	err := s.core.processBlockProposal(originID, proposal)
+	err := s.core.OnBlockProposal(originID, proposal)
 	require.NoError(s.T(), err)
 }
