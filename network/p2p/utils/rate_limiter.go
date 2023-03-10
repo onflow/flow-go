@@ -9,6 +9,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+var (
+	defaultGetTimeNowFunc = time.Now
+)
+
 const (
 	cleanUpTickInterval = 10 * time.Minute
 	rateLimiterTTL      = 10 * time.Minute
@@ -16,11 +20,17 @@ const (
 
 // RateLimiter generic rate limiter
 type RateLimiter struct {
-	limiters                 *RateLimiterMap
-	limit                    rate.Limit
-	burst                    int
-	now                      p2p.GetTimeNow
-	rateLimitLockoutDuration time.Duration // the amount of time that has to pass before a peer is allowed to connect
+	// limiters map that stores a rate limiter with metadata per peer.
+	limiters *RateLimiterMap
+	// limit amount of messages allowed per second.
+	limit rate.Limit
+	// burst amount of messages allowed at one time.
+	burst int
+	// now func that returns timestamp used to rate limit.
+	// The default time.Now func is used.
+	now p2p.GetTimeNow
+	// rateLimitLockoutDuration the amount of time that has to pass before a peer is allowed to connect.
+	rateLimitLockoutDuration time.Duration
 }
 
 // NewRateLimiter returns a new RateLimiter.
@@ -29,7 +39,7 @@ func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, 
 		limiters:                 NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
-		now:                      time.Now,
+		now:                      defaultGetTimeNowFunc,
 		rateLimitLockoutDuration: lockoutDuration * time.Second,
 	}
 
