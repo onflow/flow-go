@@ -66,11 +66,19 @@ func (m *RateLimiterMetadata) SetLastAccessed(lastAccessed time.Time) {
 
 // RateLimiterMap stores a RateLimiterMetadata for each peer in an underlying map.
 type RateLimiterMap struct {
-	mu              sync.RWMutex
-	ttl             time.Duration
+	// mu read write mutex used to synchronize updates to the rate limiter map.
+	mu sync.RWMutex
+	// ttl time to live is the duration in which a rate limiter is stored in the limiters map.
+	// Stale rate limiters from peers that have not interacted in a while will be cleaned up to
+	// free up unused resources.
+	ttl time.Duration
+	// cleanupInterval the interval in which stale rate limiter's are removed from the limiters map
+	// to free up unused resources.
 	cleanupInterval time.Duration
-	limiters        map[peer.ID]*RateLimiterMetadata
-	done            chan struct{}
+	// limiters map that stores rate limiter metadata for each peer.
+	limiters map[peer.ID]*RateLimiterMetadata
+	// done channel used to stop the cleanup loop.
+	done chan struct{}
 }
 
 func NewLimiterMap(ttl, cleanupInterval time.Duration) *RateLimiterMap {
