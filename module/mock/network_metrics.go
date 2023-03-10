@@ -165,6 +165,11 @@ func (_m *NetworkMetrics) OnEstablishStreamFailure(duration time.Duration, attem
 	_m.Called(duration, attempts)
 }
 
+// OnFirstMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnGraftReceived provides a mock function with given fields: count
 func (_m *NetworkMetrics) OnGraftReceived(count int) {
 	_m.Called(count)
@@ -200,9 +205,24 @@ func (_m *NetworkMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
 func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
+}
+
+// OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
+// OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
 }
 
 // OnPeerDialFailure provides a mock function with given fields: duration, attempts
@@ -243,6 +263,11 @@ func (_m *NetworkMetrics) OnStreamCreationFailure(duration time.Duration, attemp
 // OnStreamEstablished provides a mock function with given fields: duration, attempts
 func (_m *NetworkMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
+}
+
+// OnTimeInMeshUpdated provides a mock function with given fields: _a0, _a1
+func (_m *NetworkMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Duration) {
+	_m.Called(_a0, _a1)
 }
 
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense

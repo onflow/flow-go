@@ -135,6 +135,11 @@ func (_m *LibP2PMetrics) OnEstablishStreamFailure(duration time.Duration, attemp
 	_m.Called(duration, attempts)
 }
 
+// OnFirstMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *LibP2PMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnGraftReceived provides a mock function with given fields: count
 func (_m *LibP2PMetrics) OnGraftReceived(count int) {
 	_m.Called(count)
@@ -170,9 +175,24 @@ func (_m *LibP2PMetrics) OnIncomingRpcRejected() {
 	_m.Called()
 }
 
+// OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *LibP2PMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
 // OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
 func (_m *LibP2PMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
+}
+
+// OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
+func (_m *LibP2PMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
+	_m.Called(_a0, _a1)
+}
+
+// OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
+func (_m *LibP2PMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
 }
 
 // OnPeerDialFailure provides a mock function with given fields: duration, attempts
@@ -208,6 +228,11 @@ func (_m *LibP2PMetrics) OnStreamCreationFailure(duration time.Duration, attempt
 // OnStreamEstablished provides a mock function with given fields: duration, attempts
 func (_m *LibP2PMetrics) OnStreamEstablished(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
+}
+
+// OnTimeInMeshUpdated provides a mock function with given fields: _a0, _a1
+func (_m *LibP2PMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Duration) {
+	_m.Called(_a0, _a1)
 }
 
 // OutboundConnections provides a mock function with given fields: connectionCount
