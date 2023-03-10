@@ -397,7 +397,7 @@ func (n *Node) Routing() routing.Routing {
 }
 
 // SetPeerScoreExposer sets the node's peer score exposer implementation.
-// SetPeerScoreExposer may be called at most once. It is an error to call this
+// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
 // method if the node's peer score exposer has already been set.
 func (n *Node) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
 	if n.peerScoreExposer != nil {
@@ -408,8 +408,13 @@ func (n *Node) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
 }
 
 // PeerScoreExposer returns the node's peer score exposer implementation.
-func (n *Node) PeerScoreExposer() p2p.PeerScoreExposer {
-	return n.peerScoreExposer
+// If the node's peer score exposer has not been set, the second return value will be false.
+func (n *Node) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+	if n.peerScoreExposer == nil {
+		return nil, false
+	}
+
+	return n.peerScoreExposer, true
 }
 
 // SetPubSub sets the node's pubsub implementation.
