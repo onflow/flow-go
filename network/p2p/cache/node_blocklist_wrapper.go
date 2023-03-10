@@ -50,7 +50,7 @@ func NewNodeBlocklistWrapper(
 	identityProvider module.IdentityProvider,
 	db *badger.DB,
 	distributor p2p.DisallowListNotificationDistributor) (*NodeBlocklistWrapper, error) {
-	
+
 	blocklist, err := retrieveBlocklist(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of blocked node IDs from data base: %w", err)
