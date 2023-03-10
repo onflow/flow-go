@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	mh "github.com/multiformats/go-multihash"
@@ -56,15 +57,15 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
-		HandlerFunc:            func(network.Stream) {},
-		Unicasts:               nil,
-		Key:                    NetworkingKeyFixtures(t),
-		Address:                unittest.DefaultAddress,
-		Logger:                 unittest.Logger().Level(zerolog.ErrorLevel),
-		Role:                   flow.RoleCollection,
-		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
-		Metrics:                metrics.NewNoopCollector(),
-		ResourceManager:        testutils.NewResourceManager(t),
+		HandlerFunc:                      func(network.Stream) {},
+		Unicasts:                         nil,
+		Key:                              NetworkingKeyFixtures(t),
+		Address:                          unittest.DefaultAddress,
+		Logger:                           unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:                             flow.RoleCollection,
+		CreateStreamRetryDelay:           unicast.DefaultRetryDelay,
+		Metrics:                          metrics.NewNoopCollector(),
+		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 	}
 
@@ -158,7 +159,7 @@ type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc                      network.StreamHandler
-	Unicasts                         []unicast.ProtocolName
+	Unicasts                         []protocols.ProtocolName
 	Key                              crypto.PrivateKey
 	Address                          string
 	DhtOptions                       []dht.Option
@@ -178,7 +179,7 @@ type NodeFixtureParameters struct {
 	ResourceManager                  network.ResourceManager
 	PubSubTracer                     p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
-	CreateStreamRetryDelay time.Duration
+	CreateStreamRetryDelay           time.Duration
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
