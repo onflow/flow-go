@@ -19,7 +19,7 @@ const (
 	DefaultNumberOfWorkers = 5
 )
 
-// inspectMsgReq details extracted from an RPC control message used for further message inspection by component workers.
+// inspectMsgReq represents a short digest of an RPC control message. It is used for further message inspection by component workers.
 type inspectMsgReq struct {
 	peer             peer.ID
 	validationConfig *CtrlMsgValidationConfig
