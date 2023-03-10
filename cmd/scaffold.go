@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
@@ -52,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -211,6 +213,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", defaultConfig.NetworkConfig.UnicastBandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastRateLimitLockoutDuration, "unicast-rate-limit-lockout-duration", defaultConfig.NetworkConfig.UnicastRateLimitLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", defaultConfig.NetworkConfig.UnicastRateLimitDryRun, "disable peer disconnects and connections gating when rate limiting peers")
+
+	// networking event notifications
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
@@ -439,7 +445,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
 		mwOpts...)
-	fnb.NodeBlockListDistributor.AddConsumer(mw)
+	fnb.NodeDisallowListDistributor.AddConsumer(mw)
 	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
@@ -975,6 +981,11 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
+	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return fnb.NodeDisallowListDistributor, nil
+	})
+
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -982,18 +993,24 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		fnb.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeBlockListDistributor)
-		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
+		if fnb.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
-		node.IdentityProvider = blocklistWrapper
+		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
 
-		// register the blocklist for dynamic configuration via admin command
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+		}
+		node.IdentityProvider = disallowListWrapper
+
+		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
 		if err != nil {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}
