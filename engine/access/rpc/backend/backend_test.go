@@ -1168,7 +1168,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		Once()
 
 	suite.blocks.
-		On("ByID", header.ID()).
+		On("ByHeight", header.Height).
 		Return(&expected, nil)
 
 	backend := New(
