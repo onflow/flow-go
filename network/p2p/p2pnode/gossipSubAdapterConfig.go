@@ -45,6 +45,10 @@ func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.Gossi
 	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
 }
 
+func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
+	g.options = append(g.options, pubsub.WithRawTracer(tracer))
+}
+
 func (g *GossipSubAdapterConfig) Build() []pubsub.Option {
 	return g.options
 }

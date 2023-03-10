@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
@@ -52,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -183,7 +185,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
 	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
-	fnb.flags.BoolVar(&fnb.BaseConfig.PeerScoringEnabled, "peer-scoring-enabled", defaultConfig.PeerScoringEnabled, "enabling peer scoring on pubsub network")
+	fnb.flags.BoolVar(&fnb.BaseConfig.GossipSubConfig.PeerScoring, "peer-scoring-enabled", defaultConfig.GossipSubConfig.PeerScoring, "enabling peer scoring on pubsub network")
+	fnb.flags.DurationVar(&fnb.BaseConfig.GossipSubConfig.LocalMeshLogInterval, "gossipsub-local-mesh-logging-interval", defaultConfig.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh in gossipsub")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
@@ -217,6 +220,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Graft, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Graft, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.Prune, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.Prune, fmt.Sprintf("upper threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.UpperThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+
+	// networking event notifications
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
@@ -383,11 +390,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.IdentityProvider,
 			fnb.Metrics.Network,
 			fnb.Resolver,
-			fnb.PeerScoringEnabled,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
 			// run peer manager with the specified interval and let it also prune connections
+			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
 			controlMsgRPCInspectorCfg,
 			fnb.UnicastRateLimiterDistributor,
@@ -452,7 +459,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
 		mwOpts...)
-	fnb.NodeBlockListDistributor.AddConsumer(mw)
+	fnb.NodeDisallowListDistributor.AddConsumer(mw)
 	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
@@ -988,6 +995,11 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
+	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return fnb.NodeDisallowListDistributor, nil
+	})
+
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -995,18 +1007,24 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		fnb.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeBlockListDistributor)
-		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
+		if fnb.HeroCacheMetricsEnable {
+			collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
-		node.IdentityProvider = blocklistWrapper
+		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
 
-		// register the blocklist for dynamic configuration via admin command
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+		}
+		node.IdentityProvider = disallowListWrapper
+
+		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			blocklistWrapper.GetBlocklist, blocklistWrapper.Update)
+			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
 		if err != nil {
 			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
 		}

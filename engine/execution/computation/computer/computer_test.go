@@ -665,7 +665,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -760,7 +760,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
