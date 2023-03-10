@@ -121,48 +121,64 @@ type PubSubTracer interface {
 
 // PeerScoreSnapshot is a snapshot of the overall peer score at a given time.
 type PeerScoreSnapshot struct {
-	Score              float64
-	Topics             map[string]*TopicScoreSnapshot
-	AppSpecificScore   float64
+	Score            float64                        // the overall score of the peer.
+	Topics           map[string]*TopicScoreSnapshot // score of the peer per topic.
+	AppSpecificScore float64                        // application specific score (set by Flow protocol).
+
+	// A positive value indicates that the peer is colocated with other nodes on the same network id,
+	// and can be used to warn of sybil attacks.
 	IPColocationFactor float64
-	BehaviourPenalty   float64
+	// A positive value indicates that GossipSub has caught the peer misbehaving, and can be used to warn of an attack.
+	BehaviourPenalty float64
 }
 
 // TopicScoreSnapshot is a snapshot of the peer score within a topic at a given time.
 type TopicScoreSnapshot struct {
-	TimeInMesh               time.Duration
-	FirstMessageDeliveries   float64
-	MeshMessageDeliveries    float64
-	InvalidMessageDeliveries float64
+	// Note that float64 is used for the counters as they are decayed over the time.
+	TimeInMesh               time.Duration // total time in mesh.
+	FirstMessageDeliveries   float64       // counter of first message deliveries.
+	MeshMessageDeliveries    float64       // total mesh message deliveries (in the mesh).
+	InvalidMessageDeliveries float64       // counter of invalid message deliveries.
 }
 
-// IsWarning returns true if the peer score is in warning state.
+// IsWarning returns true if the peer score is in warning state. When the peer score is in warning state, the peer is
+// considered to be misbehaving.
 func (p PeerScoreSnapshot) IsWarning() bool {
 	for _, topic := range p.Topics {
 		if topic.IsWarning() {
+			// if any topic is in warning state, the peer is in warning state.
 			return true
 		}
 	}
 
+	if p.Score < 0 {
+		// if the overall score is negative, the peer is in warning state, it means that the peer is suspected to be
+		// misbehaving at the GossipSub level.
+		return true
+	}
+
 	if p.AppSpecificScore < 0 {
+		// if the app specific score is negative, the peer is in warning state, it means that the peer behaves in a way
+		// that is not allowed by the Flow protocol.
 		return true
 	}
 
 	if p.IPColocationFactor > 0 {
+		// if the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
+		// same IP as another peer and is suspected to be a sybil node.
 		return true
 	}
 
 	if p.BehaviourPenalty > 0 {
-		return true
-	}
-
-	if p.Score < 0 {
+		// if the behaviour penalty is positive, the peer is in warning state, it means that the peer is suspected to be
+		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages.
 		return true
 	}
 
 	return false
 }
 
+// String returns the string representation of the peer score snapshot.
 func (s TopicScoreSnapshot) String() string {
 	return fmt.Sprintf("time_in_mesh: %s, first_message_deliveries: %f, mesh message deliveries: %f, invalid message deliveries: %f",
 		s.TimeInMesh, s.FirstMessageDeliveries, s.MeshMessageDeliveries, s.InvalidMessageDeliveries)
@@ -171,6 +187,8 @@ func (s TopicScoreSnapshot) String() string {
 // IsWarning returns true if the topic score is in warning state.
 func (s TopicScoreSnapshot) IsWarning() bool {
 	// TODO: also check for first message deliveries and time in mesh when we have a better understanding of the score.
+	// If invalid message deliveries is positive, the topic is in warning state. It means that the peer is suspected to
+	// be misbehaving at the GossipSub level, e.g. sending too many invalid messages to the topic.
 	return s.InvalidMessageDeliveries > 0
 }
 
