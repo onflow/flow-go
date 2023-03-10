@@ -169,7 +169,7 @@ func (programs *Programs) get(
 	return nil, false
 }
 
-// GetAndSetProgram gets the program from the cache,
+// GetOrLoadProgram gets the program from the cache,
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
 // to load the dependencies of the program.
@@ -177,7 +177,7 @@ func (programs *Programs) get(
 // TODO: this function currently just calls GetProgram and SetProgram in pair.
 // This method can be re-written in a far better way by removing the individual
 // GetProgram and SetProgram methods.
-func (programs *Programs) GetAndSetProgram(
+func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
