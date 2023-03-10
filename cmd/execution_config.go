@@ -35,9 +35,6 @@ type ExecutionConfig struct {
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
 	preferredExeNodeIDStr                string
-	syncByBlocks                         bool
-	syncFast                             bool
-	syncThreshold                        int
 	extensiveLog                         bool
 	pauseExecution                       bool
 	chunkDataPackQueryTimeout            time.Duration
@@ -87,11 +84,6 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 		"script execution time limit")
 	flags.StringVar(&exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
-	flags.BoolVar(&exeConf.syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
-	flags.BoolVar(&exeConf.syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing,"+
-		" and rely on state syncing to catch up")
-	flags.IntVar(&exeConf.syncThreshold, "sync-threshold", 100,
-		"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 	flags.BoolVar(&exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 	flags.DurationVar(&exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout, "timeout duration to determine a chunk data pack query being slow")
 	flags.DurationVar(&exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout, "timeout duration to determine a chunk data pack response delivery being slow")

@@ -199,9 +199,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	deltas, err := NewDeltas(1000)
-	require.NoError(t, err)
-
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
@@ -226,10 +223,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState,
 		metrics,
 		tracer,
-		false,
-		filter.Any,
-		deltas,
-		10,
 		false,
 		checkAuthorizedAtBlock,
 		nil,
@@ -1570,9 +1563,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 
-	deltas, err := NewDeltas(10)
-	require.NoError(t, err)
-
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
@@ -1593,10 +1583,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		es,
 		metrics,
 		tracer,
-		false,
-		filter.Any,
-		deltas,
-		10,
 		false,
 		checkAuthorizedAtBlock,
 		nil,
