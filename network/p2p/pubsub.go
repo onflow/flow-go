@@ -53,6 +53,9 @@ type PubSubAdapterConfig interface {
 }
 
 // GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
 type GossipSubRPCInspector interface {
 	// Inspect inspects an incoming RPC message. This callback func is invoked
 	// on ever RPC message received before the message is processed by libp2p.
