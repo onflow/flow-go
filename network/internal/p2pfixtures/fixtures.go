@@ -121,7 +121,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		SetResourceManager(testutils.NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval).
+		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval)
 
 	for _, opt := range opts {
 		opt(builder)
