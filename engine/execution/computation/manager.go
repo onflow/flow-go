@@ -116,10 +116,11 @@ func New(
 		options = append(options, fvm.WithExtensiveTracing())
 	}
 
-	fvmContext := fvm.NewContextFromParent(vmCtx, options...)
+	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
+
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
-		fvmContext,
+		vmCtx,
 		metrics,
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
@@ -142,7 +143,7 @@ func New(
 		logger,
 		metrics,
 		vm,
-		fvmContext,
+		vmCtx,
 		derivedChainData,
 	)
 
