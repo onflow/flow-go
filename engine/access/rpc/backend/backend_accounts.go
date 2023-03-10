@@ -102,9 +102,9 @@ func (b *backendAccounts) getAccountAtBlockID(
 	return account, nil
 }
 
-// getAccountFromAnyExeNode retrieves the given account from any EN in `execNodes`. 
+// getAccountFromAnyExeNode retrieves the given account from any EN in `execNodes`.
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
-// other ENs are logged and swallowed. If all ENs fail to return a valid response, then an 
+// other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var errors *multierror.Error
