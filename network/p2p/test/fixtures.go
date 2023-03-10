@@ -3,6 +3,7 @@ package p2ptest
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	mh "github.com/multiformats/go-multihash"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -424,4 +426,17 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
 		cancel()
 	}
+}
+
+// PeerIdFixture returns a random peer ID for testing.
+// peer ID is the identifier of a node on the libp2p network.
+func PeerIdFixture(t *testing.T) peer.ID {
+	buf := make([]byte, 16)
+	n, err := rand.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, 16, n)
+	h, err := mh.Sum(buf, mh.SHA2_256, -1)
+	require.NoError(t, err)
+
+	return peer.ID(h)
 }
