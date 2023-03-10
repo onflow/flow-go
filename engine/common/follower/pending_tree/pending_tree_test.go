@@ -34,7 +34,7 @@ func (s *PendingTreeSuite) SetupTest() {
 
 // TestBlocksConnectToFinalized tests that adding blocks that directly connect to the finalized block result
 // in expect chain of connected blocks.
-// Having: F <- B1 <- B2 <- B3
+// Having: F ← B1 ← B2 ← B3
 // Add [B1, B2, B3], expect to get [B1;QC_B1, B2;QC_B2; B3;QC_B3]
 func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
 	blocks := certifiedBlocksFixture(3, s.finalized)
@@ -45,7 +45,7 @@ func (s *PendingTreeSuite) TestBlocksConnectToFinalized() {
 
 // TestBlocksAreNotConnectedToFinalized tests that adding blocks that don't connect to the finalized block result
 // in empty list of connected blocks.
-// Having: F <- B1 <- B2 <- B3
+// Having: F ← B1 ← B2 ← B3
 // Add [B2, B3], expect to get []
 func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
 	blocks := certifiedBlocksFixture(3, s.finalized)
@@ -56,7 +56,7 @@ func (s *PendingTreeSuite) TestBlocksAreNotConnectedToFinalized() {
 
 // TestInsertingMissingBlockToFinalized tests that adding blocks that don't connect to the finalized block result
 // in empty list of connected blocks. After adding missing blocks all connected blocks are correctly returned.
-// Having: F <- B1 <- B2 <- B3 <- B4 <- B5
+// Having: F ← B1 ← B2 ← B3 ← B4 ← B5
 // Add [B3, B4, B5], expect to get []
 // Add [B1, B2], expect to get [B1, B2, B3, B4, B5]
 func (s *PendingTreeSuite) TestInsertingMissingBlockToFinalized() {
@@ -126,7 +126,7 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 // TestBatchWithSkipsAndInRandomOrder tests that providing a batch without specific order and even with skips in height
 // results in expected behavior. We expect that each of those blocks will be added to tree and as soon as we find a
 // finalized fork we should be able to observe it as result of invocation.
-// Having: F <- A <- B <- C <- D <- E
+// Having: F ← A ← B ← C ← D ← E
 // Randomly shuffle [B, C, D, E] and add it as single batch, expect [] connected blocks.
 // Insert [A], expect [A, B, C, D, E] connected blocks.
 func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
@@ -163,7 +163,7 @@ func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 
 // TestAddingBlockAfterFinalization tests that adding a batch of blocks which includes finalized block correctly returns
 // a chain of connected blocks without finalized one.
-// Having F <- A <- B <- D.
+// Having F ← A ← B ← D.
 // Adding [A, B, C] returns [A, B, C].
 // Finalize A.
 // Adding [A, B, C, D] returns [D] since A is already finalized, [B, C] are already stored and connected to the finalized state.
@@ -184,8 +184,8 @@ func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
 
 // TestAddingBlocksWithSameHeight tests that adding blocks with same height(which results in multiple forks) that are connected
 // to finalized state are properly marked and returned as connected blocks.
-// / Having F <- A <- C
-// /          <- B <- D <- E
+// / Having F ← A ← C
+// /          ↖ B ← D ← E
 // Adding [A, B, D] returns [A, B, D]
 // Adding [C, E] returns [C, E].
 func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
