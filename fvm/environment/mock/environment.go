@@ -660,32 +660,6 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 	return r0, r1
 }
 
-// GetAndSetProgram provides a mock function with given fields: location, load
-func (_m *Environment) GetAndSetProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
-	ret := _m.Called(location, load)
-
-	var r0 *interpreter.Program
-	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) (*interpreter.Program, error)); ok {
-		return rf(location, load)
-	}
-	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) *interpreter.Program); ok {
-		r0 = rf(location, load)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.Program)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(common.Location, func() (*interpreter.Program, error)) error); ok {
-		r1 = rf(location, load)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetBlockAtHeight provides a mock function with given fields: height
 func (_m *Environment) GetBlockAtHeight(height uint64) (stdlib.Block, bool, error) {
 	ret := _m.Called(height)
@@ -781,6 +755,32 @@ func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
 	}
 
 	return r0
+}
+
+// GetOrLoadProgram provides a mock function with given fields: location, load
+func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+	ret := _m.Called(location, load)
+
+	var r0 *interpreter.Program
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) (*interpreter.Program, error)); ok {
+		return rf(location, load)
+	}
+	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) *interpreter.Program); ok {
+		r0 = rf(location, load)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*interpreter.Program)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(common.Location, func() (*interpreter.Program, error)) error); ok {
+		r1 = rf(location, load)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetSigningAccounts provides a mock function with given fields:

@@ -127,8 +127,11 @@ func New(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled: params.CadenceTracing,
-				})),
+					TracingEnabled:        params.CadenceTracing,
+					AccountLinkingEnabled: true,
+				},
+			),
+		),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
