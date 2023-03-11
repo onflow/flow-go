@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -62,11 +63,16 @@ func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *z
 
 	// push leaf nodes to allLeafNodesCh
 	// TODO: allow cancellation
+	resumeFrom := 12
 	go func() {
 		defer func() {
 			close(leafNodesCh)
 		}()
 		for i, checksum := range subtrieChecksums {
+			if i < 12 {
+				log.Info().Msgf("skip reading %v-th subtrie, resume from %v", i, resumeFrom)
+				continue
+			}
 			readCheckpointSubTrieLeafNodes(leafNodesCh, dir, fileName, i, checksum, logger)
 		}
 	}()
