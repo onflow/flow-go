@@ -325,6 +325,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 	return nodesGroups, nil
 }
 
+// readCheckpointSubTrie reads all the nodes from a given subtrie file and return them
 func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) (
 	[]*node.Node,
 	error,
@@ -339,11 +340,15 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 					if nodeIndex >= i {
 						return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 					}
+					// a interim node refers its child nodes by index, so we keep track of the node list in `nodes`, and
+					// return the node at the given index to be used as the child node of an interim node
 					return nodes[nodeIndex], nil
 				})
 				if err != nil {
 					return fmt.Errorf("cannot read node %d: %w", i, err)
 				}
+
+				// after reading the node, mark the node as i-th node
 				nodes[i] = node
 				logging(i)
 			}
@@ -360,6 +365,9 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 	return nodes[1:], nil
 }
 
+// processCheckpointSubTrie takes a processNode to process the node from the subtrie files.
+// Different processNode function can be provided in order to reuse the logic of reading nodes from the subtrie files,
+// and process differently depending on different scenarios.
 // subtrie file contains:
 // 1. checkpoint version
 // 2. nodes

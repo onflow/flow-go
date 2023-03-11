@@ -84,6 +84,13 @@ func readCheckpointSubTrieLeafNodes(leafNodesCh chan<- LeafNodeResult, dir strin
 					if nodeIndex >= i {
 						return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 					}
+					// the dummyChild child is used to create an interim node.
+					// the interim node encoded in the checkpoint file uses index to refer to its child nodes.
+					// in order to lookup its child nodes by the index, we would have to keep track of a list of array
+					// that has been read in the past, which will increase memory usage.
+					// since this function only care about the leaf nodes, we could just use dummy child as the child nodes
+					// of interim node, and throw the interim node away afterwards, so that we don't need to keep track
+					// of the node list, and keep memory usage small.
 					return dummyChild, nil
 				})
 				if err != nil {
