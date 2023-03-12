@@ -517,7 +517,7 @@ func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, trie
 
 func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logger) func(nodeCounter uint64) {
 	lookup := make(map[int]int)
-	for i := 1; i < 10; i++ { // [1...9]
+	for i := 0; i <= 10; i++ { // [0...10]
 		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
 	}
 	return func(nodeCounter uint64) {
