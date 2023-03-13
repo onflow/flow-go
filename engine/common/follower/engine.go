@@ -93,6 +93,7 @@ func New(
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processMessagesLoop).
+		AddWorker(e.finalizationProcessingLoop).
 		Build()
 
 	return e, nil
@@ -147,18 +148,12 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 
 	doneSignal := ctx.Done()
 	newPendingBlockSignal := e.pendingBlocksNotifier.Channel()
-	newFinalizedBlockSignal := e.finalizedBlockNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
 			return
 		case <-newPendingBlockSignal:
-			err := e.processQueuedBlocks(doneSignal, newFinalizedBlockSignal) // no errors expected during normal operations
-			if err != nil {
-				ctx.Throw(err)
-			}
-		case <-newFinalizedBlockSignal:
-			err := e.processFinalizedBlock()
+			err := e.processQueuedBlocks(doneSignal) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -170,17 +165,11 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
-func (e *Engine) processQueuedBlocks(doneSignal, newFinalizedBlock <-chan struct{}) error {
+func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	for {
 		select {
 		case <-doneSignal:
 			return nil
-		case <-newFinalizedBlock:
-			// finalization events should get priority.
-			err := e.processFinalizedBlock()
-			if err != nil {
-				return err
-			}
 		default:
 		}
 
@@ -204,21 +193,28 @@ func (e *Engine) processQueuedBlocks(doneSignal, newFinalizedBlock <-chan struct
 	}
 }
 
-// processFinalizedBlock performs processing of finalized block by querying it from storage
-// and propagating to follower core.
-func (e *Engine) processFinalizedBlock() error {
-	blockID := e.finalizedBlockTracker.NewestBlock().BlockID
-	// retrieve the latest finalized header, so we know the height
-	finalHeader, err := e.headers.ByBlockID(blockID)
-	if err != nil { // no expected errors
-		return fmt.Errorf("could not query finalized block %x: %w", blockID, err)
-	}
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 
-	err = e.core.OnFinalizedBlock(finalHeader)
-	if err != nil {
-		return fmt.Errorf("could not process finalized block %x: %w", blockID, err)
+	doneSignal := ctx.Done()
+	blockFinalizedSignal := e.finalizedBlockNotifier.Channel()
+	for {
+		select {
+		case <-doneSignal:
+			return
+		case <-blockFinalizedSignal:
+			// retrieve the latest finalized header, so we know the height
+			finalHeader, err := e.headers.ByBlockID(e.finalizedBlockTracker.NewestBlock().BlockID)
+			if err != nil { // no expected errors
+				ctx.Throw(err)
+			}
+			err = e.core.OnFinalizedBlock(finalHeader)
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
 	}
-	return nil
 }
 
 // onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
