@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,6 +41,7 @@ type ViewCommitter interface {
 type transactionResult struct {
 	transaction
 	*state.ExecutionSnapshot
+	fvm.ProcedureOutput
 }
 
 // TODO(ramtin): move committer and other folks to consumers layer
@@ -244,32 +246,33 @@ func (collector *resultCollector) commitCollection(
 func (collector *resultCollector) processTransactionResult(
 	txn transaction,
 	txnExecutionSnapshot *state.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
 ) error {
 	collector.convertedServiceEvents = append(
 		collector.convertedServiceEvents,
-		txn.ConvertedServiceEvents...)
+		output.ConvertedServiceEvents...)
 
 	collector.result.Events[txn.collectionIndex] = append(
 		collector.result.Events[txn.collectionIndex],
-		txn.Events...)
+		output.Events...)
 	collector.result.ServiceEvents = append(
 		collector.result.ServiceEvents,
-		txn.ServiceEvents...)
+		output.ServiceEvents...)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
-		ComputationUsed: txn.ComputationUsed,
-		MemoryUsed:      txn.MemoryEstimate,
+		ComputationUsed: output.ComputationUsed,
+		MemoryUsed:      output.MemoryEstimate,
 	}
-	if txn.Err != nil {
-		txnResult.ErrorMessage = txn.Err.Error()
+	if output.Err != nil {
+		txnResult.ErrorMessage = output.Err.Error()
 	}
 
 	collector.result.TransactionResults = append(
 		collector.result.TransactionResults,
 		txnResult)
 
-	for computationKind, intensity := range txn.ComputationIntensities {
+	for computationKind, intensity := range output.ComputationIntensities {
 		collector.result.ComputationIntensities[computationKind] += intensity
 	}
 
@@ -278,8 +281,8 @@ func (collector *resultCollector) processTransactionResult(
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
 
-	collector.currentCollectionStats.ComputationUsed += txn.ComputationUsed
-	collector.currentCollectionStats.MemoryUsed += txn.MemoryEstimate
+	collector.currentCollectionStats.ComputationUsed += output.ComputationUsed
+	collector.currentCollectionStats.MemoryUsed += output.MemoryEstimate
 	collector.currentCollectionStats.NumberOfTransactions += 1
 
 	if !txn.lastTransactionInCollection {
@@ -295,10 +298,12 @@ func (collector *resultCollector) processTransactionResult(
 func (collector *resultCollector) AddTransactionResult(
 	txn transaction,
 	snapshot *state.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
 ) {
 	result := transactionResult{
 		transaction:       txn,
 		ExecutionSnapshot: snapshot,
+		ProcedureOutput:   output,
 	}
 
 	select {
@@ -315,7 +320,8 @@ func (collector *resultCollector) runResultProcessor() {
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
 			result.transaction,
-			result.ExecutionSnapshot)
+			result.ExecutionSnapshot,
+			result.ProcedureOutput)
 		if err != nil {
 			collector.processorError = err
 			return

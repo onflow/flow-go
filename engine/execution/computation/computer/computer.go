@@ -12,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -272,7 +272,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot state.StorageSnapshot,
+	baseSnapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -311,9 +311,13 @@ func (e *blockComputer) executeBlock(
 		e.colResCons)
 	defer collector.Stop()
 
-	stateView := delta.NewDeltaView(snapshot)
+	snapshotTree := storage.NewSnapshotTree(baseSnapshot)
 	for _, txn := range transactions {
-		err := e.executeTransaction(blockSpan, txn, stateView, collector)
+		txnExecutionSnapshot, output, err := e.executeTransaction(
+			blockSpan,
+			txn,
+			snapshotTree,
+			collector)
 		if err != nil {
 			prefix := ""
 			if txn.isSystemTransaction {
@@ -326,6 +330,9 @@ func (e *blockComputer) executeBlock(
 				txn.txnIndex,
 				err)
 		}
+
+		collector.AddTransactionResult(txn, txnExecutionSnapshot, output)
+		snapshotTree = snapshotTree.Append(txnExecutionSnapshot)
 	}
 
 	res, err := collector.Finalize(ctx)
@@ -345,9 +352,13 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeTransaction(
 	parentSpan otelTrace.Span,
 	txn transaction,
-	stateView state.View,
+	storageSnapshot state.StorageSnapshot,
 	collector *resultCollector,
-) error {
+) (
+	*state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
 	startedAt := time.Now()
 	memAllocBefore := debug.GetHeapAllocsBytes()
 
@@ -374,10 +385,13 @@ func (e *blockComputer) executeTransaction(
 
 	txn.ctx = fvm.NewContextFromParent(txn.ctx, fvm.WithSpan(txSpan))
 
-	txView := stateView.NewChild()
-	err := e.vm.Run(txn.ctx, txn.TransactionProcedure, txView)
+	executionSnapshot, output, err := e.vm.RunV2(
+		txn.ctx,
+		txn.TransactionProcedure,
+		storageSnapshot)
 	if err != nil {
-		return fmt.Errorf("failed to execute transaction %v for block %s at height %v: %w",
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"failed to execute transaction %v for block %s at height %v: %w",
 			txn.txnIdStr,
 			txn.blockIdStr,
 			txn.ctx.BlockHeader.Height,
@@ -387,33 +401,19 @@ func (e *blockComputer) executeTransaction(
 	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
 	defer postProcessSpan.End()
 
-	// always merge the view, fvm take cares of reverting changes
-	// of failed transaction invocation
-
-	txnSnapshot := txView.Finalize()
-	collector.AddTransactionResult(txn, txnSnapshot)
-
-	err = stateView.Merge(txnSnapshot)
-	if err != nil {
-		return fmt.Errorf(
-			"merging tx view to collection view failed for tx %v: %w",
-			txn.txnIdStr,
-			err)
-	}
-
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
 	logger = logger.With().
-		Uint64("computation_used", txn.ComputationUsed).
-		Uint64("memory_used", txn.MemoryEstimate).
+		Uint64("computation_used", output.ComputationUsed).
+		Uint64("memory_used", output.MemoryEstimate).
 		Uint64("mem_alloc", memAllocAfter-memAllocBefore).
 		Int64("time_spent_in_ms", time.Since(startedAt).Milliseconds()).
 		Logger()
 
-	if txn.Err != nil {
+	if output.Err != nil {
 		logger = logger.With().
-			Str("error_message", txn.Err.Error()).
-			Uint16("error_code", uint16(txn.Err.Code())).
+			Str("error_message", output.Err.Error()).
+			Uint16("error_code", uint16(output.Err.Code())).
 			Logger()
 		logger.Info().Msg("transaction execution failed")
 
@@ -434,12 +434,12 @@ func (e *blockComputer) executeTransaction(
 
 	e.metrics.ExecutionTransactionExecuted(
 		time.Since(startedAt),
-		txn.ComputationUsed,
-		txn.MemoryEstimate,
+		output.ComputationUsed,
+		output.MemoryEstimate,
 		memAllocAfter-memAllocBefore,
-		len(txn.Events),
-		flow.EventsList(txn.Events).ByteSize(),
-		txn.Err != nil,
+		len(output.Events),
+		flow.EventsList(output.Events).ByteSize(),
+		output.Err != nil,
 	)
-	return nil
+	return executionSnapshot, output, nil
 }
