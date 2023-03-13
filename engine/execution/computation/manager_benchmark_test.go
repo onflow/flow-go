@@ -129,6 +129,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
