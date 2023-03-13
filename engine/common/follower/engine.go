@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,7 +51,7 @@ type Engine struct {
 	finalizedBlockTracker  *tracker.NewestBlockTracker
 	finalizedBlockNotifier engine.Notifier
 
-	core common.FollowerCore
+	core *Core
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -63,7 +62,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	engMetrics module.EngineMetrics,
-	core common.FollowerCore,
+	core *Core,
 	opts ...EngineOption,
 ) (*Engine, error) {
 	// FIFO queue for block proposals

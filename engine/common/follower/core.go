@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -48,8 +47,6 @@ type Core struct {
 	validator      hotstuff.Validator
 	sync           module.BlockRequester
 }
-
-var _ common.FollowerCore = (*Core)(nil)
 
 func NewCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,

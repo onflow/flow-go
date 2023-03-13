@@ -2,7 +2,8 @@ package follower
 
 import (
 	"context"
-	"sync"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	realstorage "github.com/onflow/flow-go/storage"
 	"testing"
 	"time"
 
@@ -11,14 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	commonmock "github.com/onflow/flow-go/engine/common/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,13 +26,11 @@ func TestFollowerEngine(t *testing.T) {
 }
 
 type EngineSuite struct {
-	suite.Suite
+	CoreSuite
 
-	net     *mocknetwork.Network
-	con     *mocknetwork.Conduit
-	me      *module.Local
-	headers *storage.Headers
-	core    *commonmock.FollowerCore
+	net *mocknetwork.Network
+	con *mocknetwork.Conduit
+	me  *module.Local
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -42,12 +39,11 @@ type EngineSuite struct {
 }
 
 func (s *EngineSuite) SetupTest() {
+	s.CoreSuite.SetupTest()
 
 	s.net = mocknetwork.NewNetwork(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.me = module.NewLocal(s.T())
-	s.headers = storage.NewHeaders(s.T())
-	s.core = commonmock.NewFollowerCore(s.T())
 
 	nodeID := unittest.IdentifierFixture()
 	s.me.On("NodeID").Return(nodeID).Maybe()
@@ -91,22 +87,32 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 	block.Header.Height = 11
 	block.Header.ParentID = parent.ID()
 
-	proposals := []*messages.BlockProposal{messages.NewBlockProposal(&parent),
-		messages.NewBlockProposal(&block)}
+	// not in cache
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
+	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
-	originID := unittest.IdentifierFixture()
+	done := make(chan struct{})
+	hotstuffProposal := model.ProposalFromFlow(block.Header)
 
-	var done sync.WaitGroup
-	done.Add(len(proposals))
-	for _, proposal := range proposals {
-		s.core.On("OnBlockProposal", originID, proposal).Run(func(_ mock.Arguments) {
-			done.Done()
-		}).Return(nil).Once()
-	}
+	// the parent is the last finalized state
+	s.snapshot.On("Head").Return(parent.Header, nil)
+	// the block passes hotstuff validation
+	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+	// we should be able to extend the state with the block
+	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
+	// we should be able to get the parent header by its ID
+	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
+	// we do not have any children cached
+	s.cache.On("ByParentID", block.ID()).Return(nil, false)
+	// the proposal should be forwarded to the follower
+	s.follower.On("SubmitProposal", hotstuffProposal).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Once()
 
 	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
-		OriginID: originID,
-		Message:  proposals,
+		OriginID: unittest.IdentifierFixture(),
+		Message:  []*messages.BlockProposal{messages.NewBlockProposal(&block)},
 	})
-	unittest.AssertReturnsBefore(s.T(), done.Wait, time.Second)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
