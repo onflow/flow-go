@@ -91,8 +91,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	rpcInspectorCfg *validation.ControlMsgValidationInspectorConfig,
+	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
+	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor,
 	uniCfg *UnicastConfig,
 ) LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
@@ -108,8 +109,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerManagerCfg,
 			gossipCfg,
 			rCfg,
-			rpcInspectorCfg,
+			rpcValidationInspectorConfig,
 			unicastRateLimiterDistributor,
+			gossipSubInspectorNotifDistributor,
 			uniCfg)
 
 		if err != nil {
@@ -133,6 +135,7 @@ type NodeBuilder interface {
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
 	SetRateLimiterDistributor(consumer p2p.UnicastRateLimiterDistributor) NodeBuilder
+	SetGossipSubInspectorNotificationDistributor(distributor p2p.GossipSubInspectorNotificationDistributor) NodeBuilder
 	SetRPCValidationInspectorConfig(cfg *validation.ControlMsgValidationInspectorConfig) NodeBuilder
 	SetGossipSubTracer(tracer p2p.PubSubTracer) NodeBuilder
 	Build() (p2p.LibP2PNode, error)
@@ -163,12 +166,12 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 
 // DefaultRPCValidationConfig returns default RPC control message inspector config.
 func DefaultRPCValidationConfig() *validation.ControlMsgValidationInspectorConfig {
-	graftCfg, _ := validation.NewCtrlMsgValidationConfig(validation.ControlMsgGraft, validation.CtrlMsgValidationLimits{
+	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
 		validation.UpperThresholdMapKey:  validation.DefaultGraftUpperThreshold,
 		validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
 		validation.RateLimitMapKey:       validation.DefaultGraftRateLimit,
 	})
-	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(validation.ControlMsgPrune, validation.CtrlMsgValidationLimits{
+	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
 		validation.UpperThresholdMapKey:  validation.DefaultPruneUpperThreshold,
 		validation.SafetyThresholdMapKey: validation.DefaultPruneSafetyThreshold,
 		validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
@@ -206,7 +209,8 @@ type LibP2PNodeBuilder struct {
 	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
-	gossipSubTracer p2p.PubSubTracer
+	gossipSubTracer                    p2p.PubSubTracer
+	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -305,6 +309,11 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f CreateNodeFunc) NodeBuilder {
 
 func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeBuilder {
 	builder.rateLimiterDistributor = distributor
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubInspectorNotificationDistributor(distributor p2p.GossipSubInspectorNotificationDistributor) NodeBuilder {
+	builder.gossipSubInspectorNotifDistributor = distributor
 	return builder
 }
 
@@ -419,7 +428,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.metrics)
 	node.SetUnicastManager(unicastManager)
 
+	// create gossip control message validation inspector
+	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig, builder.gossipSubInspectorNotifDistributor)
+
 	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			rpcControlMsgInspector.Start(ctx)
+		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			rsys, err := builder.buildRouting(ctx, h)
 			if err != nil {
@@ -443,7 +459,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			}
 
 			// builds GossipSub with the given factory
-			gossipSub, err := builder.buildGossipSub(ctx, rsys, h)
+			gossipSub, err := builder.buildGossipSub(ctx, rsys, h, rpcControlMsgInspector)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
@@ -554,8 +570,9 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	rpcInspectorCfg *validation.ControlMsgValidationInspectorConfig,
+	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig,
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
+	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor,
 	uniCfg *UnicastConfig) (NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
@@ -583,8 +600,9 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(unicastRateLimiterDistributor).
-		SetRPCValidationInspectorConfig(rpcInspectorCfg).
-		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
+		SetRPCValidationInspectorConfig(rpcValidationInspectorConfig).
+		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
+		SetGossipSubInspectorNotificationDistributor(gossipSubInspectorNotifDistributor)
 
 	if gossipCfg.PeerScoring {
 		builder.EnableGossipSubPeerScoring(idProvider)
@@ -614,7 +632,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 // - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 // Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
 // and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerContext, rsys routing.Routing, h host.Host) (p2p.PubSubAdapter, error) {
+func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerContext, rsys routing.Routing, h host.Host, rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.PubSubAdapter, error) {
 	gossipSubConfigs := builder.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
 		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
 	})
@@ -637,11 +655,7 @@ func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerConte
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
 	rpcMetricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
 	gossipSubRPCInspector.AddInspector(rpcMetricsInspector)
-
-	// create and start gossip control message validation inspector
-	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig)
-	rpcControlMsgInspector.Start(ctx)
-	gossipSubRPCInspector.AddInspector(rpcControlMsgInspector)
+	gossipSubRPCInspector.AddInspector(rpcValidationInspector)
 
 	// The app-specific rpc inspector is a hook into the pubsub that is invoked upon receiving any incoming RPC
 	gossipSubConfigs.WithAppSpecificRpcInspector(gossipSubRPCInspector)

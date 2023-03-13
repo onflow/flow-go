@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 )
@@ -56,6 +57,7 @@ func NewCorruptLibP2PNodeFactory(
 			p2pbuilder.DefaultResourceManagerConfig(),
 			p2pbuilder.DefaultRPCValidationConfig(),
 			ratelimit.NewUnicastRateLimiterDistributor(),
+			distributor.DefaultGossipSubInspectorNotificationDistributor(log),
 			uniCfg)
 
 		if err != nil {

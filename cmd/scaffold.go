@@ -382,6 +382,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, err
 		}
 
+		fnb.GossipSubInspectorNotifDistributor = distributor.DefaultGossipSubInspectorNotificationDistributor(fnb.Logger)
+
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
@@ -398,6 +400,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.LibP2PResourceManagerConfig,
 			controlMsgRPCInspectorCfg,
 			fnb.UnicastRateLimiterDistributor,
+			fnb.GossipSubInspectorNotifDistributor,
 			uniCfg,
 		)
 
@@ -995,11 +998,14 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
+	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return fnb.GossipSubInspectorNotifDistributor, nil
+	})
 	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// distributor is returned as a component to be started and stopped.
 		return fnb.NodeDisallowListDistributor, nil
 	})
-
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -1860,11 +1866,11 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 // gossipSubRPCInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
 func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig() (*validation.ControlMsgValidationInspectorConfig, error) {
 	// setup rpc validation configuration for each control message type
-	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(validation.ControlMsgGraft, fnb.GossipSubRPCValidationConfigs.Graft)
+	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, fnb.GossipSubRPCValidationConfigs.Graft)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
-	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(validation.ControlMsgPrune, fnb.GossipSubRPCValidationConfigs.Prune)
+	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, fnb.GossipSubRPCValidationConfigs.Prune)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}

@@ -284,6 +284,8 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
+	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {

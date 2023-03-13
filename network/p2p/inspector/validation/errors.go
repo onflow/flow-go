@@ -5,13 +5,14 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // ErrUpperThreshold indicates that the amount of RPC messages received exceeds upper threshold.
 type ErrUpperThreshold struct {
-	controlMsg     ControlMsg
-	amount         int
-	upperThreshold int
+	controlMsg     p2p.ControlMessageType
+	amount         uint64
+	upperThreshold uint64
 }
 
 func (e ErrUpperThreshold) Error() string {
@@ -19,7 +20,7 @@ func (e ErrUpperThreshold) Error() string {
 }
 
 // NewUpperThresholdErr returns a new ErrUpperThreshold
-func NewUpperThresholdErr(controlMsg ControlMsg, amount, upperThreshold int) ErrUpperThreshold {
+func NewUpperThresholdErr(controlMsg p2p.ControlMessageType, amount, upperThreshold uint64) ErrUpperThreshold {
 	return ErrUpperThreshold{controlMsg: controlMsg, amount: amount, upperThreshold: upperThreshold}
 }
 
@@ -31,7 +32,7 @@ func IsErrUpperThreshold(err error) bool {
 
 // ErrMalformedTopic indicates that the rpc control message has an invalid topic ID.
 type ErrMalformedTopic struct {
-	controlMsg ControlMsg
+	controlMsg p2p.ControlMessageType
 	topic      channels.Topic
 }
 
@@ -40,7 +41,7 @@ func (e ErrMalformedTopic) Error() string {
 }
 
 // NewMalformedTopicErr returns a new ErrMalformedTopic
-func NewMalformedTopicErr(controlMsg ControlMsg, topic channels.Topic) ErrMalformedTopic {
+func NewMalformedTopicErr(controlMsg p2p.ControlMessageType, topic channels.Topic) ErrMalformedTopic {
 	return ErrMalformedTopic{controlMsg: controlMsg, topic: topic}
 }
 
@@ -52,16 +53,16 @@ func IsErrMalformedTopic(err error) bool {
 
 // ErrUnknownTopicChannel indicates that the rpc control message has a topic ID associated with an unknown channel.
 type ErrUnknownTopicChannel struct {
-	controlMsg ControlMsg
+	controlMsg p2p.ControlMessageType
 	topic      channels.Topic
 }
 
 func (e ErrUnknownTopicChannel) Error() string {
-	return fmt.Sprintf("the channel for topic ID %s in control message %s does not exist", e.topic, e.controlMsg)
+	return fmt.Sprintf("unknown the channel for topic ID %s in control message %s", e.topic, e.controlMsg)
 }
 
 // NewUnknownTopicChannelErr returns a new ErrMalformedTopic
-func NewUnknownTopicChannelErr(controlMsg ControlMsg, topic channels.Topic) ErrUnknownTopicChannel {
+func NewUnknownTopicChannelErr(controlMsg p2p.ControlMessageType, topic channels.Topic) ErrUnknownTopicChannel {
 	return ErrUnknownTopicChannel{controlMsg: controlMsg, topic: topic}
 }
 
@@ -73,8 +74,8 @@ func IsErrUnknownTopicChannel(err error) bool {
 
 // ErrValidationLimit indicates the validation limit is < 0.
 type ErrValidationLimit struct {
-	controlMsg ControlMsg
-	limit      int
+	controlMsg p2p.ControlMessageType
+	limit      uint64
 	limitStr   string
 }
 
@@ -83,12 +84,32 @@ func (e ErrValidationLimit) Error() string {
 }
 
 // NewValidationLimitErr returns a new ErrValidationLimit.
-func NewValidationLimitErr(controlMsg ControlMsg, limitStr string, limit int) ErrValidationLimit {
+func NewValidationLimitErr(controlMsg p2p.ControlMessageType, limitStr string, limit uint64) ErrValidationLimit {
 	return ErrValidationLimit{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
 }
 
 // IsErrValidationLimit returns whether an error is ErrValidationLimit
 func IsErrValidationLimit(err error) bool {
 	var e ErrValidationLimit
+	return errors.As(err, &e)
+}
+
+// ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
+type ErrRateLimitedControlMsg struct {
+	controlMsg p2p.ControlMessageType
+}
+
+func (e ErrRateLimitedControlMsg) Error() string {
+	return fmt.Sprintf("control message %s is rate limited for peer", e.controlMsg)
+}
+
+// NewRateLimitedControlMsgErr returns a new ErrValidationLimit.
+func NewRateLimitedControlMsgErr(controlMsg p2p.ControlMessageType) ErrRateLimitedControlMsg {
+	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
+}
+
+// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg
+func IsErrRateLimitedControlMsg(err error) bool {
+	var e ErrRateLimitedControlMsg
 	return errors.As(err, &e)
 }
