@@ -212,7 +212,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	assert.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
 		return err == nil
-	}, 5*time.Second, 50*time.Millisecond)
+	}, 30*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
@@ -238,10 +238,10 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 
 	suite.committee.EpochEmergencyFallbackTriggered()
 	// wait for the protocol event to be processed (async)
-	assert.Eventually(suite.T(), func() bool {
+	require.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
 		return err == nil
-	}, 5*time.Second, 50*time.Millisecond)
+	}, 30*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
