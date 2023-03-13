@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common"
@@ -18,8 +21,18 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
+
+type ComplianceOption func(*Core)
+
+// WithComplianceOptions sets options for the core's compliance config
+func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
+	return func(c *Core) {
+		for _, apply := range opts {
+			apply(&c.config)
+		}
+	}
+}
 
 type Core struct {
 	log            zerolog.Logger
@@ -48,8 +61,9 @@ func NewCore(log zerolog.Logger,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
-	tracer module.Tracer) *Core {
-	return &Core{
+	tracer module.Tracer,
+	opts ...ComplianceOption) *Core {
+	c := &Core{
 		log:            log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics: mempoolMetrics,
 		cleaner:        cleaner,
@@ -63,6 +77,12 @@ func NewCore(log zerolog.Logger,
 		tracer:         tracer,
 		config:         compliance.DefaultConfig(),
 	}
+
+	for _, apply := range opts {
+		apply(c)
+	}
+
+	return c
 }
 
 // OnBlockProposal handles incoming block proposals.

@@ -6,18 +6,27 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
+
+type EngineOption func(*Engine)
+
+// WithChannel sets the channel the follower engine will use to receive blocks.
+func WithChannel(channel channels.Channel) EngineOption {
+	return func(e *Engine) {
+		e.channel = channel
+	}
+}
 
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
@@ -37,25 +46,7 @@ type Engine struct {
 	pendingBlocks         *fifoqueue.FifoQueue // queues for processing inbound blocks
 	pendingBlocksNotifier engine.Notifier
 
-	core *Core
-}
-
-type Option func(*Engine)
-
-// WithComplianceOptions sets options for the engine's compliance config
-func WithComplianceOptions(opts ...compliance.Opt) Option {
-	return func(e *Engine) {
-		for _, apply := range opts {
-			apply(&e.core.config)
-		}
-	}
-}
-
-// WithChannel sets the channel the follower engine will use to receive blocks.
-func WithChannel(channel channels.Channel) Option {
-	return func(e *Engine) {
-		e.channel = channel
-	}
+	core common.FollowerCore
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -67,7 +58,7 @@ func New(
 	me module.Local,
 	engMetrics module.EngineMetrics,
 	core *Core,
-	opts ...Option,
+	opts ...EngineOption,
 ) (*Engine, error) {
 	// FIFO queue for block proposals
 	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity)
