@@ -5,6 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -17,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/storage"
 )
 
 type EngineOption func(*Engine)
@@ -38,13 +41,16 @@ const defaultBlockQueueCapacity = 10_000
 // Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
-	log                   zerolog.Logger
-	me                    module.Local
-	engMetrics            module.EngineMetrics
-	con                   network.Conduit
-	channel               channels.Channel
-	pendingBlocks         *fifoqueue.FifoQueue // queues for processing inbound blocks
-	pendingBlocksNotifier engine.Notifier
+	log                    zerolog.Logger
+	me                     module.Local
+	engMetrics             module.EngineMetrics
+	con                    network.Conduit
+	channel                channels.Channel
+	headers                storage.Headers
+	pendingBlocks          *fifoqueue.FifoQueue // queues for processing inbound blocks
+	pendingBlocksNotifier  engine.Notifier
+	finalizedBlockTracker  *tracker.NewestBlockTracker
+	finalizedBlockNotifier engine.Notifier
 
 	core common.FollowerCore
 }
@@ -87,56 +93,73 @@ func New(
 	e.con = con
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.processBlocksLoop).
+		AddWorker(e.processMessagesLoop).
 		Build()
 
 	return e, nil
 }
 
 // OnBlockProposal errors when called since follower engine doesn't support direct ingestion via internal method.
-func (c *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
-	c.log.Error().Msg("received unexpected block proposal via internal method")
+func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
+	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
 // OnSyncedBlocks performs processing of incoming blocks by pushing into queue and notifying worker.
-func (c *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
-	c.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// a blocks batch that is synced has to come locally, from the synchronization engine
 	// the block itself will contain the proposer to indicate who created it
 
 	// queue proposal
-	if c.pendingBlocks.Push(blocks) {
-		c.pendingBlocksNotifier.Notify()
+	if e.pendingBlocks.Push(blocks) {
+		e.pendingBlocksNotifier.Notify()
+	}
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// It informs follower.Core about finalization of the respective block.
+//
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedBlockTracker.Track(block) {
+		e.finalizedBlockNotifier.Notify()
 	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (c *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
-		c.onBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		e.onBlockProposal(flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
 	default:
-		c.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 	}
 	return nil
 }
 
-// processBlocksLoop processes available block, vote, and timeout messages as they are queued.
-func (c *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processMessagesLoop processes available block and finalization events as they are queued.
+func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
-	newMessageSignal := c.pendingBlocksNotifier.Channel()
+	newPendingBlockSignal := e.pendingBlocksNotifier.Channel()
+	newFinalizedBlockSignal := e.finalizedBlockNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
 			return
-		case <-newMessageSignal:
-			err := c.processQueuedBlocks(doneSignal) // no errors expected during normal operations
+		case <-newPendingBlockSignal:
+			err := e.processQueuedBlocks(doneSignal, newFinalizedBlockSignal) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		case <-newFinalizedBlockSignal:
+			err := e.processFinalizedBlock()
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -148,42 +171,66 @@ func (c *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
-func (c *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
+func (e *Engine) processQueuedBlocks(doneSignal, newFinalizedBlock <-chan struct{}) error {
 	for {
 		select {
 		case <-doneSignal:
 			return nil
+		case <-newFinalizedBlock:
+			// finalization events should get priority.
+			err := e.processFinalizedBlock()
+			if err != nil {
+				return err
+			}
 		default:
 		}
 
-		msg, ok := c.pendingBlocks.Pop()
+		msg, ok := e.pendingBlocks.Pop()
 		if ok {
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			// NOTE: this loop might need tweaking, we might want to check channels that were passed as arguments more often.
 			for _, block := range batch.Message {
-				err := c.core.OnBlockProposal(batch.OriginID, block)
+				err := e.core.OnBlockProposal(batch.OriginID, block)
 				if err != nil {
 					return fmt.Errorf("could not handle block proposal: %w", err)
 				}
-				c.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+				e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			}
 			continue
 		}
 
-		// when there are no more messages in the queue, back to the processBlocksLoop to wait
+		// when there are no more messages in the queue, back to the processMessagesLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}
 }
 
+// processFinalizedBlock performs processing of finalized block by querying it from storage
+// and propagating to follower core.
+func (e *Engine) processFinalizedBlock() error {
+	blockID := e.finalizedBlockTracker.NewestBlock().BlockID
+	// retrieve the latest finalized header, so we know the height
+	finalHeader, err := e.headers.ByBlockID(blockID)
+	if err != nil { // no expected errors
+		return fmt.Errorf("could not query finalized block %x: %w", blockID, err)
+	}
+
+	err = e.core.OnFinalizedBlock(finalHeader)
+	if err != nil {
+		return fmt.Errorf("could not process finalized block %x: %w", blockID, err)
+	}
+	return nil
+}
+
 // onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (c *Engine) onBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
-	c.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+func (e *Engine) onBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: proposal.OriginID,
 		Message:  []*messages.BlockProposal{proposal.Message},
 	}
 	// queue proposal
-	if c.pendingBlocks.Push(proposalAsList) {
-		c.pendingBlocksNotifier.Notify()
+	if e.pendingBlocks.Push(proposalAsList) {
+		e.pendingBlocksNotifier.Notify()
 	}
 }
