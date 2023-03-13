@@ -57,7 +57,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	engMetrics module.EngineMetrics,
-	core *Core,
+	core common.FollowerCore,
 	opts ...EngineOption,
 ) (*Engine, error) {
 	// FIFO queue for block proposals
