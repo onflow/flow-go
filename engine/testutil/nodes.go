@@ -699,8 +699,25 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
-	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, validator, syncCore, node.Tracer)
+	core := follower.NewCore(
+		node.Log,
+		node.Metrics,
+		cleaner,
+		node.Headers,
+		node.Payloads,
+		followerState,
+		pendingBlocks,
+		followerCore,
+		validator,
+		syncCore,
+		node.Tracer)
+	followerEng, err := follower.New(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics,
+		core,
+	)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)

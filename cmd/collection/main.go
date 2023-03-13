@@ -299,11 +299,8 @@ func main() {
 
 			validator := validator.New(mainConsensusCommittee, verifier)
 
-			followerEng, err = followereng.New(
+			core := followereng.NewCore(
 				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				cleaner,
 				node.Storage.Headers,
@@ -315,6 +312,14 @@ func main() {
 				mainChainSyncCore,
 				node.Tracer,
 				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+			)
+
+			followerEng, err = followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				core,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

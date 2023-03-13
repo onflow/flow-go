@@ -325,11 +325,8 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
-		followerEng, err := follower.New(
+		core := follower.NewCore(
 			node.Logger,
-			node.Network,
-			node.Me,
-			node.Metrics.Engine,
 			node.Metrics.Mempool,
 			cleaner,
 			node.Storage.Headers,
@@ -341,6 +338,14 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.SyncCore,
 			node.Tracer,
 			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+		)
+
+		followerEng, err := follower.New(
+			node.Logger,
+			node.Network,
+			node.Me,
+			node.Metrics.Engine,
+			core,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)

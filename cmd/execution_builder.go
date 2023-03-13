@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	validator "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -910,12 +910,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
 	validator := validator.New(exeNode.committee, verifier)
 
-	var err error
-	exeNode.followerEng, err = followereng.New(
-		node.Logger,
-		node.Network,
-		node.Me,
-		node.Metrics.Engine,
+	core := followereng.NewCore(node.Logger,
 		node.Metrics.Mempool,
 		cleaner,
 		node.Storage.Headers,
@@ -928,6 +923,14 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Tracer,
 		followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 	)
+
+	var err error
+	exeNode.followerEng, err = followereng.New(
+		node.Logger,
+		node.Network,
+		node.Me,
+		node.Metrics.Engine,
+		core)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}

@@ -2,6 +2,15 @@ package follower
 
 import (
 	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	commonmock "github.com/onflow/flow-go/engine/common/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -11,13 +20,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestFollowerEngine(t *testing.T) {

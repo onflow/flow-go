@@ -370,12 +370,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			verifier := verification.NewCombinedVerifier(committee, packer)
 			validator := validator.New(committee, verifier)
 
-			var err error
-			followerEng, err = follower.New(
+			core := follower.NewCore(
 				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				cleaner,
 				node.Storage.Headers,
@@ -387,6 +383,15 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.Tracer,
 				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+			)
+
+			var err error
+			followerEng, err = follower.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				core,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
