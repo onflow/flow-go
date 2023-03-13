@@ -33,6 +33,10 @@ func WithChannel(channel channels.Channel) EngineOption {
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
 
+// defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
+// certified blocks between workers.
+const defaultCertifiedBlocksChannelCapacity = 100
+
 // Engine follows and maintains the local copy of the protocol state. It is a
 // passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
@@ -50,6 +54,7 @@ type Engine struct {
 	pendingBlocksNotifier  engine.Notifier
 	finalizedBlockTracker  *tracker.NewestBlockTracker
 	finalizedBlockNotifier engine.Notifier
+	certifiedBlocksChan    chan struct{}
 
 	core *Core
 }
@@ -79,11 +84,14 @@ func New(
 		pendingBlocks:         pendingBlocks,
 		pendingBlocksNotifier: engine.NewNotifier(),
 		core:                  core,
+		certifiedBlocksChan:   make(chan struct{}, defaultCertifiedBlocksChannelCapacity),
 	}
 
 	for _, apply := range opts {
 		apply(e)
 	}
+
+	e.core.certifiedBlocksChan = e.certifiedBlocksChan
 
 	con, err := net.Register(e.channel, e)
 	if err != nil {
@@ -92,8 +100,9 @@ func New(
 	e.con = con
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.processMessagesLoop).
+		AddWorker(e.processBlocksLoop).
 		AddWorker(e.finalizationProcessingLoop).
+		AddWorker(e.processCertifiedBlocksLoop).
 		Build()
 
 	return e, nil
@@ -142,8 +151,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 	return nil
 }
 
-// processMessagesLoop processes available block and finalization events as they are queued.
-func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processBlocksLoop processes available blocks as they are queued.
+func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
@@ -154,6 +163,24 @@ func (e *Engine) processMessagesLoop(ctx irrecoverable.SignalerContext, ready co
 			return
 		case <-newPendingBlockSignal:
 			err := e.processQueuedBlocks(doneSignal) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
+	}
+}
+
+// processCertifiedBlocksLoop processes certified blocks that were pushed by core and will be dispatched on dedicated core's goroutine.
+func (e *Engine) processCertifiedBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	for {
+		select {
+		case <-doneSignal:
+			return
+		case <-e.certifiedBlocksChan:
+			err := e.core.OnCertifiedBlocks() // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -187,7 +214,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 			continue
 		}
 
-		// when there are no more messages in the queue, back to the processMessagesLoop to wait
+		// when there are no more messages in the queue, back to the processBlocksLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}

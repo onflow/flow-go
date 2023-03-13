@@ -34,18 +34,19 @@ func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
 }
 
 type Core struct {
-	log            zerolog.Logger
-	mempoolMetrics module.MempoolMetrics
-	config         compliance.Config
-	tracer         module.Tracer
-	headers        storage.Headers
-	payloads       storage.Payloads
-	pending        module.PendingBlockBuffer
-	cleaner        storage.Cleaner
-	state          protocol.FollowerState
-	follower       module.HotStuffFollower
-	validator      hotstuff.Validator
-	sync           module.BlockRequester
+	log                 zerolog.Logger
+	mempoolMetrics      module.MempoolMetrics
+	config              compliance.Config
+	tracer              module.Tracer
+	headers             storage.Headers
+	payloads            storage.Payloads
+	pending             module.PendingBlockBuffer
+	cleaner             storage.Cleaner
+	state               protocol.FollowerState
+	follower            module.HotStuffFollower
+	validator           hotstuff.Validator
+	sync                module.BlockRequester
+	certifiedBlocksChan chan<- struct{}
 }
 
 func NewCore(log zerolog.Logger,
@@ -325,6 +326,10 @@ func (c *Core) processPendingChildren(ctx context.Context, header *flow.Header) 
 
 func (c *Core) OnFinalizedBlock(block *flow.Header) error {
 	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Core) OnCertifiedBlocks() error {
 	panic("implement me")
 }
 
