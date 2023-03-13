@@ -1,12 +1,15 @@
 package computer
 
 import (
+	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -15,6 +18,8 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -33,6 +38,12 @@ type ViewCommitter interface {
 	)
 }
 
+type collectionResult struct {
+	collectionItem
+	startTime time.Time
+	state.View
+}
+
 type resultCollector struct {
 	tracer    module.Tracer
 	blockSpan otelTrace.Span
@@ -42,22 +53,27 @@ type resultCollector struct {
 	closeOnce sync.Once
 
 	committer          ViewCommitter
-	state              flow.StateCommitment
-	committerInputChan chan state.View
+	committerInputChan chan collectionResult
 	committerDoneChan  chan struct{}
 	committerError     error
 
-	eventHasherInputChan chan flow.EventsList
-	eventHasherDoneChan  chan struct{}
-	eventHasherError     error
+	signer        module.Local
+	spockHasher   hash.Hasher
+	receiptHasher hash.Hasher
 
-	signer               module.Local
-	spockHasher          hash.Hasher
-	spockHasherInputChan chan *delta.SpockSnapshot
-	spockHasherDoneChan  chan struct{}
-	spockHasherError     error
+	snapshotHasherInputChan chan collectionResult
+	snapshotHasherDoneChan  chan struct{}
+	snapshotHasherError     error
+
+	executionDataProvider *provider.Provider
+
+	parentBlockExecutionResultID flow.Identifier
 
 	result *execution.ComputationResult
+
+	chunks                 []*flow.Chunk
+	spockSignatures        []crypto.Signature
+	convertedServiceEvents flow.ServiceEventList
 }
 
 func newResultCollector(
@@ -66,30 +82,34 @@ func newResultCollector(
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
 	signer module.Local,
+	executionDataProvider *provider.Provider,
 	spockHasher hash.Hasher,
+	receiptHasher hash.Hasher,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numCollections int,
 ) *resultCollector {
 	collector := &resultCollector{
-		tracer:               tracer,
-		blockSpan:            blockSpan,
-		metrics:              metrics,
-		committer:            committer,
-		state:                *block.StartState,
-		committerInputChan:   make(chan state.View, numCollections),
-		committerDoneChan:    make(chan struct{}),
-		eventHasherInputChan: make(chan flow.EventsList, numCollections),
-		eventHasherDoneChan:  make(chan struct{}),
-		signer:               signer,
-		spockHasher:          spockHasher,
-		spockHasherInputChan: make(chan *delta.SpockSnapshot, numCollections),
-		spockHasherDoneChan:  make(chan struct{}),
-		result:               execution.NewEmptyComputationResult(block),
+		tracer:                       tracer,
+		blockSpan:                    blockSpan,
+		metrics:                      metrics,
+		committer:                    committer,
+		committerInputChan:           make(chan collectionResult, numCollections),
+		committerDoneChan:            make(chan struct{}),
+		signer:                       signer,
+		spockHasher:                  spockHasher,
+		receiptHasher:                receiptHasher,
+		snapshotHasherInputChan:      make(chan collectionResult, numCollections),
+		snapshotHasherDoneChan:       make(chan struct{}),
+		executionDataProvider:        executionDataProvider,
+		parentBlockExecutionResultID: parentBlockExecutionResultID,
+		result:                       execution.NewEmptyComputationResult(block),
+		chunks:                       make([]*flow.Chunk, 0, numCollections),
+		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 	}
 
 	go collector.runCollectionCommitter()
-	go collector.runEventsHasher()
-	go collector.runSpockHasher()
+	go collector.runSnapshotHasher()
 
 	return collector
 }
@@ -97,74 +117,115 @@ func newResultCollector(
 func (collector *resultCollector) runCollectionCommitter() {
 	defer close(collector.committerDoneChan)
 
-	for view := range collector.committerInputChan {
+	for collection := range collector.committerInputChan {
 		span := collector.tracer.StartSpanFromParent(
 			collector.blockSpan,
 			trace.EXECommitDelta)
 
-		stateCommit, proof, trieUpdate, err := collector.committer.CommitView(
-			view,
-			collector.state)
+		startState := collector.result.EndState
+		endState, proof, trieUpdate, err := collector.committer.CommitView(
+			collection.View,
+			startState)
 		if err != nil {
-			collector.committerError = fmt.Errorf("committer failed: %w", err)
+			collector.committerError = fmt.Errorf(
+				"commit view failed: %w",
+				err)
 			return
 		}
 
 		collector.result.StateCommitments = append(
 			collector.result.StateCommitments,
-			stateCommit)
-		collector.result.Proofs = append(collector.result.Proofs, proof)
-		collector.result.TrieUpdates = append(
-			collector.result.TrieUpdates,
-			trieUpdate)
+			endState)
 
-		collector.state = stateCommit
-		span.End()
-	}
-}
-
-func (collector *resultCollector) runEventsHasher() {
-	defer close(collector.eventHasherDoneChan)
-
-	for data := range collector.eventHasherInputChan {
-		span := collector.tracer.StartSpanFromParent(
-			collector.blockSpan,
-			trace.EXEHashEvents)
-
-		rootHash, err := flow.EventsMerkleRootHash(data)
+		eventsHash, err := flow.EventsMerkleRootHash(
+			collector.result.Events[collection.collectionIndex])
 		if err != nil {
-			collector.eventHasherError = fmt.Errorf(
-				"event hasher failed: %w",
+			collector.committerError = fmt.Errorf(
+				"hash events failed: %w",
 				err)
 			return
 		}
 
 		collector.result.EventsHashes = append(
 			collector.result.EventsHashes,
-			rootHash)
+			eventsHash)
+
+		chunk := flow.NewChunk(
+			collection.blockId,
+			collection.collectionIndex,
+			startState,
+			len(collection.transactions),
+			eventsHash,
+			endState)
+		collector.chunks = append(collector.chunks, chunk)
+
+		collectionStruct := collection.Collection()
+
+		// Note: There's some inconsistency in how chunk execution data and
+		// chunk data pack populate their collection fields when the collection
+		// is the system collection.
+		executionCollection := &collectionStruct
+		dataPackCollection := executionCollection
+		if collection.isSystemCollection {
+			dataPackCollection = nil
+		}
+
+		collector.result.ChunkDataPacks = append(
+			collector.result.ChunkDataPacks,
+			flow.NewChunkDataPack(
+				chunk.ID(),
+				startState,
+				proof,
+				dataPackCollection))
+
+		collector.result.ChunkExecutionDatas = append(
+			collector.result.ChunkExecutionDatas,
+			&execution_data.ChunkExecutionData{
+				Collection: executionCollection,
+				Events:     collector.result.Events[collection.collectionIndex],
+				TrieUpdate: trieUpdate,
+			})
+
+		collector.metrics.ExecutionChunkDataPackGenerated(
+			len(proof),
+			len(collection.transactions))
+
+		collector.result.EndState = endState
 
 		span.End()
 	}
 }
 
-func (collector *resultCollector) runSpockHasher() {
-	defer close(collector.spockHasherDoneChan)
+func (collector *resultCollector) runSnapshotHasher() {
+	defer close(collector.snapshotHasherDoneChan)
 
-	for snapshot := range collector.spockHasherInputChan {
+	for collection := range collector.snapshotHasherInputChan {
+
+		snapshot := collection.View.(*delta.View).Interactions()
+
+		collector.result.TransactionResultIndex = append(
+			collector.result.TransactionResultIndex,
+			len(collector.result.TransactionResults))
+		collector.result.StateSnapshots = append(
+			collector.result.StateSnapshots,
+			snapshot)
+
+		collector.metrics.ExecutionCollectionExecuted(
+			time.Since(collection.startTime),
+			collector.result.CollectionStats(collection.collectionIndex))
+
 		spock, err := collector.signer.SignFunc(
 			snapshot.SpockSecret,
 			collector.spockHasher,
 			SPOCKProve)
 		if err != nil {
-			collector.spockHasherError = fmt.Errorf(
-				"spock hasher failed: %w",
+			collector.snapshotHasherError = fmt.Errorf(
+				"signing spock hash failed: %w",
 				err)
 			return
 		}
 
-		collector.result.SpockSignatures = append(
-			collector.result.SpockSignatures,
-			spock)
+		collector.spockSignatures = append(collector.spockSignatures, spock)
 	}
 }
 
@@ -172,74 +233,145 @@ func (collector *resultCollector) AddTransactionResult(
 	collectionIndex int,
 	txn *fvm.TransactionProcedure,
 ) {
-	collector.result.AddTransactionResult(collectionIndex, txn)
+	collector.convertedServiceEvents = append(
+		collector.convertedServiceEvents,
+		txn.ConvertedServiceEvents...)
+
+	collector.result.Events[collectionIndex] = append(
+		collector.result.Events[collectionIndex],
+		txn.Events...)
+	collector.result.ServiceEvents = append(
+		collector.result.ServiceEvents,
+		txn.ServiceEvents...)
+
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: txn.ComputationUsed,
+		MemoryUsed:      txn.MemoryEstimate,
+	}
+	if txn.Err != nil {
+		txnResult.ErrorMessage = txn.Err.Error()
+	}
+
+	collector.result.TransactionResults = append(
+		collector.result.TransactionResults,
+		txnResult)
+
+	for computationKind, intensity := range txn.ComputationIntensities {
+		collector.result.ComputationIntensities[computationKind] += intensity
+	}
 }
 
 func (collector *resultCollector) CommitCollection(
 	collection collectionItem,
+	startTime time.Time,
 	collectionView state.View,
-) module.ExecutionResultStats {
+) {
+
+	result := collectionResult{
+		collectionItem: collection,
+		startTime:      startTime,
+		View:           collectionView,
+	}
 
 	select {
-	case collector.committerInputChan <- collectionView:
+	case collector.committerInputChan <- result:
 		// Do nothing
 	case <-collector.committerDoneChan:
 		// Committer exited (probably due to an error)
 	}
 
 	select {
-	case collector.eventHasherInputChan <- collector.result.Events[collection.collectionIndex]:
-		// Do nothing
-	case <-collector.eventHasherDoneChan:
-		// Events hasher exited (probably due to an error)
-	}
-
-	snapshot := collectionView.(*delta.View).Interactions()
-	select {
-	case collector.spockHasherInputChan <- snapshot:
+	case collector.snapshotHasherInputChan <- result:
 		// do nothing
-	case <-collector.spockHasherDoneChan:
-		// Spock hasher exited (probably due to an error)
+	case <-collector.snapshotHasherDoneChan:
+		// Snapshot hasher exited (probably due to an error)
 	}
-
-	collector.result.AddCollection(snapshot)
-	return collector.result.CollectionStats(collection.collectionIndex)
 }
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
 		close(collector.committerInputChan)
-		close(collector.eventHasherInputChan)
-		close(collector.spockHasherInputChan)
+		close(collector.snapshotHasherInputChan)
 	})
 }
 
-func (collector *resultCollector) Finalize() (
+func (collector *resultCollector) Finalize(
+	ctx context.Context,
+) (
 	*execution.ComputationResult,
 	error,
 ) {
 	collector.Stop()
 
 	<-collector.committerDoneChan
-	<-collector.eventHasherDoneChan
-	<-collector.spockHasherDoneChan
+	<-collector.snapshotHasherDoneChan
 
 	var err error
 	if collector.committerError != nil {
 		err = multierror.Append(err, collector.committerError)
 	}
 
-	if collector.eventHasherError != nil {
-		err = multierror.Append(err, collector.eventHasherError)
-	}
-
-	if collector.spockHasherError != nil {
-		err = multierror.Append(err, collector.spockHasherError)
+	if collector.snapshotHasherError != nil {
+		err = multierror.Append(err, collector.snapshotHasherError)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
+	executionDataID, err := collector.executionDataProvider.Provide(
+		ctx,
+		collector.result.Height(),
+		collector.result.BlockExecutionData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to provide execution data: %w", err)
+	}
+
+	executionResult := flow.NewExecutionResult(
+		collector.parentBlockExecutionResultID,
+		collector.result.ExecutableBlock.ID(),
+		collector.chunks,
+		collector.convertedServiceEvents,
+		executionDataID)
+
+	executionReceipt, err := GenerateExecutionReceipt(
+		collector.signer,
+		collector.receiptHasher,
+		executionResult,
+		collector.spockSignatures)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign execution result: %w", err)
+	}
+
+	collector.result.ExecutionReceipt = executionReceipt
 	return collector.result, nil
+}
+
+func GenerateExecutionReceipt(
+	signer module.Local,
+	receiptHasher hash.Hasher,
+	result *flow.ExecutionResult,
+	spockSignatures []crypto.Signature,
+) (
+	*flow.ExecutionReceipt,
+	error,
+) {
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult:   *result,
+		Spocks:            spockSignatures,
+		ExecutorSignature: crypto.Signature{},
+		ExecutorID:        signer.NodeID(),
+	}
+
+	// generates a signature over the execution result
+	id := receipt.ID()
+	sig, err := signer.Sign(id[:], receiptHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign execution result: %w", err)
+	}
+
+	receipt.ExecutorSignature = sig
+
+	return receipt, nil
 }

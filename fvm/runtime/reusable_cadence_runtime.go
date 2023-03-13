@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -16,7 +17,7 @@ import (
 type Environment interface {
 	runtime.Interface
 
-	SetAccountFrozen(address common.Address, frozen bool) error
+	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
 var setAccountFrozenFunctionType = &sema.FunctionType{
@@ -55,6 +56,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Type: setAccountFrozenFunctionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredHostFunctionValue(
+			setAccountFrozenFunctionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
 				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 				if !ok {
@@ -71,7 +73,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 				var err error
 				if reusable.fvmEnv != nil {
 					err = reusable.fvmEnv.SetAccountFrozen(
-						common.Address(address),
+						flow.ConvertAddress(address),
 						bool(frozen))
 				} else {
 					err = errors.NewOperationNotSupportedError("SetAccountFrozen")
@@ -83,7 +85,6 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 
 				return interpreter.VoidValue{}
 			},
-			setAccountFrozenFunctionType,
 		),
 	}
 
@@ -163,6 +164,8 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	)
 }
 
+type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
+
 type ReusableCadenceRuntimePool struct {
 	pool chan *ReusableCadenceRuntime
 
@@ -173,13 +176,13 @@ type ReusableCadenceRuntimePool struct {
 	// pool will create runtimes using this function.
 	//
 	// Note that this is primarily used for testing.
-	newCustomRuntime func() runtime.Runtime
+	newCustomRuntime CadenceRuntimeConstructor
 }
 
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	newCustomRuntime func() runtime.Runtime,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
@@ -206,7 +209,7 @@ func NewReusableCadenceRuntimePool(
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
-	newCustomRuntime func() runtime.Runtime,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
@@ -217,7 +220,7 @@ func NewCustomReusableCadenceRuntimePool(
 
 func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 	if pool.newCustomRuntime != nil {
-		return pool.newCustomRuntime()
+		return pool.newCustomRuntime(pool.config)
 	}
 	return runtime.NewInterpreterRuntime(pool.config)
 }

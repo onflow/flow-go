@@ -13,10 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,28 +27,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		view := utils.NewSimpleView()
 		context := fvm.NewContext(
 			fvm.WithLogger(log),
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-		txnState := state.NewTransactionState(
-			view,
-			state.DefaultParameters().
-				WithMaxKeySizeAllowed(context.MaxStateKeySize).
-				WithMaxValueSizeAllowed(context.MaxStateValueSize).
-				WithMeterParameters(
-					meter.DefaultParameters().WithStorageInteractionLimit(
-						context.MaxStateInteractionSize)))
+		txnState := testutils.NewSimpleTransaction(nil)
 
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
-		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
-		require.NoError(t, err)
-
-		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
 		require.Nil(t, err)
-		require.Error(t, proc.Err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -67,28 +53,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		view := utils.NewSimpleView()
 		context := fvm.NewContext(
 			fvm.WithLogger(log),
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-		txnState := state.NewTransactionState(
-			view,
-			state.DefaultParameters().
-				WithMaxKeySizeAllowed(context.MaxStateKeySize).
-				WithMaxValueSizeAllowed(context.MaxStateValueSize).
-				WithMeterParameters(
-					meter.DefaultParameters().WithStorageInteractionLimit(
-						context.MaxStateInteractionSize)))
+		txnState := testutils.NewSimpleTransaction(nil)
 
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
-		derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
-		require.NoError(t, err)
-
-		err = fvm.Run(proc.NewExecutor(context, txnState, derivedTxnData))
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
 		require.Nil(t, err)
-		require.Error(t, proc.Err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -97,6 +72,12 @@ func TestSafetyCheck(t *testing.T) {
 
 type ErrorReturningRuntime struct {
 	TxErrors []error
+}
+
+var _ runtime.Runtime = &ErrorReturningRuntime{}
+
+func (e *ErrorReturningRuntime) Config() runtime.Config {
+	panic("Config not expected")
 }
 
 func (e *ErrorReturningRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
@@ -118,8 +99,6 @@ func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) 
 func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
-
-var _ runtime.Runtime = &ErrorReturningRuntime{}
 
 func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	if len(e.TxErrors) == 0 {

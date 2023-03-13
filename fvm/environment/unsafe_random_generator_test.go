@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,7 +14,7 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 	t.Run("UnsafeRandom doesnt re-seed the random", func(t *testing.T) {
 		bh := &flow.Header{}
 
-		urg := environment.NewUnsafeRandomGenerator(&environment.Tracer{}, bh)
+		urg := environment.NewUnsafeRandomGenerator(tracing.NewTracerSpan(), bh)
 
 		// 10 random numbers. extremely unlikely to get the same number all the time and just fail the test by chance
 		N := 10

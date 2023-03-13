@@ -309,7 +309,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	req := execproto.GetTransactionsByBlockIDRequest{
+	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
@@ -418,7 +418,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	// create request and forward to EN
-	req := execproto.GetTransactionByIndexRequest{
+	req := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
 		Index:   index,
 	}
@@ -642,7 +642,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
-	req := execproto.GetTransactionResultRequest{
+	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: transactionID,
 	}
@@ -673,7 +673,7 @@ func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionResultRequest,
+	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -705,7 +705,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResult(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionResultRequest,
+	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -713,7 +713,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResult(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
@@ -726,7 +726,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionsByBlockIDRequest,
+	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
 
@@ -763,7 +763,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionsByBlockIDRequest,
+	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -771,7 +771,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
@@ -784,7 +784,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionByIndexRequest,
+	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -822,7 +822,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultByIndex(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionByIndexRequest,
+	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
@@ -830,7 +830,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
+	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)

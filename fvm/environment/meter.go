@@ -45,25 +45,28 @@ const (
 	ComputationKindBLSVerifyPOP               = 2031
 	ComputationKindBLSAggregateSignatures     = 2032
 	ComputationKindBLSAggregatePublicKeys     = 2033
+	ComputationKindGetOrLoadProgram           = 2034
 )
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
-	ComputationUsed() uint64
+	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
-	MemoryEstimate() uint64
+	MemoryUsed() (uint64, error)
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
+
+	InteractionUsed() (uint64, error)
 }
 
 type meterImpl struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 }
 
-func NewMeter(txnState *state.TransactionState) Meter {
+func NewMeter(txnState state.NestedTransaction) Meter {
 	return &meterImpl{
 		txnState: txnState,
 	}
@@ -73,36 +76,31 @@ func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterComputation(kind, intensity)
-	}
-	return nil
+	return meter.txnState.MeterComputation(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.txnState.ComputationIntensities()
 }
 
-func (meter *meterImpl) ComputationUsed() uint64 {
-	return meter.txnState.TotalComputationUsed()
+func (meter *meterImpl) ComputationUsed() (uint64, error) {
+	return meter.txnState.TotalComputationUsed(), nil
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
-	}
-	return nil
+	return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (meter *meterImpl) MemoryEstimate() uint64 {
-	return meter.txnState.TotalMemoryEstimate()
+func (meter *meterImpl) MemoryUsed() (uint64, error) {
+	return meter.txnState.TotalMemoryEstimate(), nil
+}
+
+func (meter *meterImpl) InteractionUsed() (uint64, error) {
+	return meter.txnState.InteractionUsed(), nil
 }
 
 func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterEmittedEvent(byteSize)
-	}
-	return nil
+	return meter.txnState.MeterEmittedEvent(byteSize)
 }
 
 func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
@@ -117,7 +115,7 @@ type cancellableMeter struct {
 
 func NewCancellableMeter(
 	ctx context.Context,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{

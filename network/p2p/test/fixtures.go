@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -28,7 +30,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -51,12 +55,15 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	parameters := &NodeFixtureParameters{
-		HandlerFunc: func(network.Stream) {},
-		Unicasts:    nil,
-		Key:         NetworkingKeyFixtures(t),
-		Address:     unittest.DefaultAddress,
-		Logger:      unittest.Logger().Level(zerolog.ErrorLevel),
-		Role:        flow.RoleCollection,
+		HandlerFunc:            func(network.Stream) {},
+		Unicasts:               nil,
+		Key:                    NetworkingKeyFixtures(t),
+		Address:                unittest.DefaultAddress,
+		Logger:                 unittest.Logger().Level(zerolog.ErrorLevel),
+		Role:                   flow.RoleCollection,
+		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
+		Metrics:                metrics.NewNoopCollector(),
+		ResourceManager:        testutils.NewResourceManager(t),
 	}
 
 	for _, opt := range opts {
@@ -70,13 +77,12 @@ func NodeFixture(
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	noopMetrics := metrics.NewNoopCollector()
-	connManager := connection.NewConnManager(logger, noopMetrics)
-	resourceManager := testutils.NewResourceManager(t)
+	connManager, err := connection.NewConnManager(logger, parameters.Metrics, connection.DefaultConnManagerConfig())
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		parameters.Metrics,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
@@ -84,14 +90,19 @@ func NodeFixture(
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
-				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
-				noopMetrics,
+				parameters.Metrics,
 				parameters.DhtOptions...,
 			)
 		}).
-		SetResourceManager(resourceManager).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc)
+		SetResourceManager(parameters.ResourceManager).
+		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
+		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay)
+
+	if parameters.ResourceManager != nil {
+		builder.SetResourceManager(parameters.ResourceManager)
+	}
 
 	if parameters.ConnGater != nil {
 		builder.SetConnectionGater(parameters.ConnGater)
@@ -114,6 +125,10 @@ func NodeFixture(
 		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
+	if parameters.ConnManager != nil {
+		builder.SetConnectionManager(parameters.ConnManager)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -134,22 +149,32 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc        network.StreamHandler
-	Unicasts           []unicast.ProtocolName
-	Key                crypto.PrivateKey
-	Address            string
-	DhtOptions         []dht.Option
-	Role               flow.Role
-	Logger             zerolog.Logger
-	PeerScoringEnabled bool
-	IdProvider         module.IdentityProvider
-	AppSpecificScore   func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
-	ConnectionPruning  bool                  // peer manager parameter
-	UpdateInterval     time.Duration         // peer manager parameter
-	PeerProvider       p2p.PeersProvider     // peer manager parameter
-	ConnGater          connmgr.ConnectionGater
-	GossipSubFactory   p2pbuilder.GossipSubFactoryFunc
-	GossipSubConfig    p2pbuilder.GossipSubAdapterConfigFunc
+	HandlerFunc            network.StreamHandler
+	Unicasts               []protocols.ProtocolName
+	Key                    crypto.PrivateKey
+	Address                string
+	DhtOptions             []dht.Option
+	Role                   flow.Role
+	Logger                 zerolog.Logger
+	PeerScoringEnabled     bool
+	IdProvider             module.IdentityProvider
+	AppSpecificScore       func(peer.ID) float64 // overrides GossipSub scoring for sake of testing.
+	ConnectionPruning      bool                  // peer manager parameter
+	UpdateInterval         time.Duration         // peer manager parameter
+	PeerProvider           p2p.PeersProvider     // peer manager parameter
+	ConnGater              connmgr.ConnectionGater
+	ConnManager            connmgr.ConnManager
+	GossipSubFactory       p2pbuilder.GossipSubFactoryFunc
+	GossipSubConfig        p2pbuilder.GossipSubAdapterConfigFunc
+	Metrics                module.NetworkMetrics
+	ResourceManager        network.ResourceManager
+	CreateStreamRetryDelay time.Duration
+}
+
+func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.CreateStreamRetryDelay = delay
+	}
 }
 
 func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
@@ -173,7 +198,7 @@ func WithPeerManagerEnabled(connectionPruning bool, updateInterval time.Duration
 	}
 }
 
-func WithPreferredUnicasts(unicasts []unicast.ProtocolName) NodeFixtureParameterOption {
+func WithPreferredUnicasts(unicasts []protocols.ProtocolName) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Unicasts = unicasts
 	}
@@ -203,6 +228,12 @@ func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameter
 	}
 }
 
+func WithConnectionManager(connManager connmgr.ConnManager) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ConnManager = connManager
+	}
+}
+
 func WithRole(role flow.Role) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Role = role
@@ -218,6 +249,20 @@ func WithAppSpecificScore(score func(peer.ID) float64) NodeFixtureParameterOptio
 func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Logger = logger
+	}
+}
+
+func WithMetricsCollector(metrics module.NetworkMetrics) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.Metrics = metrics
+	}
+}
+
+// WithDefaultResourceManager sets the resource manager to nil, which will cause the node to use the default resource manager.
+// Otherwise, it uses the resource manager provided by the test (the infinite resource manager).
+func WithDefaultResourceManager() NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ResourceManager = nil
 	}
 }
 
@@ -302,5 +347,69 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			require.NoError(t, err)
 			require.NoError(t, node.AddPeer(ctx, otherPInfo))
 		}
+	}
+}
+
+// EnsureConnected ensures that the given nodes are connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, node := range nodes {
+		for _, other := range nodes {
+			if node == other {
+				continue
+			}
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
+		}
+	}
+}
+
+// EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
+func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+	for _, this := range nodes {
+		for _, other := range nodes {
+			if this == other {
+				continue
+			}
+			// stream creation should pass without error
+			s, err := this.CreateStream(ctx, other.Host().ID())
+			require.NoError(t, err)
+			require.NotNil(t, s)
+		}
+	}
+}
+
+// EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
+// Note: EnsureConnected() must be called to connect all nodes before calling this function.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]p2p.Subscription, len(nodes))
+	for i, node := range nodes {
+		ps, err := node.Subscribe(
+			topic,
+			validator.TopicValidator(
+				unittest.Logger(),
+				unittest.AllowAllPeerFilter()))
+		require.NoError(t, err)
+		subs[i] = ps
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for _, node := range nodes {
+		// creates a unique message to be published by the node
+		msg, _ := messageFactory()
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+		require.NoError(t, node.Publish(ctx, topic, data))
+
+		// wait for the message to be received by all nodes
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+		cancel()
 	}
 }

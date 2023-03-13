@@ -319,7 +319,7 @@ func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
 		return "135000.0", 135000.0, nil
 	}
 	if role == flow.RoleAccess {
-		return "0.0", 0.0, nil
+		return "100.0", 100.0, nil
 	}
 
 	return "", 0, fmt.Errorf("could not get token amount by role: %v", role)

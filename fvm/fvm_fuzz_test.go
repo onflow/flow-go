@@ -33,7 +33,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -251,7 +251,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -272,7 +272,8 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(tb, err)
 
-		address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+		address = flow.ConvertAddress(
+			data.(cadence.Event).Fields[0].(cadence.Address))
 
 		// ==== Transfer tokens to new account ====
 		txBody = transferTokensTx(chain).

@@ -18,8 +18,7 @@ import (
 const relic_panic = "function is not supported when building without \"relic\" Go build tag"
 
 const (
-	SignatureLenBLSBLS12381     = 48
-	KeyGenSeedMinLenBLSBLS12381 = 48
+	SignatureLenBLSBLS12381 = 48
 )
 
 // bls.go functions
@@ -88,6 +87,18 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 
 func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	message []byte, kmac hash.Hasher) ([]bool, error) {
+	panic(relic_panic)
+}
+
+func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
+	panic(relic_panic)
+}
+
+func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signature) (bool, error) {
 	panic(relic_panic)
 }
 

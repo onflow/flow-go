@@ -13,11 +13,11 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
-	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -188,7 +188,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	view state.View,
 	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
@@ -198,7 +198,7 @@ func CreateAccounts(
 }
 
 func CreateAccountsWithSimpleAddresses(
-	vm *fvm.VirtualMachine,
+	vm fvm.VM,
 	view state.View,
 	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
@@ -271,7 +271,8 @@ func CreateAccountsWithSimpleAddresses(
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}
-				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				addr = flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
 		}
@@ -284,8 +285,8 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
-	view := fvmUtils.NewSimpleView()
+func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
+	view := delta.NewDeltaView(nil)
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
@@ -303,7 +304,10 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.Run(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view)
+	if err != nil {
+		panic(err)
+	}
 	return view
 }
 

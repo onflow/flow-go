@@ -34,6 +34,8 @@ import (
 
 	trace "github.com/onflow/flow-go/module/trace"
 
+	tracing "github.com/onflow/flow-go/fvm/tracing"
+
 	zerolog "github.com/rs/zerolog"
 )
 
@@ -64,11 +66,11 @@ func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) 
 }
 
 // AccountsStorageCapacity provides a mock function with given fields: addresses, payer, maxTxFees
-func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer common.Address, maxTxFees uint64) (cadence.Value, error) {
+func (_m *Environment) AccountsStorageCapacity(addresses []flow.Address, payer flow.Address, maxTxFees uint64) (cadence.Value, error) {
 	ret := _m.Called(addresses, payer, maxTxFees)
 
 	var r0 cadence.Value
-	if rf, ok := ret.Get(0).(func([]common.Address, common.Address, uint64) cadence.Value); ok {
+	if rf, ok := ret.Get(0).(func([]flow.Address, flow.Address, uint64) cadence.Value); ok {
 		r0 = rf(addresses, payer, maxTxFees)
 	} else {
 		if ret.Get(0) != nil {
@@ -77,7 +79,7 @@ func (_m *Environment) AccountsStorageCapacity(addresses []common.Address, payer
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]common.Address, common.Address, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func([]flow.Address, flow.Address, uint64) error); ok {
 		r1 = rf(addresses, payer, maxTxFees)
 	} else {
 		r1 = ret.Error(1)
@@ -269,7 +271,7 @@ func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensit
 }
 
 // ComputationUsed provides a mock function with given fields:
-func (_m *Environment) ComputationUsed() uint64 {
+func (_m *Environment) ComputationUsed() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64
@@ -277,6 +279,29 @@ func (_m *Environment) ComputationUsed() uint64 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ConvertedServiceEvents provides a mock function with given fields:
+func (_m *Environment) ConvertedServiceEvents() flow.ServiceEventList {
+	ret := _m.Called()
+
+	var r0 flow.ServiceEventList
+	if rf, ok := ret.Get(0).(func() flow.ServiceEventList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.ServiceEventList)
+		}
 	}
 
 	return r0
@@ -366,15 +391,15 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 }
 
 // Events provides a mock function with given fields:
-func (_m *Environment) Events() []flow.Event {
+func (_m *Environment) Events() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -405,15 +430,15 @@ func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, er
 }
 
 // FrozenAccounts provides a mock function with given fields:
-func (_m *Environment) FrozenAccounts() []common.Address {
+func (_m *Environment) FrozenAccounts() []flow.Address {
 	ret := _m.Called()
 
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
+	var r0 []flow.Address
+	if rf, ok := ret.Get(0).(func() []flow.Address); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
+			r0 = ret.Get(0).([]flow.Address)
 		}
 	}
 
@@ -575,6 +600,29 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 	return r0, r1
 }
 
+// GetAndSetProgram provides a mock function with given fields: location, load
+func (_m *Environment) GetAndSetProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+	ret := _m.Called(location, load)
+
+	var r0 *interpreter.Program
+	if rf, ok := ret.Get(0).(func(common.Location, func() (*interpreter.Program, error)) *interpreter.Program); ok {
+		r0 = rf(location, load)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*interpreter.Program)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(common.Location, func() (*interpreter.Program, error)) error); ok {
+		r1 = rf(location, load)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBlockAtHeight provides a mock function with given fields: height
 func (_m *Environment) GetBlockAtHeight(height uint64) (stdlib.Block, bool, error) {
 	ret := _m.Called(height)
@@ -661,29 +709,6 @@ func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
 	}
 
 	return r0
-}
-
-// GetProgram provides a mock function with given fields: _a0
-func (_m *Environment) GetProgram(_a0 common.Location) (*interpreter.Program, error) {
-	ret := _m.Called(_a0)
-
-	var r0 *interpreter.Program
-	if rf, ok := ret.Get(0).(func(common.Location) *interpreter.Program); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*interpreter.Program)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Location) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // GetSigningAccounts provides a mock function with given fields:
@@ -811,6 +836,27 @@ func (_m *Environment) ImplementationDebugLog(message string) error {
 	return r0
 }
 
+// InteractionUsed provides a mock function with given fields:
+func (_m *Environment) InteractionUsed() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IsServiceAccountAuthorizer provides a mock function with given fields:
 func (_m *Environment) IsServiceAccountAuthorizer() bool {
 	ret := _m.Called()
@@ -871,8 +917,8 @@ func (_m *Environment) Logs() []string {
 	return r0
 }
 
-// MemoryEstimate provides a mock function with given fields:
-func (_m *Environment) MemoryEstimate() uint64 {
+// MemoryUsed provides a mock function with given fields:
+func (_m *Environment) MemoryUsed() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64
@@ -882,7 +928,14 @@ func (_m *Environment) MemoryEstimate() uint64 {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MeterComputation provides a mock function with given fields: operationType, intensity
@@ -1045,15 +1098,15 @@ func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int
 }
 
 // ServiceEvents provides a mock function with given fields:
-func (_m *Environment) ServiceEvents() []flow.Event {
+func (_m *Environment) ServiceEvents() flow.EventsList {
 	ret := _m.Called()
 
-	var r0 []flow.Event
-	if rf, ok := ret.Get(0).(func() []flow.Event); ok {
+	var r0 flow.EventsList
+	if rf, ok := ret.Get(0).(func() flow.EventsList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Event)
+			r0 = ret.Get(0).(flow.EventsList)
 		}
 	}
 
@@ -1061,11 +1114,11 @@ func (_m *Environment) ServiceEvents() []flow.Event {
 }
 
 // SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) error {
+func (_m *Environment) SetAccountFrozen(address flow.Address, frozen bool) error {
 	ret := _m.Called(address, frozen)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, bool) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, bool) error); ok {
 		r0 = rf(address, frozen)
 	} else {
 		r0 = ret.Error(0)
@@ -1077,20 +1130,6 @@ func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) err
 // SetInterpreterSharedState provides a mock function with given fields: state
 func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	_m.Called(state)
-}
-
-// SetProgram provides a mock function with given fields: _a0, _a1
-func (_m *Environment) SetProgram(_a0 common.Location, _a1 *interpreter.Program) error {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Location, *interpreter.Program) error); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SetValue provides a mock function with given fields: owner, key, value
@@ -1107,33 +1146,22 @@ func (_m *Environment) SetValue(owner []byte, key []byte, value []byte) error {
 	return r0
 }
 
-// SigningAccounts provides a mock function with given fields:
-func (_m *Environment) SigningAccounts() []common.Address {
-	ret := _m.Called()
-
-	var r0 []common.Address
-	if rf, ok := ret.Get(0).(func() []common.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]common.Address)
-		}
+// StartChildSpan provides a mock function with given fields: name, options
+func (_m *Environment) StartChildSpan(name trace.SpanName, options ...oteltrace.SpanStartOption) tracing.TracerSpan {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
 	}
+	var _ca []interface{}
+	_ca = append(_ca, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
-	return r0
-}
-
-// StartSpanFromRoot provides a mock function with given fields: name
-func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
-	ret := _m.Called(name)
-
-	var r0 oteltrace.Span
-	if rf, ok := ret.Get(0).(func(trace.SpanName) oteltrace.Span); ok {
-		r0 = rf(name)
+	var r0 tracing.TracerSpan
+	if rf, ok := ret.Get(0).(func(trace.SpanName, ...oteltrace.SpanStartOption) tracing.TracerSpan); ok {
+		r0 = rf(name, options...)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(oteltrace.Span)
-		}
+		r0 = ret.Get(0).(tracing.TracerSpan)
 	}
 
 	return r0

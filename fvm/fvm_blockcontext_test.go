@@ -369,7 +369,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, tx.Err)
 	})
 
-	t.Run("account update with checker heavy contract", func(t *testing.T) {
+	t.Run("account update with checker heavy contract (local replay limit)", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
@@ -385,7 +385,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
+		txBody := testutil.DeployLocalReplayLimitedTransaction(accounts[0], chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -404,6 +404,43 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		var parsingCheckingError *runtime.ParsingCheckingError
 		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
 		assert.ErrorContains(t, tx.Err, "program too ambiguous, local replay limit of 64 tokens exceeded")
+	})
+
+	t.Run("account update with checker heavy contract (global replay limit)", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(
+			vm,
+			ledger,
+			derived.NewEmptyDerivedBlockData(),
+			privateKeys,
+			chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployGlobalReplayLimitedTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		var parsingCheckingError *runtime.ParsingCheckingError
+		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
+		assert.ErrorContains(t, tx.Err, "program too ambiguous, global replay limit of 1024 tokens exceeded")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
@@ -963,7 +1000,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -998,7 +1035,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1077,7 +1114,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1137,7 +1174,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.MaxStateInteractionSize = 500_000
 				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
@@ -1177,9 +1214,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
-				ctx.MaxStateInteractionSize = 500_000
-				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				ctx.MaxStateInteractionSize = 50_000
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1502,8 +1538,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger)
-		require.Error(t, err)
+		txProc := fvm.Transaction(tx, 0)
+		err = vm.Run(blockCtx, txProc, ledger)
+		require.NoError(t, err)
+		require.Error(t, txProc.Err)
 	})
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
@@ -1515,8 +1553,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-		err := vm.Run(blockCtx, fvm.Script(script), ledger)
-		require.Error(t, err)
+		scriptProc := fvm.Script(script)
+		err := vm.Run(blockCtx, scriptProc, ledger)
+		require.NoError(t, err)
+		require.Error(t, scriptProc.Err)
 	})
 }
 
@@ -1571,7 +1611,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
-		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+		address := flow.ConvertAddress(
+			data.(cadence.Event).Fields[0].(cadence.Address))
 
 		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
@@ -1697,13 +1738,14 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
-	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+	address := flow.ConvertAddress(
+		data.(cadence.Event).Fields[0].(cadence.Address))
 
 	assert.Equal(t, flow.HexToAddress("05"), address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
-	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
+	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
 
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
@@ -1734,7 +1776,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1777,7 +1819,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1824,7 +1866,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1875,7 +1917,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.

@@ -7,12 +7,67 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+type DerivedTransaction interface {
+	GetProgram(
+		addressLocation common.AddressLocation,
+	) (
+		*Program,
+		*state.State,
+		bool,
+	)
+
+	SetProgram(
+		addressLocation common.AddressLocation,
+		program *Program,
+		state *state.State,
+	)
+
+	GetMeterParamOverrides(
+		txnState state.NestedTransaction,
+		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+	) (
+		MeterParamOverrides,
+		error,
+	)
+
+	AddInvalidator(invalidator TransactionInvalidator)
+}
+
+type DerivedTransactionCommitter interface {
+	DerivedTransaction
+
+	Validate() error
+	Commit() error
+}
+
+// ProgramDependencies are the programs' addresses used by this program.
+type ProgramDependencies map[flow.Address]struct{}
+
+// AddDependency adds the address as a dependency.
+func (d ProgramDependencies) AddDependency(address flow.Address) {
+	d[address] = struct{}{}
+}
+
+// Merge merges current dependencies with other dependencies.
+func (d ProgramDependencies) Merge(other ProgramDependencies) {
+	for address := range other {
+		d[address] = struct{}{}
+	}
+}
+
+type Program struct {
+	*interpreter.Program
+
+	Dependencies ProgramDependencies
+}
 
 // DerivedBlockData is a simple fork-aware OCC database for "caching" derived
 // data for a particular block.
 type DerivedBlockData struct {
-	programs *DerivedDataTable[common.AddressLocation, *interpreter.Program]
+	programs *DerivedDataTable[common.AddressLocation, *Program]
 
 	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
 }
@@ -22,7 +77,7 @@ type DerivedBlockData struct {
 type DerivedTransactionData struct {
 	programs *TableTransaction[
 		common.AddressLocation,
-		*interpreter.Program,
+		*Program,
 	]
 
 	// There's only a single entry in this table.  For simplicity, we'll use
@@ -34,7 +89,7 @@ func NewEmptyDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
 		programs: NewEmptyTable[
 			common.AddressLocation,
-			*interpreter.Program,
+			*Program,
 		](),
 		meterParamOverrides: NewEmptyTable[
 			struct{},
@@ -49,7 +104,7 @@ func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockD
 	return &DerivedBlockData{
 		programs: NewEmptyTableWithOffset[
 			common.AddressLocation,
-			*interpreter.Program,
+			*Program,
 		](offset),
 		meterParamOverrides: NewEmptyTableWithOffset[
 			struct{},
@@ -69,7 +124,7 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
@@ -96,7 +151,7 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewTableTransaction(
@@ -126,14 +181,21 @@ func (block *DerivedBlockData) NextTxIndexForTestingOnly() uint32 {
 
 func (block *DerivedBlockData) GetProgramForTestingOnly(
 	addressLocation common.AddressLocation,
-) *invalidatableEntry[*interpreter.Program] {
+) *invalidatableEntry[*Program] {
 	return block.programs.GetForTestingOnly(addressLocation)
+}
+
+// CachedPrograms returns the number of programs cached.
+// Note: this should only be called after calling commit, otherwise
+// the count will contain invalidated entries.
+func (block *DerivedBlockData) CachedPrograms() int {
+	return len(block.programs.items)
 }
 
 func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
-	*interpreter.Program,
+	*Program,
 	*state.State,
 	bool,
 ) {
@@ -142,7 +204,7 @@ func (transaction *DerivedTransactionData) GetProgram(
 
 func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
-	program *interpreter.Program,
+	program *Program,
 	state *state.State,
 ) {
 	transaction.programs.Set(addressLocation, program, state)
@@ -161,7 +223,7 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 }
 
 func (transaction *DerivedTransactionData) GetMeterParamOverrides(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 ) (
 	MeterParamOverrides,

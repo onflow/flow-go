@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	"github.com/onflow/flow-go/model/chainsync"
@@ -36,8 +37,8 @@ type NetworkSecurityMetrics interface {
 	// OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
 	OnUnauthorizedMessage(role, msgType, topic, offense string)
 
-	// OnRateLimitedUnicastMessage tracks the number of rate limited messages seen on the network.
-	OnRateLimitedUnicastMessage(role, msgType, topic, reason string)
+	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
+	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
@@ -80,16 +81,38 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
+// UnicastManagerMetrics unicast manager metrics.
+type UnicastManagerMetrics interface {
+	// OnStreamCreated tracks the overall time it takes to create a stream successfully and the number of retry attempts.
+	OnStreamCreated(duration time.Duration, attempts int)
+	// OnStreamCreationFailure tracks the amount of time taken and number of retry attempts used when the unicast manager fails to create a stream.
+	OnStreamCreationFailure(duration time.Duration, attempts int)
+	// OnPeerDialed tracks the time it takes to dial a peer during stream creation and the number of retry attempts before a peer
+	// is dialed successfully.
+	OnPeerDialed(duration time.Duration, attempts int)
+	// OnPeerDialFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot dial a peer
+	// to establish the initial connection between the two.
+	OnPeerDialFailure(duration time.Duration, attempts int)
+	// OnStreamEstablished tracks the time it takes to create a stream successfully on the available open connection during stream
+	// creation and the number of retry attempts.
+	OnStreamEstablished(duration time.Duration, attempts int)
+	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
+	// a stream on the open connection between two peers.
+	OnEstablishStreamFailure(duration time.Duration, attempts int)
+}
+
 type LibP2PMetrics interface {
 	GossipSubRouterMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
+	UnicastManagerMetrics
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
 type NetworkInboundQueueMetrics interface {
+
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
 	MessageAdded(priority int)
 
@@ -448,17 +471,25 @@ type ExecutionDataRequesterMetrics interface {
 }
 
 type RuntimeMetrics interface {
-	// TransactionParsed reports the time spent parsing a single transaction
+	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
 
-	// TransactionChecked reports the time spent checking a single transaction
+	// RuntimeTransactionChecked reports the time spent checking a single transaction
 	RuntimeTransactionChecked(dur time.Duration)
 
-	// TransactionInterpreted reports the time spent interpreting a single transaction
+	// RuntimeTransactionInterpreted reports the time spent interpreting a single transaction
 	RuntimeTransactionInterpreted(dur time.Duration)
 
 	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
 	RuntimeSetNumberOfAccounts(count uint64)
+
+	// RuntimeTransactionProgramsCacheMiss reports a programs cache miss
+	// during transaction execution
+	RuntimeTransactionProgramsCacheMiss()
+
+	// RuntimeTransactionProgramsCacheHit reports a programs cache hit
+	// during transaction execution
+	RuntimeTransactionProgramsCacheHit()
 }
 
 type ProviderMetrics interface {
@@ -556,6 +587,9 @@ type ExecutionMetrics interface {
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
+
+	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
+	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
@@ -668,7 +702,7 @@ type HeroCacheMetrics interface {
 	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 	// This normally happens -- and is expected -- when the cache is full.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectionDueToFullCapacity()
+	OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)
 
 	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.

@@ -28,7 +28,7 @@ type Builder struct {
 	metrics    module.MempoolMetrics
 	tracer     module.Tracer
 	db         *badger.DB
-	state      protocol.MutableState
+	state      protocol.ParticipantState
 	seals      storage.Seals
 	headers    storage.Headers
 	index      storage.Index
@@ -45,7 +45,7 @@ type Builder struct {
 func NewBuilder(
 	metrics module.MempoolMetrics,
 	db *badger.DB,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
 	index storage.Index,
@@ -141,7 +141,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	err = b.state.Extend(ctx, proposal)

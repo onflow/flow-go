@@ -2,19 +2,18 @@ package corruptlibp2p
 
 import (
 	"context"
-	"time"
+	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/host"
-
-	"github.com/onflow/flow-go/insecure/internal"
-	"github.com/onflow/flow-go/network/p2p"
-
+	"github.com/libp2p/go-libp2p/core/peer"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 )
 
@@ -30,18 +29,19 @@ func NewCorruptLibP2PNodeFactory(
 	resolver madns.BasicResolver,
 	peerScoringEnabled bool,
 	role string,
-	onInterceptPeerDialFilters,
-	onInterceptSecuredFilters []p2p.PeerFilter,
-	connectionPruning bool,
-	updateInterval time.Duration,
-	topicValidatorDisabled bool,
+	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
+	peerManagerCfg *p2pbuilder.PeerManagerConfig,
+	uniCfg *p2pbuilder.UnicastConfig,
+	topicValidatorDisabled,
+	withMessageSigning,
+	withStrictSignatureVerification bool,
 ) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		if chainID != flow.BftTestnet {
-			panic("illegal chain id for using corruptible conduit factory")
+			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		builder := p2pbuilder.DefaultNodeBuilder(
+		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
 			flowKey,
@@ -50,41 +50,54 @@ func NewCorruptLibP2PNodeFactory(
 			metrics,
 			resolver,
 			role,
-			onInterceptPeerDialFilters,
-			onInterceptSecuredFilters,
 			peerScoringEnabled,
-			connectionPruning,
-			updateInterval,
-			p2pbuilder.DefaultResourceManagerConfig())
+			connGaterCfg,
+			peerManagerCfg,
+			p2pbuilder.DefaultResourceManagerConfig(),
+			uniCfg)
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
+		}
 		if topicValidatorDisabled {
 			builder.SetCreateNode(NewCorruptLibP2PNode)
 		}
-		overrideWithCorruptGossipSub(builder)
+
+		overrideWithCorruptGossipSub(builder, WithMessageSigning(withMessageSigning), WithStrictSignatureVerification(withStrictSignatureVerification))
 		return builder.Build()
 	}
 }
 
-// CorruptibleGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
+// CorruptGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
 // github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
-func CorruptibleGossipSubFactory() (p2pbuilder.GossipSubFactoryFunc, *internal.CorruptGossipSubRouter) {
-	var rt *internal.CorruptGossipSubRouter
+func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2pbuilder.GossipSubFactoryFunc {
 	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
 		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
-		rt = router
+		for _, opt := range routerOpts {
+			opt(router)
+		}
 		return adapter, err
 	}
-	return factory, rt
+	return factory
 }
 
-// CorruptibleGossipSubConfigFactory returns a factory function that creates a new instance of the forked gossipsub config
+// CorruptGossipSubConfigFactory returns a factory function that creates a new instance of the forked gossipsub config
 // from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
-func CorruptibleGossipSubConfigFactory() p2pbuilder.GossipSubAdapterConfigFunc {
+func CorruptGossipSubConfigFactory(opts ...CorruptPubSubAdapterConfigOption) p2pbuilder.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
-		return NewCorruptPubSubAdapterConfig(base)
+		return NewCorruptPubSubAdapterConfig(base, opts...)
 	}
 }
 
-func overrideWithCorruptGossipSub(builder p2pbuilder.NodeBuilder) {
-	factory, _ := CorruptibleGossipSubFactory()
-	builder.SetGossipSubFactory(factory, CorruptibleGossipSubConfigFactory())
+// CorruptGossipSubConfigFactoryWithInspector returns a factory function that creates a new instance of the forked gossipsub config
+// from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
+func CorruptGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt.RPC) error) p2pbuilder.GossipSubAdapterConfigFunc {
+	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
+		return NewCorruptPubSubAdapterConfig(base, WithInspector(inspector))
+	}
+}
+
+func overrideWithCorruptGossipSub(builder p2pbuilder.NodeBuilder, opts ...CorruptPubSubAdapterConfigOption) {
+	factory := CorruptGossipSubFactory()
+	builder.SetGossipSubFactory(factory, CorruptGossipSubConfigFactory(opts...))
 }

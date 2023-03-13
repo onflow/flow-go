@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -25,14 +26,14 @@ type ContractFunctionSpec struct {
 type SystemContracts struct {
 	chain flow.Chain
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	logger  *ProgramLogger
 	runtime *Runtime
 }
 
 func NewSystemContracts(
 	chain flow.Chain,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	logger *ProgramLogger,
 	runtime *Runtime,
 ) *SystemContracts {
@@ -52,11 +53,12 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.Address(spec.AddressFromChain(sys.chain)),
-		Name:    spec.LocationName,
+		Address: common.MustBytesToAddress(
+			spec.AddressFromChain(sys.chain).Bytes()),
+		Name: spec.LocationName,
 	}
 
-	span := sys.tracer.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
 	span.SetAttributes(
 		attribute.String(
 			"transaction.ContractFunctionCall",
@@ -167,7 +169,7 @@ var setupNewAccountSpec = ContractFunctionSpec{
 // account.
 func (sys *SystemContracts) SetupNewAccount(
 	flowAddress flow.Address,
-	payer common.Address,
+	payer flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		setupNewAccountSpec,
@@ -190,7 +192,7 @@ var accountAvailableBalanceSpec = ContractFunctionSpec{
 // AccountAvailableBalance executes the get available balance contract on the
 // storage fees contract.
 func (sys *SystemContracts) AccountAvailableBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountAvailableBalanceSpec,
@@ -212,7 +214,7 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 // AccountBalance executes the get available balance contract on the service
 // account.
 func (sys *SystemContracts) AccountBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountBalanceInvocationSpec,
@@ -234,7 +236,7 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 // AccountStorageCapacity executes the get storage capacity contract on the
 // service account.
 func (sys *SystemContracts) AccountStorageCapacity(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountStorageCapacitySpec,
@@ -246,8 +248,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
-	addresses []common.Address,
-	payer common.Address,
+	addresses []flow.Address,
+	payer flow.Address,
 	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
@@ -291,7 +293,7 @@ var useContractAuditVoucherSpec = ContractFunctionSpec{
 // UseContractAuditVoucher executes the use a contract deployment audit voucher
 // contract.
 func (sys *SystemContracts) UseContractAuditVoucher(
-	address common.Address,
+	address flow.Address,
 	code string,
 ) (bool, error) {
 	resultCdc, err := sys.Invoke(

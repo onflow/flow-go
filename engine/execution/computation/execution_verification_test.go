@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -14,7 +13,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -23,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
@@ -35,13 +32,11 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
@@ -677,10 +672,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
@@ -712,15 +704,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		prov)
 	require.NoError(t, err)
 
-	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
-
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
+	prevResultId := unittest.IdentifierFixture()
 	computationResult, err := blockComputer.ExecuteBlock(
 		context.Background(),
+		prevResultId,
 		executableBlock,
-		view,
+		state.NewLedgerStorageSnapshot(
+			ledger,
+			initialCommit),
 		derived.NewEmptyDerivedBlockData())
 	require.NoError(t, err)
 
@@ -728,17 +722,27 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	for i, snapshot := range computationResult.StateSnapshots {
 		valid, err := crypto.SPOCKVerifyAgainstData(
 			myIdentity.StakingPubKey,
-			computationResult.SpockSignatures[i],
+			computationResult.Spocks[i],
 			snapshot.SpockSecret,
 			spockHasher)
 		require.NoError(t, err)
 		require.True(t, valid)
 	}
 
-	prevResultId := unittest.IdentifierFixture()
+	receipt := computationResult.ExecutionReceipt
+	receiptID := receipt.ID()
+	valid, err := myIdentity.StakingPubKey.Verify(
+		receipt.ExecutorSignature,
+		receiptID[:],
+		utils.NewExecutionReceiptHasher())
 
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
+	require.True(t, valid)
+
+	require.Equal(t, len(computationResult.ChunkDataPacks), len(receipt.Spocks))
+
+	chdps := computationResult.ChunkDataPacks
+	er := &computationResult.ExecutionResult
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
@@ -763,12 +767,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		_, fault, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
 		assert.Nil(t, fault)
 	}

@@ -7,7 +7,7 @@ package crypto
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include
+// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls12381_utils.h"
 // #include "bls_include.h"
@@ -122,18 +122,14 @@ func randZrStar(x *scalar) {
 	C.bn_randZr_star((*C.bn_st)(x))
 }
 
-// mapToZrStar reads a scalar from a slice of bytes and maps it to Zr
-// the resulting scalar is in the range 0 < k < r
-func mapToZrStar(x *scalar, src []byte) error {
-	if len(src) > maxScalarSize {
-		return invalidInputsErrorf(
-			"input slice length must be less than %d",
-			maxScalarSize)
-	}
-	C.bn_map_to_Zr_star((*C.bn_st)(x),
+// mapToZr reads a scalar from a slice of bytes and maps it to Zr.
+// The resulting scalar `k` satisfies 0 <= k < r.
+// It returns true if scalar is zero and false otherwise.
+func mapToZr(x *scalar, src []byte) bool {
+	isZero := C.bn_map_to_Zr((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return nil
+	return isZero == valid
 }
 
 // writeScalar writes a G2 point in a slice of bytes

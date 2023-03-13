@@ -1,14 +1,9 @@
 package state
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -18,52 +13,38 @@ import (
 const (
 	DefaultMaxKeySize   = 16_000      // ~16KB
 	DefaultMaxValueSize = 256_000_000 // ~256MB
-
-	// Service level keys (owner is empty):
-	UUIDKey         = "uuid"
-	AddressStateKey = "account_address_state"
-
-	// Account level keys
-	AccountKeyPrefix   = "a."
-	AccountStatusKey   = AccountKeyPrefix + "s"
-	CodeKeyPrefix      = "code."
-	ContractNamesKey   = "contract_names"
-	PublicKeyKeyPrefix = "public_key_"
 )
 
+// TODO(patrick): make State implement the View interface.
+//
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	// NOTE: A committed state is no longer accessible.  It can however be
+	// NOTE: A finalized view is no longer accessible.  It can however be
 	// re-attached to another transaction and be committed (for cached result
 	// bookkeeping purpose).
-	committed bool
+	finalized bool
 
-	view             View
-	meter            *meter.Meter
-	updatedAddresses map[flow.Address]struct{}
-	stateLimits
-}
+	view  View
+	meter *meter.Meter
 
-type stateLimits struct {
-	maxKeySizeAllowed   uint64
-	maxValueSizeAllowed uint64
+	// NOTE: parent and child state shares the same limits controller
+	*limitsController
 }
 
 type StateParameters struct {
 	meter.MeterParameters
 
-	stateLimits
+	maxKeySizeAllowed   uint64
+	maxValueSizeAllowed uint64
 }
 
 func DefaultParameters() StateParameters {
 	return StateParameters{
-		MeterParameters: meter.DefaultParameters(),
-		stateLimits: stateLimits{
-			maxKeySizeAllowed:   DefaultMaxKeySize,
-			maxValueSizeAllowed: DefaultMaxValueSize,
-		},
+		MeterParameters:     meter.DefaultParameters(),
+		maxKeySizeAllowed:   DefaultMaxKeySize,
+		maxValueSizeAllowed: DefaultMaxValueSize,
 	}
 }
 
@@ -77,27 +58,49 @@ func (params StateParameters) WithMeterParameters(
 }
 
 // WithMaxKeySizeAllowed sets limit on max key size
-func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameters {
+func (params StateParameters) WithMaxKeySizeAllowed(
+	limit uint64,
+) StateParameters {
 	newParams := params
 	newParams.maxKeySizeAllowed = limit
 	return newParams
 }
 
 // WithMaxValueSizeAllowed sets limit on max value size
-func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
+func (params StateParameters) WithMaxValueSizeAllowed(
+	limit uint64,
+) StateParameters {
 	newParams := params
 	newParams.maxValueSizeAllowed = limit
 	return newParams
 }
 
-// TODO(patrick): rm once https://github.com/onflow/flow-emulator/pull/245
-// is integrated.
-//
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
-	newParams := params
-	newParams.MeterParameters = newParams.MeterParameters.WithStorageInteractionLimit(limit)
-	return newParams
+type limitsController struct {
+	enforceLimits       bool
+	maxKeySizeAllowed   uint64
+	maxValueSizeAllowed uint64
+}
+
+func newLimitsController(params StateParameters) *limitsController {
+	return &limitsController{
+		enforceLimits:       true,
+		maxKeySizeAllowed:   params.maxKeySizeAllowed,
+		maxValueSizeAllowed: params.maxValueSizeAllowed,
+	}
+}
+
+func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
+	if f == nil {
+		return
+	}
+	current := controller.enforceLimits
+	controller.enforceLimits = false
+	f()
+	controller.enforceLimits = current
+}
+
+func (s *State) SpockSecret() []byte {
+	return s.view.SpockSecret()
 }
 
 func (s *State) View() View {
@@ -108,17 +111,14 @@ func (s *State) Meter() *meter.Meter {
 	return s.meter
 }
 
-type StateOption func(st *State) *State
-
 // NewState constructs a new state
 func NewState(view View, params StateParameters) *State {
 	m := meter.NewMeter(params.MeterParameters)
 	return &State{
-		committed:        false,
+		finalized:        false,
 		view:             view,
 		meter:            m,
-		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      params.stateLimits,
+		limitsController: newLimitsController(params),
 	}
 }
 
@@ -128,11 +128,10 @@ func (s *State) NewChildWithMeterParams(
 	params meter.MeterParameters,
 ) *State {
 	return &State{
-		committed:        false,
+		finalized:        false,
 		view:             s.view.NewChild(),
 		meter:            meter.NewMeter(params),
-		updatedAddresses: make(map[flow.Address]struct{}),
-		stateLimits:      s.stateLimits,
+		limitsController: s.limitsController,
 	}
 }
 
@@ -146,83 +145,96 @@ func (s *State) InteractionUsed() uint64 {
 	return s.meter.TotalBytesOfStorageInteractions()
 }
 
-// RegisterUpdates returns the lists of register id / value that were updated.
-func (s *State) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return s.view.RegisterUpdates()
+// BytesWritten returns the amount of total ledger bytes written
+func (s *State) BytesWritten() uint64 {
+	return s.meter.TotalBytesWrittenToStorage()
+}
+
+// UpdatedRegisterIDs returns the lists of register ids that were updated.
+func (s *State) UpdatedRegisterIDs() []flow.RegisterID {
+	return s.view.UpdatedRegisterIDs()
+}
+
+// UpdatedRegisters returns the lists of register entries that were updated.
+func (s *State) UpdatedRegisters() flow.RegisterEntries {
+	return s.view.UpdatedRegisters()
+}
+
+// UpdatedRegisterIDs returns the lists of register entries that were updated.
+func (s *State) AllRegisterIDs() []flow.RegisterID {
+	return s.view.AllRegisterIDs()
+}
+
+func (s *State) Finalize() {
+	s.finalized = true
+}
+
+func (s *State) DropChanges() error {
+	if s.finalized {
+		return fmt.Errorf("cannot DropChanges on a finalized view")
+	}
+
+	return s.view.DropChanges()
 }
 
 // Get returns a register value given owner and key
-func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
-	if s.committed {
-		return nil, fmt.Errorf("cannot Get on a committed state")
+func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	if s.finalized {
+		return nil, fmt.Errorf("cannot Get on a finalized view")
 	}
 
 	var value []byte
 	var err error
 
-	if enforceLimit {
-		if err = s.checkSize(owner, key, []byte{}); err != nil {
+	if s.enforceLimits {
+		if err = s.checkSize(id, []byte{}); err != nil {
 			return nil, err
 		}
 	}
 
-	if value, err = s.view.Get(owner, key); err != nil {
+	if value, err = s.view.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
+		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
 	}
 
-	err = s.meter.MeterStorageRead(
-		meter.StorageInteractionKey{Owner: owner, Key: key},
-		value,
-		enforceLimit)
-
+	err = s.meter.MeterStorageRead(id, value, s.enforceLimits)
 	return value, err
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
-	if s.committed {
-		return fmt.Errorf("cannot Set on a committed state")
+func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
+	if s.finalized {
+		return fmt.Errorf("cannot Set on a finalized view")
 	}
 
-	if enforceLimit {
-		if err := s.checkSize(owner, key, value); err != nil {
+	if s.enforceLimits {
+		if err := s.checkSize(id, value); err != nil {
 			return err
 		}
 	}
 
-	if err := s.view.Set(owner, key, value); err != nil {
+	if err := s.view.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
+		return fmt.Errorf("failed to update %s: %w", id, setError)
 	}
 
-	err := s.meter.MeterStorageWrite(
-		meter.StorageInteractionKey{Owner: owner, Key: key},
-		value,
-		enforceLimit,
-	)
-	if err != nil {
-		return err
-	}
-
-	if address, isAddress := addressFromOwner(owner); isAddress {
-		s.updatedAddresses[address] = struct{}{}
-	}
-
-	return nil
+	return s.meter.MeterStorageWrite(id, value, s.enforceLimits)
 }
 
 // MeterComputation meters computation usage
 func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterComputation on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterComputation on a finalized view")
 	}
 
-	return s.meter.MeterComputation(kind, intensity)
+	if s.enforceLimits {
+		return s.meter.MeterComputation(kind, intensity)
+	}
+	return nil
 }
 
 // TotalComputationUsed returns total computation used
@@ -242,11 +254,15 @@ func (s *State) TotalComputationLimit() uint {
 
 // MeterMemory meters memory usage
 func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterMemory on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterMemory on a finalized view")
 	}
 
-	return s.meter.MeterMemory(kind, intensity)
+	if s.enforceLimits {
+		return s.meter.MeterMemory(kind, intensity)
+	}
+
+	return nil
 }
 
 // MemoryIntensities returns computation intensities
@@ -265,115 +281,53 @@ func (s *State) TotalMemoryLimit() uint {
 }
 
 func (s *State) MeterEmittedEvent(byteSize uint64) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterEmittedEvent on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterEmittedEvent on a finalized view")
 	}
 
-	return s.meter.MeterEmittedEvent(byteSize)
+	if s.enforceLimits {
+		return s.meter.MeterEmittedEvent(byteSize)
+	}
+
+	return nil
 }
 
 func (s *State) TotalEmittedEventBytes() uint64 {
 	return s.meter.TotalEmittedEventBytes()
 }
 
-// MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State) error {
-	if s.committed {
-		return fmt.Errorf("cannot MergeState on a committed state")
+// MergeState the changes from a the given view to this view.
+func (s *State) Merge(other ExecutionSnapshot) error {
+	if s.finalized {
+		return fmt.Errorf("cannot Merge on a finalized view")
 	}
 
-	err := s.view.MergeView(other.view)
+	err := s.view.Merge(other)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	s.meter.MergeMeter(other.meter)
-
-	// apply address updates
-	for k, v := range other.updatedAddresses {
-		s.updatedAddresses[k] = v
-	}
-
+	s.meter.MergeMeter(other.Meter())
 	return nil
 }
 
-// UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
-func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
-
-	for k := range s.updatedAddresses {
-		addresses = append(addresses, k)
-	}
-
-	slices.SortFunc(addresses, func(a, b flow.Address) bool {
-		// reverse order to maintain compatibility with previous implementation.
-		return bytes.Compare(a[:], b[:]) >= 0
-	})
-
-	return addresses
-}
-
-func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(key))
+func (s *State) checkSize(
+	id flow.RegisterID,
+	value flow.RegisterValue,
+) error {
+	keySize := uint64(len(id.Owner) + len(id.Key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return errors.NewStateKeySizeLimitError(owner, key, keySize, s.maxKeySizeAllowed)
+		return errors.NewStateKeySizeLimitError(
+			id,
+			keySize,
+			s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
-		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
+		return errors.NewStateValueSizeLimitError(
+			value,
+			valueSize,
+			s.maxValueSizeAllowed)
 	}
 	return nil
-}
-
-func addressFromOwner(owner string) (flow.Address, bool) {
-	ownerBytes := []byte(owner)
-	if len(ownerBytes) != flow.AddressLength {
-		// not an address
-		return flow.EmptyAddress, false
-	}
-	address := flow.BytesToAddress(ownerBytes)
-	return address, true
-}
-
-// IsFVMStateKey returns true if the key is controlled by the fvm env and
-// return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner string, key string) bool {
-	// check if is a service level key (owner is empty)
-	// cases:
-	// 		- "", "uuid"
-	// 		- "", "account_address_state"
-	if len(owner) == 0 && (key == UUIDKey || key == AddressStateKey) {
-		return true
-	}
-
-	// check account level keys
-	// cases:
-	// 		- address, "contract_names"
-	// 		- address, "code.%s" (contract name)
-	// 		- address, "public_key_%d" (index)
-	// 		- address, "a.s" (account status)
-	return strings.HasPrefix(key, PublicKeyKeyPrefix) ||
-		key == ContractNamesKey ||
-		strings.HasPrefix(key, CodeKeyPrefix) ||
-		key == AccountStatusKey
-}
-
-// This returns true if the key is a slab index for an account's ordered fields
-// map.
-//
-// In general, each account's regular fields are stored in ordered map known
-// only to cadence.  Cadence encodes this map into bytes and split the bytes
-// into slab chunks before storing the slabs into the ledger.
-func IsSlabIndex(key string) bool {
-	return len(key) == 9 && key[0] == '$'
-}
-
-// PrintableKey formats slabs properly and avoids invalid utf8s
-func PrintableKey(key string) string {
-	// slab
-	if IsSlabIndex(key) {
-		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
-		return fmt.Sprintf("$%d", i)
-	}
-	return fmt.Sprintf("#%x", []byte(key))
 }

@@ -3,12 +3,12 @@ package environment
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -19,7 +19,10 @@ type Environment interface {
 	runtime.Interface
 
 	// Tracer
-	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
+	StartChildSpan(
+		name trace.SpanName,
+		options ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan
 
 	Meter
 
@@ -34,13 +37,14 @@ type Environment interface {
 	Logs() []string
 
 	// EventEmitter
-	Events() []flow.Event
-	ServiceEvents() []flow.Event
+	Events() flow.EventsList
+	ServiceEvents() flow.EventsList
+	ConvertedServiceEvents() flow.ServiceEventList
 
 	// SystemContracts
 	AccountsStorageCapacity(
-		addresses []common.Address,
-		payer common.Address,
+		addresses []flow.Address,
+		payer flow.Address,
 		maxTxFees uint64,
 	) (
 		cadence.Value,
@@ -90,7 +94,6 @@ type EnvironmentParams struct {
 
 	RuntimeParams
 
-	TracerParams
 	ProgramLoggerParams
 
 	EventEmitterParams
@@ -107,7 +110,6 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		ServiceAccountEnabled: true,
 
 		RuntimeParams:         DefaultRuntimeParams(),
-		TracerParams:          DefaultTracerParams(),
 		ProgramLoggerParams:   DefaultProgramLoggerParams(),
 		EventEmitterParams:    DefaultEventEmitterParams(),
 		BlockInfoParams:       DefaultBlockInfoParams(),

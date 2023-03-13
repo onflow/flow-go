@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -25,9 +26,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,9 +36,9 @@ var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 	common.ComputationKindStatement:          1569,
 	common.ComputationKindLoop:               1569,
 	common.ComputationKindFunctionInvocation: 1569,
-	meter.ComputationKindGetValue:            808,
-	meter.ComputationKindCreateAccount:       2837670,
-	meter.ComputationKindSetValue:            765,
+	environment.ComputationKindGetValue:      808,
+	environment.ComputationKindCreateAccount: 2837670,
+	environment.ComputationKindSetValue:      765,
 }
 
 type vmTest struct {
@@ -61,28 +60,27 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 	return vmt
 }
 
-func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
+func createChainAndVm(chainID flow.ChainID) (flow.Chain, fvm.VM) {
 	return chainID.Chain(), fvm.NewVirtualMachine()
 }
 
 func (vmt vmTest) run(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
+	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
+		chain, vm := createChainAndVm(flow.Testnet)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		baseOpts := []fvm.Option{
-			// default chain is Testnet
-			fvm.WithChain(flow.Testnet.Chain()),
+			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
 		}
+
 		opts := append(baseOpts, vmt.contextOptions...)
+
 		ctx := fvm.NewContext(opts...)
 
-		chain := ctx.Chain
-		vm := fvm.NewVirtualMachine()
-
-		view := utils.NewSimpleView()
+		view := delta.NewDeltaView(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -100,26 +98,26 @@ func (vmt vmTest) run(
 // bootstrapWith executes the bootstrap procedure and the custom bootstrap function
 // and returns a prepared bootstrappedVmTest with all the state needed
 func (vmt vmTest) bootstrapWith(
-	bootstrap func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error,
+	bootstrap func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error,
 ) (bootstrappedVmTest, error) {
+	chain, vm := createChainAndVm(flow.Testnet)
 
 	baseOpts := []fvm.Option{
-		// default chain is Testnet
-		fvm.WithChain(flow.Testnet.Chain()),
+		fvm.WithChain(chain),
 	}
 
 	opts := append(baseOpts, vmt.contextOptions...)
+
 	ctx := fvm.NewContext(opts...)
 
-	chain := ctx.Chain
-	vm := fvm.NewVirtualMachine()
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
+
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
 	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
@@ -144,7 +142,7 @@ type bootstrappedVmTest struct {
 
 // run Runs a test from the bootstrapped state, without changing the bootstrapped state
 func (vmt bootstrappedVmTest) run(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
+	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		f(t, fvm.NewVirtualMachine(), vmt.chain, vmt.ctx, vmt.view.NewChild(), vmt.derivedBlockData.NewChildDerivedBlockData())
@@ -156,7 +154,7 @@ func TestPrograms(t *testing.T) {
 	t.Run(
 		"transaction execution derivedBlockData are committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				txCtx := fvm.NewContextFromParent(ctx)
 
@@ -197,7 +195,7 @@ func TestPrograms(t *testing.T) {
 
 	t.Run("script execution derivedBlockData are not committed",
 		newVMTest().withBootstrapProcedureOptions().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
@@ -480,7 +478,7 @@ func TestWithServiceAccount(t *testing.T) {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
@@ -610,7 +608,7 @@ func TestEventLimits(t *testing.T) {
 func TestHappyPathTransactionSigning(t *testing.T) {
 
 	newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			// Create an account private key.
 			privateKey, err := testutil.GenerateAccountPrivateKey()
 			require.NoError(t, err)
@@ -642,7 +640,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
-	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
+	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
 
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
@@ -957,8 +955,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 	}
 
-	runTx := func(tc testCase) func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
-		return func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+	runTx := func(tc testCase) func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		return func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			// ==== Create an account ====
 			privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
 
@@ -982,7 +980,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
-			address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address := flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -1090,7 +1089,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1136,7 +1135,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1180,7 +1179,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1222,7 +1221,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			memoryWeights,
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
 
@@ -1283,7 +1282,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1317,7 +1316,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1352,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1393,7 +1392,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
 			maxExecutionEffort := uint64(997)
@@ -1492,10 +1491,13 @@ func TestStorageUsed(t *testing.T) {
 	address, err := hex.DecodeString("2a3c4c2581cef731")
 	require.NoError(t, err)
 
-	simpleView := utils.NewSimpleView()
+	accountStatusId := flow.AccountStatusRegisterID(
+		flow.BytesToAddress(address))
+
+	simpleView := delta.NewDeltaView(nil)
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
-	err = simpleView.Set(string(address), state.AccountStatusKey, status.ToBytes())
+	err = simpleView.Set(accountStatusId, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)
@@ -1510,7 +1512,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Testnet)
-	simpleView := utils.NewSimpleView()
+	simpleView := delta.NewDeltaView(nil)
 
 	const computationLimit = 5
 
@@ -1634,7 +1636,7 @@ func TestStorageCapacity(t *testing.T) {
 		).
 		run(func(
 			t *testing.T,
-			vm *fvm.VirtualMachine,
+			vm fvm.VM,
 			chain flow.Chain,
 			ctx fvm.Context,
 			view state.View,
@@ -1718,7 +1720,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1755,7 +1757,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1813,7 +1815,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract updates are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1874,7 +1876,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1917,7 +1919,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -2010,7 +2012,7 @@ func TestInteractionLimit(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 	).bootstrapWith(
-		func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
+		func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
 			// ==== Create an account ====
 			var txBody *flow.TransactionBody
 			privateKey, txBody = testutil.CreateAccountCreationTransaction(t, chain)
@@ -2037,7 +2039,8 @@ func TestInteractionLimit(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address = flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -2073,7 +2076,7 @@ func TestInteractionLimit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, vmt.run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
 				// ==== Transfer funds with lowe interaction limit ====
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(address).
@@ -2101,189 +2104,4 @@ func TestInteractionLimit(t *testing.T) {
 			}),
 		)
 	}
-}
-
-func TestScriptIterationShouldNotHitsParseRestrictions(t *testing.T) {
-	newVMTest().withContextOptions(
-		fvm.WithRestrictedDeployment(false),
-	).run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
-
-			// Create an account private key.
-			privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
-			contractAccountPrivateKey := privateKeys[0]
-			testAccountPrivateKey := privateKeys[1]
-			require.NoError(t, err)
-
-			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-			accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
-			require.NoError(t, err)
-			contractAccount := accounts[0]
-			testAccount := accounts[1]
-
-			contract := []byte(`
-				pub contract TestContract {
-					pub resource TestResource {
-				}
-				pub fun createTestResource(): @TestResource {
-					return <- create TestResource()
-					}
-				}
-			`)
-
-			brokenContract := []byte(`
-				pub contract TestContract {
-			`)
-
-			// deploy the contract
-			deployingContractScriptTemplate := `
-				transaction {
-					prepare(signer: AuthAccount) {
-						let code = "%s".decodeHex()
-						signer.contracts.add(
-							name: "TestContract",
-							code: code
-						)
-				}
-			}
-			`
-
-			txBody := flow.NewTransactionBody().
-				SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString(contract)))).
-				SetPayer(chain.ServiceAddress()).
-				SetProposalKey(chain.ServiceAddress(), 0, 0).
-				AddAuthorizer(contractAccount)
-			_ = testutil.SignPayload(txBody, contractAccount, contractAccountPrivateKey)
-			_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-
-			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view)
-			require.NoError(t, err)
-			require.NoError(t, tx.Err)
-
-			txBody = flow.NewTransactionBody().
-				SetScript([]byte(fmt.Sprintf(
-					`
-					import TestContract from %s
-					
-					transaction {
-					  prepare(acct: AuthAccount) {
-						acct.save(<-TestContract.createTestResource() ,to: /storage/test,)
-					  }
-					  execute {}
-					}
-					`, contractAccount.HexWithPrefix()))).
-				SetPayer(chain.ServiceAddress()).
-				SetProposalKey(chain.ServiceAddress(), 0, 1).
-				AddAuthorizer(testAccount)
-
-			_ = testutil.SignPayload(txBody, testAccount, testAccountPrivateKey)
-			_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-
-			tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-			err = vm.Run(ctx, tx, view)
-			require.NoError(t, err)
-			require.NoError(t, tx.Err)
-
-			txnState := state.NewTransactionState(
-				view,
-				state.DefaultParameters())
-			acc := environment.NewAccounts(txnState)
-
-			// ==== this breaks the deployed contract ====
-			contractUpdater := environment.NewContractUpdaterForTesting(acc, nil)
-			err = contractUpdater.SetContract(runtime.Address(contractAccount), "TestContract", brokenContract, nil)
-			require.NoError(t, err)
-			_, err = contractUpdater.Commit()
-			require.NoError(t, err)
-
-			// ==== finally the test ====
-			address := cadence.NewAddress(testAccount)
-			script := fvm.Script([]byte(`
-			pub fun main(address: Address): [String] {
-				let account = getAuthAccount(address)
-				let paths: [String] = []
-				account.forEachStored(fun (path: StoragePath, type: Type): Bool {
-				  paths.append(path.toString())
-				  return true
-				})
-				return paths
-			}`,
-			)).WithArguments(
-				jsoncdc.MustEncode(address),
-			)
-			scriptCtx := fvm.NewContextFromParent(ctx)
-			scriptCtx.DerivedBlockData = nil
-			err = vm.Run(scriptCtx, script, view)
-
-			require.NoError(t, err)
-		})(t)
-}
-
-func TestAuthAccountCapabilities(t *testing.T) {
-	test := func(t *testing.T, linkingEnabled bool) {
-		newVMTest().
-			withBootstrapProcedureOptions().
-			withContextOptions(
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						1,
-						runtime.Config{
-							AccountLinkingEnabled: linkingEnabled,
-						},
-					),
-				),
-			).
-			run(
-				func(
-					t *testing.T,
-					vm *fvm.VirtualMachine,
-					chain flow.Chain,
-					ctx fvm.Context,
-					view state.View,
-					derivedBlockData *derived.DerivedBlockData,
-				) {
-					// Create an account private key.
-					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-					privateKey := privateKeys[0]
-					require.NoError(t, err)
-
-					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
-					require.NoError(t, err)
-					account := accounts[0]
-
-					txBody := flow.NewTransactionBody().SetScript([]byte(`
-					   transaction {
-						   prepare(acct: AuthAccount) {
-							   acct.linkAccount(/public/foo)
-						   }
-					   }
-					`)).
-						AddAuthorizer(account).
-						SetPayer(chain.ServiceAddress()).
-						SetProposalKey(chain.ServiceAddress(), 0, 0)
-
-					_ = testutil.SignPayload(txBody, account, privateKey)
-					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-					tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-
-					err = vm.Run(ctx, tx, view)
-					require.NoError(t, err)
-					if linkingEnabled {
-						require.NoError(t, tx.Err)
-					} else {
-						require.Error(t, tx.Err)
-					}
-				},
-			)(t)
-	}
-
-	t.Run("linking enabled", func(t *testing.T) {
-		test(t, true)
-	})
-	t.Run("linking disabled", func(t *testing.T) {
-		test(t, false)
-	})
-
 }

@@ -20,7 +20,6 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeRootQuorumCertificate      = 12
 	codeSporkID                    = 13
 	codeProtocolVersion            = 14
 	codeEpochCommitSafetyThreshold = 15
@@ -33,6 +32,7 @@ const (
 	codeExecutedBlock           = 23 // latest executed block with max height
 	codeRootHeight              = 24 // the height of the highest block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
+	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
 
 	// codes for single entity storage
 	// 31 was used for identities before epochs
@@ -47,12 +47,12 @@ const (
 	codeChunk                = 38
 
 	// codes for indexing single identifier by identifier/integeter
-	codeHeightToBlock           = 40 // index mapping height to block ID
-	codeBlockIDToLatestSealID   = 41 // index mapping a block its last payload seal
-	codeClusterBlockToRefBlock  = 42 // index cluster block ID to reference block ID
-	codeBlockValidity           = 43 // validity of block per HotStuff
-	codeRefHeightToClusterBlock = 44 // index reference block height to cluster block IDs
-	codeBlockIDToFinalizedSeal  = 45 // index _finalized_ seal by sealed block ID
+	codeHeightToBlock              = 40 // index mapping height to block ID
+	codeBlockIDToLatestSealID      = 41 // index mapping a block its last payload seal
+	codeClusterBlockToRefBlock     = 42 // index cluster block ID to reference block ID
+	codeRefHeightToClusterBlock    = 43 // index reference block height to cluster block IDs
+	codeBlockIDToFinalizedSeal     = 44 // index _finalized_ seal by sealed block ID
+	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs

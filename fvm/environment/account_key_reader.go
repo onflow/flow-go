@@ -4,10 +4,12 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -20,22 +22,22 @@ type AccountKeyReader interface {
 	// the given index. An error is returned if the specified account does not
 	// exist, the provided index is not valid, or if the key retrieval fails.
 	GetAccountKey(
-		address runtime.Address,
+		address common.Address,
 		keyIndex int,
 	) (
 		*runtime.AccountKey,
 		error,
 	)
-	AccountKeysCount(address runtime.Address) (uint64, error)
+	AccountKeysCount(address common.Address) (uint64, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountKeyReader
 }
 
 func NewParseRestrictedAccountKeyReader(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountKeyReader,
 ) AccountKeyReader {
 	return ParseRestrictedAccountKeyReader{
@@ -45,7 +47,7 @@ func NewParseRestrictedAccountKeyReader(
 }
 
 func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
-	address runtime.Address,
+	address common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -59,7 +61,7 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		keyIndex)
 }
 
-func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
 	return parseRestrict1Arg1Ret(
 		reader.txnState,
 		"AccountKeysCount",
@@ -69,14 +71,14 @@ func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address runtime.A
 }
 
 type accountKeyReader struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	accounts Accounts
 }
 
 func NewAccountKeyReader(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
 ) AccountKeyReader {
@@ -88,13 +90,13 @@ func NewAccountKeyReader(
 }
 
 func (reader *accountKeyReader) GetAccountKey(
-	address runtime.Address,
+	runtimeAddress common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
 	error,
 ) {
-	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
+	defer reader.tracer.StartChildSpan(trace.FVMEnvGetAccountKey).End()
 
 	formatErr := func(err error) (*runtime.AccountKey, error) {
 		return nil, fmt.Errorf("getting account key failed: %w", err)
@@ -110,11 +112,11 @@ func (reader *accountKeyReader) GetAccountKey(
 		return nil, nil
 	}
 
-	accountAddress := flow.Address(address)
+	address := flow.ConvertAddress(runtimeAddress)
 
 	// address verification is also done in this step
 	accountPublicKey, err := reader.accounts.GetPublicKey(
-		accountAddress,
+		address,
 		uint64(keyIndex))
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
@@ -137,8 +139,13 @@ func (reader *accountKeyReader) GetAccountKey(
 	return runtimeAccountKey, nil
 }
 
-func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (uint64, error) {
-	defer reader.tracer.StartSpanFromRoot(trace.FVMEnvAccountKeysCount).End()
+func (reader *accountKeyReader) AccountKeysCount(
+	runtimeAddress common.Address,
+) (
+	uint64,
+	error,
+) {
+	defer reader.tracer.StartChildSpan(trace.FVMEnvAccountKeysCount).End()
 
 	formatErr := func(err error) (uint64, error) {
 		return 0, fmt.Errorf("fetching account key count failed: %w", err)
@@ -149,13 +156,17 @@ func (reader *accountKeyReader) AccountKeysCount(address runtime.Address) (uint6
 		return formatErr(err)
 	}
 
-	accountAddress := flow.Address(address)
-
 	// address verification is also done in this step
-	return reader.accounts.GetPublicKeyCount(accountAddress)
+	return reader.accounts.GetPublicKeyCount(
+		flow.ConvertAddress(runtimeAddress))
 }
 
-func FlowToRuntimeAccountKey(flowKey flow.AccountPublicKey) (*runtime.AccountKey, error) {
+func FlowToRuntimeAccountKey(
+	flowKey flow.AccountPublicKey,
+) (
+	*runtime.AccountKey,
+	error,
+) {
 	signAlgo := crypto.CryptoToRuntimeSigningAlgorithm(flowKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
 		return nil, errors.NewValueErrorf(

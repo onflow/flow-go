@@ -12,12 +12,10 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -26,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
@@ -41,26 +38,36 @@ const (
 	ReusableCadenceRuntimePoolSize = 1000
 )
 
-var uploadEnabled = true
-
-func SetUploaderEnabled(enabled bool) {
-	uploadEnabled = enabled
-
-	log.Info().Msgf("changed uploadEnabled to %v", enabled)
-}
-
-func GetUploaderEnabled() bool {
-	return uploadEnabled
-}
-
 type ComputationManager interface {
-	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(
+		ctx context.Context,
+		script []byte,
+		arguments [][]byte,
+		blockHeader *flow.Header,
+		snapshot state.StorageSnapshot,
+	) (
+		[]byte,
+		error,
+	)
+
 	ComputeBlock(
 		ctx context.Context,
+		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		view state.View,
-	) (*execution.ComputationResult, error)
-	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
+		snapshot state.StorageSnapshot,
+	) (
+		*execution.ComputationResult,
+		error,
+	)
+
+	GetAccount(
+		addr flow.Address,
+		header *flow.Header,
+		snapshot state.StorageSnapshot,
+	) (
+		*flow.Account,
+		error,
+	)
 }
 
 type ComputationConfig struct {
@@ -75,7 +82,7 @@ type ComputationConfig struct {
 	// will create a virtual machine using this function.
 	//
 	// Note that this is primarily used for testing.
-	NewCustomVirtualMachine func() computer.VirtualMachine
+	NewCustomVirtualMachine func() fvm.VM
 }
 
 // Manager manages computation and execution
@@ -85,13 +92,12 @@ type Manager struct {
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
-	vm                       computer.VirtualMachine
+	vm                       fvm.VM
 	vmCtx                    fvm.Context
 	blockComputer            computer.BlockComputer
 	derivedChainData         *derived.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
-	uploaders                []uploader.Uploader
 	rngLock                  *sync.Mutex
 	rng                      *rand.Rand
 }
@@ -104,13 +110,12 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	uploaders []uploader.Uploader,
 	executionDataProvider *provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	var vm computer.VirtualMachine
+	var vm fvm.VM
 	if params.NewCustomVirtualMachine != nil {
 		vm = params.NewCustomVirtualMachine()
 	} else {
@@ -169,7 +174,6 @@ func New(
 		derivedChainData:         derivedChainData,
 		scriptLogThreshold:       params.ScriptLogThreshold,
 		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
-		uploaders:                uploaders,
 		rngLock:                  &sync.Mutex{},
 		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -177,7 +181,7 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) VM() computer.VirtualMachine {
+func (e *Manager) VM() fvm.VM {
 	return e.vm
 }
 
@@ -186,7 +190,7 @@ func (e *Manager) ExecuteScript(
 	code []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	view state.View,
+	snapshot state.StorageSnapshot,
 ) ([]byte, error) {
 
 	startedAt := time.Now()
@@ -251,6 +255,7 @@ func (e *Manager) ExecuteScript(
 			}
 		}()
 
+		view := delta.NewDeltaView(snapshot)
 		return e.vm.Run(blockCtx, script, view)
 	}()
 	if err != nil {
@@ -277,15 +282,20 @@ func (e *Manager) ExecuteScript(
 	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
+	e.metrics.ExecutionScriptExecuted(
+		time.Since(startedAt),
+		script.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		script.MemoryEstimate)
 
 	return encodedValue, nil
 }
 
 func (e *Manager) ComputeBlock(
 	ctx context.Context,
+	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	view state.View,
+	snapshot state.StorageSnapshot,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -296,7 +306,12 @@ func (e *Manager) ComputeBlock(
 		block.ID(),
 		block.ParentID())
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, derivedBlockData)
+	result, err := e.blockComputer.ExecuteBlock(
+		ctx,
+		parentBlockExecutionResultID,
+		block,
+		snapshot,
+		derivedBlockData)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -306,47 +321,37 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block.Block)).
-		Msg("block result computed / derived data cache updated")
-
-	if uploadEnabled {
-		var group errgroup.Group
-
-		for _, uploader := range e.uploaders {
-			uploader := uploader
-
-			group.Go(func() error {
-				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
-				defer span.End()
-
-				return uploader.Upload(result)
-			})
-		}
-
-		err = group.Wait()
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload block result: %w", err)
-		}
-	}
-
-	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
 	return result, nil
 }
 
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
+func (e *Manager) GetAccount(
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot state.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccount(blockCtx, address, view)
+	delta.NewDeltaView(snapshot)
+	account, err := e.vm.GetAccount(
+		blockCtx,
+		address,
+		delta.NewDeltaView(snapshot))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
+		return nil, fmt.Errorf(
+			"failed to get account (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
 	}
 
 	return account, nil

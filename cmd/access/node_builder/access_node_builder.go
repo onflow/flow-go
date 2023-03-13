@@ -71,7 +71,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
@@ -192,7 +192,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.MutableState
+	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
@@ -236,14 +236,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(
-			state,
-			node.Storage.Index,
-			node.Storage.Payloads,
-			node.Tracer,
-			node.ProtocolEvents,
-			blocktimer.DefaultBlockTimer,
-		)
+		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 		builder.FollowerState = followerState
 
 		return err
@@ -705,7 +698,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
+		blocklistWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
 		}
@@ -1066,7 +1060,10 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - Default Flow libp2p pubsub options
 func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2pbuilder.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, networkMetrics)
+		connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("could not create connection manager: %w", err)
+		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
@@ -1086,7 +1083,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 				return dht.NewDHT(
 					ctx,
 					h,
-					unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					protocols.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					networkMetrics,
 					dht.AsServer(),
@@ -1094,6 +1091,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			}).
 			// disable connection pruning for the access node which supports the observer
 			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
+			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			Build()
 
 		if err != nil {
@@ -1109,13 +1107,11 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkSecurityMetrics,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
-
+	validators ...network.MessageValidator,
+) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
-
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
-
-	builder.Middleware = middleware.NewMiddleware(
+	mw := middleware.NewMiddleware(
 		logger,
 		libp2pNode,
 		nodeID,
@@ -1125,7 +1121,9 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...))
-
+		middleware.WithMessageValidators(validators...), // use default identifier provider
+	)
+	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.Middleware = mw
 	return builder.Middleware
 }

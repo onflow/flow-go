@@ -158,3 +158,11 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return r.db.Update(operation.SkipNonExist(operation.RemoveExecutionResultIndex(blockID)))
 }
+
+// BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (r *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveExecutionResultIndex(blockID)(writeBatch)
+}

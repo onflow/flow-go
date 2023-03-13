@@ -24,6 +24,7 @@ type State struct {
 	db      *badger.DB
 	headers storage.Headers
 	blocks  storage.Blocks
+	qcs     storage.QuorumCertificates
 	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
@@ -36,6 +37,8 @@ type State struct {
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
 }
+
+var _ protocol.State = (*State)(nil)
 
 type BootstrapConfig struct {
 	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
@@ -62,6 +65,7 @@ func Bootstrap(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -82,7 +86,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
@@ -111,7 +115,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = transaction.WithTx(operation.InsertRootQuorumCertificate(qc))(tx)
+		err = qcs.StoreTx(qc)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
@@ -357,9 +361,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
-
 			if err := isValidEpochCommit(commit, setup); err != nil {
-				return fmt.Errorf("invalid commit")
+				return fmt.Errorf("invalid commit: %w", err)
+			}
+
+			err = indexFirstHeight(previous)(tx.DBTxn)
+			if err != nil {
+				return fmt.Errorf("could not index epoch first height: %w", err)
 			}
 
 			setups = append(setups, setup)
@@ -383,9 +391,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
-
 		if err := isValidEpochCommit(commit, setup); err != nil {
-			return fmt.Errorf("invalid commit")
+			return fmt.Errorf("invalid commit: %w", err)
+		}
+
+		err = indexFirstHeight(current)(tx.DBTxn)
+		if err != nil {
+			return fmt.Errorf("could not index epoch first height: %w", err)
 		}
 
 		setups = append(setups, setup)
@@ -503,6 +515,27 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 	}
 }
 
+// indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
+// The input epoch must have been started (the first block of the epoch has been finalized).
+// No errors are expected during normal operation.
+func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		counter, err := epoch.Counter()
+		if err != nil {
+			return fmt.Errorf("could not get epoch counter: %w", err)
+		}
+		firstHeight, err := epoch.FirstHeight()
+		if err != nil {
+			return fmt.Errorf("could not get epoch first height: %w", err)
+		}
+		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
+		}
+		return nil
+	}
+}
+
 func OpenState(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,
@@ -510,6 +543,7 @@ func OpenState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -521,7 +555,7 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -581,10 +615,10 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
-	if errors.Is(err, storage.ErrNotFound) {
-		return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
-	}
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
+		}
 		// critical storage error
 		return invalid.NewSnapshotf("could not look up block by height: %w", err)
 	}
@@ -607,6 +641,7 @@ func newState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
@@ -618,6 +653,7 @@ func newState(
 		results: results,
 		seals:   seals,
 		blocks:  blocks,
+		qcs:     qcs,
 		epoch: struct {
 			setups   storage.EpochSetups
 			commits  storage.EpochCommits

@@ -107,6 +107,7 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 	}
 }
 
+// results in `storage.ErrNotFound` for unknown height
 func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Identifier, error) {
 	return func(tx *badger.Txn) (flow.Identifier, error) {
 		blockID, err := h.heightCache.Get(height)(tx)
@@ -138,6 +139,9 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.retrieveTx(blockID)(tx)
 }
 
+// BlockIDByHeight the block ID that is finalized at the given height. It is an optimized version
+// of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no finalized block is known at given height.
 func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()
@@ -194,6 +198,14 @@ func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch s
 
 func (h *Headers) RemoveChunkBlockIndexByChunkID(chunkID flow.Identifier) error {
 	return h.db.Update(operation.RemoveBlockIDByChunkID(chunkID))
+}
+
+// BatchRemoveChunkBlockIndexByChunkID removes block to chunk index entry keyed by a blockID in a provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (h *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveBlockIDByChunkID(chunkID)(writeBatch)
 }
 
 // RollbackExecutedBlock update the executed block header to the given header.

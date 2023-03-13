@@ -7,11 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
@@ -19,6 +21,7 @@ var DefaultPeerUpdateInterval = 10 * time.Minute
 
 var _ p2p.PeerManager = (*PeerManager)(nil)
 var _ component.Component = (*PeerManager)(nil)
+var _ p2p.RateLimiterConsumer = (*PeerManager)(nil)
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
@@ -151,4 +154,18 @@ func (pm *PeerManager) SetPeersProvider(peersProvider p2p.PeersProvider) {
 	}
 
 	pm.peersProvider = peersProvider
+}
+
+// OnRateLimitedPeer rate limiter distributor consumer func that will be called when a peer is rate limited, the rate limited peer
+// is disconnected immediately after being rate limited.
+func (pm *PeerManager) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+	pm.logger.Warn().
+		Str("peer_id", pid.String()).
+		Str("role", role).
+		Str("message_type", msgType).
+		Str("topic", topic).
+		Str("reason", reason).
+		Bool(logging.KeySuspicious, true).
+		Msg("pruning connection to rate-limited peer")
+	pm.RequestPeerUpdate()
 }

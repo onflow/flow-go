@@ -22,9 +22,13 @@ var (
 	// in the EpochCommitted phase.
 	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 
+	// ErrEpochTransitionNotFinalized is a sentinel returned when a query is made
+	// for a block at an epoch boundary which has not yet been finalized.
+	ErrEpochTransitionNotFinalized = fmt.Errorf("cannot query block at un-finalized epoch transition")
+
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
-	// for a sealing segment below the root block.
-	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot query sealing segment below root block")
+	// for a sealing segment below the root block (local history cutoff).
+	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot construct sealing segment beyond locally known history")
 
 	// ErrClusterNotFound is a sentinel error returns for queries for a cluster
 	ErrClusterNotFound = fmt.Errorf("could not find cluster")
@@ -98,4 +102,30 @@ func NewInvalidServiceEventErrorf(msg string, args ...interface{}) error {
 			error: fmt.Errorf(msg, args...),
 		},
 	)
+}
+
+// UnfinalizedSealingSegmentError indicates that including unfinalized blocks
+// in the sealing segment is illegal.
+type UnfinalizedSealingSegmentError struct {
+	error
+}
+
+func NewUnfinalizedSealingSegmentErrorf(msg string, args ...interface{}) error {
+	return UnfinalizedSealingSegmentError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnfinalizedSealingSegmentError) Unwrap() error {
+	return e.error
+}
+
+func (e UnfinalizedSealingSegmentError) Error() string {
+	return e.error.Error()
+}
+
+// IsUnfinalizedSealingSegmentError returns true if err is of type UnfinalizedSealingSegmentError
+func IsUnfinalizedSealingSegmentError(err error) bool {
+	var e UnfinalizedSealingSegmentError
+	return errors.As(err, &e)
 }

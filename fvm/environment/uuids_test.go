@@ -5,15 +5,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
-	view := utils.NewSimpleView()
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	txnState := state.NewTransactionState(
+		delta.NewDeltaView(nil),
+		state.DefaultParameters())
 	uuidsA := NewUUIDGenerator(
-		NewTracer(DefaultTracerParams()),
+		tracing.NewTracerSpan(),
 		NewMeter(txnState),
 		txnState)
 
@@ -26,7 +28,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 	// create new UUIDs instance
 	uuidsB := NewUUIDGenerator(
-		NewTracer(DefaultTracerParams()),
+		tracing.NewTracerSpan(),
 		NewMeter(txnState),
 		txnState)
 	uuid, err = uuidsB.getUUID() // should read saved value
@@ -36,10 +38,11 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 }
 
 func Test_GenerateUUID(t *testing.T) {
-	view := utils.NewSimpleView()
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	txnState := state.NewTransactionState(
+		delta.NewDeltaView(nil),
+		state.DefaultParameters())
 	genA := NewUUIDGenerator(
-		NewTracer(DefaultTracerParams()),
+		tracing.NewTracerSpan(),
 		NewMeter(txnState),
 		txnState)
 
@@ -56,7 +59,7 @@ func Test_GenerateUUID(t *testing.T) {
 
 	// Create new generator instance from same ledger
 	genB := NewUUIDGenerator(
-		NewTracer(DefaultTracerParams()),
+		tracing.NewTracerSpan(),
 		NewMeter(txnState),
 		txnState)
 

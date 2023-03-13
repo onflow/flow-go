@@ -229,7 +229,24 @@ func SetupMockConsensusNode(t *testing.T,
 				hasher,
 			)
 			assert.NoError(t, err)
-			assert.True(t, valid)
+
+			if !valid {
+				// When chunk verifier returns chunk fault, a placeholder
+				// signature is generated for that chunk.
+				isChunkFaultSignature, err := crypto.SPOCKVerifyAgainstData(
+					pk,
+					resultApproval.Body.Spock,
+					nil, // chunk fault has no spock secret
+					hasher,
+				)
+				assert.NoError(t, err)
+
+				if isChunkFaultSignature {
+					assert.Fail(t, "chunk verifier returned chunk fault")
+				} else {
+					assert.Fail(t, "spock secret mismatch")
+				}
+			}
 
 			wg.Done()
 		}).Return(nil)
@@ -359,7 +376,7 @@ func EvenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList,
-	state protocol.MutableState) []*flow.Block {
+	state protocol.ParticipantState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks

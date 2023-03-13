@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/google/go-cmp/cmp"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -110,7 +112,7 @@ func (suite *Suite) RunTest(
 	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers, results *storage.ExecutionResults),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, results := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _, _, results := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
@@ -365,11 +367,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
-			actual := *resp.Block
+			actual := resp.Block
 			expectedMessage, err := convert.BlockHeaderToMessage(header, suite.signerIds)
 			require.NoError(suite.T(), err)
-			require.Equal(suite.T(), *expectedMessage, actual)
-			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
+			require.Empty(suite.T(), cmp.Diff(expectedMessage, actual, protocmp.Transform()))
+			expectedBlockHeader, err := convert.MessageToBlockHeader(actual)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
@@ -487,7 +489,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
-			er := *resp.ExecutionResult
+			er := resp.ExecutionResult
 
 			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
 			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
@@ -553,7 +555,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		results := storage.NewExecutionResults(suite.metrics, db)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -681,7 +683,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		results := storage.NewExecutionResults(suite.metrics, db)

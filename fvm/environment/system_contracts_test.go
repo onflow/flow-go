@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -53,18 +54,17 @@ func TestSystemContractsInvoke(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tracer := environment.NewTracer(environment.DefaultTracerParams())
-			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
-				0,
-				func() runtime.Runtime {
-					return &testutil.TestInterpreterRuntime{
-						InvokeContractFunc: tc.contractFunction,
-					}
-				},
-			)
+			tracer := tracing.NewTracerSpan()
 			runtime := environment.NewRuntime(
 				environment.RuntimeParams{
-					ReusableCadenceRuntimePool: runtimePool,
+					ReusableCadenceRuntimePool: reusableRuntime.NewCustomReusableCadenceRuntimePool(
+						0,
+						func(_ runtime.Config) runtime.Runtime {
+							return &testutil.TestInterpreterRuntime{
+								InvokeContractFunc: tc.contractFunction,
+							}
+						},
+					),
 				},
 			)
 			invoker := environment.NewSystemContracts(
@@ -77,7 +77,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
-						return flow.Address{}
+						return flow.EmptyAddress
 					},
 					FunctionName: "functionName",
 				},
