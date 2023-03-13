@@ -8,7 +8,7 @@ on:
     branches:
       - master-private
 
-# GH_TOKEN needed to enable GitHub CLI commands
+# GH_TOKEN needed to enable GitHub CLI commands from scripts
 env:
   GH_TOKEN: ${{ github.token }}
 
@@ -21,6 +21,7 @@ jobs:
         with:
           # checkout entire history - necessary when pushing to multiple origin branches after syncing with public flow-go repo
           fetch-depth: 0
+          token: ${{ secrets.REPO_SYNC }}
 
       - name: Run sync
         run: sh tools/repo_sync/sync-from-public-flow-go.sh
