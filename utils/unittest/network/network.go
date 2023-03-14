@@ -38,6 +38,8 @@ type Network struct {
 	publishFunc NetworkPublishFunc
 }
 
+var _ network.Network = (*Network)(nil)
+
 // NewNetwork returns a new mock network.
 func NewNetwork() *Network {
 	return &Network{

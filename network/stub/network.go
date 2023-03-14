@@ -80,6 +80,8 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	return net
 }
 
+var _ network.Network = (*Network)(nil)
+
 // GetID returns the identity of the attached node.
 func (n *Network) GetID() flow.Identifier {
 	return n.myId
