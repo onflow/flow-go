@@ -16,7 +16,6 @@ import (
 type ComputationResult struct {
 	*entity.ExecutableBlock
 	StateSnapshots         []state.ExecutionSnapshot
-	StateCommitments       []flow.StateCommitment
 	Events                 []flow.EventsList
 	EventsHashes           []flow.Identifier
 	ServiceEvents          flow.EventsList
@@ -40,7 +39,6 @@ func NewEmptyComputationResult(
 	return &ComputationResult{
 		ExecutableBlock:        block,
 		StateSnapshots:         make([]state.ExecutionSnapshot, 0, numCollections),
-		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
 		Events:                 make([]flow.EventsList, numCollections),
 		EventsHashes:           make([]flow.Identifier, 0, numCollections),
 		ServiceEvents:          make(flow.EventsList, 0),
@@ -98,7 +96,7 @@ func (cr *ComputationResult) CollectionStats(
 
 func (cr *ComputationResult) BlockStats() module.ExecutionResultStats {
 	stats := module.ExecutionResultStats{}
-	for idx := 0; idx < len(cr.StateCommitments); idx++ {
+	for idx := 0; idx < len(cr.StateSnapshots); idx++ {
 		stats.Merge(cr.CollectionStats(idx))
 	}
 
