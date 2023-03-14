@@ -199,20 +199,23 @@ func (programs *Programs) GetOrLoadProgram(
 }
 
 func (programs *Programs) getOrLoadAddressProgram(
-	address common.AddressLocation,
+	location common.AddressLocation,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
-	loader := newProgramLoader(load, programs.dependencyStack)
+	loader := newProgramLoader(load, programs.dependencyStack, location)
 	program, err := programs.txnState.GetOrComputeProgram(
 		programs.txnState,
-		address,
+		location,
 		loader,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting program: %w", err)
 	}
 
+	// Add dependencies to the stack.
+	// This is only really needed if loader was not called,
+	// but there is no harm in doing it always.
 	programs.dependencyStack.addDependencies(program.Dependencies)
 
 	if loader.Called() {
@@ -229,6 +232,7 @@ type programLoader struct {
 	loadFunc        func() (*interpreter.Program, error)
 	dependencyStack *dependencyStack
 	called          bool
+	location        common.AddressLocation
 }
 
 var _ derived.ValueComputer[common.AddressLocation, *derived.Program] = (*programLoader)(nil)
@@ -236,17 +240,20 @@ var _ derived.ValueComputer[common.AddressLocation, *derived.Program] = (*progra
 func newProgramLoader(
 	loadFunc func() (*interpreter.Program, error),
 	dependencyStack *dependencyStack,
+	location common.AddressLocation,
 ) *programLoader {
 	return &programLoader{
 		loadFunc:        loadFunc,
 		dependencyStack: dependencyStack,
-		called:          false,
+		// called will be true if the loader was called.
+		called:   false,
+		location: location,
 	}
 }
 
 func (loader *programLoader) Compute(
 	txState state.NestedTransaction,
-	address common.AddressLocation,
+	location common.AddressLocation,
 ) (
 	*derived.Program,
 	error,
@@ -257,11 +264,16 @@ func (loader *programLoader) Compute(
 		// this more apparent.
 		panic("program loader called twice")
 	}
+	if loader.location != location {
+		// This should never happen, as the program loader constructed specifically
+		// to load one location once. This is only a sanity check.
+		panic("program loader called with unexpected location")
+	}
 
 	loader.called = true
 
 	interpreterProgram, dependencies, err :=
-		loader.loadWithDependencyTracking(address, loader.loadFunc)
+		loader.loadWithDependencyTracking(location, loader.loadFunc)
 	if err != nil {
 		return nil, fmt.Errorf("load program failed: %w", err)
 	}
