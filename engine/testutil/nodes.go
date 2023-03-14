@@ -648,9 +648,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
 	require.NoError(t, err)
 
-	deltas, err := ingestion.NewDeltas(1000)
-	require.NoError(t, err)
-
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
@@ -676,10 +673,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		node.Metrics,
 		node.Tracer,
-		false,
-		filter.Any,
-		deltas,
-		syncThreshold,
 		false,
 		checkAuthorizedAtBlock,
 		nil,
