@@ -136,7 +136,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	// initialize the mocks and engine
 	conduit := &mocknetwork.Conduit{}
 	collectionConduit := &mocknetwork.Conduit{}
-	syncConduit := &mocknetwork.Conduit{}
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
