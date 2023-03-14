@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestAccountStatus(t *testing.T) {
@@ -17,7 +18,7 @@ func TestAccountStatus(t *testing.T) {
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {
 		// TODO: remove freezing feature
-		t.Skip("Skip as we are removing the freezing feature.")
+		unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "Skip as we are removing the freezing feature.")
 
 		s.SetFrozenFlag(true)
 		require.True(t, s.IsAccountFrozen())

@@ -209,7 +209,7 @@ func TestTransactionVerification(t *testing.T) {
 
 	t.Run("frozen account is rejected", func(t *testing.T) {
 		// TODO: remove freezing feature
-		t.Skip("Skip as we are removing the freezing feature.")
+		unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "Skip as we are removing the freezing feature.")
 
 		ctx := fvm.NewContext(
 			fvm.WithAuthorizationChecksEnabled(true),
