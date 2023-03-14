@@ -29,6 +29,7 @@ type Suite struct {
 	exe1ID                  flow.Identifier
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
+	ver2ID                  flow.Identifier // 2nd verification node
 	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
 }
 
@@ -84,7 +85,7 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// generates one verification node
+	// generates two verification node
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
@@ -92,6 +93,14 @@ func (s *Suite) SetupSuite() {
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+
+	s.ver2ID = unittest.IdentifierFixture()
+	ver2Config := testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.ver2ID),
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+	s.nodeConfigs = append(s.nodeConfigs, ver2Config)
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
