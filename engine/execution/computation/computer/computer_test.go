@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
@@ -101,7 +102,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
 		)
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
@@ -277,7 +278,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -416,7 +417,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
