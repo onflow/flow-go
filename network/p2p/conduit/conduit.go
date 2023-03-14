@@ -74,6 +74,8 @@ type Conduit struct {
 	adapter network.Adapter
 }
 
+var _ network.Conduit = (*Conduit)(nil)
+
 // Publish sends an event to the network layer for unreliable delivery
 // to subscribers of the given event on the network layer. It uses a
 // publish-subscribe layer and can thus not guarantee that the specified

@@ -20,7 +20,7 @@ type Conduit struct {
 	egressController insecure.EgressController
 }
 
-var _ network.Conduit = &Conduit{}
+var _ network.Conduit = (*Conduit)(nil)
 
 // Publish sends the incoming events as publish events to the controller of this conduit (i.e., its factory) to handle.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {

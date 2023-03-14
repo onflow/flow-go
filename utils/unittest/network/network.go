@@ -21,6 +21,8 @@ type Conduit struct {
 	channel channels.Channel
 }
 
+var _ network.Conduit = (*Conduit)(nil)
+
 // Publish sends a message on this mock network, invoking any callback that has
 // been specified. This will panic if no callback is found.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {

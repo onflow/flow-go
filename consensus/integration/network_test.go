@@ -172,6 +172,8 @@ type Conduit struct {
 	queue   chan message
 }
 
+var _ network.Conduit = (*Conduit)(nil)
+
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit closed")
