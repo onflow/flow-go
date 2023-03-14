@@ -1,8 +1,8 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -15,16 +15,19 @@ import (
 // TODO(patrick): rm unaccessed fields
 type ComputationResult struct {
 	*entity.ExecutableBlock
-	StateSnapshots         []*delta.SpockSnapshot
+	StateSnapshots         []state.ExecutionSnapshot
 	StateCommitments       []flow.StateCommitment
 	Events                 []flow.EventsList
 	EventsHashes           []flow.Identifier
 	ServiceEvents          flow.EventsList
 	TransactionResults     []flow.TransactionResult
 	TransactionResultIndex []int
+
+	// TODO(patrick): switch this to execution snapshot
 	ComputationIntensities meter.MeteredComputationIntensities
-	ChunkDataPacks         []*flow.ChunkDataPack
-	EndState               flow.StateCommitment
+
+	ChunkDataPacks []*flow.ChunkDataPack
+	EndState       flow.StateCommitment
 
 	*execution_data.BlockExecutionData
 	*flow.ExecutionReceipt
@@ -36,7 +39,7 @@ func NewEmptyComputationResult(
 	numCollections := len(block.CompleteCollections) + 1
 	return &ComputationResult{
 		ExecutableBlock:        block,
-		StateSnapshots:         make([]*delta.SpockSnapshot, 0, numCollections),
+		StateSnapshots:         make([]state.ExecutionSnapshot, 0, numCollections),
 		StateCommitments:       make([]flow.StateCommitment, 0, numCollections),
 		Events:                 make([]flow.EventsList, numCollections),
 		EventsHashes:           make([]flow.Identifier, 0, numCollections),
@@ -74,13 +77,20 @@ func (cr *ComputationResult) CollectionStats(
 
 	events := cr.Events[collectionIndex]
 	snapshot := cr.StateSnapshots[collectionIndex]
+
+	numTouched := len(snapshot.AllRegisterIDs())
+	bytesWritten := 0
+	for _, entry := range snapshot.UpdatedRegisters() {
+		bytesWritten += len(entry.Value)
+	}
+
 	return module.ExecutionResultStats{
 		ComputationUsed:                 computationUsed,
 		MemoryUsed:                      memoryUsed,
 		EventCounts:                     len(events),
 		EventSize:                       events.ByteSize(),
-		NumberOfRegistersTouched:        snapshot.NumberOfRegistersTouched,
-		NumberOfBytesWrittenToRegisters: snapshot.NumberOfBytesWrittenToRegisters,
+		NumberOfRegistersTouched:        numTouched,
+		NumberOfBytesWrittenToRegisters: bytesWritten,
 		NumberOfCollections:             1,
 		NumberOfTransactions:            endTxnIndex - startTxnIndex,
 	}

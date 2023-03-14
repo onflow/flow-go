@@ -146,13 +146,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
-	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
-	FVMTransactionStorageUsedCheck   SpanName = "fvm.env.transactionStorageUsedCheck"
-	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
-	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+	FVMVerifyTransaction           SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction      SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction          SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees       SpanName = "fvm.deductTransactionFees"
+	FVMTransactionStorageUsedCheck SpanName = "fvm.env.transactionStorageUsedCheck"
+	FVMInvokeContractFunction      SpanName = "fvm.invokeContractFunction"
 
 	FVMEnvValueExists                SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                   SpanName = "fvm.env.getValue"
@@ -183,7 +182,6 @@ const (
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvUnsafeRandom               SpanName = "fvm.env.unsafeRandom"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
-	FVMEnvSetAccountFrozen           SpanName = "fvm.env.setAccountFrozen"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"
 	FVMEnvAccountKeysCount           SpanName = "fvm.env.accountKeysCount"
