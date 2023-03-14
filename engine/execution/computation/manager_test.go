@@ -429,6 +429,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 				LogTimeThreshold:   1 * time.Millisecond,
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
+			DerivedDataCacheSize: 10,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
