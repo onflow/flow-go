@@ -12,7 +12,7 @@ import (
 )
 
 type EngineProcessFunc func(channels.Channel, flow.Identifier, interface{}) error
-type NetworkPublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
+type PublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
 
 // Conduit represents a mock conduit.
 type Conduit struct {
@@ -35,7 +35,7 @@ type Network struct {
 	mocknetwork.Network
 	conduits    map[channels.Channel]*Conduit
 	engines     map[channels.Channel]network.MessageProcessor
-	publishFunc NetworkPublishFunc
+	publishFunc PublishFunc
 }
 
 var _ network.Network = (*Network)(nil)
@@ -75,7 +75,7 @@ func (n *Network) Send(channel channels.Channel, originID flow.Identifier, event
 
 // OnPublish specifies the callback that should be executed when `Publish` is called on any conduits
 // created by this mock network.
-func (n *Network) OnPublish(publishFunc NetworkPublishFunc) *Network {
+func (n *Network) OnPublish(publishFunc PublishFunc) *Network {
 	n.publishFunc = publishFunc
 	return n
 }
