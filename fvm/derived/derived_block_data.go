@@ -20,20 +20,6 @@ type DerivedTransaction interface {
 		error,
 	)
 
-	GetProgram(
-		addressLocation common.AddressLocation,
-	) (
-		*Program,
-		*state.State,
-		bool,
-	)
-
-	SetProgram(
-		addressLocation common.AddressLocation,
-		program *Program,
-		state *state.State,
-	)
-
 	GetMeterParamOverrides(
 		txnState state.NestedTransaction,
 		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
@@ -213,24 +199,6 @@ func (transaction *DerivedTransactionData) GetOrComputeProgram(
 		txState,
 		addressLocation,
 		programComputer)
-}
-
-func (transaction *DerivedTransactionData) GetProgram(
-	addressLocation common.AddressLocation,
-) (
-	*Program,
-	*state.State,
-	bool,
-) {
-	return transaction.programs.Get(addressLocation)
-}
-
-func (transaction *DerivedTransactionData) SetProgram(
-	addressLocation common.AddressLocation,
-	program *Program,
-	state *state.State,
-) {
-	transaction.programs.Set(addressLocation, program, state)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(
