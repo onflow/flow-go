@@ -224,7 +224,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	return bc, nil
 }
 
-// cacheBlockAndFindEquivocations adds the given block to the underlying block cache. By indexing the
+// cache adds the given block to the underlying block cache. By indexing the
 // first block cached for every view, we can detect equivocation. The first return value contains the
 // already-cached equivocating block or `nil` otherwise. Repeated calls with the same block are no-ops.
 // Any errors are symptoms of internal state corruption
