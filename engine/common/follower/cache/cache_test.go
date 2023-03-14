@@ -109,6 +109,7 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 	require.Nil(s.T(), certifyingQC)
 	child := unittest.BlockWithParentFixture(block.Header)
 	certifiedBatch, certifyingQC, err = s.cache.AddBlocks([]*flow.Block{child})
+	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
 	require.NotNil(s.T(), certifyingQC)
 	require.Equal(s.T(), block.ID(), certifyingQC.BlockID)
@@ -143,11 +144,13 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 
 	// add A
 	certifiedBlocks, certifiedQC, err = s.cache.AddBlocks(blocks[:1])
+	require.NoError(s.T(), err)
 	require.Empty(s.T(), certifiedBlocks)
 	require.Nil(s.T(), certifiedQC)
 
 	// add B
 	certifiedBlocks, certifiedQC, err = s.cache.AddBlocks(blocks[1:2])
+	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[:2], certifiedBlocks)
 	require.Equal(s.T(), blocks[2].Header.QuorumCertificate(), certifiedQC)
 }
