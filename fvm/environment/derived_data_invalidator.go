@@ -104,7 +104,11 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	// updated.  A program has itself listed as a dependency, so that this
 	// simpler.
 	for _, key := range invalidator.ContractUpdateKeys {
-		_, ok := program.Dependencies[key.Address]
+		loc := common.AddressLocation{
+			Address: common.MustBytesToAddress(key.Address.Bytes()),
+			Name:    key.Name,
+		}
+		_, ok := program.Dependencies[loc]
 		if ok {
 			return true
 		}

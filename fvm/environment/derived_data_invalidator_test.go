@@ -32,8 +32,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
 	programA := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressA: {},
+		Dependencies: map[common.AddressLocation]struct{}{
+			programALoc: {},
 		},
 	}
 
@@ -42,9 +42,9 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programBLoc := common.AddressLocation{Address: cAddressB, Name: "B"}
 	programB := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressA: {},
-			addressB: {},
+		Dependencies: map[common.AddressLocation]struct{}{
+			programALoc: {},
+			programBLoc: {},
 		},
 	}
 
@@ -53,8 +53,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programDLoc := common.AddressLocation{Address: cAddressD, Name: "D"}
 	programD := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressD: {},
+		Dependencies: map[common.AddressLocation]struct{}{
+			programDLoc: {},
 		},
 	}
 
@@ -63,12 +63,12 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programCLoc := common.AddressLocation{Address: cAddressC, Name: "C"}
 	programC := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
+		Dependencies: map[common.AddressLocation]struct{}{
 			// C indirectly depends on A trough B
-			addressA: {},
-			addressB: {},
-			addressC: {},
-			addressD: {},
+			programALoc: {},
+			programBLoc: {},
+			programCLoc: {},
+			programDLoc: {},
 		},
 	}
 

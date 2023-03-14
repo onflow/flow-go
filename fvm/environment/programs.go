@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -300,7 +299,7 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	dependencies := make(derived.ProgramDependencies, 1)
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
+	dependencies.AddDependency(loc)
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,

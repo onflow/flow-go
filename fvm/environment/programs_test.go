@@ -222,7 +222,7 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entry.Value.Dependencies, 1)
-		require.NotNil(t, entry.Value.Dependencies[addressA])
+		require.NotNil(t, entry.Value.Dependencies[contractALocation])
 
 		// assert some reads were recorded (at least loading of code)
 		require.NotEmpty(t, entry.ExecutionSnapshot.ReadSet)
@@ -316,8 +316,8 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entryB.Value.Dependencies, 2)
-		require.NotNil(t, entryB.Value.Dependencies[addressA])
-		require.NotNil(t, entryB.Value.Dependencies[addressB])
+		require.NotNil(t, entryB.Value.Dependencies[contractALocation])
+		require.NotNil(t, entryB.Value.Dependencies[contractBLocation])
 
 		// program B should contain all the registers used by program A, as it depends on it
 		contractBSnapshot = entryB.ExecutionSnapshot
@@ -451,9 +451,9 @@ func Test_Programs(t *testing.T) {
 
 		// assert dependencies are correct
 		require.Len(t, entryC.Value.Dependencies, 3)
-		require.NotNil(t, entryC.Value.Dependencies[addressA])
-		require.NotNil(t, entryC.Value.Dependencies[addressB])
-		require.NotNil(t, entryC.Value.Dependencies[addressC])
+		require.NotNil(t, entryC.Value.Dependencies[contractALocation])
+		require.NotNil(t, entryC.Value.Dependencies[contractBLocation])
+		require.NotNil(t, entryC.Value.Dependencies[contractCLocation])
 
 		cached := derivedBlockData.CachedPrograms()
 		require.Equal(t, 3, cached)
