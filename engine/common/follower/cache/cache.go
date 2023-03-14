@@ -32,8 +32,8 @@ type batchContext struct {
 	equivocatingBlocks [][2]*flow.Block
 }
 
-// Cache stores pending blocks received from other replicas, caches blocks by blockID, it also
-// maintains secondary index by view and by parent. Additional indexes are used to track proposal equivocation
+// Cache stores pending blocks received from other replicas, caches blocks by blockID, and maintains
+// secondary indices to look up blocks by view or by parent ID. Additional indices are used to track proposal equivocation
 // (multiple valid proposals for same block) and find blocks not only by parent but also by child.
 // Resolves certified blocks when processing incoming batches.
 // Concurrency safe.
@@ -42,7 +42,7 @@ type Cache struct {
 	lock    sync.RWMutex
 	// secondary index by view, can be used to detect equivocation
 	byView map[uint64]flow.Identifier
-	// secondary index by parentID, can be used to find child of the block
+	// secondary index by parentID, for finding a block's known children
 	byParent map[flow.Identifier]BlocksByID
 	// when message equivocation has been detected report it using this callback
 	onEquivocation OnEquivocation
@@ -60,9 +60,9 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 	}
 }
 
-// NewCache creates new instance of Cache, as part of construction process connects ejection event from HeroCache to
-// post-ejection processing logic to perform cleanup of secondary indexes to prevent memory leaks.
+// NewCache creates new instance of Cache
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
+	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices. 
 	distributor := NewDistributor(collector)
 	cache := &Cache{
 		backend: herocache.NewCache(
@@ -81,8 +81,8 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 }
 
 // handleEjectedEntity performs cleanup of secondary indexes to prevent memory leaks.
-// WARNING: Concurrency safety of this function is guaranteed by s.lock, this callback can be called
-// only in herocache.Cache.Add and we perform this call while s.lock is in locked state.
+// WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
+// by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
 func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 	block := entity.(*flow.Block)
 	delete(c.byView, block.Header.View)
