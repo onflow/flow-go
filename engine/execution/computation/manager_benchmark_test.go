@@ -196,6 +196,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 			elapsed += time.Since(start)
 			b.StopTimer()
 
+			for _, snapshot := range res.StateSnapshots {
+				err := ledger.Merge(snapshot)
+				require.NoError(b, err)
+			}
+
 			require.NoError(b, err)
 			for j, r := range res.TransactionResults {
 				// skip system transactions
