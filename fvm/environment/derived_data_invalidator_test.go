@@ -97,8 +97,11 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator A invalidates all but D", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressA,
+			ContractUpdateKeys: []environment.ContractUpdateKey{
+				{
+					addressA,
+					"A",
+				},
 			},
 		}.ProgramInvalidator()
 
@@ -111,8 +114,11 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator D invalidates D, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressD,
+			ContractUpdateKeys: []environment.ContractUpdateKey{
+				{
+					addressD,
+					"D",
+				},
 			},
 		}.ProgramInvalidator()
 
@@ -125,8 +131,11 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("address invalidator B invalidates B, C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressB,
+			ContractUpdateKeys: []environment.ContractUpdateKey{
+				{
+					addressB,
+					"B",
+				},
 			},
 		}.ProgramInvalidator()
 
@@ -201,7 +210,6 @@ func TestMeterParamOverridesInvalidator(t *testing.T) {
 
 	invalidator = environment.DerivedDataInvalidator{
 		ContractUpdateKeys:         nil,
-		FrozenAccounts:             nil,
 		MeterParamOverridesUpdated: true,
 	}.MeterParamOverridesInvalidator()
 

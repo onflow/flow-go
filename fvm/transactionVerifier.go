@@ -156,7 +156,6 @@ func newSignatureEntries(
 }
 
 // TransactionVerifier verifies the content of the transaction by
-// checking accounts (authorizers, payer, proposer) are not frozen
 // checking there is no double signature
 // all signatures are valid
 // all accounts provides enoguh weights
@@ -213,10 +212,6 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	accounts := environment.NewAccounts(txnState)
-	err = v.checkAccountsAreNotFrozen(tx, accounts)
-	if err != nil {
-		return err
-	}
 
 	if keyWeightThreshold < 0 {
 		return nil
@@ -393,22 +388,4 @@ func (v *TransactionVerifier) hasSufficientKeyWeight(
 	keyWeightThreshold int,
 ) bool {
 	return weights[address] >= keyWeightThreshold
-}
-
-func (v *TransactionVerifier) checkAccountsAreNotFrozen(
-	tx *flow.TransactionBody,
-	accounts environment.Accounts,
-) error {
-	authorizers := make([]flow.Address, 0, len(tx.Authorizers)+2)
-	authorizers = append(authorizers, tx.Authorizers...)
-	authorizers = append(authorizers, tx.ProposalKey.Address, tx.Payer)
-
-	for _, authorizer := range authorizers {
-		err := accounts.CheckAccountNotFrozen(authorizer)
-		if err != nil {
-			return fmt.Errorf("checking frozen account failed: %w", err)
-		}
-	}
-
-	return nil
 }
