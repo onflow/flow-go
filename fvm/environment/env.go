@@ -70,8 +70,6 @@ type Environment interface {
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 
-	AccountFreezer
-
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// corresponding modified sets invalidator.
@@ -81,7 +79,7 @@ type Environment interface {
 	)
 
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
-	// EventEmitter, AccountFreezer) to initial state.
+	// EventEmitter) to initial state.
 	Reset()
 }
 

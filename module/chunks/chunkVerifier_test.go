@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
@@ -355,11 +356,23 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+func (vm *vmMock) RunV2(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
 	}
+
+	view := delta.NewDeltaView(nil)
+	output := fvm.ProcedureOutput{}
 
 	id0 := flow.NewRegisterID("00", "")
 	id5 := flow.NewRegisterID("05", "")
@@ -367,15 +380,15 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		// add updates to the ledger
-		_ = led.Set(id0, []byte{'F'})
-		tx.Logs = []string{"log1", "log2"}
-		tx.Events = eventsList
+		_ = view.Set(id0, []byte{'F'})
+		output.Logs = []string{"log1", "log2"}
+		output.Events = eventsList
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set(id5, []byte{'B'})
-		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
+		_ = view.Set(id5, []byte{'B'})
+		output.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
-		tx.Events = append(eventsList, flow.Event{
+		output.Events = append(eventsList, flow.Event{
 			Type:             "event.Extra",
 			TransactionID:    flow.Identifier{2, 3},
 			TransactionIndex: 0,
@@ -383,13 +396,28 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error
 			Payload:          []byte{88},
 		})
 	default:
-		_, _ = led.Get(id0)
-		_, _ = led.Get(id5)
-		_ = led.Set(id5, []byte{'B'})
-		tx.Logs = []string{"log1", "log2"}
-		tx.Events = eventsList
+		_, _ = view.Get(id0)
+		_, _ = view.Get(id5)
+		_ = view.Set(id5, []byte{'B'})
+		output.Logs = []string{"log1", "log2"}
+		output.Events = eventsList
 	}
 
+	return view, output, nil
+}
+
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
 	return nil
 }
 
@@ -399,23 +427,50 @@ func (vmMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Acc
 
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	tx, ok := proc.(*fvm.TransactionProcedure)
+func (vm *vmSystemOkMock) RunV2(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	_, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
 	}
 
-	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochSetupServiceEvent}
-
+	view := delta.NewDeltaView(nil)
 	id0 := flow.NewRegisterID("00", "")
 	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	_, _ = led.Get(id0)
-	_, _ = led.Get(id5)
-	_ = led.Set(id5, []byte{'B'})
-	tx.Logs = []string{"log1", "log2"}
+	_, _ = view.Get(id0)
+	_, _ = view.Get(id5)
+	_ = view.Set(id5, []byte{'B'})
 
+	output := fvm.ProcedureOutput{
+		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
+		Logs:                   []string{"log1", "log2"},
+	}
+
+	return view, output, nil
+}
+
+func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
 	return nil
 }
 
@@ -425,14 +480,42 @@ func (vmSystemOkMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*
 
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	tx, ok := proc.(*fvm.TransactionProcedure)
+func (vm *vmSystemBadMock) RunV2(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	_, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
 	}
-	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochCommitServiceEvent}
 
+	// EpochSetup event is expected, but we emit EpochCommit here resulting in
+	// a chunk fault
+	output := fvm.ProcedureOutput{
+		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
+	}
+
+	return delta.NewDeltaView(nil), output, nil
+}
+
+func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
 	return nil
 }
 

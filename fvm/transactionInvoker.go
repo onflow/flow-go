@@ -464,7 +464,7 @@ func (executor *transactionExecutor) commit(
 		return err
 	}
 
-	// Based on various (e.g., contract and frozen account) updates, we decide
+	// Based on various (e.g., contract) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
 	executor.txnState.AddInvalidator(invalidator)

@@ -20,8 +20,6 @@ type testContractUpdaterStubs struct {
 	removalEnabled       bool
 	deploymentAuthorized []flow.Address
 	removalAuthorized    []flow.Address
-
-	auditFunc func(address flow.Address, code []byte) (bool, error)
 }
 
 func (p testContractUpdaterStubs) RestrictedDeploymentEnabled() bool {
@@ -39,16 +37,6 @@ func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 		return p.deploymentAuthorized
 	}
 	return p.removalAuthorized
-}
-
-func (p testContractUpdaterStubs) UseContractAuditVoucher(
-	address flow.Address,
-	code []byte,
-) (
-	bool,
-	error,
-) {
-	return p.auditFunc(address, code)
 }
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
@@ -157,7 +145,6 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 				removalEnabled:       true,
 				deploymentAuthorized: []flow.Address{authAdd, authBoth},
 				removalAuthorized:    []flow.Address{authRemove, authBoth},
-				auditFunc:            func(address flow.Address, code []byte) (bool, error) { return false, nil },
 			})
 
 	}
@@ -291,119 +278,6 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	})
 }
 
-func TestContract_DeploymentVouchers(t *testing.T) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-
-	addressWithVoucher := flow.HexToAddress("01")
-	err := accounts.Create(nil, addressWithVoucher)
-	require.NoError(t, err)
-
-	addressNoVoucher := flow.HexToAddress("02")
-	err = accounts.Create(nil, addressNoVoucher)
-	require.NoError(t, err)
-
-	contractUpdater := environment.NewContractUpdaterForTesting(
-		accounts,
-		testContractUpdaterStubs{
-			deploymentEnabled: true,
-			removalEnabled:    true,
-			auditFunc: func(address flow.Address, code []byte) (bool, error) {
-				if address.String() == addressWithVoucher.String() {
-					return true, nil
-				}
-				return false, nil
-			},
-		})
-
-	// set contract without voucher
-	err = contractUpdater.SetContract(
-		addressNoVoucher,
-		"TestContract1",
-		[]byte("pub contract TestContract1 {}"),
-		[]flow.Address{
-			addressNoVoucher,
-		},
-	)
-	require.Error(t, err)
-	require.False(t, contractUpdater.HasUpdates())
-
-	// try to set contract with voucher
-	err = contractUpdater.SetContract(
-		addressWithVoucher,
-		"TestContract2",
-		[]byte("pub contract TestContract2 {}"),
-		[]flow.Address{
-			addressWithVoucher,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.HasUpdates())
-}
-
-func TestContract_ContractUpdate(t *testing.T) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-
-	flowAddress := flow.HexToAddress("01")
-	err := accounts.Create(nil, flowAddress)
-	require.NoError(t, err)
-
-	var authorizationChecked bool
-
-	contractUpdater := environment.NewContractUpdaterForTesting(
-		accounts,
-		testContractUpdaterStubs{
-			deploymentEnabled: true,
-			removalEnabled:    true,
-			auditFunc: func(address flow.Address, code []byte) (bool, error) {
-				// Ensure the voucher check is only called once,
-				// for the initial contract deployment,
-				// and not for the subsequent update
-				require.False(t, authorizationChecked)
-				authorizationChecked = true
-				return true, nil
-			},
-		})
-
-	// deploy contract with voucher
-	err = contractUpdater.SetContract(
-		flowAddress,
-		"TestContract",
-		[]byte("pub contract TestContract {}"),
-		[]flow.Address{
-			flowAddress,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.HasUpdates())
-
-	contractUpdateKeys, err := contractUpdater.Commit()
-	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]environment.ContractUpdateKey{
-			{
-				Address: flowAddress,
-				Name:    "TestContract",
-			},
-		},
-		contractUpdateKeys,
-	)
-
-	// try to update contract without voucher
-	err = contractUpdater.SetContract(
-		flowAddress,
-		"TestContract",
-		[]byte("pub contract TestContract {}"),
-		[]flow.Address{
-			flowAddress,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.HasUpdates())
-}
-
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	mockAccounts := &envMock.Accounts{}
 
@@ -444,20 +318,10 @@ func TestContract_ContractRemoval(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("contract removal with restriction", func(t *testing.T) {
-		var authorizationChecked bool
-
 		contractUpdater := environment.NewContractUpdaterForTesting(
 			accounts,
 			testContractUpdaterStubs{
 				removalEnabled: true,
-				auditFunc: func(address flow.Address, code []byte) (bool, error) {
-					// Ensure the voucher check is only called once,
-					// for the initial contract deployment,
-					// and not for the subsequent update
-					require.False(t, authorizationChecked)
-					authorizationChecked = true
-					return true, nil
-				},
 			})
 
 		// deploy contract with voucher
@@ -509,20 +373,10 @@ func TestContract_ContractRemoval(t *testing.T) {
 	})
 
 	t.Run("contract removal without restriction", func(t *testing.T) {
-		var authorizationChecked bool
 
 		contractUpdater := environment.NewContractUpdaterForTesting(
 			accounts,
-			testContractUpdaterStubs{
-				auditFunc: func(address flow.Address, code []byte) (bool, error) {
-					// Ensure the voucher check is only called once,
-					// for the initial contract deployment,
-					// and not for the subsequent update
-					require.False(t, authorizationChecked)
-					authorizationChecked = true
-					return true, nil
-				},
-			})
+			testContractUpdaterStubs{})
 
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(

@@ -11,6 +11,15 @@ import (
 )
 
 type DerivedTransaction interface {
+	GetOrComputeProgram(
+		txState state.NestedTransaction,
+		addressLocation common.AddressLocation,
+		programComputer ValueComputer[common.AddressLocation, *Program],
+	) (
+		*Program,
+		error,
+	)
+
 	GetProgram(
 		addressLocation common.AddressLocation,
 	) (
@@ -190,6 +199,20 @@ func (block *DerivedBlockData) GetProgramForTestingOnly(
 // the count will contain invalidated entries.
 func (block *DerivedBlockData) CachedPrograms() int {
 	return len(block.programs.items)
+}
+
+func (transaction *DerivedTransactionData) GetOrComputeProgram(
+	txState state.NestedTransaction,
+	addressLocation common.AddressLocation,
+	programComputer ValueComputer[common.AddressLocation, *Program],
+) (
+	*Program,
+	error,
+) {
+	return transaction.programs.GetOrCompute(
+		txState,
+		addressLocation,
+		programComputer)
 }
 
 func (transaction *DerivedTransactionData) GetProgram(

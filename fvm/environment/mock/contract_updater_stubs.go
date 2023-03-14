@@ -59,30 +59,6 @@ func (_m *ContractUpdaterStubs) RestrictedRemovalEnabled() bool {
 	return r0
 }
 
-// UseContractAuditVoucher provides a mock function with given fields: address, code
-func (_m *ContractUpdaterStubs) UseContractAuditVoucher(address flow.Address, code []byte) (bool, error) {
-	ret := _m.Called(address, code)
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, []byte) (bool, error)); ok {
-		return rf(address, code)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Address, []byte) bool); ok {
-		r0 = rf(address, code)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Address, []byte) error); ok {
-		r1 = rf(address, code)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 type mockConstructorTestingTNewContractUpdaterStubs interface {
 	mock.TestingT
 	Cleanup(func())

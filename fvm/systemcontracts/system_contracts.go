@@ -23,13 +23,12 @@ const (
 
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch        = "FlowEpoch"
-	ContractNameClusterQC    = "FlowClusterQC"
-	ContractNameDKG          = "FlowDKG"
-	ContractServiceAccount   = "FlowServiceAccount"
-	ContractNameFlowFees     = "FlowFees"
-	ContractStorageFees      = "FlowStorageFees"
-	ContractDeploymentAudits = "FlowContractAudits"
+	ContractNameEpoch      = "FlowEpoch"
+	ContractNameClusterQC  = "FlowClusterQC"
+	ContractNameDKG        = "FlowDKG"
+	ContractServiceAccount = "FlowServiceAccount"
+	ContractNameFlowFees   = "FlowFees"
+	ContractStorageFees    = "FlowStorageFees"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -45,7 +44,6 @@ const (
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
-	ContractDeploymentAuditsFunction_useVoucherForDeploy                      = "useVoucherForDeploy"
 )
 
 // SystemContract represents a system contract on a particular chain.

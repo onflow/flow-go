@@ -20,7 +20,6 @@ type ContractUpdate struct {
 
 type DerivedDataInvalidator struct {
 	ContractUpdateKeys []ContractUpdateKey
-	FrozenAccounts     []flow.Address
 
 	MeterParamOverridesUpdated bool
 }
@@ -33,7 +32,6 @@ func NewDerivedDataInvalidator(
 ) DerivedDataInvalidator {
 	return DerivedDataInvalidator{
 		ContractUpdateKeys:         contractKeys,
-		FrozenAccounts:             env.FrozenAccounts(),
 		MeterParamOverridesUpdated: meterParamOverridesUpdated(env),
 	}
 }
@@ -82,8 +80,7 @@ type ProgramInvalidator struct {
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 	return invalidator.MeterParamOverridesUpdated ||
-		len(invalidator.ContractUpdateKeys) > 0 ||
-		len(invalidator.FrozenAccounts) > 0
+		len(invalidator.ContractUpdateKeys) > 0
 }
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
@@ -94,15 +91,6 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	if invalidator.MeterParamOverridesUpdated {
 		// if meter parameters changed we need to invalidate all programs
 		return true
-	}
-
-	// if an account was (un)frozen we need to invalidate all
-	// programs that depend on any contract on that address.
-	for _, frozenAccount := range invalidator.FrozenAccounts {
-		_, ok := program.Dependencies[frozenAccount]
-		if ok {
-			return true
-		}
 	}
 
 	// invalidate all programs depending on any of the contracts that were updated
