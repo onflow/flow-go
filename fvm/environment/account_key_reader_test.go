@@ -4,7 +4,6 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	testMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,7 +27,7 @@ func newDummyAccountKeyReader(
 }
 
 func bytesToAddress(bytes ...uint8) common.Address {
-	return common.Address(cadence.BytesToAddress(bytes))
+	return common.MustBytesToAddress(bytes)
 }
 
 func TestKeyConversionValidAlgorithms(t *testing.T) {

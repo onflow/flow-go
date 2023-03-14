@@ -169,7 +169,7 @@ func (programs *Programs) get(
 	return nil, false
 }
 
-// GetAndSetProgram gets the program from the cache,
+// GetOrLoadProgram gets the program from the cache,
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
 // to load the dependencies of the program.
@@ -177,7 +177,7 @@ func (programs *Programs) get(
 // TODO: this function currently just calls GetProgram and SetProgram in pair.
 // This method can be re-written in a far better way by removing the individual
 // GetProgram and SetProgram methods.
-func (programs *Programs) GetAndSetProgram(
+func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
@@ -206,14 +206,6 @@ func (programs *Programs) getOrLoadAddressProgram(
 	address common.AddressLocation,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
-
-	// TODO: to be removed when freezing account feature is removed
-	freezeError := programs.accounts.CheckAccountNotFrozen(
-		flow.ConvertAddress(address.Address),
-	)
-	if freezeError != nil {
-		return nil, fmt.Errorf("get program failed: %w", freezeError)
-	}
 
 	// reading program from cache
 	program, programState, has := programs.txnState.GetProgram(address)
@@ -361,15 +353,6 @@ func (programs *Programs) GetProgram(
 	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.ConvertAddress(addressLocation.Address)
-
-		freezeError := programs.accounts.CheckAccountNotFrozen(address)
-		if freezeError != nil {
-			return nil, fmt.Errorf("get program failed: %w", freezeError)
-		}
 	}
 
 	program, has := programs.get(location)

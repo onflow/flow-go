@@ -665,7 +665,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -760,7 +760,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -1005,9 +1005,6 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	accounts := environment.NewAccounts(testutils.NewSimpleTransaction(view))
 
-	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
-	// as freeze check should happen before a transaction signature is checked
-	// but we currently discard all the touches if it fails and any point
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
@@ -1171,8 +1168,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		module.ExecutionResultStats{
 			EventCounts:                     expectedNumberOfEvents,
 			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        66,
-			NumberOfBytesWrittenToRegisters: 4214,
+			NumberOfRegistersTouched:        63,
+			NumberOfBytesWrittenToRegisters: 4154,
 			NumberOfCollections:             1,
 			NumberOfTransactions:            1,
 		},

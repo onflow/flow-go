@@ -50,9 +50,10 @@ type SafeBeaconKeys interface {
 	// epoch, only if my key has been confirmed valid and safe for use.
 	//
 	// Returns:
-	// * (key, true, nil) if the key is present and confirmed valid
-	// * (nil, false, nil) if no key was generated or the key has been marked invalid (by SetDKGEnded)
-	// * (nil, false, error) for any other condition, or exception
-	// Error returns: storage.ErrNotFound
+	//   - (key, true, nil) if the key is present and confirmed valid
+	//   - (nil, false, nil) if the key has been marked invalid or unavailable
+	//     -> no beacon key will ever be available for the epoch in this case
+	//   - (nil, false, storage.ErrNotFound) if the DKG has not ended
+	//   - (nil, false, error) for any unexpected exception
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
