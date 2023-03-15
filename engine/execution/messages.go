@@ -104,3 +104,70 @@ func (cr *ComputationResult) BlockStats() module.ExecutionResultStats {
 
 	return stats
 }
+
+func (cr *ComputationResult) CollectionResult(colIndex int) *ColResSnapshot {
+	if colIndex < 0 && colIndex > len(cr.CompleteCollections) {
+		return nil
+	}
+	return &ColResSnapshot{
+		BlockHeaderFunc: func() *flow.Header {
+			return cr.Block.Header
+		},
+		CollectionFunc: func() *flow.Collection {
+			return &flow.Collection{
+				Transactions: cr.CollectionAt(colIndex).Transactions,
+			}
+		},
+		UpdatedRegistersFunc: func() flow.RegisterEntries {
+			return cr.StateSnapshots[colIndex].UpdatedRegisters()
+		},
+		TouchedRegistersFunc: func() flow.RegisterIDs {
+			return cr.StateSnapshots[colIndex].AllRegisterIDs()
+		},
+		EmittedEventsFunc: func() flow.EventsList {
+			return cr.Events[colIndex]
+		},
+		TransactionResultsFunc: func() flow.TransactionResults {
+			var startTxnIndex int
+			if colIndex > 0 {
+				startTxnIndex = cr.TransactionResultIndex[colIndex-1]
+			}
+			endTxnIndex := cr.TransactionResultIndex[colIndex]
+			return cr.TransactionResults[startTxnIndex:endTxnIndex]
+		},
+	}
+
+}
+
+type ColResSnapshot struct {
+	BlockHeaderFunc        func() *flow.Header
+	CollectionFunc         func() *flow.Collection
+	UpdatedRegistersFunc   func() flow.RegisterEntries
+	TouchedRegistersFunc   func() flow.RegisterIDs
+	EmittedEventsFunc      func() flow.EventsList
+	TransactionResultsFunc func() flow.TransactionResults
+}
+
+func (cr *ColResSnapshot) BlockHeader() *flow.Header {
+	return cr.BlockHeaderFunc()
+}
+
+func (cr *ColResSnapshot) Collection() *flow.Collection {
+	return cr.CollectionFunc()
+}
+
+func (cr *ColResSnapshot) UpdatedRegisters() flow.RegisterEntries {
+	return cr.UpdatedRegistersFunc()
+}
+
+func (cr *ColResSnapshot) TouchedRegisters() flow.RegisterIDs {
+	return cr.TouchedRegisters()
+}
+
+func (cr *ColResSnapshot) EmittedEvents() flow.EventsList {
+	return cr.EmittedEvents()
+}
+
+func (cr *ColResSnapshot) TransactionResults() flow.TransactionResults {
+	return cr.TransactionResults()
+}

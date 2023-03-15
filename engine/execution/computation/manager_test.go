@@ -139,7 +139,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)

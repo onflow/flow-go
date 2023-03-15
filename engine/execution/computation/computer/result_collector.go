@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -41,6 +42,7 @@ type transactionResult struct {
 	state.ExecutionSnapshot
 }
 
+// TODO(ramtin): move committer and other folks to consumers layer
 type resultCollector struct {
 	tracer    module.Tracer
 	blockSpan otelTrace.Span
@@ -62,7 +64,8 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result *execution.ComputationResult
+	result    *execution.ComputationResult
+	consumers []result.ExecutedCollectionConsumer
 
 	chunks                 []*flow.Chunk
 	spockSignatures        []crypto.Signature
@@ -84,6 +87,7 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numTransactions int,
+	consumers []result.ExecutedCollectionConsumer,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	collector := &resultCollector{
@@ -99,6 +103,7 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
+		consumers:                    consumers,
 		chunks:                       make([]*flow.Chunk, 0, numCollections),
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		currentCollectionStartTime:   time.Now(),
@@ -255,6 +260,10 @@ func (collector *resultCollector) processTransactionResult(
 
 	if !txn.lastTransactionInCollection {
 		return nil
+	}
+
+	for _, consumer := range collector.consumers {
+		consumer.OnExecutedCollection(collector.result.CollectionResult(txn.collectionIndex))
 	}
 
 	err = collector.commitCollection(

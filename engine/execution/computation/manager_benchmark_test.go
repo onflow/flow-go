@@ -153,7 +153,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
