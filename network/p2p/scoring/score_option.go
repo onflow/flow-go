@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -85,9 +86,7 @@ type ScoreOption struct {
 	appSpecificScoreFunction func(peer.ID) float64
 }
 
-type PeerScoreParamsOption func(option *ScoreOption)
-
-func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) PeerScoreParamsOption {
+func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) p2p.PeerScoreParamsOption {
 	return func(s *ScoreOption) {
 		s.appSpecificScoreFunction = appSpecificScoreFunction
 	}
@@ -96,7 +95,7 @@ func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64
 // WithTopicScoreParams adds the topic score parameters to the peer score parameters.
 // It is used to configure the topic score parameters for the pubsub system.
 // If there is already a topic score parameter for the given topic, it will be overwritten.
-func WithTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) PeerScoreParamsOption {
+func WithTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) p2p.PeerScoreParamsOption {
 	return func(s *ScoreOption) {
 		if s.peerScoreParams.Topics == nil {
 			s.peerScoreParams.Topics = make(map[string]*pubsub.TopicScoreParams)
@@ -105,7 +104,7 @@ func WithTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicSc
 	}
 }
 
-func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...PeerScoreParamsOption) *ScoreOption {
+func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...p2p.PeerScoreParamsOption) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger = logger.With().
 		Str("module", "pubsub_score_option").

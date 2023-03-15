@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -113,7 +112,7 @@ func NodeFixture(
 
 	if parameters.PeerScoringEnabled {
 		if parameters.PeerScoreOptions == nil {
-			parameters.PeerScoreOptions = make([]scoring.PeerScoreParamsOption, 0)
+			parameters.PeerScoreOptions = make([]p2p.PeerScoreParamsOption, 0)
 		}
 		builder.EnableGossipSubPeerScoring(parameters.IdProvider, parameters.PeerScoreOptions...)
 	}
@@ -167,7 +166,7 @@ type NodeFixtureParameters struct {
 	Logger                           zerolog.Logger
 	PeerScoringEnabled               bool
 	IdProvider                       module.IdentityProvider
-	PeerScoreOptions                 []scoring.PeerScoreParamsOption
+	PeerScoreOptions                 []p2p.PeerScoreParamsOption
 	ConnectionPruning                bool              // peer manager parameter
 	UpdateInterval                   time.Duration     // peer manager parameter
 	PeerProvider                     p2p.PeersProvider // peer manager parameter
@@ -257,10 +256,10 @@ func WithRole(role flow.Role) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerScoreParamsOption(opt scoring.PeerScoreParamsOption) NodeFixtureParameterOption {
+func WithPeerScoreParamsOption(opt p2p.PeerScoreParamsOption) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		if p.PeerScoreOptions == nil {
-			p.PeerScoreOptions = make([]scoring.PeerScoreParamsOption, 0)
+			p.PeerScoreOptions = make([]p2p.PeerScoreParamsOption, 0)
 		}
 		p.PeerScoreOptions = append(p.PeerScoreOptions, opt)
 	}

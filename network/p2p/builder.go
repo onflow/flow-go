@@ -63,7 +63,7 @@ type GossipSubBuilder interface {
 
 	// SetPeerScoringParameterOptions sets the peer scoring parameter options of the builder.
 	// If the peer scoring parameter options have already been set, a fatal error is logged.
-	SetPeerScoringParameterOptions(options ...scoring.PeerScoreParamsOption)
+	SetPeerScoringParameterOptions(options ...PeerScoreParamsOption)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -88,7 +88,7 @@ type NodeBuilder interface {
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
-	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
+	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...PeerScoreParamsOption) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
@@ -97,3 +97,5 @@ type NodeBuilder interface {
 	SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder
 	Build() (LibP2PNode, error)
 }
+
+type PeerScoreParamsOption func(option *scoring.ScoreOption)
