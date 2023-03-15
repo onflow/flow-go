@@ -163,7 +163,7 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal
 	}
 }
 
-// OnSyncedBlocks feeds a batch of blocks obtained from sync into the processing pipeline.
+// OnSyncedBlocks feeds a batch of blocks obtained via sync into the processing pipeline.
 // Blocks in batch aren't required to be in any particular order.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
