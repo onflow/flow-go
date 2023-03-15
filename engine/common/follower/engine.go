@@ -142,7 +142,7 @@ func New(
 
 // OnBlockProposal logs an error and drops the proposal. This is because the follower ingests new
 // blocks directly from the networking layer (channel `channels.ReceiveBlocks` by default), which
-// delivers its messages by calling the generic `Process` method. Receiving block proposal as 
+// delivers its messages by calling the generic `Process` method. Receiving block proposal as
 // from another internal component is likely an implementation bug.
 func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
 	e.log.Error().Msg("received unexpected block proposal via internal method")
@@ -152,7 +152,7 @@ func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
 func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
-	// states which node forwarded the batch to us. Each block contains its proposer and signature.  
+	// states which node forwarded the batch to us. Each block contains its proposer and signature.
 
 	// queue proposal
 	if e.pendingBlocks.Push(blocks) {
