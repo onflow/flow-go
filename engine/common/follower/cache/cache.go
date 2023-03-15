@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
@@ -46,6 +47,8 @@ type Cache struct {
 	byParent map[flow.Identifier]BlocksByID
 	// when message equivocation has been detected report it using this callback
 	onEquivocation OnEquivocation
+	// lowest view that we use to prune the cache, we don't want to accept blocks lower than it
+	lowestPrunedView counters.StrictMonotonousCounter
 }
 
 // Peek performs lookup of cached block by blockID.
@@ -120,6 +123,8 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 // Expected errors during normal operations:
 //   - ErrDisconnectedBatch
 func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, certifyingQC *flow.QuorumCertificate, err error) {
+	batch = filterBlocksByView(c.lowestPrunedView.Value(), batch)
+
 	batchSize := len(batch)
 	if batchSize < 1 { // empty batch is no-op
 		return nil, nil, nil
@@ -172,6 +177,11 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	}
 
 	return certifiedBatch, certifyingQC, nil
+}
+
+// PruneUpToView sets the lowest view that we are accepting blocks for, we don't need to process anything lower than it.
+func (c *Cache) PruneUpToView(view uint64) {
+	c.lowestPrunedView.Set(view)
 }
 
 // unsafeAtomicAdd does the following within a single atomic operation:
@@ -272,4 +282,17 @@ func enforceSequentialBlocks(batch []*flow.Block) ([]flow.Identifier, error) {
 		blockIDs = append(blockIDs, parentID)
 	}
 	return blockIDs, nil
+}
+
+// filterBlocksByView performs a specific filter ensuring blocks are higher than the lowest view.
+// It assumes that batch is ordered sequentially, to avoid extra allocations while filtering.
+// It has to be paired with enforceSequentialBlocks which checks if blocks are properly ordered.
+func filterBlocksByView(lowestView uint64, batch []*flow.Block) []*flow.Block {
+	i := 0
+	for ; i < len(batch); i++ {
+		if batch[i].Header.View > lowestView {
+			break
+		}
+	}
+	return batch[i:]
 }
