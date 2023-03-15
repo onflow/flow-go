@@ -128,10 +128,6 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	collector.result.StateCommitments = append(
-		collector.result.StateCommitments,
-		endState)
-
 	eventsHash, err := flow.EventsMerkleRootHash(
 		collector.result.Events[collection.collectionIndex])
 	if err != nil {
