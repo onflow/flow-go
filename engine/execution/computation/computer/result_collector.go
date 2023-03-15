@@ -71,8 +71,12 @@ type resultCollector struct {
 	spockSignatures        []crypto.Signature
 	convertedServiceEvents flow.ServiceEventList
 
+	blockStartTime time.Time
+	blockStats     module.ExecutionResultStats
+
 	currentCollectionStartTime time.Time
 	currentCollectionView      *delta.View
+	currentCollectionStats     module.ExecutionResultStats
 }
 
 func newResultCollector(
@@ -90,6 +94,7 @@ func newResultCollector(
 	consumers []result.ExecutedCollectionConsumer,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
+	now := time.Now()
 	collector := &resultCollector{
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
@@ -106,8 +111,12 @@ func newResultCollector(
 		consumers:                    consumers,
 		chunks:                       make([]*flow.Chunk, 0, numCollections),
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
-		currentCollectionStartTime:   time.Now(),
+		blockStartTime:               now,
+		currentCollectionStartTime:   now,
 		currentCollectionView:        delta.NewDeltaView(nil),
+		currentCollectionStats: module.ExecutionResultStats{
+			NumberOfCollections: 1,
+		},
 	}
 
 	go collector.runResultProcessor()
@@ -133,12 +142,8 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	collector.result.StateCommitments = append(
-		collector.result.StateCommitments,
-		endState)
-
-	eventsHash, err := flow.EventsMerkleRootHash(
-		collector.result.Events[collection.collectionIndex])
+	events := collector.result.Events[collection.collectionIndex]
+	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
 		return fmt.Errorf("hash events failed: %w", err)
 	}
@@ -189,24 +194,12 @@ func (collector *resultCollector) commitCollection(
 
 	collector.result.EndState = endState
 
-	return nil
-}
-
-func (collector *resultCollector) hashCollection(
-	collection collectionInfo,
-	startTime time.Time,
-	collectionExecutionSnapshot state.ExecutionSnapshot,
-) error {
 	collector.result.TransactionResultIndex = append(
 		collector.result.TransactionResultIndex,
 		len(collector.result.TransactionResults))
 	collector.result.StateSnapshots = append(
 		collector.result.StateSnapshots,
 		collectionExecutionSnapshot)
-
-	collector.metrics.ExecutionCollectionExecuted(
-		time.Since(startTime),
-		collector.result.CollectionStats(collection.collectionIndex))
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret(),
@@ -217,6 +210,27 @@ func (collector *resultCollector) hashCollection(
 	}
 
 	collector.spockSignatures = append(collector.spockSignatures, spock)
+
+	collector.currentCollectionStats.EventCounts = len(events)
+	collector.currentCollectionStats.EventSize = events.ByteSize()
+	collector.currentCollectionStats.NumberOfRegistersTouched = len(
+		collectionExecutionSnapshot.AllRegisterIDs())
+	for _, entry := range collectionExecutionSnapshot.UpdatedRegisters() {
+		collector.currentCollectionStats.NumberOfBytesWrittenToRegisters += len(
+			entry.Value)
+	}
+
+	collector.metrics.ExecutionCollectionExecuted(
+		time.Since(startTime),
+		collector.currentCollectionStats)
+
+	collector.blockStats.Merge(collector.currentCollectionStats)
+
+	collector.currentCollectionStartTime = time.Now()
+	collector.currentCollectionView = delta.NewDeltaView(nil)
+	collector.currentCollectionStats = module.ExecutionResultStats{
+		NumberOfCollections: 1,
+	}
 
 	return nil
 }
@@ -258,6 +272,10 @@ func (collector *resultCollector) processTransactionResult(
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
 
+	collector.currentCollectionStats.ComputationUsed += txn.ComputationUsed
+	collector.currentCollectionStats.MemoryUsed += txn.MemoryEstimate
+	collector.currentCollectionStats.NumberOfTransactions += 1
+
 	if !txn.lastTransactionInCollection {
 		return nil
 	}
@@ -266,26 +284,10 @@ func (collector *resultCollector) processTransactionResult(
 		consumer.OnExecutedCollection(collector.result.CollectionResult(txn.collectionIndex))
 	}
 
-	err = collector.commitCollection(
+	return collector.commitCollection(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionView)
-	if err != nil {
-		return err
-	}
-
-	err = collector.hashCollection(
-		txn.collectionInfo,
-		collector.currentCollectionStartTime,
-		collector.currentCollectionView)
-	if err != nil {
-		return err
-	}
-
-	collector.currentCollectionStartTime = time.Now()
-	collector.currentCollectionView = delta.NewDeltaView(nil)
-
-	return nil
 }
 
 func (collector *resultCollector) AddTransactionResult(
@@ -364,6 +366,11 @@ func (collector *resultCollector) Finalize(
 	}
 
 	collector.result.ExecutionReceipt = executionReceipt
+
+	collector.metrics.ExecutionBlockExecuted(
+		time.Since(collector.blockStartTime),
+		collector.blockStats)
+
 	return collector.result, nil
 }
 
