@@ -1,6 +1,8 @@
 package result
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // ExecutedCollection holds results of a collection execution
 type ExecutedCollection interface {

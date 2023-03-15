@@ -109,13 +109,13 @@ func (cr *ColResSnapshot) UpdatedRegisters() flow.RegisterEntries {
 }
 
 func (cr *ColResSnapshot) TouchedRegisters() flow.RegisterIDs {
-	return cr.TouchedRegisters()
+	return cr.TouchedRegistersFunc()
 }
 
 func (cr *ColResSnapshot) EmittedEvents() flow.EventsList {
-	return cr.EmittedEvents()
+	return cr.EmittedEventsFunc()
 }
 
 func (cr *ColResSnapshot) TransactionResults() flow.TransactionResults {
-	return cr.TransactionResults()
+	return cr.TransactionResultsFunc()
 }

@@ -280,8 +280,12 @@ func (collector *resultCollector) processTransactionResult(
 		return nil
 	}
 
+	// TODO(ramtin): trigger consumers concurrently
 	for _, consumer := range collector.consumers {
-		consumer.OnExecutedCollection(collector.result.CollectionResult(txn.collectionIndex))
+		err = consumer.OnExecutedCollection(collector.result.CollectionResult(txn.collectionIndex))
+		if err != nil {
+			return fmt.Errorf("consumer failed: %w", err)
+		}
 	}
 
 	return collector.commitCollection(
