@@ -173,8 +173,8 @@ type NodeFixtureParameters struct {
 	PeerProvider                     p2p.PeersProvider // peer manager parameter
 	ConnGater                        connmgr.ConnectionGater
 	ConnManager                      connmgr.ConnManager
-	GossipSubFactory                 p2pbuilder.GossipSubFactoryFunc
-	GossipSubConfig                  p2pbuilder.GossipSubAdapterConfigFunc
+	GossipSubFactory                 p2p.GossipSubFactoryFunc
+	GossipSubConfig                  p2p.GossipSubAdapterConfigFunc
 	Metrics                          module.LibP2PMetrics
 	ResourceManager                  network.ResourceManager
 	PubSubTracer                     p2p.PubSubTracer

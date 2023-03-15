@@ -91,10 +91,10 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 	}
 }
 
-type nodeOpt func(p2pbuilder.NodeBuilder)
+type nodeOpt func(p2p.NodeBuilder)
 
 func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
-	return func(builder p2pbuilder.NodeBuilder) {
+	return func(builder p2p.NodeBuilder) {
 		builder.SetSubscriptionFilter(filter)
 	}
 }

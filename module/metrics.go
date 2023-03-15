@@ -108,10 +108,14 @@ type UnicastManagerMetrics interface {
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
 }
 
-type LibP2PMetrics interface {
+type GossipSubMetrics interface {
 	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	GossipSubLocalMeshMetrics
+}
+
+type LibP2PMetrics interface {
+	GossipSubMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
