@@ -270,7 +270,6 @@ func TestExecuteScript(t *testing.T) {
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -335,7 +334,6 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -384,7 +382,6 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 				return &PanickingVM{}
 			},
 		},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -438,7 +435,6 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
 		},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -492,7 +488,6 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 				return &LongRunningVM{duration: 0}
 			},
 		},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -612,7 +607,6 @@ func TestExecuteScriptTimeout(t *testing.T) {
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
-		nil,
 	)
 
 	require.NoError(t, err)
@@ -659,7 +653,6 @@ func TestExecuteScriptCancelled(t *testing.T) {
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
-		nil,
 	)
 
 	require.NoError(t, err)
@@ -865,7 +858,6 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
-		nil,
 	)
 	vm := manager.vm
 	view := testutil.RootBootstrappedLedger(vm, ctx)

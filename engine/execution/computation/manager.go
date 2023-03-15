@@ -96,7 +96,6 @@ func New(
 	committer computer.ViewCommitter,
 	executionDataProvider *provider.Provider,
 	params ComputationConfig,
-	colResCons []result.ExecutedCollectionConsumer,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -133,7 +132,7 @@ func New(
 		committer,
 		me,
 		executionDataProvider,
-		colResCons,
+		nil, // TODO(ramtin): update me with proper consumers
 	)
 
 	if err != nil {
