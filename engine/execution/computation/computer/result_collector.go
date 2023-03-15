@@ -26,7 +26,7 @@ import (
 type ViewCommitter interface {
 	// CommitView commits a views' register delta and collects proofs
 	CommitView(
-		state.View,
+		*state.ExecutionSnapshot,
 		flow.StateCommitment,
 	) (
 		flow.StateCommitment,
@@ -38,7 +38,7 @@ type ViewCommitter interface {
 
 type transactionResult struct {
 	transaction
-	state.ExecutionSnapshot
+	*state.ExecutionSnapshot
 }
 
 type resultCollector struct {
@@ -122,8 +122,7 @@ func newResultCollector(
 func (collector *resultCollector) commitCollection(
 	collection collectionInfo,
 	startTime time.Time,
-	// TODO(patrick): switch to ExecutionSnapshot
-	collectionExecutionSnapshot state.View,
+	collectionExecutionSnapshot *state.ExecutionSnapshot,
 ) error {
 	defer collector.tracer.StartSpanFromParent(
 		collector.blockSpan,
@@ -197,7 +196,7 @@ func (collector *resultCollector) commitCollection(
 		collectionExecutionSnapshot)
 
 	spock, err := collector.signer.SignFunc(
-		collectionExecutionSnapshot.SpockSecret(),
+		collectionExecutionSnapshot.SpockSecret,
 		collector.spockHasher,
 		SPOCKProve)
 	if err != nil {
@@ -232,7 +231,7 @@ func (collector *resultCollector) commitCollection(
 
 func (collector *resultCollector) processTransactionResult(
 	txn transaction,
-	txnExecutionSnapshot state.ExecutionSnapshot,
+	txnExecutionSnapshot *state.ExecutionSnapshot,
 ) error {
 	collector.convertedServiceEvents = append(
 		collector.convertedServiceEvents,
@@ -278,12 +277,12 @@ func (collector *resultCollector) processTransactionResult(
 	return collector.commitCollection(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
-		collector.currentCollectionView)
+		collector.currentCollectionView.Finalize())
 }
 
 func (collector *resultCollector) AddTransactionResult(
 	txn transaction,
-	snapshot state.ExecutionSnapshot,
+	snapshot *state.ExecutionSnapshot,
 ) {
 	result := transactionResult{
 		transaction:       txn,

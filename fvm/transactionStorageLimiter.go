@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -34,7 +34,7 @@ type TransactionStorageLimiter struct{}
 // the fee deduction step happens after the storage limit check.
 func (limiter TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
-	txnState storage.Transaction,
+	snapshot *state.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
@@ -44,7 +44,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := limiter.checkStorageLimits(env, txnState, payer, maxTxFees)
+	err := limiter.checkStorageLimits(env, snapshot, payer, maxTxFees)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
@@ -55,16 +55,14 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 // storage limit is exceeded.  The returned list include addresses of updated
 // registers (and the payer's address).
 func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
-	txnState storage.Transaction,
+	snapshot *state.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
 ) []flow.Address {
-	updatedIds := txnState.UpdatedRegisterIDs()
-
 	// Multiple updated registers might be from the same address.  We want to
 	// duplicated the addresses to reduce check overhead.
-	dedup := make(map[flow.Address]struct{}, len(updatedIds)+1)
-	addresses := make([]flow.Address, 0, len(updatedIds)+1)
+	dedup := make(map[flow.Address]struct{}, len(snapshot.WriteSet)+1)
+	addresses := make([]flow.Address, 0, len(snapshot.WriteSet)+1)
 
 	// In case the payer is not updated, include it here.  If the maxTxFees is
 	// zero, it doesn't matter if the payer is included or not.
@@ -73,7 +71,7 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 		addresses = append(addresses, payer)
 	}
 
-	for _, id := range updatedIds {
+	for id := range snapshot.WriteSet {
 		address, ok := addressFromRegisterId(id)
 		if !ok {
 			continue
@@ -102,11 +100,11 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 // address and exceeded the storage limit.
 func (limiter TransactionStorageLimiter) checkStorageLimits(
 	env environment.Environment,
-	txnState storage.Transaction,
+	snapshot *state.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
-	addresses := limiter.getStorageCheckAddresses(txnState, payer, maxTxFees)
+	addresses := limiter.getStorageCheckAddresses(snapshot, payer, maxTxFees)
 
 	usages := make([]uint64, len(addresses))
 

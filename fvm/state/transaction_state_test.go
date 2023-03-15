@@ -204,7 +204,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	err = cachedState.Set(key, val)
 	require.NoError(t, err)
 
-	err = txn.AttachAndCommitNestedTransaction(cachedState)
+	err = txn.AttachAndCommitNestedTransaction(cachedState.Finalize())
 	require.NoError(t, err)
 
 	require.Equal(t, 3, txn.NumNestedTransactions())
@@ -228,9 +228,9 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Ensure nested transactions are merged correctly
 
-	state, err := txn.CommitParseRestrictedNestedTransaction(loc2)
+	snapshot, err := txn.CommitParseRestrictedNestedTransaction(loc2)
 	require.NoError(t, err)
-	require.Equal(t, restrictedNestedState2, state)
+	require.Equal(t, restrictedNestedState2.Finalize(), snapshot)
 
 	require.Equal(t, 2, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(restrictedId1))
@@ -247,9 +247,9 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	state, err = txn.CommitParseRestrictedNestedTransaction(loc1)
+	snapshot, err = txn.CommitParseRestrictedNestedTransaction(loc1)
 	require.NoError(t, err)
-	require.Equal(t, restrictedNestedState1, state)
+	require.Equal(t, restrictedNestedState1.Finalize(), snapshot)
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id1))
@@ -472,9 +472,9 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 		Name:    "other",
 	}
 
-	cacheableState, err := txn.CommitParseRestrictedNestedTransaction(other)
+	cacheableSnapshot, err := txn.CommitParseRestrictedNestedTransaction(other)
 	require.Error(t, err)
-	require.Nil(t, cacheableState)
+	require.Nil(t, cacheableSnapshot)
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id))
@@ -522,41 +522,4 @@ func TestPauseAndResume(t *testing.T) {
 	val, err = txn.Get(key2)
 	require.NoError(t, err)
 	require.NotNil(t, val)
-}
-
-func TestInvalidCommittedStateModification(t *testing.T) {
-	txn := newTestTransactionState()
-
-	id1, err := txn.BeginNestedTransaction()
-	require.NoError(t, err)
-
-	key := flow.NewRegisterID("addr", "key")
-	err = txn.Set(key, createByteArray(2))
-	require.NoError(t, err)
-
-	_, err = txn.Get(key)
-	require.NoError(t, err)
-
-	committedState, err := txn.CommitNestedTransaction(id1)
-	require.NoError(t, err)
-
-	err = committedState.Merge(
-		state.NewState(
-			delta.NewDeltaView(nil),
-			state.DefaultParameters()))
-	require.ErrorContains(t, err, "cannot Merge on a finalized view")
-
-	txn.ResumeNestedTransaction(committedState)
-
-	err = txn.Set(key, createByteArray(2))
-	require.ErrorContains(t, err, "cannot Set on a finalized view")
-
-	_, err = txn.Get(key)
-	require.ErrorContains(t, err, "cannot Get on a finalized view")
-
-	err = txn.RestartNestedTransaction(id1)
-	require.ErrorContains(t, err, "cannot DropChanges on a finalized view")
-
-	_, err = txn.CommitNestedTransaction(id1)
-	require.NoError(t, err)
 }

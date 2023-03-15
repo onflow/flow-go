@@ -13,6 +13,14 @@ func NewNoopViewCommitter() *NoopViewCommitter {
 	return &NoopViewCommitter{}
 }
 
-func (n NoopViewCommitter) CommitView(_ state.View, s flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error) {
+func (NoopViewCommitter) CommitView(
+	_ *state.ExecutionSnapshot,
+	s flow.StateCommitment,
+) (
+	flow.StateCommitment,
+	[]byte,
+	*ledger.TrieUpdate,
+	error,
+) {
 	return s, nil, nil, nil
 }
