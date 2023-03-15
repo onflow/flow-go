@@ -36,7 +36,6 @@ func ComputationResultForBlockFixture(
 
 	numChunks := len(collections) + 1
 	stateSnapshots := make([]state.ExecutionSnapshot, numChunks)
-	stateCommitments := make([]flow.StateCommitment, numChunks)
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
 	spockHashes := make([]crypto.Signature, numChunks)
@@ -48,7 +47,6 @@ func ComputationResultForBlockFixture(
 		numChunks)
 	for i := 0; i < numChunks; i++ {
 		stateSnapshots[i] = StateInteractionsFixture()
-		stateCommitments[i] = *completeBlock.StartState
 		events[i] = make(flow.EventsList, 0)
 		eventHashes[i] = unittest.IdentifierFixture()
 
@@ -94,7 +92,6 @@ func ComputationResultForBlockFixture(
 		TransactionResultIndex: make([]int, numChunks),
 		ExecutableBlock:        completeBlock,
 		StateSnapshots:         stateSnapshots,
-		StateCommitments:       stateCommitments,
 		Events:                 events,
 		EventsHashes:           eventHashes,
 		ChunkDataPacks:         chunkDataPacks,

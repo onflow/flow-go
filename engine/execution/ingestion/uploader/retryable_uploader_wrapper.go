@@ -245,7 +245,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		},
 		Events:             []flow.EventsList{events},
 		TransactionResults: transactionResults,
-		StateCommitments:   []flow.StateCommitment{endState},
 		BlockExecutionData: executionData,
+		EndState:           endState,
 	}, nil
 }

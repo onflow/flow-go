@@ -267,8 +267,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 			executableBlock)
 	}
 
-	if len(computationResult.StateCommitments) > 0 {
-		computationResult.StateCommitments[len(computationResult.StateCommitments)-1] = newStateCommitment
+	if len(computationResult.Chunks) > 0 {
+		computationResult.Chunks[len(computationResult.Chunks)-1].EndState = newStateCommitment
 	}
 
 	// copy executable block to set `Executing` state for arguments matching
