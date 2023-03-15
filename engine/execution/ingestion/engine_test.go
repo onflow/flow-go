@@ -35,7 +35,6 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -137,7 +136,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	// initialize the mocks and engine
 	conduit := &mocknetwork.Conduit{}
 	collectionConduit := &mocknetwork.Conduit{}
-	syncConduit := &mocknetwork.Conduit{}
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -197,11 +195,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
-
-	deltas, err := NewDeltas(1000)
-	require.NoError(t, err)
-
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
@@ -226,10 +219,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState,
 		metrics,
 		tracer,
-		false,
-		filter.Any,
-		deltas,
-		10,
 		false,
 		checkAuthorizedAtBlock,
 		nil,
@@ -1547,9 +1536,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	ctrl := gomock.NewController(t)
 	net := mocknetwork.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
-	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
-	net.EXPECT().Register(gomock.Eq(channels.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -1569,9 +1556,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
-
-	deltas, err := NewDeltas(10)
-	require.NoError(t, err)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
@@ -1593,10 +1577,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		es,
 		metrics,
 		tracer,
-		false,
-		filter.Any,
-		deltas,
-		10,
 		false,
 		checkAuthorizedAtBlock,
 		nil,

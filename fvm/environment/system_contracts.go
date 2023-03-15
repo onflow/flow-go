@@ -279,33 +279,3 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		},
 	)
 }
-
-var useContractAuditVoucherSpec = ContractFunctionSpec{
-	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractDeploymentAudits,
-	FunctionName:     systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
-	ArgumentTypes: []sema.Type{
-		&sema.AddressType{},
-		sema.StringType,
-	},
-}
-
-// UseContractAuditVoucher executes the use a contract deployment audit voucher
-// contract.
-func (sys *SystemContracts) UseContractAuditVoucher(
-	address flow.Address,
-	code string,
-) (bool, error) {
-	resultCdc, err := sys.Invoke(
-		useContractAuditVoucherSpec,
-		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
-			cadence.String(code),
-		},
-	)
-	if err != nil {
-		return false, err
-	}
-	result := resultCdc.(cadence.Bool).ToGoValue().(bool)
-	return result, nil
-}

@@ -18,6 +18,9 @@ type View interface {
 // Storage is the storage interface used by the virtual machine to read and
 // write register values.
 type Storage interface {
+	// TODO(patrick): remove once fvm.VM.Run() is deprecated
+	Peek(id flow.RegisterID) (flow.RegisterValue, error)
+
 	Set(id flow.RegisterID, value flow.RegisterValue) error
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 

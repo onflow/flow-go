@@ -74,6 +74,13 @@ func (view *SimpleView) DropChanges() error {
 	return view.base.DropChanges()
 }
 
+func (view *SimpleView) Peek(id flow.RegisterID) (flow.RegisterValue, error) {
+	view.Lock()
+	defer view.Unlock()
+
+	return view.base.Peek(id)
+}
+
 func (view *SimpleView) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	view.Lock()
 	defer view.Unlock()
