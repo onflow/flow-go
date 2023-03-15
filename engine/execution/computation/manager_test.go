@@ -163,7 +163,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
-	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
 	stats := returnedComputationResult.BlockStats()
 	assert.True(t, stats.ComputationUsed > 0)
 	assert.True(t, stats.MemoryUsed > 0)
@@ -506,6 +506,18 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
+func (p *PanickingVM) RunV2(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
@@ -523,6 +535,20 @@ func (p *PanickingVM) GetAccount(
 
 type LongRunningVM struct {
 	duration time.Duration
+}
+
+func (l *LongRunningVM) RunV2(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	time.Sleep(l.duration)
+
+	return nil, fvm.ProcedureOutput{Value: cadence.NewVoid()}, nil
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {

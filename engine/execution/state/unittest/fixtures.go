@@ -4,14 +4,15 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() *delta.SpockSnapshot {
-	return delta.NewDeltaView(nil).Interactions()
+func StateInteractionsFixture() state.ExecutionSnapshot {
+	return delta.NewDeltaView(nil)
 }
 
 func ComputationResultFixture(
@@ -34,7 +35,7 @@ func ComputationResultForBlockFixture(
 	collections := completeBlock.Collections()
 
 	numChunks := len(collections) + 1
-	stateViews := make([]*delta.SpockSnapshot, numChunks)
+	stateSnapshots := make([]state.ExecutionSnapshot, numChunks)
 	stateCommitments := make([]flow.StateCommitment, numChunks)
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
@@ -46,7 +47,7 @@ func ComputationResultForBlockFixture(
 		0,
 		numChunks)
 	for i := 0; i < numChunks; i++ {
-		stateViews[i] = StateInteractionsFixture()
+		stateSnapshots[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
 		events[i] = make(flow.EventsList, 0)
 		eventHashes[i] = unittest.IdentifierFixture()
@@ -92,7 +93,7 @@ func ComputationResultForBlockFixture(
 	return &execution.ComputationResult{
 		TransactionResultIndex: make([]int, numChunks),
 		ExecutableBlock:        completeBlock,
-		StateSnapshots:         stateViews,
+		StateSnapshots:         stateSnapshots,
 		StateCommitments:       stateCommitments,
 		Events:                 events,
 		EventsHashes:           eventHashes,
