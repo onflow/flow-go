@@ -337,10 +337,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			derivedBlockData)
 		require.NoError(t, err)
 
-		for i := range computationResult.StateCommitments {
-			spockSecrets = append(
-				spockSecrets,
-				computationResult.StateSnapshots[i].SpockSecret())
+		for _, snapshot := range computationResult.StateSnapshots {
+			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
 		chunkDataPacks = computationResult.ChunkDataPacks

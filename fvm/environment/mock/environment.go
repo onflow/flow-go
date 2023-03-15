@@ -12,7 +12,7 @@ import (
 
 	common "github.com/onflow/cadence/runtime/common"
 
-	derived "github.com/onflow/flow-go/fvm/derived"
+	environment "github.com/onflow/flow-go/fvm/environment"
 
 	flow "github.com/onflow/flow-go/model/flow"
 
@@ -443,19 +443,19 @@ func (_m *Environment) Events() flow.EventsList {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, error) {
+func (_m *Environment) FlushPendingUpdates() ([]environment.ContractUpdateKey, error) {
 	ret := _m.Called()
 
-	var r0 derived.TransactionInvalidator
+	var r0 []environment.ContractUpdateKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (derived.TransactionInvalidator, error)); ok {
+	if rf, ok := ret.Get(0).(func() ([]environment.ContractUpdateKey, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() derived.TransactionInvalidator); ok {
+	if rf, ok := ret.Get(0).(func() []environment.ContractUpdateKey); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(derived.TransactionInvalidator)
+			r0 = ret.Get(0).([]environment.ContractUpdateKey)
 		}
 	}
 
