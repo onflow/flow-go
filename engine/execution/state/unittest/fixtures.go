@@ -3,7 +3,6 @@ package unittest
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -11,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() state.ExecutionSnapshot {
-	return delta.NewDeltaView(nil)
+func StateInteractionsFixture() *state.ExecutionSnapshot {
+	return &state.ExecutionSnapshot{}
 }
 
 func ComputationResultFixture(
@@ -35,7 +34,7 @@ func ComputationResultForBlockFixture(
 	collections := completeBlock.Collections()
 
 	numChunks := len(collections) + 1
-	stateSnapshots := make([]state.ExecutionSnapshot, numChunks)
+	stateSnapshots := make([]*state.ExecutionSnapshot, numChunks)
 	events := make([]flow.EventsList, numChunks)
 	eventHashes := make([]flow.Identifier, numChunks)
 	spockHashes := make([]crypto.Signature, numChunks)

@@ -44,7 +44,6 @@ type SpockSnapshot struct {
 	SpockSecret []byte
 }
 
-// TODO(patrick): rm after updating emulator.
 func NewView(
 	readFunc func(owner string, key string) (flow.RegisterValue, error),
 ) *View {
@@ -133,20 +132,6 @@ func (v *View) DropChanges() error {
 	return nil
 }
 
-func (v *View) AllRegisterIDs() []flow.RegisterID {
-	return v.Interactions().AllRegisterIDs()
-}
-
-// UpdatedRegisterIDs returns a list of updated registers' ids.
-func (v *View) UpdatedRegisterIDs() []flow.RegisterID {
-	return v.Delta().UpdatedRegisterIDs()
-}
-
-// UpdatedRegisters returns a list of updated registers.
-func (v *View) UpdatedRegisters() flow.RegisterEntries {
-	return v.Delta().UpdatedRegisters()
-}
-
 // Get gets a register value from this view.
 //
 // This function will return an error if it fails to read from the underlying
@@ -211,22 +196,31 @@ func (v *View) Delta() Delta {
 }
 
 // TODO(patrick): remove after updating emulator
-func (view *View) MergeView(child state.ExecutionSnapshot) error {
-	return view.Merge(child)
+func (view *View) MergeView(child state.View) error {
+	return view.Merge(child.Finalize())
 }
 
-func (view *View) Merge(child state.ExecutionSnapshot) error {
-	for _, id := range child.AllRegisterIDs() {
+func (view *View) Finalize() *state.ExecutionSnapshot {
+	return &state.ExecutionSnapshot{
+		// TODO(patrick): exclude reads that came from the write set
+		ReadSet:     view.regTouchSet,
+		WriteSet:    view.delta.Data,
+		SpockSecret: view.SpockSecret(),
+	}
+}
+
+func (view *View) Merge(child *state.ExecutionSnapshot) error {
+	for id := range child.ReadSet {
 		view.regTouchSet[id] = struct{}{}
 	}
 
-	_, err := view.spockSecretHasher.Write(child.SpockSecret())
+	_, err := view.spockSecretHasher.Write(child.SpockSecret)
 	if err != nil {
 		return fmt.Errorf("merging SPoCK secrets failed: %w", err)
 	}
 
-	for _, entry := range child.UpdatedRegisters() {
-		view.delta.Data[entry.Key] = entry.Value
+	for key, value := range child.WriteSet {
+		view.delta.Data[key] = value
 	}
 
 	return nil

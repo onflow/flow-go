@@ -724,7 +724,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		valid, err := crypto.SPOCKVerifyAgainstData(
 			myIdentity.StakingPubKey,
 			computationResult.Spocks[i],
-			snapshot.SpockSecret(),
+			snapshot.SpockSecret,
 			spockHasher)
 		require.NoError(t, err)
 		require.True(t, valid)
