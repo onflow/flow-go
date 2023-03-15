@@ -24,14 +24,14 @@ type DerivedTransaction interface {
 		addressLocation common.AddressLocation,
 	) (
 		*Program,
-		*state.State,
+		*state.ExecutionSnapshot,
 		bool,
 	)
 
 	SetProgram(
 		addressLocation common.AddressLocation,
 		program *Program,
-		state *state.State,
+		snapshot *state.ExecutionSnapshot,
 	)
 
 	GetMeterParamOverrides(
@@ -219,7 +219,7 @@ func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
 	*Program,
-	*state.State,
+	*state.ExecutionSnapshot,
 	bool,
 ) {
 	return transaction.programs.Get(addressLocation)
@@ -228,9 +228,9 @@ func (transaction *DerivedTransactionData) GetProgram(
 func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
 	program *Program,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) {
-	transaction.programs.Set(addressLocation, program, state)
+	transaction.programs.Set(addressLocation, program, snapshot)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(

@@ -116,7 +116,7 @@ type VM interface {
 		Procedure,
 		state.StorageSnapshot,
 	) (
-		state.ExecutionSnapshot,
+		*state.ExecutionSnapshot,
 		ProcedureOutput,
 		error,
 	)
@@ -141,7 +141,7 @@ func (vm *VirtualMachine) RunV2(
 	proc Procedure,
 	storageSnapshot state.StorageSnapshot,
 ) (
-	state.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -206,7 +206,7 @@ func (vm *VirtualMachine) RunV2(
 		}
 	}
 
-	return view, executor.Output(), nil
+	return view.Finalize(), executor.Output(), nil
 }
 
 func (vm *VirtualMachine) Run(

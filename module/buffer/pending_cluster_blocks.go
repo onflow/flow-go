@@ -18,13 +18,13 @@ func (b *PendingClusterBlocks) Add(originID flow.Identifier, block *cluster.Bloc
 	return b.backend.add(originID, block.Header, block.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[cluster.Block]{}, false
+		return flow.Slashable[*cluster.Block]{}, false
 	}
 
-	block := flow.Slashable[cluster.Block]{
+	block := flow.Slashable[*cluster.Block]{
 		OriginID: item.originID,
 		Message: &cluster.Block{
 			Header:  item.header,
@@ -35,15 +35,15 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[clu
 	return block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[cluster.Block], 0, len(items))
+	blocks := make([]flow.Slashable[*cluster.Block], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[cluster.Block]{
+		block := flow.Slashable[*cluster.Block]{
 			OriginID: item.originID,
 			Message: &cluster.Block{
 				Header:  item.header,
