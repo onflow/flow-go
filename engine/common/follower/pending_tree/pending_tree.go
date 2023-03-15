@@ -130,8 +130,7 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 		t.forest.AddVertex(vertex)
 
 		if t.connectsToFinalizedBlock(block) {
-			connectedBlocks := t.updateAndCollectFork([]CertifiedBlock{}, vertex)
-			allConnectedBlocks = append(allConnectedBlocks, connectedBlocks...)
+			allConnectedBlocks = t.updateAndCollectFork(allConnectedBlocks, vertex)
 		}
 	}
 
@@ -151,19 +150,30 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 
 // FinalizeForkAtLevel takes last finalized block and prunes levels below the finalized view.
 // When a block is finalized we don't care for all blocks below it since they were already finalized.
+// Finalizing a block might result in observing a connected chain of blocks that previously weren't.
+// These blocks will be returned as result of invocation.
 // No errors are expected during normal operation.
-func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
+func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) ([]CertifiedBlock, error) {
+	var connectedBlocks []CertifiedBlock
 	blockID := finalized.ID()
 	if t.forest.LowestLevel >= finalized.View {
-		return nil
+		return connectedBlocks, nil
 	}
 
 	t.lastFinalizedID = blockID
 	err := t.forest.PruneUpToLevel(finalized.View)
 	if err != nil {
-		return fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
+		return connectedBlocks, fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
 	}
-	return nil
+
+	// detect any
+	iter := t.forest.GetChildren(t.lastFinalizedID)
+	for iter.HasNext() {
+		v := iter.NextVertex().(*PendingBlockVertex)
+		connectedBlocks = t.updateAndCollectFork(connectedBlocks, v)
+	}
+
+	return connectedBlocks, nil
 }
 
 // updateAndCollectFork marks the subtree rooted at `vertex.Block` as connected to the finalized state

@@ -150,11 +150,45 @@ func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
 	assert.Equal(s.T(), blocks, connectedBlocks)
 }
 
+// TestResolveBlocksAfterFinalization tests that finalizing a block performs resolution against tree state and collects
+// newly connected blocks(with the respect to new finalized state) and returns them as result.
+// Having:
+//
+//	       ↙ B2 ← B3
+//	F ← B1 ← B4 ← B5 ← B6 ← B7
+//
+// Add [B2, B3], expect to get []
+// Add [B5, B6, B7], expect to get []
+// Finalize B4, expect to get [B5, B6, B7]
+func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
+	longestFork := certifiedBlocksFixture(5, s.finalized)
+	B2 := unittest.BlockWithParentFixture(longestFork[0].Block.Header)
+	// make sure short fork doesn't have conflicting views, so we don't trigger exception
+	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
+	B3 := unittest.BlockWithParentFixture(B2.Header)
+	shortFork := []CertifiedBlock{{
+		Block: B2,
+		QC:    B3.Header.QuorumCertificate(),
+	}, certifiedBlockFixture(B3)}
+
+	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), connectedBlocks)
+
+	connectedBlocks, err = s.pendingTree.AddBlocks(longestFork[2:])
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), connectedBlocks)
+
+	connectedBlocks, err = s.pendingTree.FinalizeForkAtLevel(longestFork[1].Block.Header)
+	require.NoError(s.T(), err)
+	require.ElementsMatch(s.T(), longestFork[2:], connectedBlocks)
+}
+
 // TestBlocksLowerThanFinalizedView tests that implementation drops blocks lower than finalized view.
 func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	newFinalized := unittest.BlockWithParentFixture(block.Header)
-	err := s.pendingTree.FinalizeForkAtLevel(newFinalized.Header)
+	_, err := s.pendingTree.FinalizeForkAtLevel(newFinalized.Header)
 	require.NoError(s.T(), err)
 	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
@@ -174,7 +208,7 @@ func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), blocks[:3], connectedBlocks)
 
-	err = s.pendingTree.FinalizeForkAtLevel(blocks[0].Block.Header)
+	_, err = s.pendingTree.FinalizeForkAtLevel(blocks[0].Block.Header)
 	require.NoError(s.T(), err)
 
 	connectedBlocks, err = s.pendingTree.AddBlocks(blocks)
