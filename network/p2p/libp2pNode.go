@@ -28,6 +28,8 @@ type LibP2PNode interface {
 	module.ReadyDoneAware
 	// PeerConnections connection status information per peer.
 	PeerConnections
+	// PeerScore exposes the peer score API.
+	PeerScore
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -78,6 +80,11 @@ type LibP2PNode interface {
 	HasSubscription(topic channels.Topic) bool
 	// SetUnicastManager sets the unicast manager for the node.
 	SetUnicastManager(uniMgr UnicastManager)
+}
+
+// PeerScore is the interface for the peer score module. It is used to expose the peer score to other
+// components of the node. It is also used to set the peer score exposer implementation.
+type PeerScore interface {
 	// SetPeerScoreExposer sets the node's peer score exposer implementation.
 	// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
 	// method if the node's peer score exposer has already been set.
