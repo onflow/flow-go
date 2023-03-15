@@ -222,15 +222,17 @@ func (c *Cache) PruneUpToView(view uint64) {
 // removeByView removes all blocks for the given view.
 // NOT concurrency safe: execute within Cache's lock.
 func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
-	delete(c.byView, view)
-
 	for blockID, block := range blocks {
+		c.backend.Remove(blockID)
+
 		siblings := c.byParent[block.Header.ParentID]
 		delete(siblings, blockID)
 		if len(siblings) == 0 {
 			delete(c.byParent, block.Header.ParentID)
 		}
 	}
+
+	delete(c.byView, view)
 }
 
 // unsafeAtomicAdd does the following within a single atomic operation:
