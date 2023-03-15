@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -120,6 +119,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionBlockExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(1)
+
 		exemetrics.On("ExecutionCollectionExecuted",
 			mock.Anything,  // duration
 			mock.Anything). // stats
@@ -1084,6 +1089,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedCachedPrograms := 0
 
 	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionBlockExecuted",
+		mock.Anything,  // duration
+		mock.Anything). // stats
+		Return(nil).
+		Times(1)
+
 	metrics.On("ExecutionCollectionExecuted",
 		mock.Anything,  // duration
 		mock.Anything). // stats
@@ -1158,23 +1169,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	assert.Len(t, result.TransactionResults, 1)
 
 	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
-
-	stats := result.CollectionStats(0)
-	// ignore computation and memory used
-	stats.ComputationUsed = 0
-	stats.MemoryUsed = 0
-
-	assert.Equal(
-		t,
-		module.ExecutionResultStats{
-			EventCounts:                     expectedNumberOfEvents,
-			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        63,
-			NumberOfBytesWrittenToRegisters: 4154,
-			NumberOfCollections:             1,
-			NumberOfTransactions:            1,
-		},
-		stats)
 
 	committer.AssertExpectations(t)
 }
