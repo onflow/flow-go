@@ -661,10 +661,6 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	e.metrics.ExecutionBlockExecuted(
-		time.Since(startedAt),
-		computationResult.BlockStats())
-
 	for computationKind, intensity := range computationResult.ComputationIntensities {
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}

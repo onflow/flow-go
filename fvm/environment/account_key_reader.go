@@ -22,13 +22,13 @@ type AccountKeyReader interface {
 	// the given index. An error is returned if the specified account does not
 	// exist, the provided index is not valid, or if the key retrieval fails.
 	GetAccountKey(
-		address common.Address,
+		runtimeAddress common.Address,
 		keyIndex int,
 	) (
 		*runtime.AccountKey,
 		error,
 	)
-	AccountKeysCount(address common.Address) (uint64, error)
+	AccountKeysCount(runtimeAddress common.Address) (uint64, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
@@ -47,7 +47,7 @@ func NewParseRestrictedAccountKeyReader(
 }
 
 func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
-	address common.Address,
+	runtimeAddress common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -57,16 +57,21 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		reader.txnState,
 		trace.FVMEnvGetAccountKey,
 		reader.impl.GetAccountKey,
-		address,
+		runtimeAddress,
 		keyIndex)
 }
 
-func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(
+	runtimeAddress common.Address,
+) (
+	uint64,
+	error,
+) {
 	return parseRestrict1Arg1Ret(
 		reader.txnState,
 		"AccountKeysCount",
 		reader.impl.AccountKeysCount,
-		address,
+		runtimeAddress,
 	)
 }
 
