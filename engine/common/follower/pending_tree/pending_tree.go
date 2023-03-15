@@ -3,8 +3,6 @@ package pending_tree
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
@@ -99,11 +97,6 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
 func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBlock, error) {
-	// sort blocks by height, so we can identify if there are candidates for being connected to the finalized state.
-	slices.SortFunc(certifiedBlocks, func(lhs CertifiedBlock, rhs CertifiedBlock) bool {
-		return lhs.Height() < rhs.Height()
-	})
-
 	var allConnectedBlocks []CertifiedBlock
 	for _, block := range certifiedBlocks {
 		// skip blocks lower than finalized view
@@ -137,7 +130,7 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 		t.forest.AddVertex(vertex)
 
 		if t.connectsToFinalizedBlock(block) {
-			connectedBlocks := t.updateAndCollectFork(vertex)
+			connectedBlocks := t.updateAndCollectFork([]CertifiedBlock{}, vertex)
 			allConnectedBlocks = append(allConnectedBlocks, connectedBlocks...)
 		}
 	}
@@ -184,17 +177,21 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) error {
 // For example, suppose B is the input vertex. Then:
 //   - A must already be connected to the finalized state
 //   - B, E, C, D are marked as connected to the finalized state and included in the output list
-func (t *PendingTree) updateAndCollectFork(vertex *PendingBlockVertex) []CertifiedBlock {
-	certifiedBlocks := []CertifiedBlock{vertex.CertifiedBlock}
+//
+// This method has a similar signature as `append` for performance reasons:
+//   - any connected certified blocks are appended to `queue`
+//   - we return the _resulting slice_ after all appends
+func (t *PendingTree) updateAndCollectFork(queue []CertifiedBlock, vertex *PendingBlockVertex) []CertifiedBlock {
 	vertex.connectedToFinalized = true
+	queue = append(queue, vertex.CertifiedBlock)
+
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
 		nextVertex := iter.NextVertex().(*PendingBlockVertex)
 		// if it's already connected then it was already reported
 		if !nextVertex.connectedToFinalized {
-			blocks := t.updateAndCollectFork(nextVertex)
-			certifiedBlocks = append(certifiedBlocks, blocks...)
+			queue = t.updateAndCollectFork(queue, nextVertex)
 		}
 	}
-	return certifiedBlocks
+	return queue
 }
