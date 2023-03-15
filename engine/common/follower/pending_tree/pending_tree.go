@@ -149,11 +149,11 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 	if block.Block.Header.ParentID == t.lastFinalizedID {
 		return true
-	} else if parentVertex, found := t.forest.GetVertex(block.Block.Header.ParentID); found {
-		return parentVertex.(*PendingBlockVertex).connectedToFinalized
-	} else {
-		return false
 	}
+	if parentVertex, found := t.forest.GetVertex(block.Block.Header.ParentID); found {
+		return parentVertex.(*PendingBlockVertex).connectedToFinalized
+	}
+	return false
 }
 
 // FinalizeForkAtLevel takes last finalized block and prunes levels below the finalized view.
