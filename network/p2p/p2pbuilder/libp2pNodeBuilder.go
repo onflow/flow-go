@@ -595,9 +595,23 @@ func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerConte
 	}
 
 	var scoreOpt *scoring.ScoreOption
+	var scoreTracer p2p.PeerScoreTracer
 	if builder.gossipSubPeerScoring {
 		scoreOpt = scoring.NewScoreOption(builder.logger, builder.idProvider, builder.peerScoringParameterOptions...)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
+		
+		if builder.gossipSubScoreTracerInterval > 0 {
+			scoreTracer = tracer.NewGossipSubScoreTracer(
+				builder.logger,
+				builder.idProvider,
+				builder.metrics,
+				builder.gossipSubScoreTracerInterval)
+			gossipSubConfigs.WithScoreTracer(scoreTracer)
+			builder.logger.Debug().Msg("starting gossipsub score tracer")
+			scoreTracer.Start(ctx)
+			<-scoreTracer.Ready()
+			builder.logger.Debug().Msg("gossipsub score tracer started")
+		}
 	}
 
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(builder.metrics, builder.logger)
@@ -608,20 +622,6 @@ func (builder *LibP2PNodeBuilder) buildGossipSub(ctx irrecoverable.SignalerConte
 
 	if builder.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(builder.gossipSubTracer)
-	}
-
-	var scoreTracer p2p.PeerScoreTracer
-	if builder.gossipSubScoreTracerInterval > 0 {
-		scoreTracer = tracer.NewGossipSubScoreTracer(
-			builder.logger,
-			builder.idProvider,
-			builder.metrics,
-			builder.gossipSubScoreTracerInterval)
-		gossipSubConfigs.WithScoreTracer(scoreTracer)
-		builder.logger.Debug().Msg("starting gossipsub score tracer")
-		scoreTracer.Start(ctx)
-		<-scoreTracer.Ready()
-		builder.logger.Debug().Msg("gossipsub score tracer started")
 	}
 
 	gossipSub, err := builder.gossipSubFactory(ctx, builder.logger, h, gossipSubConfigs)
