@@ -57,7 +57,7 @@ type Node struct {
 	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
 	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
 	routing          routing.Routing
-	pCache           *ProtocolPeerCache
+	pCache           p2p.ProtocolPeerCache
 	peerManager      p2p.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
 }
@@ -66,7 +66,7 @@ type Node struct {
 func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
-	pCache *ProtocolPeerCache,
+	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
 ) *Node {
 	return &Node{

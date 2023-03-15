@@ -461,7 +461,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 // DefaultCreateNodeFunc returns new libP2P node.
 func DefaultCreateNodeFunc(logger zerolog.Logger,
 	host host.Host,
-	pCache *p2pnode.ProtocolPeerCache,
+	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, peerManager)
 }
