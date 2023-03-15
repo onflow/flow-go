@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -212,7 +213,7 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 }
 
 // EnableGossipSubPeerScoring sets builder.gossipSubPeerScoring to true.
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...p2p.PeerScoreParamsOption) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubPeerScoring(true)
 	builder.gossipSubBuilder.SetIDProvider(provider)
 	builder.gossipSubBuilder.SetPeerScoringParameterOptions(ops...)

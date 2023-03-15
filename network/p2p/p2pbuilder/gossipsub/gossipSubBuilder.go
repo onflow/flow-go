@@ -33,7 +33,7 @@ type Builder struct {
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
 	gossipSubTracer             p2p.PubSubTracer
-	peerScoringParameterOptions []p2p.PeerScoreParamsOption
+	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	idProvider                  module.IdentityProvider
 	rsys                        routing.Routing
 }
@@ -131,7 +131,7 @@ func (g *Builder) SetRoutingSystem(rsys routing.Routing) {
 
 // SetPeerScoringParameterOptions sets the peer scoring parameter options of the builder.
 // If the peer scoring parameter options have already been set, a fatal error is logged.
-func (g *Builder) SetPeerScoringParameterOptions(options ...p2p.PeerScoreParamsOption) {
+func (g *Builder) SetPeerScoringParameterOptions(options ...scoring.PeerScoreParamsOption) {
 	if g.peerScoringParameterOptions != nil {
 		g.logger.Fatal().Msg("peer scoring parameter options has already been set")
 		return
