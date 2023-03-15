@@ -29,6 +29,15 @@ func (d *HeroCacheDistributor) AddConsumer(consumer OnEntityEjected) {
 	d.consumers = append(d.consumers, consumer)
 }
 
+func (d *HeroCacheDistributor) OnEntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
+	// report to parent metrics
+	d.HeroCacheMetrics.OnEntityEjectionDueToEmergency(ejectedEntity)
+	// report to extra consumers
+	for _, consumer := range d.consumers {
+		consumer(ejectedEntity)
+	}
+}
+
 func (d *HeroCacheDistributor) OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity) {
 	// report to parent metrics
 	d.HeroCacheMetrics.OnEntityEjectionDueToFullCapacity(ejectedEntity)

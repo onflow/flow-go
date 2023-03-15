@@ -276,8 +276,8 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	if linkedId, _, ok := c.linkedEntityOf(b, slotToUse); ok {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
-		c.invalidateEntity(b, slotToUse)
-		c.collector.OnEntityEjectionDueToEmergency()
+		ejectedEntity := c.invalidateEntity(b, slotToUse)
+		c.collector.OnEntityEjectionDueToEmergency(ejectedEntity)
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
@@ -473,6 +473,6 @@ func (c *Cache) unuseSlot(b bucketIndex, s slotIndex) {
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
-func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) {
-	c.entities.Remove(c.buckets[b].slots[s].entityIndex)
+func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) flow.Entity {
+	return c.entities.Remove(c.buckets[b].slots[s].entityIndex)
 }

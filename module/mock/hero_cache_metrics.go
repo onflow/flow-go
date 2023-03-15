@@ -17,9 +17,9 @@ func (_m *HeroCacheMetrics) BucketAvailableSlots(_a0 uint64, _a1 uint64) {
 	_m.Called(_a0, _a1)
 }
 
-// OnEntityEjectionDueToEmergency provides a mock function with given fields:
-func (_m *HeroCacheMetrics) OnEntityEjectionDueToEmergency() {
-	_m.Called()
+// OnEntityEjectionDueToEmergency provides a mock function with given fields: ejectedEntity
+func (_m *HeroCacheMetrics) OnEntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
+	_m.Called(ejectedEntity)
 }
 
 // OnEntityEjectionDueToFullCapacity provides a mock function with given fields: ejectedEntity

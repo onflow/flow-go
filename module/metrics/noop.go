@@ -218,7 +218,7 @@ func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)               
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
 func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)           {}
-func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
+func (nc *NoopCollector) OnEntityEjectionDueToEmergency(ejectedEntity flow.Entity)              {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
 func (nc *NoopCollector) OnKeyPutAttempt(uint32)                                                {}

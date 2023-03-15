@@ -715,7 +715,7 @@ type HeroCacheMetrics interface {
 	// each key belongs to an existing (key, entity) pair.
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectionDueToEmergency()
+	OnEntityEjectionDueToEmergency(ejectedEntity flow.Entity)
 }
 
 type ChainSyncMetrics interface {

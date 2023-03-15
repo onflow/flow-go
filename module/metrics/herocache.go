@@ -277,6 +277,6 @@ func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity(flow.Entity) {
 // each key belongs to an existing (key, entity) pair.
 // Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnEntityEjectionDueToEmergency() {
+func (h *HeroCacheCollector) OnEntityEjectionDueToEmergency(flow.Entity) {
 	h.countKeyEjectionDueToEmergency.Inc()
 }
