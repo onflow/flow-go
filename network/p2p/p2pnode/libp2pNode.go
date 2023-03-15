@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -59,7 +58,7 @@ type Node struct {
 	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
 	routing          routing.Routing
 	pCache           *ProtocolPeerCache
-	peerManager      *connection.PeerManager
+	peerManager      p2p.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
 }
 
@@ -68,7 +67,7 @@ func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
 	pCache *ProtocolPeerCache,
-	peerManager *connection.PeerManager,
+	peerManager p2p.PeerManager,
 ) *Node {
 	return &Node{
 		host:        host,
