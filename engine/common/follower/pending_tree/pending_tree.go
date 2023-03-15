@@ -166,7 +166,6 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) ([]CertifiedBl
 		return connectedBlocks, fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
 	}
 
-	// detect any
 	iter := t.forest.GetChildren(t.lastFinalizedID)
 	for iter.HasNext() {
 		v := iter.NextVertex().(*PendingBlockVertex)
