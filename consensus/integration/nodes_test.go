@@ -415,7 +415,7 @@ func createNode(
 	notifier.AddConsumer(logConsumer)
 
 	cleaner := &storagemock.Cleaner{}
-	cleaner.On("RunGC")
+	cleaner.On("RunGC").Return(nil)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()

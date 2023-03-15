@@ -29,7 +29,8 @@ func (r receiveCacheEntry) Checksum() flow.Identifier {
 }
 
 // NewHeroReceiveCache returns a new HeroCache-based receive cache.
-func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *ReceiveCache {
+func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
+) *ReceiveCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection, // receive cache must be LRU.

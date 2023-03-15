@@ -274,13 +274,15 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
+
+	store := queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector())
 	providerEngine, err := provider.New(
 		node.Log,
 		node.Metrics,
 		node.Net,
 		node.Me,
 		node.State,
-		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		store,
 		uint(1000),
 		channels.ProvideCollections,
 		selector,
@@ -582,6 +584,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	store := queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector())
+
 	pusherEngine, err := executionprovider.New(
 		node.Log,
 		node.Tracer,
@@ -590,7 +594,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		metricsCollector,
 		checkAuthorizedAtBlock,
-		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		store,
 		executionprovider.DefaultChunkDataPackRequestWorker,
 		executionprovider.DefaultChunkDataPackQueryTimeout,
 		executionprovider.DefaultChunkDataPackDeliveryTimeout,

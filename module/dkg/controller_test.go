@@ -333,20 +333,26 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 func TestDelay(t *testing.T) {
 
 	t.Run("should return 0 delay for <=0 inputs", func(t *testing.T) {
-		delay := computePreprocessingDelay(0, 100)
+		delay, err := computePreprocessingDelay(0, 100)
+		require.NoError(t, err)
 		assert.Equal(t, delay, time.Duration(0))
-		delay = computePreprocessingDelay(time.Hour, 0)
+		delay, err = computePreprocessingDelay(time.Hour, 0)
+		require.NoError(t, err)
 		assert.Equal(t, delay, time.Duration(0))
-		delay = computePreprocessingDelay(time.Millisecond, -1)
+		delay, err = computePreprocessingDelay(time.Millisecond, -1)
+		require.NoError(t, err)
 		assert.Equal(t, delay, time.Duration(0))
-		delay = computePreprocessingDelay(-time.Millisecond, 100)
+		delay, err = computePreprocessingDelay(-time.Millisecond, 100)
+		require.NoError(t, err)
 		assert.Equal(t, delay, time.Duration(0))
 	})
 
 	// NOTE: this is a probabilistic test. It will (extremely infrequently) fail.
 	t.Run("should return different values for same inputs", func(t *testing.T) {
-		d1 := computePreprocessingDelay(time.Hour, 100)
-		d2 := computePreprocessingDelay(time.Hour, 100)
+		d1, err := computePreprocessingDelay(time.Hour, 100)
+		require.NoError(t, err)
+		d2, err := computePreprocessingDelay(time.Hour, 100)
+		require.NoError(t, err)
 		assert.NotEqual(t, d1, d2)
 	})
 
@@ -360,7 +366,8 @@ func TestDelay(t *testing.T) {
 		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
 		assert.Equal(t, expectedMaxDelay, maxDelay)
 
-		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		delay, err := computePreprocessingDelay(baseDelay, dkgSize)
+		require.NoError(t, err)
 		assert.LessOrEqual(t, minDelay, delay)
 		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
 	})
@@ -375,7 +382,8 @@ func TestDelay(t *testing.T) {
 		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
 		assert.Equal(t, expectedMaxDelay, maxDelay)
 
-		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		delay, err := computePreprocessingDelay(baseDelay, dkgSize)
+		require.NoError(t, err)
 		assert.LessOrEqual(t, minDelay, delay)
 		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
 	})

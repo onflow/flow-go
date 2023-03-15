@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strings"
-	"sync"
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -26,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -75,8 +74,6 @@ type Manager struct {
 	derivedChainData         *derived.DerivedChainData
 	scriptLogThreshold       time.Duration
 	scriptExecutionTimeLimit time.Duration
-	rngLock                  *sync.Mutex
-	rng                      *rand.Rand
 }
 
 func New(
@@ -145,8 +142,6 @@ func New(
 		derivedChainData:         derivedChainData,
 		scriptLogThreshold:       params.ScriptLogThreshold,
 		scriptExecutionTimeLimit: params.ScriptExecutionTimeLimit,
-		rngLock:                  &sync.Mutex{},
-		rng:                      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -171,9 +166,10 @@ func (e *Manager) ExecuteScript(
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
 	if e.log.Debug().Enabled() {
-		e.rngLock.Lock()
-		trackerID := e.rng.Uint32()
-		e.rngLock.Unlock()
+		trackerID, err := rand.Uint32()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate tracker id: %w", err)
+		}
 
 		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
 		trackedLogger.Debug().Msg("script is sent for execution")

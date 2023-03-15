@@ -3,9 +3,8 @@ package state_stream
 import (
 	"bytes"
 	"context"
-	"math/rand"
+	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -35,7 +34,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
+
 	suite.headers = storagemock.NewHeaders(suite.T())
 	suite.seals = storagemock.NewSeals(suite.T())
 	suite.results = storagemock.NewExecutionResults(suite.T())

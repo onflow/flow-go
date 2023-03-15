@@ -937,6 +937,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			if builder.HeroCacheMetricsEnable {
 				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
 			}
+
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				heroCacheCollector)

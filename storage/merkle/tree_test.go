@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	crand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +64,7 @@ func TestEmptyTreeHash(t *testing.T) {
 
 		// generate random key-value pair
 		key := make([]byte, keyLength)
-		rand.Read(key)
+		crand.Read(key)
 		val := []byte{1}
 
 		// add key-value pair: hash should be non-empty
@@ -239,7 +239,7 @@ func Test_KeyLengthChecked(t *testing.T) {
 // of a _single_ key-value pair to an otherwise empty tree.
 func TestTreeSingle(t *testing.T) {
 	// initialize the random generator, tree and zero hash
-	rand.Seed(time.Now().UnixNano())
+
 	keyLength := 32
 	tree, err := NewTree(keyLength)
 	assert.NoError(t, err)
@@ -275,7 +275,7 @@ func TestTreeSingle(t *testing.T) {
 // Key-value pairs are added and deleted in the same order.
 func TestTreeBatch(t *testing.T) {
 	// initialize random generator, tree, zero hash
-	rand.Seed(time.Now().UnixNano())
+
 	keyLength := 32
 	tree, err := NewTree(keyLength)
 	assert.NoError(t, err)
@@ -321,7 +321,7 @@ func TestTreeBatch(t *testing.T) {
 // in which the elements were added.
 func TestRandomOrder(t *testing.T) {
 	// initialize random generator, two trees and zero hash
-	rand.Seed(time.Now().UnixNano())
+
 	keyLength := 32
 	tree1, err := NewTree(keyLength)
 	assert.NoError(t, err)
@@ -382,8 +382,8 @@ func BenchmarkTree(b *testing.B) {
 func randomKeyValuePair(keySize, valueSize int) ([]byte, []byte) {
 	key := make([]byte, keySize)
 	val := make([]byte, valueSize)
-	_, _ = rand.Read(key)
-	_, _ = rand.Read(val)
+	_, _ = crand.Read(key)
+	_, _ = crand.Read(val)
 	return key, val
 }
 

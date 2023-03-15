@@ -46,14 +46,16 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 	limit := uint(50_000)
 
+	cache := herocache.NewCache(
+		uint32(limit),
+		8,
+		heropool.LRUEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector())
+
 	backData := stdmap.NewBackend(
 		stdmap.WithBackData(
-			herocache.NewCache(
-				uint32(limit),
-				8,
-				heropool.LRUEjection,
-				unittest.Logger(),
-				metrics.NewNoopCollector())),
+			cache),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))

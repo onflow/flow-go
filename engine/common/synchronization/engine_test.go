@@ -59,7 +59,6 @@ type SyncSuite struct {
 
 func (ss *SyncSuite) SetupTest() {
 	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
 
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))

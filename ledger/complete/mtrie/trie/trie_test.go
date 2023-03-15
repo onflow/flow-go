@@ -5,10 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"math"
-	"math/rand"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
@@ -354,9 +352,7 @@ func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger
 }
 
 func TestSplitByPath(t *testing.T) {
-	seed := time.Now().UnixNano()
-	t.Logf("rand seed is %d", seed)
-	rand.Seed(seed)
+	rand := unittest.GetPRG(t)
 
 	const pathsNumber = 100
 	const redundantPaths = 10
@@ -490,6 +486,7 @@ func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
 }
 
 func Test_Pruning(t *testing.T) {
+	rand := unittest.GetPRG(t)
 	emptyTrie := trie.NewEmptyMTrie()
 
 	path1 := testutils.PathByUint16(1 << 12)       // 000100...

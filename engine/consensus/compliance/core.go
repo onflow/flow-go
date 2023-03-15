@@ -242,7 +242,10 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// good moment to potentially kick-off a garbage collection of the DB
 	// NOTE: this is only effectively run every 1000th calls, which corresponds
 	// to every 1000th successfully processed block
-	c.cleaner.RunGC()
+	err = c.cleaner.RunGC()
+	if err != nil {
+		return fmt.Errorf("run GC failed: %w", err)
+	}
 
 	return nil
 }

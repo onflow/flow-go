@@ -96,8 +96,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	_, err := rand.Read(seed)
 	require.NoError(t, err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
@@ -1386,8 +1385,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	_, err = rand.Read(seed)
 	require.NoError(t, err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)

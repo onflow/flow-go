@@ -1,8 +1,8 @@
 package fvm_test
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/onflow/cadence"

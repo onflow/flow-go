@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/hex"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -60,8 +59,6 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 
-	rootBlockCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
-
 	// optional parameters to influence various aspects of identity generation
 	rootBlockCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
 }
@@ -77,14 +74,6 @@ func rootBlock(cmd *cobra.Command, args []string) {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
 	}
-
-	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
-		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
-		return
-	}
-
-	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
-	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()

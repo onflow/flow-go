@@ -3,5 +3,5 @@
 package storage
 
 type Cleaner interface {
-	RunGC()
+	RunGC() error
 }

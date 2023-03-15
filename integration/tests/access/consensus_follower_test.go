@@ -177,8 +177,8 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 // TODO: Move this to unittest and resolve the circular dependency issue
 func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
-	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSASecp256k1 {
+	_, err := rand.Read(seed)
+	if err != nil {
 		return nil, err
 	}
 	return utils.GeneratePublicNetworkingKey(unittest.SeedFixture(n))

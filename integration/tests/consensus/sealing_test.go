@@ -67,7 +67,6 @@ func (ss *SealingSuite) SetupTest() {
 	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// to collect node confiss...
 	var nodeConfigs []testnet.NodeConfig

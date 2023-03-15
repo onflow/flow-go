@@ -19,14 +19,18 @@ type HeroQueue struct {
 	sizeLimit uint
 }
 
-func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *HeroQueue {
+func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
+) *HeroQueue {
+
+	cache := herocache.NewCache(
+		sizeLimit,
+		herocache.DefaultOversizeFactor,
+		heropool.NoEjection,
+		logger.With().Str("mempool", "hero-queue").Logger(),
+		collector)
+
 	return &HeroQueue{
-		cache: herocache.NewCache(
-			sizeLimit,
-			herocache.DefaultOversizeFactor,
-			heropool.NoEjection,
-			logger.With().Str("mempool", "hero-queue").Logger(),
-			collector),
+		cache:     cache,
 		sizeLimit: uint(sizeLimit),
 	}
 }

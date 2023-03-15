@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"reflect"
 
 	"github.com/ipfs/go-cid"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const IdentifierLen = 32
@@ -179,21 +179,24 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	return sum == computed
 }
 
-// Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
-func Sample(size uint, ids ...Identifier) []Identifier {
+// Sample returns non-deterministic random sample of length 'size' of the ids
+func Sample(size uint, ids ...Identifier) ([]Identifier, error) {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)
 	dup = append(dup, ids...)
 	// if sample size is greater than total size, return all the elements
 	if n <= size {
-		return dup
+		return dup, nil
 	}
-	for i := uint(0); i < size; i++ {
-		j := uint(rand.Intn(int(n - i)))
-		dup[i], dup[j+i] = dup[j+i], dup[i]
+	swap := func(i, j uint) {
+		dup[i], dup[j] = dup[j], dup[i]
 	}
-	return dup[:size]
+
+	err := rand.Samples(n, size, swap)
+	if err != nil {
+		return nil, fmt.Errorf("generating randoms failed: %w", err)
+	}
+	return dup[:size], nil
 }
 
 func CidToId(c cid.Cid) (Identifier, error) {

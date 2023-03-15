@@ -348,7 +348,10 @@ func (e *Engine) processBlockProposal(originID flow.Identifier, proposal *messag
 	// good moment to potentially kick-off a garbage collection of the DB
 	// NOTE: this is only effectively run every 1000th calls, which corresponds
 	// to every 1000th successfully processed block
-	e.cleaner.RunGC()
+	err = e.cleaner.RunGC()
+	if err != nil {
+		return fmt.Errorf("run GC failed: %w", err)
+	}
 
 	return nil
 }

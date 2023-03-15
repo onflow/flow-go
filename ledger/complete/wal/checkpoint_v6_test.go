@@ -3,10 +3,10 @@ package wal
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"

@@ -69,7 +69,7 @@ func (s *Suite) SetupTest() {
 	s.me.On("NodeID").Return(nodeID).Maybe()
 
 	s.net.On("Register", mock.Anything, mock.Anything).Return(s.con, nil)
-	s.cleaner.On("RunGC").Return().Maybe()
+	s.cleaner.On("RunGC").Return(nil).Maybe()
 	s.state.On("Final").Return(s.snapshot).Maybe()
 	s.cache.On("PruneByView", mock.Anything).Return().Maybe()
 	s.cache.On("Size", mock.Anything).Return(uint(0)).Maybe()

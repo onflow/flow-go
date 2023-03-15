@@ -376,7 +376,7 @@ func TestRandomProofs(t *testing.T) {
 
 			// generate some random paths and payloads
 			seed := time.Now().UnixNano()
-			rand.Seed(seed)
+
 			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
 			paths := testutils.RandomPaths(numberOfPaths)

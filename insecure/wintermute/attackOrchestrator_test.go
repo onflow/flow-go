@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -557,7 +558,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
 	miscellaneousEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptedIds[rand.Uint64n(len(corruptedIds))],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -631,7 +632,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
 	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptedIds[rand.Uint64n(len(corruptedIds))],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -703,7 +704,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 
 	// generates a result approval event for one of the chunks of the original result.
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId: corruptedIds.Sample(1)[0],
+		CorruptOriginId: corruptedIds[rand.Uint64n(len(corruptedIds))],
 		Channel:         channels.TestNetworkChannel,
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,

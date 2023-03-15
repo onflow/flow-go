@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
@@ -143,8 +143,11 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 		if retries > 0 {
 			// choose a random interval between 0 to 5
 			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
-			r := rand.Intn(MaxConnectAttemptSleepDuration)
-			time.Sleep(time.Duration(r) * time.Millisecond)
+			r, err := rand.Uintn(uint(MaxConnectAttemptSleepDuration))
+			if err != nil {
+				return s, dialAddr, fmt.Errorf("failed to generate randomness: %w", err)
+			}
+			time.Sleep(time.Duration(int64(r)) * time.Millisecond)
 		}
 
 		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})

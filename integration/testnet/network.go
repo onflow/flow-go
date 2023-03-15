@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -1336,7 +1337,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err = rand.Read(randomSource)
+	_, err = crand.Read(randomSource)
 	if err != nil {
 		return nil, err
 	}

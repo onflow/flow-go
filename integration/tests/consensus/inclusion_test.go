@@ -47,7 +47,6 @@ func (is *InclusionSuite) SetupTest() {
 	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// to collect node confiis...
 	var nodeConfigs []testnet.NodeConfig

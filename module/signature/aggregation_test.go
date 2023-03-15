@@ -4,7 +4,6 @@
 package signature
 
 import (
-	"crypto/rand"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -16,7 +15,14 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
+func getPRG(t *testing.T) *mrand.Rand {
+	random := time.Now().UnixNano()
+	t.Logf("rng seed is %d", random)
+	rng := mrand.New(mrand.NewSource(random))
+	return rng
+}
+
+func createAggregationData(t *testing.T, rand *mrand.Rand, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
 	// create message and tag
 	msgLen := 100
 	msg := make([]byte, msgLen)
@@ -43,7 +49,7 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 }
 
 func TestAggregatorSameMessage(t *testing.T) {
-
+	rand := getPRG(t)
 	signersNum := 20
 
 	// constructor edge cases
@@ -67,7 +73,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Happy paths
 	t.Run("happy path", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs := createAggregationData(t, rand, signersNum)
 		// only add half of the signatures
 		subSet := signersNum / 2
 		for i, sig := range sigs[subSet:] {
@@ -127,7 +133,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs := createAggregationData(t, rand, signersNum)
 		// loop through invalid inputs
 		for _, index := range []int{-1, signersNum} {
 			ok, err := aggregator.Verify(index, sigs[0])
@@ -156,7 +162,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
+		aggregator, sigs := createAggregationData(t, rand, signersNum)
 		for i, sig := range sigs {
 			err := aggregator.TrustedAdd(i, sig)
 			require.NoError(t, err)
@@ -182,12 +188,12 @@ func TestAggregatorSameMessage(t *testing.T) {
 	//  2. The signature was deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key. In
 	//     this case, the aggregation step succeeds. But the post-check fails.
 	t.Run("invalid signature", func(t *testing.T) {
-		_, s := createAggregationData(t, 1)
+		_, s := createAggregationData(t, rand, 1)
 		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
 		mismatchingSig := s[0]
 
 		for _, invalidSig := range []crypto.Signature{invalidStructureSig, mismatchingSig} {
-			aggregator, sigs := createAggregationData(t, signersNum)
+			aggregator, sigs := createAggregationData(t, rand, signersNum)
 			ok, err := aggregator.VerifyAndAdd(0, sigs[0]) // first, add a valid signature
 			require.NoError(t, err)
 			assert.True(t, ok)
@@ -221,9 +227,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 }
 
 func TestKeyAggregator(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 
 	signersNum := 20
 	// create keys
@@ -305,8 +309,8 @@ func TestKeyAggregator(t *testing.T) {
 		rounds := 30
 		for i := 0; i < rounds; i++ {
 			go func() { // test module concurrency
-				low := mrand.Intn(signersNum - 1)
-				high := low + 1 + mrand.Intn(signersNum-1-low)
+				low := rand.Intn(signersNum - 1)
+				high := low + 1 + rand.Intn(signersNum-1-low)
 				var key, expectedKey crypto.PublicKey
 				var err error
 				key, err = aggregator.KeyAggregate(indices[low:high])

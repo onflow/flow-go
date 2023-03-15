@@ -5,7 +5,6 @@ import (
 	"math/bits"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,7 +136,6 @@ const invalidCodeWord = uint64(0xab2ae42382900010)
 
 func testAddressGeneration(t *testing.T) {
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
 	const loop = 50
@@ -230,7 +228,6 @@ func testAddressGeneration(t *testing.T) {
 
 func testAddressesIntersection(t *testing.T) {
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
 	const loop = 25
@@ -299,7 +296,6 @@ func testAddressesIntersection(t *testing.T) {
 
 func testIndexFromAddress(t *testing.T) {
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
 	const loop = 50
@@ -340,7 +336,6 @@ func testIndexFromAddress(t *testing.T) {
 
 func TestUint48(t *testing.T) {
 	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	const loop = 50
 	// test consistensy of putUint48 and uint48

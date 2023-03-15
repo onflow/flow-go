@@ -3,7 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
-	mrand "math/rand"
+
 	"sync"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
@@ -85,7 +86,10 @@ func (pm *PeerManager) updateLoop(ctx irrecoverable.SignalerContext) {
 func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
 	// add a random delay to initial launch to avoid synchronizing this
 	// potentially expensive operation across the network
-	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	r, _ := rand.Uint64n(uint64(pm.peerUpdateInterval.Nanoseconds()))
+	// ignore the error here, if randomness fails `r` would be zero and there will be no delay
+	// for the current node
+	delay := time.Duration(r)
 
 	ticker := time.NewTicker(pm.peerUpdateInterval)
 	defer ticker.Stop()

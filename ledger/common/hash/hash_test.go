@@ -1,9 +1,8 @@
 package hash_test
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"testing"
-	"time"
 
 	"golang.org/x/crypto/sha3"
 
@@ -15,10 +14,6 @@ import (
 )
 
 func TestHash(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-
 	t.Run("lengthSanity", func(t *testing.T) {
 		assert.Equal(t, 32, hash.HashLen)
 	})

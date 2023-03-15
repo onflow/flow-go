@@ -3,13 +3,13 @@
 package badger
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 type Cleaner struct {
@@ -18,13 +18,13 @@ type Cleaner struct {
 	metrics module.CleanerMetrics
 	enabled bool
 	ratio   float64
-	freq    int
-	calls   int
+	freq    uint
+	calls   uint
 }
 
 // NewCleaner returns a cleaner that runs the badger value log garbage collection once every `frequency` calls
 // if a frequency of zero is passed in, we will not run the GC at all
-func NewCleaner(log zerolog.Logger, db *badger.DB, metrics module.CleanerMetrics, frequency int) *Cleaner {
+func NewCleaner(log zerolog.Logger, db *badger.DB, metrics module.CleanerMetrics, frequency uint) *Cleaner {
 	// NOTE: we run garbage collection frequently at points in our business
 	// logic where we are likely to have a small breather in activity; it thus
 	// makes sense to run garbage collection often, with a smaller ratio, rather
@@ -40,24 +40,33 @@ func NewCleaner(log zerolog.Logger, db *badger.DB, metrics module.CleanerMetrics
 	// we don't want the entire network to run GC at the same time, so
 	// distribute evenly over time
 	if c.enabled {
-		c.calls = rand.Intn(c.freq)
+		var err error
+		c.calls, err = rand.Uintn(c.freq)
+		if err != nil {
+			// if true randomess in the node is broken, set `calls` to zero.
+			c.calls = 0
+		}
 	}
 	return c
 }
 
-func (c *Cleaner) RunGC() {
+func (c *Cleaner) RunGC() error {
 	if !c.enabled {
-		return
+		return nil
 	}
 	// only actually run approximately every frequency number of calls
 	c.calls++
 	if c.calls < c.freq {
-		return
+		return nil
 	}
 
 	// we add 20% jitter into the interval, so that we don't risk nodes syncing
 	// up on their GC calls over time
-	c.calls = rand.Intn(c.freq / 5)
+	var err error
+	c.calls, err = rand.Uintn(c.freq / 5)
+	if err != nil {
+		return err
+	}
 
 	// run the garbage collection in own goroutine and handle sentinel errors
 	go func() {
@@ -84,4 +93,5 @@ func (c *Cleaner) RunGC() {
 			Msg("garbage collection on value log executed")
 		c.metrics.RanGC(runtime)
 	}()
+	return nil
 }

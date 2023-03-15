@@ -2,9 +2,7 @@ package compliance
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -82,7 +80,6 @@ type CommonSuite struct {
 
 func (cs *CommonSuite) SetupTest() {
 	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
 
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
@@ -113,7 +110,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up storage cleaner
 	cs.cleaner = &storage.Cleaner{}
-	cs.cleaner.On("RunGC").Return()
+	cs.cleaner.On("RunGC").Return(nil)
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}

@@ -285,7 +285,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		defer cancel()
 
 		// replace one ID with a block ID for which the storage returns a not found error
-		rand.Seed(time.Now().Unix())
 		invalidBlockIndex := rand.Intn(len(testBlocks))
 		invalidID := unittest.IdentifierFixture()
 		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()

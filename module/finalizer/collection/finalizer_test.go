@@ -1,9 +1,7 @@
 package collection_test
 
 import (
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +25,6 @@ func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// seed the RNG
-		rand.Seed(time.Now().UnixNano())
 
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()

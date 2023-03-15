@@ -1,6 +1,8 @@
 package verification
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -23,10 +25,14 @@ type ChunkDataPackRequestInfo struct {
 
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agreeing and disagreeing execution nodes of the chunk data pack request.
-func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
+func (c ChunkDataPackRequestInfo) SampleTargets(count int) (flow.IdentifierList, error) {
 	// if there are enough receipts produced the same result (agrees), we sample from them.
 	if len(c.Agrees) >= count {
-		return c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count)).NodeIDs()
+		sample, err := c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count))
+		if err != nil {
+			return nil, fmt.Errorf("sampling target failed: %w", err)
+		}
+		return sample.NodeIDs(), nil
 	}
 
 	// since there is at least one agree, then usually, we just need `count - 1` extra nodes as backup.
@@ -35,8 +41,11 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
 	// fetch from the one produced the same result (the only agree)
 	need := uint(count - len(c.Agrees))
 
-	nonResponders := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need).NodeIDs()
-	return append(c.Agrees, nonResponders...)
+	nonResponders, err := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need)
+	if err != nil {
+		return nil, fmt.Errorf("sampling target failed: %w", err)
+	}
+	return append(c.Agrees, nonResponders.NodeIDs()...), nil
 }
 
 type ChunkDataPackRequestInfoList []*ChunkDataPackRequestInfo

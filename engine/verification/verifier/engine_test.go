@@ -78,8 +78,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	//
 	// generates signing and verification keys
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	_, err := rand.Read(seed)
 	require.NoError(suite.T(), err)
 
 	// creates private key of verification node

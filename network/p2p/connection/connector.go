@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	mrand "math/rand"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -165,11 +166,17 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 // defaultLibp2pBackoffConnector creates a default libp2p backoff connector similar to the one created by libp2p.pubsub
 // (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
 func defaultLibp2pBackoffConnector(host host.Host) (*discoveryBackoff.BackoffConnector, error) {
-	rngSrc := rand.NewSource(rand.Int63())
+	r, err := rand.Uint64()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backoff connector: %w", err)
+	}
+	// math/rand is used as // NewExponentialBackoff is based on a math/rand parameter which is used as a jitter  is based on a math/rand parameter.
+	// the random source is used as a jitter in NewExponentialBackoff
+	rng := mrand.New(mrand.NewSource(int64(r)))
 	minBackoff, maxBackoff := time.Second*10, time.Hour
 	cacheSize := 100
 	dialTimeout := time.Minute * 2
-	backoff := discoveryBackoff.NewExponentialBackoff(minBackoff, maxBackoff, discoveryBackoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
+	backoff := discoveryBackoff.NewExponentialBackoff(minBackoff, maxBackoff, discoveryBackoff.FullJitter, time.Second, 5.0, 0, rng)
 	backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backoff connector: %w", err)

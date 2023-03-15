@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -151,7 +152,7 @@ func RandomPaths(n int) []l.Path {
 	i := 0
 	for i < n {
 		var path l.Path
-		rand.Read(path[:])
+		crand.Read(path[:])
 		// deduplicate
 		if _, found := alreadySelectPaths[path]; !found {
 			paths = append(paths, path)
@@ -166,11 +167,11 @@ func RandomPaths(n int) []l.Path {
 func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
-	rand.Read(keydata)
+	crand.Read(keydata)
 	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
-	rand.Read(valuedata)
+	crand.Read(valuedata)
 	value := l.Value(valuedata)
 	return l.NewPayload(key, value)
 }
@@ -196,7 +197,7 @@ func RandomValues(n int, minByteSize, maxByteSize int) []l.Value {
 			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 		}
 		value := make([]byte, byteSize)
-		rand.Read(value)
+		crand.Read(value)
 		values = append(values, value)
 	}
 	return values
@@ -218,7 +219,7 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 				byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 			}
 			keyPartData := make([]byte, byteSize)
-			rand.Read(keyPartData)
+			crand.Read(keyPartData)
 			keyParts = append(keyParts, l.NewKeyPart(uint16(j), keyPartData))
 		}
 		key := l.NewKey(keyParts)

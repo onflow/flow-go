@@ -1,8 +1,8 @@
 package relay_test
 
 import (
+	"encoding/hex"
 	"fmt"
-	"math/rand"
 
 	"github.com/rs/zerolog"
 
@@ -21,10 +21,10 @@ func Example() {
 	logger := zerolog.Nop()
 	splitterNet := splitterNetwork.NewNetwork(net, logger)
 
-	// generate a random origin ID
+	// generate an origin ID
 	var id flow.Identifier
-	rand.Seed(0)
-	rand.Read(id[:])
+	bytes, _ := hex.DecodeString("0194fdc2fa2ffcc041d3ff12045b73c86e4ff95ff662a5eee82abdf44a2d0b75")
+	copy(id[:], bytes)
 
 	// create engines
 	engineProcessFunc := func(engineName string) testnet.EngineProcessFunc {

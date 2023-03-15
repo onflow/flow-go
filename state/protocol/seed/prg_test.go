@@ -1,26 +1,23 @@
 package seed
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func getRandomSource(t *testing.T) []byte {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+func getSeed(t *testing.T) []byte {
 	seed := make([]byte, RandomSourceLength)
-	rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	return seed
 }
 
 // check PRGs created from the same source give the same outputs
 func TestDeterministic(t *testing.T) {
-	seed := getRandomSource(t)
+	seed := getSeed(t)
 	customizer := []byte("test")
 	prg1, err := PRGFromRandomSource(seed, customizer)
 	require.NoError(t, err)
@@ -36,7 +33,7 @@ func TestDeterministic(t *testing.T) {
 }
 
 func TestCustomizer(t *testing.T) {
-	seed := getRandomSource(t)
+	seed := getSeed(t)
 	customizer1 := []byte("test1")
 	prg1, err := PRGFromRandomSource(seed, customizer1)
 	require.NoError(t, err)

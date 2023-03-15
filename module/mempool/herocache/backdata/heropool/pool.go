@@ -1,9 +1,8 @@
 package heropool
 
 import (
-	"math/rand"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 type EjectionMode string
@@ -94,8 +93,10 @@ func (p *Pool) initFreeEntities() {
 // If the pool has an available slot (either empty or by ejection), then the second boolean returned value (ejectionOccurred)
 // determines whether an ejection happened to make one slot free or not. Ejection happens if there is no available
 // slot, and there is an ejection mode set.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (i EIndex, slotAvailable bool, ejectionOccurred bool) {
-	entityIndex, slotAvailable, ejectionHappened := p.sliceIndexForEntity()
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
+	entityIndex EIndex, slotAvailable bool, ejectionOccurred bool) {
+	entityIndex, slotAvailable, ejectionOccurred = p.sliceIndexForEntity()
+
 	if slotAvailable {
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
@@ -120,7 +121,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.size++
 	}
 
-	return entityIndex, slotAvailable, ejectionHappened
+	return entityIndex, slotAvailable, ejectionOccurred
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
@@ -160,7 +161,7 @@ func (p Pool) Head() (flow.Entity, bool) {
 // If the pool has an available slot (either empty or by ejection), then the second boolean returned value
 // (ejectionOccurred) determines whether an ejection happened to make one slot free or not.
 // Ejection happens if there is no available slot, and there is an ejection mode set.
-func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectionOccurred bool) {
+func (p *Pool) sliceIndexForEntity() (EIndex, bool, bool) {
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
@@ -174,7 +175,13 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectionO
 			return p.claimFreeHead(), true, true
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
-			randomIndex := EIndex(rand.Uint32() % p.size)
+			random, err := rand.Uint32n(p.size)
+			if err != nil {
+				// TODO: to check with Yahya
+				// randomness failed and no ejection has happened
+				return 0, false, false
+			}
+			randomIndex := EIndex(random)
 			p.invalidateEntityAtIndex(randomIndex)
 			return p.claimFreeHead(), true, true
 		}
