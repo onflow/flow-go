@@ -143,8 +143,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           trace.NewNoopTracer(),
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
@@ -256,8 +254,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           trace.NewNoopTracer(),
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
