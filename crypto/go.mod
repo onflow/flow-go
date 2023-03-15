@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1
+	github.com/cloudflare/bn256 v0.0.0-20220804214613-39fbc7d184f0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.8.0
 	github.com/supranational/blst v0.3.10
