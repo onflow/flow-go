@@ -13,17 +13,17 @@ type AccountCreator struct {
 	mock.Mock
 }
 
-// CreateAccount provides a mock function with given fields: payer
-func (_m *AccountCreator) CreateAccount(payer common.Address) (common.Address, error) {
-	ret := _m.Called(payer)
+// CreateAccount provides a mock function with given fields: runtimePayer
+func (_m *AccountCreator) CreateAccount(runtimePayer common.Address) (common.Address, error) {
+	ret := _m.Called(runtimePayer)
 
 	var r0 common.Address
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (common.Address, error)); ok {
-		return rf(payer)
+		return rf(runtimePayer)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) common.Address); ok {
-		r0 = rf(payer)
+		r0 = rf(runtimePayer)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(common.Address)
@@ -31,7 +31,7 @@ func (_m *AccountCreator) CreateAccount(payer common.Address) (common.Address, e
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(payer)
+		r1 = rf(runtimePayer)
 	} else {
 		r1 = ret.Error(1)
 	}

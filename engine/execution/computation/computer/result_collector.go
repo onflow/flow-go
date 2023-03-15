@@ -6,14 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,10 +36,9 @@ type ViewCommitter interface {
 	)
 }
 
-type collectionResult struct {
-	collectionItem
-	startTime time.Time
-	state.View
+type transactionResult struct {
+	transaction
+	state.ExecutionSnapshot
 }
 
 type resultCollector struct {
@@ -50,20 +47,16 @@ type resultCollector struct {
 
 	metrics module.ExecutionMetrics
 
-	closeOnce sync.Once
+	closeOnce          sync.Once
+	processorInputChan chan transactionResult
+	processorDoneChan  chan struct{}
+	processorError     error
 
-	committer          ViewCommitter
-	committerInputChan chan collectionResult
-	committerDoneChan  chan struct{}
-	committerError     error
+	committer ViewCommitter
 
 	signer        module.Local
 	spockHasher   hash.Hasher
 	receiptHasher hash.Hasher
-
-	snapshotHasherInputChan chan collectionResult
-	snapshotHasherDoneChan  chan struct{}
-	snapshotHasherError     error
 
 	executionDataProvider *provider.Provider
 
@@ -74,6 +67,9 @@ type resultCollector struct {
 	chunks                 []*flow.Chunk
 	spockSignatures        []crypto.Signature
 	convertedServiceEvents flow.ServiceEventList
+
+	currentCollectionStartTime time.Time
+	currentCollectionView      *delta.View
 }
 
 func newResultCollector(
@@ -87,158 +83,149 @@ func newResultCollector(
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	numCollections int,
+	numTransactions int,
 ) *resultCollector {
+	numCollections := len(block.Collections()) + 1
 	collector := &resultCollector{
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
 		metrics:                      metrics,
+		processorInputChan:           make(chan transactionResult, numTransactions),
+		processorDoneChan:            make(chan struct{}),
 		committer:                    committer,
-		committerInputChan:           make(chan collectionResult, numCollections),
-		committerDoneChan:            make(chan struct{}),
 		signer:                       signer,
 		spockHasher:                  spockHasher,
 		receiptHasher:                receiptHasher,
-		snapshotHasherInputChan:      make(chan collectionResult, numCollections),
-		snapshotHasherDoneChan:       make(chan struct{}),
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
 		chunks:                       make([]*flow.Chunk, 0, numCollections),
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
+		currentCollectionStartTime:   time.Now(),
+		currentCollectionView:        delta.NewDeltaView(nil),
 	}
 
-	go collector.runCollectionCommitter()
-	go collector.runSnapshotHasher()
+	go collector.runResultProcessor()
 
 	return collector
 }
 
-func (collector *resultCollector) runCollectionCommitter() {
-	defer close(collector.committerDoneChan)
+func (collector *resultCollector) commitCollection(
+	collection collectionInfo,
+	startTime time.Time,
+	// TODO(patrick): switch to ExecutionSnapshot
+	collectionExecutionSnapshot state.View,
+) error {
+	defer collector.tracer.StartSpanFromParent(
+		collector.blockSpan,
+		trace.EXECommitDelta).End()
 
-	for collection := range collector.committerInputChan {
-		span := collector.tracer.StartSpanFromParent(
-			collector.blockSpan,
-			trace.EXECommitDelta)
+	startState := collector.result.EndState
+	endState, proof, trieUpdate, err := collector.committer.CommitView(
+		collectionExecutionSnapshot,
+		startState)
+	if err != nil {
+		return fmt.Errorf("commit view failed: %w", err)
+	}
 
-		startState := collector.result.EndState
-		endState, proof, trieUpdate, err := collector.committer.CommitView(
-			collection.View,
-			startState)
-		if err != nil {
-			collector.committerError = fmt.Errorf(
-				"commit view failed: %w",
-				err)
-			return
-		}
+	collector.result.StateCommitments = append(
+		collector.result.StateCommitments,
+		endState)
 
-		collector.result.StateCommitments = append(
-			collector.result.StateCommitments,
-			endState)
+	eventsHash, err := flow.EventsMerkleRootHash(
+		collector.result.Events[collection.collectionIndex])
+	if err != nil {
+		return fmt.Errorf("hash events failed: %w", err)
+	}
 
-		eventsHash, err := flow.EventsMerkleRootHash(
-			collector.result.Events[collection.collectionIndex])
-		if err != nil {
-			collector.committerError = fmt.Errorf(
-				"hash events failed: %w",
-				err)
-			return
-		}
+	collector.result.EventsHashes = append(
+		collector.result.EventsHashes,
+		eventsHash)
 
-		collector.result.EventsHashes = append(
-			collector.result.EventsHashes,
-			eventsHash)
+	chunk := flow.NewChunk(
+		collection.blockId,
+		collection.collectionIndex,
+		startState,
+		len(collection.Transactions),
+		eventsHash,
+		endState)
+	collector.chunks = append(collector.chunks, chunk)
 
-		chunk := flow.NewChunk(
-			collection.blockId,
-			collection.collectionIndex,
+	collectionStruct := collection.Collection()
+
+	// Note: There's some inconsistency in how chunk execution data and
+	// chunk data pack populate their collection fields when the collection
+	// is the system collection.
+	executionCollection := &collectionStruct
+	dataPackCollection := executionCollection
+	if collection.isSystemTransaction {
+		dataPackCollection = nil
+	}
+
+	collector.result.ChunkDataPacks = append(
+		collector.result.ChunkDataPacks,
+		flow.NewChunkDataPack(
+			chunk.ID(),
 			startState,
-			len(collection.transactions),
-			eventsHash,
-			endState)
-		collector.chunks = append(collector.chunks, chunk)
+			proof,
+			dataPackCollection))
 
-		collectionStruct := collection.Collection()
+	collector.result.ChunkExecutionDatas = append(
+		collector.result.ChunkExecutionDatas,
+		&execution_data.ChunkExecutionData{
+			Collection: executionCollection,
+			Events:     collector.result.Events[collection.collectionIndex],
+			TrieUpdate: trieUpdate,
+		})
 
-		// Note: There's some inconsistency in how chunk execution data and
-		// chunk data pack populate their collection fields when the collection
-		// is the system collection.
-		executionCollection := &collectionStruct
-		dataPackCollection := executionCollection
-		if collection.isSystemCollection {
-			dataPackCollection = nil
-		}
+	collector.metrics.ExecutionChunkDataPackGenerated(
+		len(proof),
+		len(collection.Transactions))
 
-		collector.result.ChunkDataPacks = append(
-			collector.result.ChunkDataPacks,
-			flow.NewChunkDataPack(
-				chunk.ID(),
-				startState,
-				proof,
-				dataPackCollection))
+	collector.result.EndState = endState
 
-		collector.result.ChunkExecutionDatas = append(
-			collector.result.ChunkExecutionDatas,
-			&execution_data.ChunkExecutionData{
-				Collection: executionCollection,
-				Events:     collector.result.Events[collection.collectionIndex],
-				TrieUpdate: trieUpdate,
-			})
-
-		collector.metrics.ExecutionChunkDataPackGenerated(
-			len(proof),
-			len(collection.transactions))
-
-		collector.result.EndState = endState
-
-		span.End()
-	}
+	return nil
 }
 
-func (collector *resultCollector) runSnapshotHasher() {
-	defer close(collector.snapshotHasherDoneChan)
+func (collector *resultCollector) hashCollection(
+	collection collectionInfo,
+	startTime time.Time,
+	collectionExecutionSnapshot state.ExecutionSnapshot,
+) error {
+	collector.result.TransactionResultIndex = append(
+		collector.result.TransactionResultIndex,
+		len(collector.result.TransactionResults))
+	collector.result.StateSnapshots = append(
+		collector.result.StateSnapshots,
+		collectionExecutionSnapshot)
 
-	for collection := range collector.snapshotHasherInputChan {
+	collector.metrics.ExecutionCollectionExecuted(
+		time.Since(startTime),
+		collector.result.CollectionStats(collection.collectionIndex))
 
-		snapshot := collection.View.(*delta.View).Interactions()
-
-		collector.result.TransactionResultIndex = append(
-			collector.result.TransactionResultIndex,
-			len(collector.result.TransactionResults))
-		collector.result.StateSnapshots = append(
-			collector.result.StateSnapshots,
-			snapshot)
-
-		collector.metrics.ExecutionCollectionExecuted(
-			time.Since(collection.startTime),
-			collector.result.CollectionStats(collection.collectionIndex))
-
-		spock, err := collector.signer.SignFunc(
-			snapshot.SpockSecret,
-			collector.spockHasher,
-			SPOCKProve)
-		if err != nil {
-			collector.snapshotHasherError = fmt.Errorf(
-				"signing spock hash failed: %w",
-				err)
-			return
-		}
-
-		collector.spockSignatures = append(collector.spockSignatures, spock)
+	spock, err := collector.signer.SignFunc(
+		collectionExecutionSnapshot.SpockSecret(),
+		collector.spockHasher,
+		SPOCKProve)
+	if err != nil {
+		return fmt.Errorf("signing spock hash failed: %w", err)
 	}
+
+	collector.spockSignatures = append(collector.spockSignatures, spock)
+
+	return nil
 }
 
-func (collector *resultCollector) AddTransactionResult(
-	collectionIndex int,
-	txn *fvm.TransactionProcedure,
-) {
+func (collector *resultCollector) processTransactionResult(
+	txn transaction,
+	txnExecutionSnapshot state.ExecutionSnapshot,
+) error {
 	collector.convertedServiceEvents = append(
 		collector.convertedServiceEvents,
 		txn.ConvertedServiceEvents...)
 
-	collector.result.Events[collectionIndex] = append(
-		collector.result.Events[collectionIndex],
+	collector.result.Events[txn.collectionIndex] = append(
+		collector.result.Events[txn.collectionIndex],
 		txn.Events...)
 	collector.result.ServiceEvents = append(
 		collector.result.ServiceEvents,
@@ -260,39 +247,72 @@ func (collector *resultCollector) AddTransactionResult(
 	for computationKind, intensity := range txn.ComputationIntensities {
 		collector.result.ComputationIntensities[computationKind] += intensity
 	}
+
+	err := collector.currentCollectionView.Merge(txnExecutionSnapshot)
+	if err != nil {
+		return fmt.Errorf("failed to merge into collection view: %w", err)
+	}
+
+	if !txn.lastTransactionInCollection {
+		return nil
+	}
+
+	err = collector.commitCollection(
+		txn.collectionInfo,
+		collector.currentCollectionStartTime,
+		collector.currentCollectionView)
+	if err != nil {
+		return err
+	}
+
+	err = collector.hashCollection(
+		txn.collectionInfo,
+		collector.currentCollectionStartTime,
+		collector.currentCollectionView)
+	if err != nil {
+		return err
+	}
+
+	collector.currentCollectionStartTime = time.Now()
+	collector.currentCollectionView = delta.NewDeltaView(nil)
+
+	return nil
 }
 
-func (collector *resultCollector) CommitCollection(
-	collection collectionItem,
-	startTime time.Time,
-	collectionView state.View,
+func (collector *resultCollector) AddTransactionResult(
+	txn transaction,
+	snapshot state.ExecutionSnapshot,
 ) {
-
-	result := collectionResult{
-		collectionItem: collection,
-		startTime:      startTime,
-		View:           collectionView,
+	result := transactionResult{
+		transaction:       txn,
+		ExecutionSnapshot: snapshot,
 	}
 
 	select {
-	case collector.committerInputChan <- result:
+	case collector.processorInputChan <- result:
 		// Do nothing
-	case <-collector.committerDoneChan:
-		// Committer exited (probably due to an error)
+	case <-collector.processorDoneChan:
+		// Processor exited (probably due to an error)
 	}
+}
 
-	select {
-	case collector.snapshotHasherInputChan <- result:
-		// do nothing
-	case <-collector.snapshotHasherDoneChan:
-		// Snapshot hasher exited (probably due to an error)
+func (collector *resultCollector) runResultProcessor() {
+	defer close(collector.processorDoneChan)
+
+	for result := range collector.processorInputChan {
+		err := collector.processTransactionResult(
+			result.transaction,
+			result.ExecutionSnapshot)
+		if err != nil {
+			collector.processorError = err
+			return
+		}
 	}
 }
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
-		close(collector.committerInputChan)
-		close(collector.snapshotHasherInputChan)
+		close(collector.processorInputChan)
 	})
 }
 
@@ -304,20 +324,10 @@ func (collector *resultCollector) Finalize(
 ) {
 	collector.Stop()
 
-	<-collector.committerDoneChan
-	<-collector.snapshotHasherDoneChan
+	<-collector.processorDoneChan
 
-	var err error
-	if collector.committerError != nil {
-		err = multierror.Append(err, collector.committerError)
-	}
-
-	if collector.snapshotHasherError != nil {
-		err = multierror.Append(err, collector.snapshotHasherError)
-	}
-
-	if err != nil {
-		return nil, err
+	if collector.processorError != nil {
+		return nil, collector.processorError
 	}
 
 	executionDataID, err := collector.executionDataProvider.Provide(

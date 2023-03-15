@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -100,15 +101,6 @@ type Procedure interface {
 
 	Type() ProcedureType
 
-	// The initial snapshot time is used as part of OCC validation to ensure
-	// there are no read-write conflict amongst transactions.  Note that once
-	// we start supporting parallel preprocessing/execution, a transaction may
-	// operation on mutliple snapshots.
-	//
-	// For scripts, since they can only be executed after the block has been
-	// executed, the initial snapshot time is EndOfBlockExecutionTime.
-	InitialSnapshotTime() derived.LogicalTime
-
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
 	ExecutionTime() derived.LogicalTime
@@ -119,6 +111,16 @@ type Procedure interface {
 
 // VM runs procedures
 type VM interface {
+	RunV2(
+		Context,
+		Procedure,
+		state.StorageSnapshot,
+	) (
+		state.ExecutionSnapshot,
+		ProcedureOutput,
+		error,
+	)
+
 	Run(Context, Procedure, state.View) error
 	GetAccount(Context, flow.Address, state.View) (*flow.Account, error)
 }
@@ -134,11 +136,15 @@ func NewVirtualMachine() *VirtualMachine {
 }
 
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(
+func (vm *VirtualMachine) RunV2(
 	ctx Context,
 	proc Procedure,
-	v state.View,
-) error {
+	storageSnapshot state.StorageSnapshot,
+) (
+	state.ExecutionSnapshot,
+	ProcedureOutput,
+	error,
+) {
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
 		derivedBlockData = derived.NewEmptyDerivedBlockDataWithTransactionOffset(
@@ -150,22 +156,28 @@ func (vm *VirtualMachine) Run(
 	switch proc.Type() {
 	case ScriptProcedureType:
 		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
-			proc.InitialSnapshotTime(),
+			proc.ExecutionTime(),
 			proc.ExecutionTime())
 	case TransactionProcedureType, BootstrapProcedureType:
 		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
-			proc.InitialSnapshotTime(),
+			proc.ExecutionTime(),
 			proc.ExecutionTime())
 	default:
-		return fmt.Errorf("invalid proc type: %v", proc.Type())
+		return nil, ProcedureOutput{}, fmt.Errorf(
+			"invalid proc type: %v",
+			proc.Type())
 	}
 
 	if err != nil {
-		return fmt.Errorf("error creating derived transaction data: %w", err)
+		return nil, ProcedureOutput{}, fmt.Errorf(
+			"error creating derived transaction data: %w",
+			err)
 	}
 
+	// TODO(patrick): initialize view inside TransactionState
+	view := delta.NewDeltaView(storageSnapshot)
 	nestedTxn := state.NewTransactionState(
-		v,
+		view,
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -179,10 +191,8 @@ func (vm *VirtualMachine) Run(
 	executor := proc.NewExecutor(ctx, txnState)
 	err = Run(executor)
 	if err != nil {
-		return err
+		return nil, ProcedureOutput{}, err
 	}
-
-	proc.SetOutput(executor.Output())
 
 	// Note: it is safe to skip committing derived data for non-normal
 	// transactions (i.e., bootstrap and script) since these do not invalidate
@@ -190,9 +200,34 @@ func (vm *VirtualMachine) Run(
 	if proc.Type() == TransactionProcedureType {
 		// NOTE: It is not safe to ignore derivedTxnData' commit error for
 		// transactions that trigger derived data invalidation.
-		return txnState.Commit()
+		err = derivedTxnData.Commit()
+		if err != nil {
+			return nil, ProcedureOutput{}, err
+		}
 	}
 
+	return view, executor.Output(), nil
+}
+
+func (vm *VirtualMachine) Run(
+	ctx Context,
+	proc Procedure,
+	v state.View,
+) error {
+	executionSnapshot, output, err := vm.RunV2(
+		ctx,
+		proc,
+		state.NewPeekerStorageSnapshot(v))
+	if err != nil {
+		return err
+	}
+
+	err = v.Merge(executionSnapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
 	return nil
 }
 
