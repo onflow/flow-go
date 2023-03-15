@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -80,7 +79,6 @@ type Manager struct {
 	vm               fvm.VM
 	blockComputer    computer.BlockComputer
 	queryExecutor    query.Executor
-	colResCons       []result.ExecutedCollectionConsumer
 	derivedChainData *derived.DerivedChainData
 }
 
