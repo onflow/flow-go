@@ -11,7 +11,7 @@ import (
 // TODO(patrick): rm unaccessed fields
 type ComputationResult struct {
 	*entity.ExecutableBlock
-	StateSnapshots         []state.ExecutionSnapshot
+	StateSnapshots         []*state.ExecutionSnapshot
 	Events                 []flow.EventsList
 	EventsHashes           []flow.Identifier
 	ServiceEvents          flow.EventsList
@@ -34,7 +34,7 @@ func NewEmptyComputationResult(
 	numCollections := len(block.CompleteCollections) + 1
 	return &ComputationResult{
 		ExecutableBlock:        block,
-		StateSnapshots:         make([]state.ExecutionSnapshot, 0, numCollections),
+		StateSnapshots:         make([]*state.ExecutionSnapshot, 0, numCollections),
 		Events:                 make([]flow.EventsList, numCollections),
 		EventsHashes:           make([]flow.Identifier, 0, numCollections),
 		ServiceEvents:          make(flow.EventsList, 0),

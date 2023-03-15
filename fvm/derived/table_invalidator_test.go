@@ -22,7 +22,7 @@ func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 func (invalidator *testInvalidator) ShouldInvalidateEntry(
 	key string,
 	value *string,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) bool {
 	invalidator.callCount += 1
 	return invalidator.invalidateAll ||

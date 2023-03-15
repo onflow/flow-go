@@ -78,13 +78,13 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
+	snapshot, err := programs.txnState.CommitParseRestrictedNestedTransaction(
 		address)
 	if err != nil {
 		return err
 	}
 
-	if state.BytesWritten() > 0 {
+	if len(snapshot.WriteSet) > 0 {
 		// This should never happen. Loading a program should not write to the state.
 		// If this happens, it indicates an implementation error.
 		return fmt.Errorf("cannot set program. State was written to during program parsing")
@@ -110,10 +110,13 @@ func (programs *Programs) set(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 
-	programs.txnState.SetProgram(address, &derived.Program{
-		Program:      program,
-		Dependencies: dependencies,
-	}, state)
+	programs.txnState.SetProgram(
+		address,
+		&derived.Program{
+			Program:      program,
+			Dependencies: dependencies,
+		},
+		snapshot)
 	return nil
 }
 
@@ -134,12 +137,12 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.txnState.GetProgram(address)
+	program, snapshot, has := programs.txnState.GetProgram(address)
 	if has {
 		programs.cacheHit()
 
 		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommitNestedTransaction(state)
+		err := programs.txnState.AttachAndCommitNestedTransaction(snapshot)
 		if err != nil {
 			panic(fmt.Sprintf(
 				"merge error while getting program, panic: %s",
