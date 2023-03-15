@@ -95,8 +95,8 @@ func New(
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
 	executionDataProvider *provider.Provider,
-	colResCons []result.ExecutedCollectionConsumer,
 	params ComputationConfig,
+	colResCons []result.ExecutedCollectionConsumer,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
