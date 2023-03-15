@@ -40,6 +40,8 @@ type PendingBlockVertex struct {
 	connectedToFinalized bool
 }
 
+var _ forest.Vertex = (*PendingBlockVertex)(nil)
+
 // NewVertex creates new vertex while performing a sanity check of data correctness.
 func NewVertex(certifiedBlock CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
 	if certifiedBlock.Block.Header.View != certifiedBlock.QC.View {
@@ -59,10 +61,10 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 }
 
 // PendingTree is a mempool holding certified blocks that eventually might be connected to the finalized state.
-// As soon as a valid fork of certified blocks descending from the latest finalized block we pass this information to caller.
-// Internally, the mempool utilizes the LevelledForest.
+// As soon as a valid fork of certified blocks descending from the latest finalized block is observed,
+// we pass this information to caller. Internally, the mempool utilizes the LevelledForest.
 // PendingTree is NOT safe to use in concurrent environment.
-// NOTE: PendingTree relies on notion of `CertifiedBlock` which is a valid block which is certified by corresponding QC.
+// NOTE: PendingTree relies on notion of `CertifiedBlock` which is a valid block accompanied by a certifying QC (proving block validity).
 // This works well for consensus follower as it is designed to work with certified blocks. To use this structure for consensus
 // participant we can abstract out CertifiedBlock or replace it with a generic argument that satisfies some contract(returns View, Height, BlockID).
 // With this change this structure can be used by consensus participant for tracking connection to the finalized state even without
@@ -83,7 +85,7 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // AddBlocks accepts a batch of certified blocks, adds them to the tree of pending blocks and finds blocks connected to the finalized state.
 // This function performs processing of incoming certified blocks, implementation is split into a few different sections
 // but tries to be optimal in terms of performance to avoid doing extra work as much as possible.
-// This function follows next implementation:
+// This function proceeds as follows:
 //  1. Sorts incoming batch by height. Since blocks can be submitted in random order we need to find blocks with
 //     the lowest height since they are candidates for being connected to the finalized state.
 //  2. Filters out blocks that are already finalized.
