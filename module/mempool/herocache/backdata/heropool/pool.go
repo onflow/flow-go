@@ -3,6 +3,7 @@ package heropool
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
+	"github.com/rs/zerolog"
 )
 
 type EjectionMode string
@@ -46,6 +47,7 @@ func (p PoolEntity) Entity() flow.Entity {
 }
 
 type Pool struct {
+	logger       zerolog.Logger
 	size         uint32
 	free         state // keeps track of free slots.
 	used         state // keeps track of allocated slots to cachedEntities.
@@ -53,7 +55,7 @@ type Pool struct {
 	ejectionMode EjectionMode
 }
 
-func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
+func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
 	l := &Pool{
 		free: state{
 			head: poolIndex{index: 0},
@@ -65,6 +67,7 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
 		},
 		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
+		logger:       logger,
 	}
 
 	l.initFreeEntities()
@@ -159,28 +162,34 @@ func (p Pool) Head() (flow.Entity, bool) {
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
 func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity flow.Entity) {
+	lruEject := func() (EIndex, bool, flow.Entity) {
+		// LRU ejection
+		// the used head is the oldest entity, so we turn the used head to a free head here.
+		invalidatedEntity := p.invalidateUsedHead()
+		return p.claimFreeHead(), true, invalidatedEntity
+	}
+
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
 		case NoEjection:
 			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
 			return 0, false, nil
-		case LRUEjection:
-			// LRU ejection
-			// the used head is the oldest entity, so we turn the used head to a free head here.
-			invalidatedEntity := p.invalidateUsedHead()
-			return p.claimFreeHead(), true, invalidatedEntity
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
 			random, err := rand.Uint32n(p.size)
 			if err != nil {
-				// TODO: to check with Yahya
-				// randomness failed and no ejection has happened
-				return 0, false, nil
+				p.logger.Warn().Err(err).
+					Msg("hero pool random ejection failed - falling back to LRU ejection")
+				// fall back to LRU ejection only for this instance
+				return lruEject()
 			}
 			randomIndex := EIndex(random)
 			invalidatedEntity := p.invalidateEntityAtIndex(randomIndex)
 			return p.claimFreeHead(), true, invalidatedEntity
+		case LRUEjection:
+			// LRU ejection
+			return lruEject()
 		}
 	}
 
