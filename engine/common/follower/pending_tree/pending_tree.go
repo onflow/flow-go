@@ -97,6 +97,8 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // using incoming batch. Each block that was connected to the finalized state is reported once.
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
+//
+// All other errors should be treated as exceptions.
 func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBlock, error) {
 	var allConnectedBlocks []CertifiedBlock
 	for _, block := range certifiedBlocks {
