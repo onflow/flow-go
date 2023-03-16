@@ -397,7 +397,10 @@ func main() {
 				collectionRequestQueue,
 				collectionProviderWorkers,
 				channels.ProvideCollections,
-				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				filter.And(
+					filter.HasWeight(true),
+					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				),
 				retrieve,
 			)
 		}).
