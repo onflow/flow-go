@@ -277,7 +277,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 //     (because A also depends on everything B depends on)
 //   - set(A): pop A, getting all the collected dependencies for A
 type dependencyTracker struct {
-	location     common.AddressLocation
+	location     common.Location
 	dependencies derived.ProgramDependencies
 }
 
@@ -295,7 +295,7 @@ func newDependencyStack() *dependencyStack {
 
 // push a new location to track dependencies for.
 // it is assumed that the dependencies will be loaded before the program is set and pop is called.
-func (s *dependencyStack) push(loc common.AddressLocation) {
+func (s *dependencyStack) push(loc common.Location) {
 	dependencies := make(derived.ProgramDependencies, 1)
 
 	// A program is listed as its own dependency.
@@ -320,9 +320,9 @@ func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependenci
 }
 
 // pop the last dependencies on the stack and return them.
-func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependencies, error) {
+func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, error) {
 	if len(s.trackers) == 0 {
-		return common.AddressLocation{},
+		return nil,
 			nil,
 			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
 	}

@@ -37,11 +37,11 @@ type DerivedTransactionCommitter interface {
 	Commit() error
 }
 
-// ProgramDependencies are the programs' addresses used by this program.
-type ProgramDependencies map[common.AddressLocation]struct{}
+// ProgramDependencies are the programs' locations used by this program.
+type ProgramDependencies map[common.Location]struct{}
 
-// AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(location common.AddressLocation) {
+// AddDependency adds the location as a dependency.
+func (d ProgramDependencies) AddDependency(location common.Location) {
 	d[location] = struct{}{}
 }
 
