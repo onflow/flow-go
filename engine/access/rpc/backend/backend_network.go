@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/access"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,7 +51,12 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 		return nil, err
 	}
 
-	return convert.SnapshotToBytes(validSnapshot)
+	data, err := convert.SnapshotToBytes(validSnapshot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
+	}
+
+	return data, nil
 }
 
 func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {

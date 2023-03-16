@@ -91,10 +91,8 @@ const (
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
 	EXEComputeBlock           SpanName = "exe.computer.computeBlock"
-	EXEMergeCollectionView    SpanName = "exe.computer.mergeCollectionView"
 	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
 	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
-	EXEMergeTransactionView   SpanName = "exe.computer.mergeTransactionView"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
@@ -146,13 +144,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
-	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
-	FVMTransactionStorageUsedCheck   SpanName = "fvm.env.transactionStorageUsedCheck"
-	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
-	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+	FVMVerifyTransaction           SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction      SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction          SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees       SpanName = "fvm.deductTransactionFees"
+	FVMTransactionStorageUsedCheck SpanName = "fvm.env.transactionStorageUsedCheck"
+	FVMInvokeContractFunction      SpanName = "fvm.invokeContractFunction"
 
 	FVMEnvValueExists                SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                   SpanName = "fvm.env.getValue"
@@ -183,7 +180,6 @@ const (
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvUnsafeRandom               SpanName = "fvm.env.unsafeRandom"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
-	FVMEnvSetAccountFrozen           SpanName = "fvm.env.setAccountFrozen"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"
 	FVMEnvAccountKeysCount           SpanName = "fvm.env.accountKeysCount"

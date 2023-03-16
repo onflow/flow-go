@@ -72,25 +72,25 @@ func (_m *ComputationManager) ExecuteScript(ctx context.Context, script []byte, 
 	return r0, r1
 }
 
-// GetAccount provides a mock function with given fields: addr, header, snapshot
-func (_m *ComputationManager) GetAccount(addr flow.Address, header *flow.Header, snapshot state.StorageSnapshot) (*flow.Account, error) {
-	ret := _m.Called(addr, header, snapshot)
+// GetAccount provides a mock function with given fields: ctx, addr, header, snapshot
+func (_m *ComputationManager) GetAccount(ctx context.Context, addr flow.Address, header *flow.Header, snapshot state.StorageSnapshot) (*flow.Account, error) {
+	ret := _m.Called(ctx, addr, header, snapshot)
 
 	var r0 *flow.Account
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, state.StorageSnapshot) (*flow.Account, error)); ok {
-		return rf(addr, header, snapshot)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, *flow.Header, state.StorageSnapshot) (*flow.Account, error)); ok {
+		return rf(ctx, addr, header, snapshot)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, state.StorageSnapshot) *flow.Account); ok {
-		r0 = rf(addr, header, snapshot)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, *flow.Header, state.StorageSnapshot) *flow.Account); ok {
+		r0 = rf(ctx, addr, header, snapshot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Address, *flow.Header, state.StorageSnapshot) error); ok {
-		r1 = rf(addr, header, snapshot)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, *flow.Header, state.StorageSnapshot) error); ok {
+		r1 = rf(ctx, addr, header, snapshot)
 	} else {
 		r1 = ret.Error(1)
 	}
