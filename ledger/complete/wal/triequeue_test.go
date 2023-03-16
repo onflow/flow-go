@@ -127,10 +127,10 @@ func TestTrieQueueWithInitialValues(t *testing.T) {
 
 func randomMTrie() (*trie.MTrie, error) {
 	var randomPath ledger.Path
-	rand.Read(randomPath[:])
+	_, _ = rand.Read(randomPath[:])
 
 	var randomHashValue hash.Hash
-	rand.Read(randomHashValue[:])
+	_, _ = rand.Read(randomHashValue[:])
 
 	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 

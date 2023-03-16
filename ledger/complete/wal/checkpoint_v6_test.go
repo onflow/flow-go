@@ -87,7 +87,7 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 
 func randPathPayload() (ledger.Path, ledger.Payload) {
 	var path ledger.Path
-	rand.Read(path[:])
+	_, _ = rand.Read(path[:])
 	payload := testutils.RandomPayload(1, 100)
 	return path, *payload
 }
@@ -193,10 +193,10 @@ func TestEncodeSubTrie(t *testing.T) {
 
 func randomNode() *node.Node {
 	var randomPath ledger.Path
-	rand.Read(randomPath[:])
+	_, _ = rand.Read(randomPath[:])
 
 	var randomHashValue hash.Hash
-	rand.Read(randomHashValue[:])
+	_, _ = rand.Read(randomHashValue[:])
 
 	return node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 }

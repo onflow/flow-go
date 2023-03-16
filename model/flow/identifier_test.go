@@ -134,7 +134,8 @@ func TestCIDConversion(t *testing.T) {
 
 	// generate random CID
 	data := make([]byte, 4)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
 	cid = blocks.NewBlock(data).Cid()
 
 	id, err = flow.CidToId(cid)

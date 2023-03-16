@@ -152,7 +152,7 @@ func RandomPaths(n int) []l.Path {
 	i := 0
 	for i < n {
 		var path l.Path
-		crand.Read(path[:])
+		_, _ = crand.Read(path[:])
 		// deduplicate
 		if _, found := alreadySelectPaths[path]; !found {
 			paths = append(paths, path)
@@ -167,7 +167,7 @@ func RandomPaths(n int) []l.Path {
 func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
-	crand.Read(keydata)
+	_, _ = crand.Read(keydata)
 	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)

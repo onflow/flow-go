@@ -24,8 +24,9 @@ func TestHash(t *testing.T) {
 
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(path[:])
-			_, err := rand.Read(value)
+			_, err := rand.Read(path[:])
+			require.NoError(t, err)
+			_, err = rand.Read(value)
 			require.NoError(t, err)
 			h := hash.HashLeaf(path, value)
 
@@ -41,8 +42,10 @@ func TestHash(t *testing.T) {
 		var h1, h2 hash.Hash
 
 		for i := 0; i < 5000; i++ {
-			rand.Read(h1[:])
-			rand.Read(h2[:])
+			_, err := rand.Read(h1[:])
+			require.NoError(t, err)
+			_, err = rand.Read(h2[:])
+			require.NoError(t, err)
 			h := hash.HashInterNode(h1, h2)
 
 			hasher := sha3.New256()
@@ -91,8 +94,8 @@ func Test_ComputeCompactValue(t *testing.T) {
 func BenchmarkHash(b *testing.B) {
 
 	var h1, h2 hash.Hash
-	rand.Read(h1[:])
-	rand.Read(h2[:])
+	_, _ = rand.Read(h1[:])
+	_, _ = rand.Read(h2[:])
 
 	// customized sha3 for ledger
 	b.Run("LedgerSha3", func(b *testing.B) {

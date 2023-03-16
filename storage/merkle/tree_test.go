@@ -3,10 +3,10 @@
 package merkle
 
 import (
+	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
-	crand "math/rand"
+	mrand "math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,7 +64,9 @@ func TestEmptyTreeHash(t *testing.T) {
 
 		// generate random key-value pair
 		key := make([]byte, keyLength)
-		crand.Read(key)
+		_, err := crand.Read(key)
+		require.NoError(t, err)
+
 		val := []byte{1}
 
 		// add key-value pair: hash should be non-empty
@@ -346,7 +348,7 @@ func TestRandomOrder(t *testing.T) {
 	}
 
 	// shuffle the keys and insert them with random order into the second tree
-	rand.Shuffle(len(keys), func(i int, j int) {
+	mrand.Shuffle(len(keys), func(i int, j int) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
 	for _, key := range keys {

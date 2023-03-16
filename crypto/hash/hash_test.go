@@ -122,7 +122,8 @@ func TestHashersAPI(t *testing.T) {
 	}
 
 	data := make([]byte, 1801)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
 
 	for _, newFunction := range newHasherFunctions {
 		// Reset should empty the state
@@ -256,7 +257,7 @@ func TestKeccak(t *testing.T) {
 func BenchmarkComputeHash(b *testing.B) {
 
 	m := make([]byte, 32)
-	rand.Read(m)
+	_, _ = rand.Read(m)
 
 	b.Run("SHA2_256", func(b *testing.B) {
 		b.ResetTimer()

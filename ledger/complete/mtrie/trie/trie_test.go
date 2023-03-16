@@ -363,7 +363,8 @@ func TestSplitByPath(t *testing.T) {
 	paths := make([]ledger.Path, 0, pathsNumber)
 	for i := 0; i < pathsNumber-redundantPaths; i++ {
 		var p ledger.Path
-		rand.Read(p[:])
+		_, err := rand.Read(p[:])
+		require.NoError(t, err)
 		paths = append(paths, p)
 	}
 	for i := 0; i < redundantPaths; i++ {
@@ -652,7 +653,8 @@ func Test_Pruning(t *testing.T) {
 
 			for i := 0; i < numberOfUpdates; {
 				var path ledger.Path
-				rand.Read(path[:])
+				_, err := rand.Read(path[:])
+				require.NoError(t, err)
 				// deduplicate
 				if _, found := allPaths[path]; !found {
 					payload := testutils.RandomPayload(1, 100)

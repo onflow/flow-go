@@ -161,7 +161,8 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		height := rand.Intn(257)
 
 		var hashValue hash.Hash
-		crand.Read(hashValue[:])
+		_, err := crand.Read(hashValue[:])
+		require.NoError(t, err)
 
 		n := node.NewNode(height, nil, nil, paths[i], payloads[i], hashValue)
 
