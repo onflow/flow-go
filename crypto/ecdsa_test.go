@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"crypto/elliptic"
-	"crypto/rand"
+	crand "crypto/rand"
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -73,7 +73,7 @@ func TestECDSAHasher(t *testing.T) {
 
 		// generate a key pair
 		seed := make([]byte, ecdsaMinSeed[curve])
-		n, err := rand.Read(seed)
+		n, err := crand.Read(seed)
 		require.Equal(t, n, ecdsaMinSeed[curve])
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
@@ -156,7 +156,7 @@ func TestECDSAUtils(t *testing.T) {
 	for _, curve := range ecdsaCurves {
 		// generate a key pair
 		seed := make([]byte, ecdsaMinSeed[curve])
-		n, err := rand.Read(seed)
+		n, err := crand.Read(seed)
 		require.Equal(t, n, ecdsaMinSeed[curve])
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
@@ -256,7 +256,7 @@ func TestSignatureFormatCheck(t *testing.T) {
 		t.Run("valid signature", func(t *testing.T) {
 			len := ecdsaSigLen[curve]
 			sig := Signature(make([]byte, len))
-			rand.Read(sig)
+			crand.Read(sig)
 			sig[len/2] = 0    // force s to be less than the curve order
 			sig[len-1] |= 1   // force s to be non zero
 			sig[0] = 0        // force r to be less than the curve order
@@ -283,7 +283,7 @@ func TestSignatureFormatCheck(t *testing.T) {
 			// signature with a zero s
 			len := ecdsaSigLen[curve]
 			sig0s := Signature(make([]byte, len))
-			rand.Read(sig0s[:len/2])
+			crand.Read(sig0s[:len/2])
 
 			valid, err := SignatureFormatCheck(curve, sig0s)
 			assert.Nil(t, err)
@@ -291,7 +291,7 @@ func TestSignatureFormatCheck(t *testing.T) {
 
 			// signature with a zero r
 			sig0r := Signature(make([]byte, len))
-			rand.Read(sig0r[len/2:])
+			crand.Read(sig0r[len/2:])
 
 			valid, err = SignatureFormatCheck(curve, sig0r)
 			assert.Nil(t, err)
@@ -301,7 +301,7 @@ func TestSignatureFormatCheck(t *testing.T) {
 		t.Run("large values", func(t *testing.T) {
 			len := ecdsaSigLen[curve]
 			sigLargeS := Signature(make([]byte, len))
-			rand.Read(sigLargeS[:len/2])
+			crand.Read(sigLargeS[:len/2])
 			// make sure s is larger than the curve order
 			for i := len / 2; i < len; i++ {
 				sigLargeS[i] = 0xFF
@@ -312,7 +312,7 @@ func TestSignatureFormatCheck(t *testing.T) {
 			assert.False(t, valid)
 
 			sigLargeR := Signature(make([]byte, len))
-			rand.Read(sigLargeR[len/2:])
+			crand.Read(sigLargeR[len/2:])
 			// make sure s is larger than the curve order
 			for i := 0; i < len/2; i++ {
 				sigLargeR[i] = 0xFF
@@ -357,7 +357,7 @@ func TestEllipticUnmarshalSecp256k1(t *testing.T) {
 func BenchmarkECDSADecode(b *testing.B) {
 	// random message
 	seed := make([]byte, 50)
-	_, _ = rand.Read(seed)
+	_, _ = crand.Read(seed)
 
 	for _, curve := range []SigningAlgorithm{ECDSASecp256k1, ECDSAP256} {
 		sk, _ := GeneratePrivateKey(curve, seed)

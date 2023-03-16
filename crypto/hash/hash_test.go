@@ -1,10 +1,9 @@
 package hash
 
 import (
+	"crypto/rand"
 	"encoding/hex"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,9 +119,6 @@ func TestHashersAPI(t *testing.T) {
 		NewKeccak_256,
 	}
 
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
 	data := make([]byte, 1801)
 	rand.Read(data)
 
@@ -164,10 +160,6 @@ func TestHashersAPI(t *testing.T) {
 // It compares the hashes of random data of different lengths to
 // the output of standard Go sha3.
 func TestSHA3(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-
 	t.Run("SHA3_256", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
@@ -203,10 +195,6 @@ func TestSHA3(t *testing.T) {
 // It compares the hashes of random data of different lengths to
 // the output of Go LegacyKeccak.
 func TestKeccak(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-
 	for i := 0; i < 5000; i++ {
 		value := make([]byte, i)
 		rand.Read(value)

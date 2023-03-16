@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,12 +16,12 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	data := make([]byte, 100)
 
-	n, err := rand.Read(seed)
+	n, err := crand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
-	_, err = rand.Read(data)
+	_, err = crand.Read(data)
 	require.NoError(t, err)
 
 	// generate a SPoCK proof
@@ -87,16 +87,16 @@ func TestSPOCKProveVerify(t *testing.T) {
 	data := make([]byte, 100)
 
 	// data
-	_, err := rand.Read(data)
+	_, err := crand.Read(data)
 	require.NoError(t, err)
 	// sk1
-	n, err := rand.Read(seed1)
+	n, err := crand.Read(seed1)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLSBLS12381, seed1)
 	require.NoError(t, err)
 	// sk2
-	n, err = rand.Read(seed2)
+	n, err = crand.Read(seed2)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk2, err := GeneratePrivateKey(BLSBLS12381, seed2)

@@ -4,12 +4,11 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +66,8 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 }
 
 // utility function to generate a random BLS private key
-func randomSK(t *testing.T, seed []byte) PrivateKey {
+func randomSK(t *testing.T, rand *mrand.Rand) PrivateKey {
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func randomSK(t *testing.T, seed []byte) PrivateKey {
 // utility function to generate a non BLS private key
 func invalidSK(t *testing.T) PrivateKey {
 	seed := make([]byte, KeyGenSeedMinLenECDSAP256)
-	n, err := rand.Read(seed)
+	n, err := crand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenECDSAP256)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(ECDSAP256, seed)
@@ -89,29 +89,30 @@ func invalidSK(t *testing.T) PrivateKey {
 
 // BLS tests
 func TestBLSBLS12381Hasher(t *testing.T) {
+	rand := getPRG(t)
 	// generate a key pair
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	sk := randomSK(t, seed)
+	sk := randomSK(t, rand)
 	sig := make([]byte, SignatureLenBLSBLS12381)
+	msg := []byte("message")
 
 	// empty hasher
 	t.Run("Empty hasher", func(t *testing.T) {
-		_, err := sk.Sign(seed, nil)
+		_, err := sk.Sign(msg, nil)
 		assert.Error(t, err)
 		assert.True(t, IsNilHasherError(err))
-		_, err = sk.PublicKey().Verify(sig, seed, nil)
+		_, err = sk.PublicKey().Verify(sig, msg, nil)
 		assert.Error(t, err)
 		assert.True(t, IsNilHasherError(err))
 	})
 
 	// short size hasher
 	t.Run("short size hasher", func(t *testing.T) {
-		s, err := sk.Sign(seed, hash.NewSHA2_256())
+		s, err := sk.Sign(msg, hash.NewSHA2_256())
 		assert.Error(t, err)
 		assert.True(t, IsInvalidHasherSizeError(err))
 		assert.Nil(t, s)
 
-		valid, err := sk.PublicKey().Verify(sig, seed, hash.NewSHA2_256())
+		valid, err := sk.PublicKey().Verify(sig, msg, hash.NewSHA2_256())
 		assert.Error(t, err)
 		assert.True(t, IsInvalidHasherSizeError(err))
 		assert.False(t, valid)
@@ -206,9 +207,9 @@ func TestBLSEquals(t *testing.T) {
 
 // TestBLSUtils tests some utility functions
 func TestBLSUtils(t *testing.T) {
+	rand := getPRG(t)
 	// generate a key pair
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	sk := randomSK(t, seed)
+	sk := randomSK(t, rand)
 	// test Algorithm()
 	testKeysAlgorithm(t, sk, BLSBLS12381)
 	// test Size()
@@ -217,9 +218,7 @@ func TestBLSUtils(t *testing.T) {
 
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
@@ -228,12 +227,12 @@ func TestBLSPOP(t *testing.T) {
 	t.Run("PoP tests", func(t *testing.T) {
 		loops := 10
 		for j := 0; j < loops; j++ {
-			n, err := mrand.Read(seed)
+			n, err := rand.Read(seed)
 			require.Equal(t, n, seedMinLength)
 			require.NoError(t, err)
 			sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 			require.NoError(t, err)
-			_, err = mrand.Read(input)
+			_, err = rand.Read(input)
 			require.NoError(t, err)
 			s, err := BLSGeneratePOP(sk)
 			require.NoError(t, err)
@@ -276,6 +275,7 @@ func TestBLSPOP(t *testing.T) {
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
 func TestBLSAggregateSignatures(t *testing.T) {
+	rand := getPRG(t)
 	// random message
 	input := make([]byte, 100)
 	_, err := rand.Read(input)
@@ -283,19 +283,16 @@ func TestBLSAggregateSignatures(t *testing.T) {
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
 	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
 	var aggSig, expectedSig Signature
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		s, err := sk.Sign(input, kmac)
 		require.NoError(t, err)
 		sigs = append(sigs, s)
@@ -348,7 +345,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 	// check if one the public keys is not correct
 	t.Run("one invalid public key", func(t *testing.T) {
 		randomIndex := mrand.Intn(sigsNum)
-		newSk := randomSK(t, seed)
+		newSk := randomSK(t, rand)
 		sks[randomIndex] = newSk
 		pks[randomIndex] = newSk.PublicKey()
 		aggSk, err := AggregateBLSPrivateKeys(sks)
@@ -414,18 +411,15 @@ func TestBLSAggregateSignatures(t *testing.T) {
 // the public key of the aggregated private key is equal to the aggregated
 // public key
 func TestBLSAggregatePubKeys(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 	// number of keys to aggregate
 	pkNum := mrand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
 	sks := make([]PrivateKey, 0, pkNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 
 	// create the signatures
 	for i := 0; i < pkNum; i++ {
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		sks = append(sks, sk)
 		pks = append(pks, sk.PublicKey())
 	}
@@ -509,17 +503,14 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 // BLS multi-signature
 // public keys removal sanity check
 func TestBLSRemovePubKeys(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 	// number of keys to aggregate
 	pkNum := mrand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 
 	// generate public keys
 	for i := 0; i < pkNum; i++ {
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		pks = append(pks, sk.PublicKey())
 	}
 	// aggregate public keys
@@ -546,7 +537,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 
 	// remove an extra key and check inequality
 	t.Run("inequality check", func(t *testing.T) {
-		extraPk := randomSK(t, seed).PublicKey()
+		extraPk := randomSK(t, rand).PublicKey()
 		partialPk, err := RemoveBLSPublicKeys(aggPk, []PublicKey{extraPk})
 		assert.NoError(t, err)
 
@@ -562,7 +553,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		identityPk, err := RemoveBLSPublicKeys(aggPk, pks)
 		require.NoError(t, err)
 		// identity public key is expected
-		randomPk := randomSK(t, seed).PublicKey()
+		randomPk := randomSK(t, rand).PublicKey()
 		randomPkPlusIdentityPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, identityPk})
 		require.NoError(t, err)
 
@@ -608,9 +599,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 // batch verification technique and compares the result to verifying each signature
 // separately.
 func TestBLSBatchVerify(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 	// random message
 	input := make([]byte, 100)
 	_, err := mrand.Read(input)
@@ -622,12 +611,12 @@ func TestBLSBatchVerify(t *testing.T) {
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
 	expectedValid := make([]bool, 0, sigsNum)
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		s, err := sk.Sign(input, kmac)
 		require.NoError(t, err)
 		sigs = append(sigs, s)
@@ -757,7 +746,7 @@ func alterSignature(s Signature) {
 func BenchmarkBatchVerify(b *testing.B) {
 	// random message
 	input := make([]byte, 100)
-	_, _ = mrand.Read(input)
+	_, _ = crand.Read(input)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 100
@@ -767,7 +756,8 @@ func BenchmarkBatchVerify(b *testing.B) {
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		_, _ = mrand.Read(seed)
+		_, err := crand.Read(seed)
+		require.NoError(b, err)
 		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 		require.NoError(b, err)
 		s, err := sk.Sign(input, kmac)
@@ -813,9 +803,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 // and verify the aggregated signature using the multi-signature verification with
 // many message.
 func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 
 	// number of signatures to aggregate
 	sigsNum := mrand.Intn(20) + 1
@@ -824,10 +812,10 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	// number of keys
 	keysNum := mrand.Intn(sigsNum) + 1
 	sks := make([]PrivateKey, 0, keysNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
 	// generate the keys
 	for i := 0; i < keysNum; i++ {
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		sks = append(sks, sk)
 	}
 
@@ -972,14 +960,19 @@ func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	inputKmacs := make([]hash.Hasher, 0, sigsNum)
 	sigs := make([]Signature, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
 	inputMsgs := make([][]byte, 0, sigsNum)
 	kmac := NewExpandMsgXOFKMAC128("bench tag")
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
 		input := make([]byte, 100)
-		_, _ = mrand.Read(seed)
+		_, err := crand.Read(input)
+		require.NoError(b, err)
+
+		_, err = crand.Read(seed)
+		require.NoError(b, err)
 		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 		require.NoError(b, err)
 		s, err := sk.Sign(input, kmac)
@@ -1001,20 +994,21 @@ func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 
 // Bench of all aggregation functions
 func BenchmarkAggregate(b *testing.B) {
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	// random message
 	input := make([]byte, 100)
-	_, _ = mrand.Read(input)
+	_, _ = crand.Read(input)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 1000
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		_, _ = mrand.Read(seed)
+		_, err := crand.Read(seed)
+		require.NoError(b, err)
 		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 		require.NoError(b, err)
 		s, err := sk.Sign(input, kmac)
@@ -1058,9 +1052,7 @@ func BenchmarkAggregate(b *testing.B) {
 }
 
 func TestBLSIdentity(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 
 	var identitySig []byte
 	msg := []byte("random_message")
@@ -1073,8 +1065,7 @@ func TestBLSIdentity(t *testing.T) {
 		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
 
 		// sum up a random signature and its inverse to get identity
-		seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-		sk := randomSK(t, seed)
+		sk := randomSK(t, rand)
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
