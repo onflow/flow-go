@@ -185,7 +185,7 @@ func (s *ScoreOption) defaultPeerScoreParams() {
 }
 
 func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
-	s.preparePeerScoreParams()
+	s.defaultPeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
