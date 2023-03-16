@@ -96,17 +96,8 @@ func (_m *BackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Clear provides a mock function with given fields:
-func (_m *BackData) Clear() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *BackData) Clear() {
+	_m.Called()
 }
 
 // Entities provides a mock function with given fields:

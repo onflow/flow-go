@@ -171,7 +171,10 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
-	crand.Read(valuedata)
+	_, err := crand.Read(valuedata)
+	if err != nil {
+		panic("random generation failed")
+	}
 	value := l.Value(valuedata)
 	return l.NewPayload(key, value)
 }
@@ -197,7 +200,10 @@ func RandomValues(n int, minByteSize, maxByteSize int) []l.Value {
 			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 		}
 		value := make([]byte, byteSize)
-		crand.Read(value)
+		_, err := rand.Read(value)
+		if err != nil {
+			panic("random generation failed")
+		}
 		values = append(values, value)
 	}
 	return values
@@ -219,7 +225,10 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 				byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 			}
 			keyPartData := make([]byte, byteSize)
-			crand.Read(keyPartData)
+			_, err := crand.Read(keyPartData)
+			if err != nil {
+				panic("random generation failed")
+			}
 			keyParts = append(keyParts, l.NewKeyPart(uint16(j), keyPartData))
 		}
 		key := l.NewKey(keyParts)
