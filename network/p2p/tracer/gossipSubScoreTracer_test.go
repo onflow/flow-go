@@ -83,6 +83,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		p2ptest.WithLogger(logger),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
 		p2ptest.WithPeerScoringEnabled(idProvider),         // enable peer scoring for sake of testing.
+		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
 		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{
 			AppSpecificScoreParams: func(pid peer.ID) float64 {
 				id, ok := idProvider.ByPeerID(pid)
@@ -98,30 +99,28 @@ func TestGossipSubScoreTracer(t *testing.T) {
 				}
 				return 0
 			},
-		}),
-		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
-		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
-			topic1: {
-				// set the topic score params to some fixed values for sake of testing.
-				// Note that these values are not realistic and should not be used in production.
-				TopicWeight:                     1,
-				TimeInMeshQuantum:               1 * time.Second,
-				TimeInMeshWeight:                1,
-				TimeInMeshCap:                   1000,
-				FirstMessageDeliveriesWeight:    1,
-				FirstMessageDeliveriesDecay:     0.999,
-				FirstMessageDeliveriesCap:       1000,
-				MeshMessageDeliveriesWeight:     -1,
-				MeshMessageDeliveriesDecay:      0.999,
-				MeshMessageDeliveriesThreshold:  100,
-				MeshMessageDeliveriesActivation: 1 * time.Second,
-				MeshMessageDeliveriesCap:        1000,
-				MeshFailurePenaltyWeight:        -1,
-				MeshFailurePenaltyDecay:         0.999,
-				InvalidMessageDeliveriesWeight:  -1,
-				InvalidMessageDeliveriesDecay:   0.999,
+			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
+				topic1: {
+					// set the topic score params to some fixed values for sake of testing.
+					// Note that these values are not realistic and should not be used in production.
+					TopicWeight:                     1,
+					TimeInMeshQuantum:               1 * time.Second,
+					TimeInMeshWeight:                1,
+					TimeInMeshCap:                   1000,
+					FirstMessageDeliveriesWeight:    1,
+					FirstMessageDeliveriesDecay:     0.999,
+					FirstMessageDeliveriesCap:       1000,
+					MeshMessageDeliveriesWeight:     -1,
+					MeshMessageDeliveriesDecay:      0.999,
+					MeshMessageDeliveriesThreshold:  100,
+					MeshMessageDeliveriesActivation: 1 * time.Second,
+					MeshMessageDeliveriesCap:        1000,
+					MeshFailurePenaltyWeight:        -1,
+					MeshFailurePenaltyDecay:         0.999,
+					InvalidMessageDeliveriesWeight:  -1,
+					InvalidMessageDeliveriesDecay:   0.999,
+				},
 			},
-		},
 		}),
 		p2ptest.WithRole(flow.RoleConsensus))
 
