@@ -284,15 +284,22 @@ func enforceSequentialBlocks(batch []*flow.Block) ([]flow.Identifier, error) {
 	return blockIDs, nil
 }
 
-// filterBlocksByView performs a specific filter ensuring blocks are higher than the lowest view.
-// It assumes that batch is ordered sequentially, to avoid extra allocations while filtering.
-// It has to be paired with enforceSequentialBlocks which checks if blocks are properly ordered.
-func filterBlocksByView(lowestView uint64, batch []*flow.Block) []*flow.Block {
-	i := 0
-	for ; i < len(batch); i++ {
-		if batch[i].Header.View > lowestView {
-			break
+// trimLeadingFinalizedBlocks trims the blocks at the _beginning_ of the batch, whose views
+// are smaller or equal to the lowest pruned view. Formally, let i be the _smallest_ index such that
+//
+//	batch[i].View ≥ lowestPrunedView
+//
+// Hence, for all k < i: batch[k].View < lowestPrunedView (otherwise, a smaller value for i exists).
+// Note:
+//   - For this method, we do _not_ assume any specific ordering of the blocks.
+//   - We drop all blocks at the _beginning_ that we anyway would not want to cache.
+//   - The returned slice of blocks could still contain blocks with views below the cutoff.
+func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.Block) []*flow.Block {
+	lowestView := c.lowestPrunedView.Value()
+	for i, block := range batch {
+		if block.Header.View >= lowestView {
+			return batch[i:]
 		}
 	}
-	return batch[i:]
+	return nil
 }
