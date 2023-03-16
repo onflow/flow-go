@@ -557,8 +557,11 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
+
 	miscellaneousEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds[rand.Uint64n(len(corruptedIds))],
+		CorruptOriginId:   corruptedIds[random],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -631,8 +634,11 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	approval := unittest.ResultApprovalFixture()
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
 	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
+
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds[rand.Uint64n(len(corruptedIds))],
+		CorruptOriginId:   corruptedIds[random],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -703,8 +709,10 @@ func TestWintermute_ResultApproval(t *testing.T) {
 	}
 
 	// generates a result approval event for one of the chunks of the original result.
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId: corruptedIds[rand.Uint64n(len(corruptedIds))],
+		CorruptOriginId: corruptedIds[random],
 		Channel:         channels.TestNetworkChannel,
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,

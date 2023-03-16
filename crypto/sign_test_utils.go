@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -137,12 +138,10 @@ func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int)
 	})
 
 	t.Run("deterministic generation", func(t *testing.T) {
-		r := time.Now().UnixNano()
-		mrand.Seed(r)
-		t.Logf("math rand seed is %d", r)
+
 		// same seed results in the same key
 		seed := make([]byte, minLen)
-		read, err := mrand.Read(seed)
+		read, err := crand.Read(seed)
 		require.Equal(t, read, minLen)
 		require.NoError(t, err)
 		sk1, err := GeneratePrivateKey(salg, seed)

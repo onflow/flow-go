@@ -2,7 +2,6 @@ package random
 
 import (
 	"bytes"
-	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -100,9 +99,11 @@ func TestUint(t *testing.T) {
 	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -138,9 +139,11 @@ func TestSubPermutation(t *testing.T) {
 	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -221,9 +224,11 @@ func TestShuffle(t *testing.T) {
 	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -304,9 +309,10 @@ func TestSamples(t *testing.T) {
 	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -396,9 +402,9 @@ func TestStateRestore(t *testing.T) {
 
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	crand.Read(customizer)
+	_, err = rand.Read(customizer)
 	t.Logf("seed is %x, customizer is %x\n", seed, customizer)
 
 	// create an rng

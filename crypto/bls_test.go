@@ -65,7 +65,7 @@ func TestBLSMainMethods(t *testing.T) {
 
 		for _, sk := range []PrivateKey{sk1, skMinus1} {
 			input := make([]byte, 100)
-			_, err = mrand.Read(input)
+			_, err = crand.Read(input)
 			require.NoError(t, err)
 			s, err := sk.Sign(input, hasher)
 			require.NoError(t, err)
@@ -628,12 +628,12 @@ func TestBLSBatchVerify(t *testing.T) {
 	rand := getPRG(t)
 	// random message
 	input := make([]byte, 100)
-	_, err := mrand.Read(input)
+	_, err := rand.Read(input)
 	require.NoError(t, err)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
-	sigsNum := mrand.Intn(100) + 2
+	sigsNum := rand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -669,14 +669,14 @@ func TestBLSBatchVerify(t *testing.T) {
 	})
 
 	// pick a random number of invalid signatures
-	invalidSigsNum := mrand.Intn(sigsNum-1) + 1
+	invalidSigsNum := rand.Intn(sigsNum-1) + 1
 	// generate a random permutation of indices to pick the
 	// invalid signatures.
 	indices := make([]int, 0, sigsNum)
 	for i := 0; i < sigsNum; i++ {
 		indices = append(indices, i)
 	}
-	mrand.Shuffle(sigsNum, func(i, j int) {
+	rand.Shuffle(sigsNum, func(i, j int) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
