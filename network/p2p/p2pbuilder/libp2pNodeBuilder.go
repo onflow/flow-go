@@ -381,12 +381,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// gossipsub is created here, because it needs to be created during the node startup.
-			gossipSub, socreTracer, err := builder.gossipSubBuilder.Build(ctx)
+			gossipSub, scoreTracer, err := builder.gossipSubBuilder.Build(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
 			}
-			if socreTracer != nil {
-				node.SetPeerScoreExposer(socreTracer)
+			if scoreTracer != nil {
+				node.SetPeerScoreExposer(scoreTracer)
 			}
 			node.SetPubSub(gossipSub)
 
