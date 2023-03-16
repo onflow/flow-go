@@ -1,9 +1,10 @@
 package heropool
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
-	"github.com/rs/zerolog"
 )
 
 type EjectionMode string
