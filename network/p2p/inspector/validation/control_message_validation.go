@@ -142,7 +142,11 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.Co
 
 		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, upperThresholdErr))
 		if err != nil {
-			return fmt.Errorf("failed to distribute invalid control message notification: %w", err)
+			lg.Error().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("failed to distribute invalid control message notification")
+			return err
 		}
 		return upperThresholdErr
 	}
@@ -179,6 +183,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *inspectMsgReq)
 		if err != nil {
 			lg.Error().
 				Err(err).
+				Bool(logging.KeySuspicious, true).
 				Msg("failed to distribute invalid control message notification")
 		}
 	}
