@@ -117,6 +117,9 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 
 // inspect performs initial inspection of RPC control message and queues up message for further inspection if required.
 // All errors returned from this function can be considered benign.
+// errors returned:
+//
+//	ErrUpperThreshold if message count greater than the configured upper threshold.
 func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	validationConfig, ok := c.validationConfig.config(ctrlMsgType)
 	if !ok {
