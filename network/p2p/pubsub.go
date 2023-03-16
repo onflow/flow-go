@@ -121,9 +121,12 @@ type PubSubTracer interface {
 
 // PeerScoreSnapshot is a snapshot of the overall peer score at a given time.
 type PeerScoreSnapshot struct {
-	Score            float64                        // the overall score of the peer.
-	Topics           map[string]*TopicScoreSnapshot // score of the peer per topic.
-	AppSpecificScore float64                        // application specific score (set by Flow protocol).
+        // Score the overall score of the peer.
+	Score            float64
+	// Topics map that stores the score of the peer per topic.                        
+	Topics           map[string]*TopicScoreSnapshot
+	 // AppSpecificScore application specific score (set by Flow protocol).
+	AppSpecificScore float64                      
 
 	// A positive value indicates that the peer is colocated with other nodes on the same network id,
 	// and can be used to warn of sybil attacks.
