@@ -277,7 +277,7 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	[]ContractUpdateKey,
+	ContractUpdates,
 	error,
 ) {
 	return env.ContractUpdater.Commit()

@@ -100,7 +100,7 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// Add dependencies to the stack.
 	// This is only really needed if loader was not called,
 	// but there is no harm in doing it always.
-	programs.dependencyStack.addDependencies(program.Dependencies)
+	programs.dependencyStack.add(program.Dependencies)
 
 	if loader.Called() {
 		programs.cacheMiss()
@@ -245,7 +245,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, derived.NewProgramDependencies(), err
 	}
 
 	if stackLocation != address {
@@ -258,7 +258,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 		//   - set(B): pops B
 		//   - set(A): pops A
 		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return nil, nil, fmt.Errorf(
+		return nil, derived.NewProgramDependencies(), fmt.Errorf(
 			"cannot set program. Popped dependencies are for an unexpeced address"+
 				" (expected %s, got %s)", address, stackLocation)
 	}
@@ -296,10 +296,10 @@ func newDependencyStack() *dependencyStack {
 // push a new location to track dependencies for.
 // it is assumed that the dependencies will be loaded before the program is set and pop is called.
 func (s *dependencyStack) push(loc common.Location) {
-	dependencies := make(derived.ProgramDependencies, 1)
+	dependencies := derived.NewProgramDependencies()
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(loc)
+	dependencies.Add(loc)
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,
@@ -307,8 +307,8 @@ func (s *dependencyStack) push(loc common.Location) {
 	})
 }
 
-// addDependencies adds dependencies to the current dependency tracker
-func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependencies) {
+// add adds dependencies to the current dependency tracker
+func (s *dependencyStack) add(dependencies derived.ProgramDependencies) {
 	l := len(s.trackers)
 	if l == 0 {
 		// stack is empty.
@@ -323,7 +323,7 @@ func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependenci
 func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, error) {
 	if len(s.trackers) == 0 {
 		return nil,
-			nil,
+			derived.NewProgramDependencies(),
 			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
 	}
 

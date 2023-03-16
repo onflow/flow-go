@@ -27,6 +27,10 @@ func Test_Programs(t *testing.T) {
 		Address: common.MustBytesToAddress(addressA.Bytes()),
 		Name:    "A",
 	}
+	contractA2Location := common.AddressLocation{
+		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Name:    "A2",
+	}
 
 	contractBLocation := common.AddressLocation{
 		Address: common.MustBytesToAddress(addressB.Bytes()),
@@ -54,8 +58,16 @@ func Test_Programs(t *testing.T) {
 		}
 	`
 
+	contractA2Code := `
+		pub contract A2 {
+			pub fun hello(): String {
+        		return "hello from A2"
+    		}
+		}
+	`
+
 	contractBCode := `
-		import A from 0xa
+		import 0xa
 
 		pub contract B {
 			pub fun hello(): String {
@@ -221,8 +233,8 @@ func Test_Programs(t *testing.T) {
 		require.Equal(t, 1, cached)
 
 		// assert dependencies are correct
-		require.Len(t, entry.Value.Dependencies, 1)
-		require.NotNil(t, entry.Value.Dependencies[contractALocation])
+		require.Equal(t, 1, entry.Value.Dependencies.Count())
+		require.True(t, entry.Value.Dependencies.ContainsLocation(contractALocation))
 
 		// assert some reads were recorded (at least loading of code)
 		require.NotEmpty(t, entry.ExecutionSnapshot.ReadSet)
@@ -315,9 +327,9 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryB)
 
 		// assert dependencies are correct
-		require.Len(t, entryB.Value.Dependencies, 2)
-		require.NotNil(t, entryB.Value.Dependencies[contractALocation])
-		require.NotNil(t, entryB.Value.Dependencies[contractBLocation])
+		require.Equal(t, 2, entryB.Value.Dependencies.Count())
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractBLocation))
 
 		// program B should contain all the registers used by program A, as it depends on it
 		contractBSnapshot = entryB.ExecutionSnapshot
@@ -346,6 +358,111 @@ func Test_Programs(t *testing.T) {
 					"B")
 				// this time we fail if a read of code occurs
 				require.NotEqual(t, id.Key, idA.Key)
+				require.NotEqual(t, id.Key, idB.Key)
+
+				return mainView.Peek(id)
+			}))
+
+		procCallB = fvm.Transaction(
+			callTx("B", addressB),
+			derivedBlockData.NextTxIndexForTestingOnly())
+
+		err = vm.Run(context, procCallB, viewExecB2)
+		require.NoError(t, err)
+
+		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
+
+		compareViews(t, viewExecB, viewExecB2)
+
+		// merge it back
+		err = mainView.Merge(viewExecB2.Finalize())
+		require.NoError(t, err)
+	})
+
+	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
+		// deploy contract B
+		procContractA2 := fvm.Transaction(
+			contractDeployTx("A2", contractA2Code, addressA),
+			derivedBlockData.NextTxIndexForTestingOnly())
+		err := vm.Run(context, procContractA2, mainView)
+		require.NoError(t, err)
+
+		// a, b and c are invalid
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+
+		require.Nil(t, entryB) // B could have star imports to 0xa, so it's invalidated
+		require.Nil(t, entryC) // still invalid
+		require.Nil(t, entryA) // A could have star imports to 0xa, so it's invalidated
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 0, cached)
+	})
+
+	t.Run("contract B imports contract A and A2 because of * import", func(t *testing.T) {
+
+		// programs should have no entries for A and B, as per previous test
+
+		// run a TX using contract B
+		procCallB := fvm.Transaction(
+			callTx("B", addressB),
+			derivedBlockData.NextTxIndexForTestingOnly())
+
+		viewExecB = delta.NewDeltaView(
+			state.NewPeekerStorageSnapshot(mainView))
+
+		err = vm.Run(context, procCallB, viewExecB)
+		require.NoError(t, err)
+
+		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
+
+		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		require.NotNil(t, entry)
+
+		// state should be essentially the same as one which we got in tx with contract A
+		require.Equal(t, contractASnapshot, entry.ExecutionSnapshot)
+
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		require.NotNil(t, entryB)
+
+		// assert dependencies are correct
+		require.Equal(t, 3, entryB.Value.Dependencies.Count())
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractBLocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractA2Location))
+
+		// program B should contain all the registers used by program A, as it depends on it
+		contractBSnapshot = entryB.ExecutionSnapshot
+
+		require.Empty(t, contractASnapshot.WriteSet)
+
+		for id := range contractASnapshot.ReadSet {
+			_, ok := contractBSnapshot.ReadSet[id]
+			require.True(t, ok)
+		}
+
+		// merge it back
+		err = mainView.Merge(viewExecB.Finalize())
+		require.NoError(t, err)
+
+		// rerun transaction
+
+		// execute transaction again, this time make sure it doesn't load code
+		viewExecB2 := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				idA := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				idA2 := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A2")
+				idB := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"B")
+				// this time we fail if a read of code occurs
+				require.NotEqual(t, id.Key, idA.Key)
+				require.NotEqual(t, id.Key, idA2.Key)
 				require.NotEqual(t, id.Key, idB.Key)
 
 				return mainView.Peek(id)
@@ -409,15 +526,17 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
 		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2)
 		require.NotNil(t, entryB)
 		require.Nil(t, entryC)
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 2, cached)
+		require.Equal(t, 3, cached)
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
@@ -450,13 +569,13 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryC)
 
 		// assert dependencies are correct
-		require.Len(t, entryC.Value.Dependencies, 3)
-		require.NotNil(t, entryC.Value.Dependencies[contractALocation])
-		require.NotNil(t, entryC.Value.Dependencies[contractBLocation])
-		require.NotNil(t, entryC.Value.Dependencies[contractCLocation])
+		require.Equal(t, 4, entryC.Value.Dependencies.Count())
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractBLocation))
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractCLocation))
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 3, cached)
+		require.Equal(t, 4, cached)
 	})
 }
 

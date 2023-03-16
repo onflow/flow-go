@@ -76,7 +76,7 @@ type ContractUpdater interface {
 	// OperationNotSupportedError.
 	RemoveAccountContractCode(runtimeAddress common.Address, name string) error
 
-	Commit() ([]ContractUpdateKey, error)
+	Commit() (ContractUpdates, error)
 
 	Reset()
 }
@@ -123,7 +123,7 @@ func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
 }
 
 func (updater ParseRestrictedContractUpdater) Commit() (
-	[]ContractUpdateKey,
+	ContractUpdates,
 	error,
 ) {
 	return updater.impl.Commit()
@@ -150,8 +150,8 @@ func (NoContractUpdater) RemoveAccountContractCode(
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
-func (NoContractUpdater) Commit() ([]ContractUpdateKey, error) {
-	return nil, nil
+func (NoContractUpdater) Commit() (ContractUpdates, error) {
+	return ContractUpdates{}, nil
 }
 
 func (NoContractUpdater) Reset() {
@@ -437,26 +437,49 @@ func (updater *ContractUpdaterImpl) RemoveContract(
 	return nil
 }
 
-func (updater *ContractUpdaterImpl) Commit() ([]ContractUpdateKey, error) {
-	updatedKeys, updateList := updater.updates()
+func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
+	updateList := updater.updates()
 	updater.Reset()
+
+	contractUpdates := ContractUpdates{
+		Updates:   make([]ContractUpdateKey, 0, len(updateList)),
+		Deploys:   make([]ContractUpdateKey, 0, len(updateList)),
+		Deletions: make([]ContractUpdateKey, 0, len(updateList)),
+	}
 
 	var err error
 	for _, v := range updateList {
-		if len(v.Code) > 0 {
-			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
-			if err != nil {
-				return nil, err
-			}
-		} else {
+		var currentlyExists bool
+		currentlyExists, err = updater.accounts.ContractExists(v.Name, v.Address)
+		if err != nil {
+			return ContractUpdates{}, err
+		}
+		shouldDelete := len(v.Code) == 0
+
+		if shouldDelete {
+			// this is a removal
+			contractUpdates.Deletions = append(contractUpdates.Deletions, v.ContractUpdateKey)
 			err = updater.accounts.DeleteContract(v.Name, v.Address)
 			if err != nil {
-				return nil, err
+				return ContractUpdates{}, err
+			}
+		} else {
+			if !currentlyExists {
+				// this is a deployment
+				contractUpdates.Deploys = append(contractUpdates.Deploys, v.ContractUpdateKey)
+			} else {
+				// this is an update
+				contractUpdates.Updates = append(contractUpdates.Updates, v.ContractUpdateKey)
+			}
+
+			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
+			if err != nil {
+				return ContractUpdates{}, err
 			}
 		}
 	}
 
-	return updatedKeys, nil
+	return contractUpdates, nil
 }
 
 func (updater *ContractUpdaterImpl) Reset() {
@@ -467,12 +490,9 @@ func (updater *ContractUpdaterImpl) HasUpdates() bool {
 	return len(updater.draftUpdates) > 0
 }
 
-func (updater *ContractUpdaterImpl) updates() (
-	[]ContractUpdateKey,
-	[]ContractUpdate,
-) {
+func (updater *ContractUpdaterImpl) updates() []ContractUpdate {
 	if len(updater.draftUpdates) == 0 {
-		return nil, nil
+		return nil
 	}
 	keys := make([]ContractUpdateKey, 0, len(updater.draftUpdates))
 	updates := make([]ContractUpdate, 0, len(updater.draftUpdates))
@@ -482,7 +502,7 @@ func (updater *ContractUpdaterImpl) updates() (
 	}
 
 	sort.Sort(&sortableContractUpdates{keys: keys, updates: updates})
-	return keys, updates
+	return updates
 }
 
 func (updater *ContractUpdaterImpl) isAuthorizedForDeployment(
