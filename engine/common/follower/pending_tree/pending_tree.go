@@ -148,10 +148,26 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 	return false
 }
 
-// FinalizeForkAtLevel takes last finalized block and prunes levels below the finalized view.
-// When a block is finalized we don't care for all blocks below it since they were already finalized.
-// Finalizing a block might result in observing a connected chain of blocks that previously weren't.
-// These blocks will be returned as result of invocation.
+// FinalizeForkAtLevel takes last finalized block and prunes all blocks below the finalized view.
+// PendingTree treats its input as a potentially repetitive stream of information: repeated
+// and older inputs (out of order) are already consistent with the current state. Repetitive
+// inputs might cause repetitive outputs. 
+// When a block is finalized we don't care for any blocks below it, since they were already finalized.
+// Finalizing a block might causes the pending PendingTree to detect _additional_ blocks as now
+// being connected to the latest finalized block. This happens of some connecting blocks are missing
+// and then a block higher than the missing blocks is finalized.
+// In the following example, B is the last finalized block known to the PendingTree
+//
+//	A ← B  ←-?-?-?-- X ← Y ← Z
+//
+// The network has already progressed to finalizing block X. However, the interim blocks denoted
+// by '←-?-?-?--' have not been received by our PendingTree. Therefore, we still consider X,Y,Z
+// as disconnected. If the PendingTree tree is now informed that X is finalized, it can fast-
+// forward to the respective state, as it anyway would prune all the blocks below X.
+//
+// If the PendingTree detect additional blocks as descending from the latest finalized block, it
+// returns these blocks. Returned blocks are ordered such that parents appear before their children.
+//
 // No errors are expected during normal operation.
 func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) ([]CertifiedBlock, error) {
 	var connectedBlocks []CertifiedBlock
