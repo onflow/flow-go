@@ -366,20 +366,16 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.metrics)
 	node.SetUnicastManager(unicastManager)
 
-	var rsys routing.Routing
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// routing system is created here, because it needs to be created during the node startup.
-			rsys, err = builder.buildRouting(ctx, h)
+			rsys, err := builder.buildRouting(ctx, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create rsys system: %w", err))
 			}
 			node.SetRouting(rsys)
 			builder.gossipSubBuilder.SetRoutingSystem(rsys)
 
-			ready()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// gossipsub is created here, because it needs to be created during the node startup.
 			gossipSub, scoreTracer, err := builder.gossipSubBuilder.Build(ctx)
 			if err != nil {
