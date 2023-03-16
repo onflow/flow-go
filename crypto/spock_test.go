@@ -13,11 +13,11 @@ import (
 
 func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	// test the consistency with different data
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, KeyGenSeedMinLen)
 	data := make([]byte, 100)
 
 	n, err := crand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
@@ -82,8 +82,8 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 // tests of happy and unhappy paths of SPOCKVerify
 func TestSPOCKProveVerify(t *testing.T) {
 	// test the consistency with different data
-	seed1 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	seed2 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	seed1 := make([]byte, KeyGenSeedMinLen)
+	seed2 := make([]byte, KeyGenSeedMinLen)
 	data := make([]byte, 100)
 
 	// data
@@ -91,13 +91,13 @@ func TestSPOCKProveVerify(t *testing.T) {
 	require.NoError(t, err)
 	// sk1
 	n, err := crand.Read(seed1)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLSBLS12381, seed1)
 	require.NoError(t, err)
 	// sk2
 	n, err = crand.Read(seed2)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk2, err := GeneratePrivateKey(BLSBLS12381, seed2)
 	require.NoError(t, err)

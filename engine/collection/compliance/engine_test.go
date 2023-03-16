@@ -39,7 +39,7 @@ type EngineSuite struct {
 	me         *module.Local
 	net        *mocknetwork.Network
 	payloads   *storage.ClusterPayloads
-	protoState *protocol.MutableState
+	protoState *protocol.State
 	con        *mocknetwork.Conduit
 
 	payloadDB map[flow.Identifier]*cluster.Payload
@@ -77,7 +77,7 @@ func (cs *EngineSuite) SetupTest() {
 		nil,
 	)
 
-	cs.protoState = &protocol.MutableState{}
+	cs.protoState = &protocol.State{}
 	cs.protoState.On("Final").Return(protoSnapshot)
 
 	cs.clusterID = "cluster-id"
@@ -172,7 +172,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
 				OriginID: unittest.IdentifierFixture(),
 				Message:  proposal,
 			})
@@ -191,7 +191,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})

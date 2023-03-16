@@ -9,6 +9,159 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Opaque identifier used for Restarting nested transactions
+type NestedTransactionId struct {
+	state *State
+}
+
+func (id NestedTransactionId) StateForTestingOnly() *State {
+	return id.state
+}
+
+type Meter interface {
+	MeterComputation(kind common.ComputationKind, intensity uint) error
+	ComputationIntensities() meter.MeteredComputationIntensities
+	TotalComputationLimit() uint
+	TotalComputationUsed() uint64
+
+	MeterMemory(kind common.MemoryKind, intensity uint) error
+	MemoryIntensities() meter.MeteredMemoryIntensities
+	TotalMemoryEstimate() uint64
+
+	InteractionUsed() uint64
+
+	MeterEmittedEvent(byteSize uint64) error
+	TotalEmittedEventBytes() uint64
+
+	// RunWithAllLimitsDisabled runs f with limits disabled
+	RunWithAllLimitsDisabled(f func())
+}
+
+// NestedTransaction provides active transaction states and facilitates common
+// state management operations.
+type NestedTransaction interface {
+	Meter
+
+	// NumNestedTransactions returns the number of uncommitted nested
+	// transactions.  Note that the main transaction is not considered a
+	// nested transaction.
+	NumNestedTransactions() int
+
+	// IsParseRestricted returns true if the current nested transaction is in
+	// parse resticted access mode.
+	IsParseRestricted() bool
+
+	MainTransactionId() NestedTransactionId
+
+	// IsCurrent returns true if the provide id refers to the current (nested)
+	// transaction.
+	IsCurrent(id NestedTransactionId) bool
+
+	// BeginNestedTransaction creates a unrestricted nested transaction within
+	// the current unrestricted (nested) transaction.  The meter parameters are
+	// inherited from the current transaction.  This returns error if the
+	// current nested transaction is program restricted.
+	BeginNestedTransaction() (
+		NestedTransactionId,
+		error,
+	)
+
+	// BeginNestedTransactionWithMeterParams creates a unrestricted nested
+	// transaction within the current unrestricted (nested) transaction, using
+	// the provided meter parameters. This returns error if the current nested
+	// transaction is program restricted.
+	BeginNestedTransactionWithMeterParams(
+		params meter.MeterParameters,
+	) (
+		NestedTransactionId,
+		error,
+	)
+
+	// BeginParseRestrictedNestedTransaction creates a restricted nested
+	// transaction within the current (nested) transaction.  The meter
+	// parameters are inherited from the current transaction.
+	BeginParseRestrictedNestedTransaction(
+		location common.AddressLocation,
+	) (
+		NestedTransactionId,
+		error,
+	)
+
+	// CommitNestedTransaction commits the changes in the current unrestricted
+	// nested transaction to the parent (nested) transaction.  This returns
+	// error if the expectedId does not match the current nested transaction.
+	// This returns the committed execution snapshot otherwise.
+	//
+	// Note: The returned committed execution snapshot may be reused by another
+	// transaction via AttachAndCommitNestedTransaction to update the
+	// transaction bookkeeping, but the caller must manually invalidate the
+	// state.
+	// USE WITH EXTREME CAUTION.
+	CommitNestedTransaction(
+		expectedId NestedTransactionId,
+	) (
+		*ExecutionSnapshot,
+		error,
+	)
+
+	// CommitParseRestrictedNestedTransaction commits the changes in the
+	// current restricted nested transaction to the parent (nested)
+	// transaction.  This returns error if the specified location does not
+	// match the tracked location. This returns the committed execution
+	// snapshot otherwise.
+	//
+	// Note: The returned committed execution snapshot may be reused by another
+	// transaction via AttachAndCommitNestedTransaction to update the
+	// transaction bookkeeping, but the caller must manually invalidate the
+	// state.
+	// USE WITH EXTREME CAUTION.
+	CommitParseRestrictedNestedTransaction(
+		location common.AddressLocation,
+	) (
+		*ExecutionSnapshot,
+		error,
+	)
+
+	// PauseNestedTransaction detaches the current nested transaction from the
+	// parent transaction, and returns the paused nested transaction state.
+	// The paused nested transaction may be resume via Resume.
+	//
+	// WARNING: Pause and Resume are intended for implementing continuation
+	// passing style behavior for the transaction executor, with the assumption
+	// that the states accessed prior to pausing remain valid after resumption.
+	// The paused nested transaction should not be reused across transactions.
+	// IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE THAT
+	// COULD LEAD TO PHANTOM READS.
+	PauseNestedTransaction(
+		expectedId NestedTransactionId,
+	) (
+		*State,
+		error,
+	)
+
+	// ResumeNestedTransaction attaches the paused nested transaction (state)
+	// to the current transaction.
+	ResumeNestedTransaction(pausedState *State)
+
+	// AttachAndCommitNestedTransaction commits the changes from the cached
+	// nested transaction execution snapshot to the current (nested)
+	// transaction.
+	AttachAndCommitNestedTransaction(cachedSnapshot *ExecutionSnapshot) error
+
+	// RestartNestedTransaction merges all changes that belongs to the nested
+	// transaction about to be restart (for spock/meter bookkeeping), then
+	// wipes its view changes.
+	RestartNestedTransaction(
+		id NestedTransactionId,
+	) error
+
+	Get(id flow.RegisterID) (flow.RegisterValue, error)
+
+	Set(id flow.RegisterID, value flow.RegisterValue) error
+
+	ViewForTestingOnly() View
+}
+
 type nestedTransactionStackFrame struct {
 	state *State
 
@@ -20,21 +173,10 @@ type nestedTransactionStackFrame struct {
 	parseRestriction *common.AddressLocation
 }
 
-// TransactionState provides active transaction states and facilitates common
-// state management operations.
-type TransactionState struct {
+type transactionState struct {
 	// NOTE: The first frame is always the main transaction, and is not
 	// poppable during the course of the transaction.
 	nestedTransactions []nestedTransactionStackFrame
-}
-
-// Opaque identifier used for Restarting nested transactions
-type NestedTransactionId struct {
-	state *State
-}
-
-func (id NestedTransactionId) StateForTestingOnly() *State {
-	return id.state
 }
 
 // NewTransactionState constructs a new state transaction which manages nested
@@ -42,9 +184,9 @@ func (id NestedTransactionId) StateForTestingOnly() *State {
 func NewTransactionState(
 	startView View,
 	params StateParameters,
-) *TransactionState {
+) NestedTransaction {
 	startState := NewState(startView, params)
-	return &TransactionState{
+	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
 				state:            startState,
@@ -54,43 +196,33 @@ func NewTransactionState(
 	}
 }
 
-func (s *TransactionState) current() nestedTransactionStackFrame {
+func (s *transactionState) current() nestedTransactionStackFrame {
 	return s.nestedTransactions[s.NumNestedTransactions()]
 }
 
-func (s *TransactionState) currentState() *State {
+func (s *transactionState) currentState() *State {
 	return s.current().state
 }
 
-// NumNestedTransactions returns the number of uncommitted nested transactions.
-// Note that the main transaction is not considered a nested transaction.
-func (s *TransactionState) NumNestedTransactions() int {
+func (s *transactionState) NumNestedTransactions() int {
 	return len(s.nestedTransactions) - 1
 }
 
-// IsParseRestricted returns true if the current nested transaction is in
-// parse resticted access mode.
-func (s *TransactionState) IsParseRestricted() bool {
+func (s *transactionState) IsParseRestricted() bool {
 	return s.current().parseRestriction != nil
 }
 
-func (s *TransactionState) MainTransactionId() NestedTransactionId {
+func (s *transactionState) MainTransactionId() NestedTransactionId {
 	return NestedTransactionId{
 		state: s.nestedTransactions[0].state,
 	}
 }
 
-// IsCurrent returns true if the provide id refers to the current (nested)
-// transaction.
-func (s *TransactionState) IsCurrent(id NestedTransactionId) bool {
+func (s *transactionState) IsCurrent(id NestedTransactionId) bool {
 	return s.currentState() == id.state
 }
 
-// BeginNestedTransaction creates a unrestricted nested transaction within the
-// current unrestricted (nested) transaction.  The meter parameters are
-// inherited from the current transaction.  This returns error if the current
-// nested transaction is program restricted.
-func (s *TransactionState) BeginNestedTransaction() (
+func (s *transactionState) BeginNestedTransaction() (
 	NestedTransactionId,
 	error,
 ) {
@@ -109,11 +241,7 @@ func (s *TransactionState) BeginNestedTransaction() (
 	}, nil
 }
 
-// BeginNestedTransactionWithMeterParams creates a unrestricted nested
-// transaction within the current unrestricted (nested) transaction, using the
-// provided meter parameters. This returns error if the current nested
-// transaction is program restricted.
-func (s *TransactionState) BeginNestedTransactionWithMeterParams(
+func (s *transactionState) BeginNestedTransactionWithMeterParams(
 	params meter.MeterParameters,
 ) (
 	NestedTransactionId,
@@ -134,10 +262,7 @@ func (s *TransactionState) BeginNestedTransactionWithMeterParams(
 	}, nil
 }
 
-// BeginParseRestrictedNestedTransaction creates a restricted nested
-// transaction within the current (nested) transaction.  The meter parameters
-// are inherited from the current transaction.
-func (s *TransactionState) BeginParseRestrictedNestedTransaction(
+func (s *transactionState) BeginParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
 	NestedTransactionId,
@@ -151,7 +276,7 @@ func (s *TransactionState) BeginParseRestrictedNestedTransaction(
 	}, nil
 }
 
-func (s *TransactionState) push(
+func (s *transactionState) push(
 	child *State,
 	location *common.AddressLocation,
 ) {
@@ -164,7 +289,7 @@ func (s *TransactionState) push(
 	)
 }
 
-func (s *TransactionState) pop(op string) (*State, error) {
+func (s *transactionState) pop(op string) (*State, error) {
 	if len(s.nestedTransactions) < 2 {
 		return nil, fmt.Errorf("cannot %s the main transaction", op)
 	}
@@ -175,34 +300,26 @@ func (s *TransactionState) pop(op string) (*State, error) {
 	return child.state, nil
 }
 
-func (s *TransactionState) mergeIntoParent() (*State, error) {
+func (s *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) {
 	childState, err := s.pop("commit")
 	if err != nil {
 		return nil, err
 	}
 
-	childState.committed = true
+	childSnapshot := childState.Finalize()
 
-	err = s.current().state.MergeState(childState)
+	err = s.current().state.Merge(childSnapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return childState, nil
+	return childSnapshot, nil
 }
 
-// Commit commits the changes in the current unrestricted nested transaction
-// to the parent (nested) transaction.  This returns error if the expectedId
-// does not match the current nested transaction.  This returns the committed
-// state otherwise.
-//
-// Note: The returned committed state may be reused by another transaction via
-// AttachAndCommit to update the transaction bookkeeping, but the caller must
-// manually invalidate the state. USE WITH EXTREME CAUTION.
-func (s *TransactionState) Commit(
+func (s *transactionState) CommitNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
-	*State,
+	*ExecutionSnapshot,
 	error,
 ) {
 	if !s.IsCurrent(expectedId) {
@@ -221,18 +338,10 @@ func (s *TransactionState) Commit(
 	return s.mergeIntoParent()
 }
 
-// CommitParseRestricted commits the changes in the current restricted nested
-// transaction to the parent (nested) transaction.  This returns error if the
-// specified location does not match the tracked location.  This returns the
-// committed state otherwise.
-//
-// Note: The returned committed state may be reused by another transaction via
-// AttachAndCommit to update the transaction bookkeeping, but the caller must
-// manually invalidate the state. USE WITH EXTREME CAUTION.
-func (s *TransactionState) CommitParseRestricted(
+func (s *transactionState) CommitParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
-	*State,
+	*ExecutionSnapshot,
 	error,
 ) {
 	currentFrame := s.current()
@@ -250,17 +359,7 @@ func (s *TransactionState) CommitParseRestricted(
 	return s.mergeIntoParent()
 }
 
-// Pause detaches the current nested transaction from the parent transaction,
-// and returns the paused nested transaction state.  The paused nested
-// transaction may be resume via Resume.
-//
-// WARNING: Pause and Resume are intended for implementing continuation passing
-// style behavior for the transaction executor, with the assumption that the
-// states accessed prior to pausing remain valid after resumption.  The paused
-// nested transaction should not be reused across transactions.  IT IS NOT
-// SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE THAT COULD LEAD TO
-// PHANTOM READS.
-func (s *TransactionState) Pause(
+func (s *transactionState) PauseNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
 	*State,
@@ -280,24 +379,17 @@ func (s *TransactionState) Pause(
 	return s.pop("pause")
 }
 
-// Resume attaches the paused nested transaction (state) to the current
-// transaction.
-func (s *TransactionState) Resume(pausedState *State) {
+func (s *transactionState) ResumeNestedTransaction(pausedState *State) {
 	s.push(pausedState, nil)
 }
 
-// AttachAndCommit commits the changes in the cached nested transaction state
-// to the current (nested) transaction.
-func (s *TransactionState) AttachAndCommit(cachedState *State) error {
-	s.push(cachedState, nil)
-	_, err := s.mergeIntoParent()
-	return err
+func (s *transactionState) AttachAndCommitNestedTransaction(
+	cachedSnapshot *ExecutionSnapshot,
+) error {
+	return s.current().state.Merge(cachedSnapshot)
 }
 
-// RestartNestedTransaction merges all changes that belongs to the nested
-// transaction about to be restart (for spock/meter bookkeeping), then
-// wipes its view changes.
-func (s *TransactionState) RestartNestedTransaction(
+func (s *transactionState) RestartNestedTransaction(
 	id NestedTransactionId,
 ) error {
 
@@ -323,11 +415,10 @@ func (s *TransactionState) RestartNestedTransaction(
 		}
 	}
 
-	s.currentState().View().DropDelta()
-	return nil
+	return s.currentState().DropChanges()
 }
 
-func (s *TransactionState) Get(
+func (s *transactionState) Get(
 	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
@@ -336,72 +427,63 @@ func (s *TransactionState) Get(
 	return s.currentState().Get(id)
 }
 
-func (s *TransactionState) Set(
+func (s *transactionState) Set(
 	id flow.RegisterID,
 	value flow.RegisterValue,
 ) error {
 	return s.currentState().Set(id, value)
 }
 
-func (s *TransactionState) MeterComputation(
+func (s *transactionState) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
 	return s.currentState().MeterComputation(kind, intensity)
 }
 
-func (s *TransactionState) MeterMemory(
+func (s *transactionState) MeterMemory(
 	kind common.MemoryKind,
 	intensity uint,
 ) error {
 	return s.currentState().MeterMemory(kind, intensity)
 }
 
-func (s *TransactionState) ComputationIntensities() meter.MeteredComputationIntensities {
+func (s *transactionState) ComputationIntensities() meter.MeteredComputationIntensities {
 	return s.currentState().ComputationIntensities()
 }
 
-func (s *TransactionState) TotalComputationLimit() uint {
+func (s *transactionState) TotalComputationLimit() uint {
 	return s.currentState().TotalComputationLimit()
 }
 
-func (s *TransactionState) TotalComputationUsed() uint64 {
+func (s *transactionState) TotalComputationUsed() uint64 {
 	return s.currentState().TotalComputationUsed()
 }
 
-func (s *TransactionState) MemoryIntensities() meter.MeteredMemoryIntensities {
+func (s *transactionState) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.currentState().MemoryIntensities()
 }
 
-func (s *TransactionState) TotalMemoryEstimate() uint64 {
+func (s *transactionState) TotalMemoryEstimate() uint64 {
 	return s.currentState().TotalMemoryEstimate()
 }
 
-func (s *TransactionState) InteractionUsed() uint64 {
+func (s *transactionState) InteractionUsed() uint64 {
 	return s.currentState().InteractionUsed()
 }
 
-func (s *TransactionState) MeterEmittedEvent(byteSize uint64) error {
+func (s *transactionState) MeterEmittedEvent(byteSize uint64) error {
 	return s.currentState().MeterEmittedEvent(byteSize)
 }
 
-func (s *TransactionState) TotalEmittedEventBytes() uint64 {
+func (s *transactionState) TotalEmittedEventBytes() uint64 {
 	return s.currentState().TotalEmittedEventBytes()
 }
 
-func (s *TransactionState) ViewForTestingOnly() View {
+func (s *transactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
 }
 
-func (s *TransactionState) UpdatedRegisterIDs() []flow.RegisterID {
-	return s.currentState().UpdatedRegisterIDs()
-}
-
-func (s *TransactionState) UpdatedRegisters() flow.RegisterEntries {
-	return s.currentState().UpdatedRegisters()
-}
-
-// RunWithAllLimitsDisabled runs f with limits disabled
-func (s *TransactionState) RunWithAllLimitsDisabled(f func()) {
+func (s *transactionState) RunWithAllLimitsDisabled(f func()) {
 	s.currentState().RunWithAllLimitsDisabled(f)
 }

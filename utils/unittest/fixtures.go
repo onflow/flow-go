@@ -230,7 +230,7 @@ func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockPropos
 }
 
 // AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
-func AsSlashable[T any](msg *T) flow.Slashable[T] {
+func AsSlashable[T any](msg T) flow.Slashable[T] {
 	slashable := flow.Slashable[T]{
 		OriginID: IdentifierFixture(),
 		Message:  msg,
@@ -1711,6 +1711,15 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 		apply(&qc)
 	}
 	return &qc
+}
+
+// CertifyBlock returns a quorum certificate for the given block header
+func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
+	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+		qc.View = header.View
+		qc.BlockID = header.ID()
+	})
+	return qc
 }
 
 func QuorumCertificatesFixtures(n uint, opts ...func(*flow.QuorumCertificate)) []*flow.QuorumCertificate {

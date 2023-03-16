@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -133,7 +132,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
 	derivedChainData      *derived.DerivedChainData
-	activeView            state.View
+	activeSnapshot        state.StorageSnapshot
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
@@ -224,7 +223,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		prov)
 	require.NoError(tb, err)
 
-	view := delta.NewDeltaView(exeState.LedgerGetRegister(ledger, initialCommit))
+	snapshot := exeState.NewLedgerStorageSnapshot(ledger, initialCommit)
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)
@@ -234,7 +233,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		blockComputer:         blockComputer,
 		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeView:            view,
+		activeSnapshot:        snapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 		onStopFunc:            onStopFunc,
@@ -257,7 +256,12 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		executableBlock.ID(),
 		executableBlock.ParentID())
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
+	computationResult, err := b.blockComputer.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		b.activeSnapshot,
+		derivedBlockData)
 	require.NoError(tb, err)
 
 	b.activeStateCommitment = computationResult.EndState
@@ -301,7 +305,8 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 					if err != nil {
 						tb.Fatal("setup account failed, error decoding events")
 					}
-					addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+					addr = flow.ConvertAddress(
+						data.(cadence.Event).Fields[0].(cadence.Address))
 					break
 				}
 			}

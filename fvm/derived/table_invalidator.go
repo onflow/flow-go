@@ -9,7 +9,7 @@ type TableInvalidator[TKey comparable, TVal any] interface {
 	ShouldInvalidateEntries() bool
 
 	// This returns true if the table entry should be invalidated.
-	ShouldInvalidateEntry(TKey, TVal, *state.State) bool
+	ShouldInvalidateEntry(TKey, TVal, *state.ExecutionSnapshot) bool
 }
 
 type tableInvalidatorAtTime[TKey comparable, TVal any] struct {
@@ -23,12 +23,12 @@ type tableInvalidatorAtTime[TKey comparable, TVal any] struct {
 type chainedTableInvalidators[TKey comparable, TVal any] []tableInvalidatorAtTime[TKey, TVal]
 
 func (chained chainedTableInvalidators[TKey, TVal]) ApplicableInvalidators(
-	snapshotTime LogicalTime,
+	toValidateTime LogicalTime,
 ) chainedTableInvalidators[TKey, TVal] {
 	// NOTE: switch to bisection search (or reverse iteration) if the list
 	// is long.
 	for idx, entry := range chained {
-		if snapshotTime <= entry.executionTime {
+		if toValidateTime <= entry.executionTime {
 			return chained[idx:]
 		}
 	}
@@ -49,10 +49,10 @@ func (chained chainedTableInvalidators[TKey, TVal]) ShouldInvalidateEntries() bo
 func (chained chainedTableInvalidators[TKey, TVal]) ShouldInvalidateEntry(
 	key TKey,
 	value TVal,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) bool {
 	for _, invalidator := range chained {
-		if invalidator.ShouldInvalidateEntry(key, value, state) {
+		if invalidator.ShouldInvalidateEntry(key, value, snapshot) {
 			return true
 		}
 	}

@@ -17,10 +17,29 @@ import (
 // grpc library default is 4MB
 const DefaultMaxMsgSize = 1024 * 1024 * 20
 
+// CertificateConfig is used to configure an Certificate
+type CertificateConfig struct {
+	opts []libp2ptls.IdentityOption
+}
+
+// CertificateOption transforms an CertificateConfig to apply optional settings.
+type CertificateOption func(r *CertificateConfig)
+
+// WithCertTemplate specifies the template to use when generating a new certificate.
+func WithCertTemplate(template *x509.Certificate) CertificateOption {
+	return func(c *CertificateConfig) {
+		c.opts = append(c.opts, libp2ptls.WithCertTemplate(template))
+	}
+}
+
 // X509Certificate generates a self-signed x509 TLS certificate from the given key. The generated certificate
 // includes a libp2p extension that specifies the public key and the signature. The certificate does not include any
 // SAN extension.
-func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
+func X509Certificate(privKey crypto.PrivateKey, opts ...CertificateOption) (*tls.Certificate, error) {
+	config := CertificateConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
 
 	// convert the Flow crypto private key to a Libp2p private crypto key
 	libP2PKey, err := keyutils.LibP2PPrivKeyFromFlow(privKey)
@@ -29,7 +48,7 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 	}
 
 	// create a libp2p Identity from the libp2p private key
-	id, err := libp2ptls.NewIdentity(libP2PKey)
+	id, err := libp2ptls.NewIdentity(libP2PKey, config.opts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate identity: %w", err)
 	}

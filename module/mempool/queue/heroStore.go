@@ -8,6 +8,25 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue/internal"
 )
 
+type HeroStoreConfig struct {
+	SizeLimit uint32
+	Collector module.HeroCacheMetrics
+}
+
+type HeroStoreConfigOption func(builder *HeroStoreConfig)
+
+func WithHeroStoreSizeLimit(sizeLimit uint32) HeroStoreConfigOption {
+	return func(builder *HeroStoreConfig) {
+		builder.SizeLimit = sizeLimit
+	}
+}
+
+func WithHeroStoreCollector(collector module.HeroCacheMetrics) HeroStoreConfigOption {
+	return func(builder *HeroStoreConfig) {
+		builder.Collector = collector
+	}
+}
+
 // HeroStore is a FIFO (first-in-first-out) size-bound queue for maintaining engine.Message types.
 // It is based on HeroQueue.
 type HeroStore struct {

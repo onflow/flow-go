@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -131,7 +132,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
@@ -139,7 +140,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution nodes")
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution nodes %s: %v", execNodes, err)
+		return nil, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
 	}
 	b.log.Trace().
 		Str("execution_id", successfulNode.String()).
@@ -191,16 +192,35 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 	return results, nil
 }
 
+// getEventsFromAnyExeNode retrieves the given events from any EN in `execNodes`.
+// We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
+// other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
+// error aggregating all failures is returned.
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
 	var errors *multierror.Error
 	// try to get events from one of the execution nodes
 	for _, execNode := range execNodes {
+		start := time.Now()
 		resp, err := b.tryGetEvents(ctx, execNode, req)
+		duration := time.Since(start)
+
+		logger := b.log.With().
+			Str("execution_node", execNode.String()).
+			Str("event", req.GetType()).
+			Int("blocks", len(req.BlockIds)).
+			Int64("rtt_ms", duration.Milliseconds()).
+			Logger()
+
 		if err == nil {
+			// return if any execution node replied successfully
+			logger.Debug().Msg("Successfully got events")
 			return resp, execNode, nil
 		}
+
+		logger.Err(err).Msg("failed to execute GetEvents")
+
 		errors = multierror.Append(errors, err)
 	}
 	return nil, nil, errors.ErrorOrNil()

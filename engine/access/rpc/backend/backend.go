@@ -188,7 +188,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	for i, idStr := range ids {
 		id, err := flow.HexStringToIdentifier(idStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", id, err)
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
 		}
 		idList[i] = id
 	}

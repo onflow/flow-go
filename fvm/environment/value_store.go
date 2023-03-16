@@ -24,12 +24,12 @@ type ValueStore interface {
 }
 
 type ParseRestrictedValueStore struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     ValueStore
 }
 
 func NewParseRestrictedValueStore(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl ValueStore,
 ) ValueStore {
 	return ParseRestrictedValueStore{

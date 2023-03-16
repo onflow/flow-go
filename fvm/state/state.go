@@ -21,10 +21,10 @@ const (
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	// NOTE: A committed state is no longer accessible.  It can however be
+	// NOTE: A finalized view is no longer accessible.  It can however be
 	// re-attached to another transaction and be committed (for cached result
 	// bookkeeping purpose).
-	committed bool
+	finalized bool
 
 	view  View
 	meter *meter.Meter
@@ -58,14 +58,18 @@ func (params StateParameters) WithMeterParameters(
 }
 
 // WithMaxKeySizeAllowed sets limit on max key size
-func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameters {
+func (params StateParameters) WithMaxKeySizeAllowed(
+	limit uint64,
+) StateParameters {
 	newParams := params
 	newParams.maxKeySizeAllowed = limit
 	return newParams
 }
 
 // WithMaxValueSizeAllowed sets limit on max value size
-func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
+func (params StateParameters) WithMaxValueSizeAllowed(
+	limit uint64,
+) StateParameters {
 	newParams := params
 	newParams.maxValueSizeAllowed = limit
 	return newParams
@@ -99,17 +103,11 @@ func (s *State) View() View {
 	return s.view
 }
 
-func (s *State) Meter() *meter.Meter {
-	return s.meter
-}
-
-type StateOption func(st *State) *State
-
 // NewState constructs a new state
 func NewState(view View, params StateParameters) *State {
 	m := meter.NewMeter(params.MeterParameters)
 	return &State{
-		committed:        false,
+		finalized:        false,
 		view:             view,
 		meter:            m,
 		limitsController: newLimitsController(params),
@@ -122,7 +120,7 @@ func (s *State) NewChildWithMeterParams(
 	params meter.MeterParameters,
 ) *State {
 	return &State{
-		committed:        false,
+		finalized:        false,
 		view:             s.view.NewChild(),
 		meter:            meter.NewMeter(params),
 		limitsController: s.limitsController,
@@ -144,20 +142,18 @@ func (s *State) BytesWritten() uint64 {
 	return s.meter.TotalBytesWrittenToStorage()
 }
 
-// UpdatedRegisterIDs returns the lists of register ids that were updated.
-func (s *State) UpdatedRegisterIDs() []flow.RegisterID {
-	return s.view.UpdatedRegisterIDs()
-}
+func (s *State) DropChanges() error {
+	if s.finalized {
+		return fmt.Errorf("cannot DropChanges on a finalized view")
+	}
 
-// UpdatedRegisters returns the lists of register entries that were updated.
-func (s *State) UpdatedRegisters() flow.RegisterEntries {
-	return s.view.UpdatedRegisters()
+	return s.view.DropChanges()
 }
 
 // Get returns a register value given owner and key
 func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	if s.committed {
-		return nil, fmt.Errorf("cannot Get on a committed state")
+	if s.finalized {
+		return nil, fmt.Errorf("cannot Get on a finalized view")
 	}
 
 	var value []byte
@@ -182,8 +178,8 @@ func (s *State) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 
 // Set updates state delta with a register update
 func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
-	if s.committed {
-		return fmt.Errorf("cannot Set on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot Set on a finalized view")
 	}
 
 	if s.enforceLimits {
@@ -204,8 +200,8 @@ func (s *State) Set(id flow.RegisterID, value flow.RegisterValue) error {
 
 // MeterComputation meters computation usage
 func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterComputation on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterComputation on a finalized view")
 	}
 
 	if s.enforceLimits {
@@ -231,8 +227,8 @@ func (s *State) TotalComputationLimit() uint {
 
 // MeterMemory meters memory usage
 func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterMemory on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterMemory on a finalized view")
 	}
 
 	if s.enforceLimits {
@@ -258,8 +254,8 @@ func (s *State) TotalMemoryLimit() uint {
 }
 
 func (s *State) MeterEmittedEvent(byteSize uint64) error {
-	if s.committed {
-		return fmt.Errorf("cannot MeterEmittedEvent on a committed state")
+	if s.finalized {
+		return fmt.Errorf("cannot MeterEmittedEvent on a finalized view")
 	}
 
 	if s.enforceLimits {
@@ -273,19 +269,25 @@ func (s *State) TotalEmittedEventBytes() uint64 {
 	return s.meter.TotalEmittedEventBytes()
 }
 
-// MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State) error {
-	if s.committed {
-		return fmt.Errorf("cannot MergeState on a committed state")
+func (s *State) Finalize() *ExecutionSnapshot {
+	s.finalized = true
+	snapshot := s.view.Finalize()
+	snapshot.Meter = s.meter
+	return snapshot
+}
+
+// MergeState the changes from a the given view to this view.
+func (s *State) Merge(other *ExecutionSnapshot) error {
+	if s.finalized {
+		return fmt.Errorf("cannot Merge on a finalized view")
 	}
 
-	err := s.view.MergeView(other.view)
+	err := s.view.Merge(other)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	s.meter.MergeMeter(other.meter)
-
+	s.meter.MergeMeter(other.Meter)
 	return nil
 }
 

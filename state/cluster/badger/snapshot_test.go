@@ -52,7 +52,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
@@ -65,7 +65,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root := unittest.RootSnapshotFixture(participants)
 
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, root)
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, root)
 	require.NoError(suite.T(), err)
 
 	suite.Require().Nil(err)

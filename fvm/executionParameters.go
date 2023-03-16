@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage"
 )
 
 // getBasicMeterParameters returns the set of meter parameters used for
@@ -45,17 +45,16 @@ func getBasicMeterParameters(
 func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	txnState *state.TransactionState,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) (
 	meter.MeterParameters,
 	error,
 ) {
 	procParams := getBasicMeterParameters(ctx, proc)
 
-	overrides, err := derivedTxnData.GetMeterParamOverrides(
+	overrides, err := txnState.GetMeterParamOverrides(
 		txnState,
-		NewMeterParamOverridesComputer(ctx, derivedTxnData))
+		NewMeterParamOverridesComputer(ctx, txnState))
 	if err != nil {
 		return procParams, err
 	}
@@ -84,19 +83,22 @@ func getBodyMeterParameters(
 }
 
 type MeterParamOverridesComputer struct {
-	ctx            Context
-	derivedTxnData *derived.DerivedTransactionData
+	ctx      Context
+	txnState storage.Transaction
 }
 
 func NewMeterParamOverridesComputer(
 	ctx Context,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.Transaction,
 ) MeterParamOverridesComputer {
-	return MeterParamOverridesComputer{ctx, derivedTxnData}
+	return MeterParamOverridesComputer{
+		ctx:      ctx,
+		txnState: txnState,
+	}
 }
 
 func (computer MeterParamOverridesComputer) Compute(
-	txnState *state.TransactionState,
+	_ state.NestedTransaction,
 	_ struct{},
 ) (
 	derived.MeterParamOverrides,
@@ -104,8 +106,8 @@ func (computer MeterParamOverridesComputer) Compute(
 ) {
 	var overrides derived.MeterParamOverrides
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
-		overrides, err = computer.getMeterParamOverrides(txnState)
+	computer.txnState.RunWithAllLimitsDisabled(func() {
+		overrides, err = computer.getMeterParamOverrides()
 	})
 
 	if err != nil {
@@ -117,9 +119,7 @@ func (computer MeterParamOverridesComputer) Compute(
 	return overrides, nil
 }
 
-func (computer MeterParamOverridesComputer) getMeterParamOverrides(
-	txnState *state.TransactionState,
-) (
+func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
 	derived.MeterParamOverrides,
 	error,
 ) {
@@ -128,12 +128,11 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides(
 	serviceAddress := computer.ctx.Chain.ServiceAddress()
 	service := common.Address(serviceAddress)
 
-	env := environment.NewScriptEnvironment(
+	env := environment.NewScriptEnv(
 		context.Background(),
 		computer.ctx.TracerSpan,
 		computer.ctx.EnvironmentParams,
-		txnState,
-		computer.derivedTxnData)
+		computer.txnState)
 
 	overrides := derived.MeterParamOverrides{}
 
@@ -214,9 +213,10 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 		return nil, err
 	}
 
-	weightsRaw, ok := utils.CadenceValueToWeights(value)
+	weightsRaw, ok := cadenceValueToWeights(value)
 	if !ok {
-		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
+		// this is a non-fatal error. It is expected if the weights are not
+		// set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			path.String())
@@ -236,6 +236,32 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	}
 
 	return weights, nil
+}
+
+// cadenceValueToWeights converts a cadence value to a map of weights used for
+// metering
+func cadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
+	dict, ok := value.(cadence.Dictionary)
+	if !ok {
+		return nil, false
+	}
+
+	result := make(map[uint]uint64, len(dict.Pairs))
+	for _, p := range dict.Pairs {
+		key, ok := p.Key.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		value, ok := p.Value.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		result[uint(key.ToGoValue().(uint64))] = uint64(value)
+	}
+
+	return result, true
 }
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account

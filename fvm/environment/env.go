@@ -3,11 +3,9 @@ package environment
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -44,8 +42,8 @@ type Environment interface {
 
 	// SystemContracts
 	AccountsStorageCapacity(
-		addresses []common.Address,
-		payer common.Address,
+		addresses []flow.Address,
+		payer flow.Address,
 		maxTxFees uint64,
 	) (
 		cadence.Value,
@@ -71,18 +69,16 @@ type Environment interface {
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 
-	AccountFreezer
-
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
-	// corresponding modified sets invalidator.
+	// the updated contract keys.
 	FlushPendingUpdates() (
-		derived.TransactionInvalidator,
+		[]ContractUpdateKey,
 		error,
 	)
 
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
-	// EventEmitter, AccountFreezer) to initial state.
+	// EventEmitter) to initial state.
 	Reset()
 }
 

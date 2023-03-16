@@ -37,7 +37,7 @@ type Suite struct {
 	cleaner   *storage.Cleaner
 	headers   *storage.Headers
 	payloads  *storage.Payloads
-	state     *protocol.MutableState
+	state     *protocol.FollowerState
 	snapshot  *protocol.Snapshot
 	cache     *module.PendingBlockBuffer
 	follower  *module.HotStuffFollower
@@ -58,7 +58,7 @@ func (s *Suite) SetupTest() {
 	s.cleaner = storage.NewCleaner(s.T())
 	s.headers = storage.NewHeaders(s.T())
 	s.payloads = storage.NewPayloads(s.T())
-	s.state = protocol.NewMutableState(s.T())
+	s.state = protocol.NewFollowerState(s.T())
 	s.snapshot = protocol.NewSnapshot(s.T())
 	s.cache = module.NewPendingBlockBuffer(s.T())
 	s.follower = module.NewHotStuffFollower(s.T())
@@ -124,12 +124,12 @@ func (s *Suite) TestHandlePendingBlock() {
 	block.Header.Height = 12
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
 	s.snapshot.On("Head").Return(head.Header, nil)
-	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -158,8 +158,8 @@ func (s *Suite) TestHandleProposal() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -170,7 +170,7 @@ func (s *Suite) TestHandleProposal() {
 	// the block passes hotstuff validation
 	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	// we should be able to extend the state with the block
-	s.state.On("Extend", mock.Anything, &block).Return(nil).Once()
+	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
 	// we should be able to get the parent header by its ID
 	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
 	// we do not have any children cached
@@ -201,7 +201,7 @@ func (s *Suite) TestHandleProposalSkipProposalThreshold() {
 	done := make(chan struct{})
 
 	// not in cache or storage
-	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return(nil, realstorage.ErrNotFound).Once()
@@ -235,15 +235,15 @@ func (s *Suite) TestHandleProposalWithPendingChildren() {
 	// the parent is the last finalized state
 	s.snapshot.On("Head").Return(parent.Header, nil)
 
-	s.cache.On("ByID", mock.Anything).Return(flow.Slashable[flow.Block]{}, false)
+	s.cache.On("ByID", mock.Anything).Return(flow.Slashable[*flow.Block]{}, false)
 	// first time calling, assume it's not there
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// both blocks pass HotStuff validation
 	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	s.validator.On("ValidateProposal", childHotstuffProposal).Return(nil)
 	// should extend state with the input block, and the child
-	s.state.On("Extend", mock.Anything, block).Return(nil).Once()
-	s.state.On("Extend", mock.Anything, child).Return(nil).Once()
+	s.state.On("ExtendCertified", mock.Anything, block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
+	s.state.On("ExtendCertified", mock.Anything, child, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
 	// we have already received and stored the parent
 	s.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil).Once()
 	// should submit to follower
@@ -253,7 +253,7 @@ func (s *Suite) TestHandleProposalWithPendingChildren() {
 	}).Once()
 
 	// we have one pending child cached
-	pending := []flow.Slashable[flow.Block]{
+	pending := []flow.Slashable[*flow.Block]{
 		{
 			OriginID: originID,
 			Message:  child,
@@ -281,8 +281,8 @@ func (s *Suite) TestProcessSyncedBlock() {
 	block.Header.ParentID = parent.ID()
 
 	// not in cache
-	s.cache.On("ByID", block.ID()).Return(flow.Slashable[flow.Block]{}, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
+	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
 	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	done := make(chan struct{})
@@ -293,7 +293,7 @@ func (s *Suite) TestProcessSyncedBlock() {
 	// the block passes hotstuff validation
 	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	// we should be able to extend the state with the block
-	s.state.On("Extend", mock.Anything, &block).Return(nil).Once()
+	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
 	// we should be able to get the parent header by its ID
 	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
 	// we do not have any children cached
@@ -303,9 +303,9 @@ func (s *Suite) TestProcessSyncedBlock() {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlock(flow.Slashable[messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  messages.NewBlockProposal(&block),
+		Message:  []*messages.BlockProposal{messages.NewBlockProposal(&block)},
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }

@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -19,8 +19,54 @@ func createByteArray(size int) []byte {
 	return bytes
 }
 
+func TestState_Finalize(t *testing.T) {
+	view := delta.NewDeltaView(nil)
+	parent := state.NewState(view, state.DefaultParameters())
+
+	child := parent.NewChild()
+
+	readId := flow.NewRegisterID("0", "x")
+
+	_, err := child.Get(readId)
+	require.NoError(t, err)
+
+	writeId := flow.NewRegisterID("1", "y")
+	writeValue := flow.RegisterValue("a")
+
+	err = child.Set(writeId, writeValue)
+	require.NoError(t, err)
+
+	childSnapshot := child.Finalize()
+
+	require.Equal(
+		t,
+		map[flow.RegisterID]struct{}{
+			readId:  struct{}{},
+			writeId: struct{}{}, // TODO(patrick): rm from read set
+		},
+		childSnapshot.ReadSet)
+
+	require.Equal(
+		t,
+		map[flow.RegisterID]flow.RegisterValue{
+			writeId: writeValue,
+		},
+		childSnapshot.WriteSet)
+
+	require.NotNil(t, childSnapshot.SpockSecret)
+	require.NotNil(t, childSnapshot.Meter)
+
+	parentSnapshot := parent.Finalize()
+	// empty read / write set since child was not merged.
+	require.Empty(t, parentSnapshot.ReadSet)
+	require.Empty(t, parentSnapshot.WriteSet)
+	require.NotNil(t, parentSnapshot.SpockSecret)
+	require.NotNil(t, parentSnapshot.Meter)
+
+}
+
 func TestState_ChildMergeFunctionality(t *testing.T) {
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 	st := state.NewState(view, state.DefaultParameters())
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
@@ -67,7 +113,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// merge to parent
-		err = st.MergeState(stChild)
+		err = st.Merge(stChild.Finalize())
 		require.NoError(t, err)
 
 		// read key3 on parent
@@ -92,7 +138,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestState_MaxValueSize(t *testing.T) {
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 	st := state.NewState(view, state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
 	key := flow.NewRegisterID("address", "key")
@@ -109,7 +155,7 @@ func TestState_MaxValueSize(t *testing.T) {
 }
 
 func TestState_MaxKeySize(t *testing.T) {
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 	st := state.NewState(
 		view,
 		// Note: owners are always 8 bytes
@@ -137,7 +183,7 @@ func TestState_MaxKeySize(t *testing.T) {
 }
 
 func TestState_MaxInteraction(t *testing.T) {
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	key1 := flow.NewRegisterID("1", "2")
 	key1Size := uint64(8 + 1)
@@ -190,7 +236,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.MergeState(stChild)
+	err = st.Merge(stChild.Finalize())
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), key1Size+value1Size)
 

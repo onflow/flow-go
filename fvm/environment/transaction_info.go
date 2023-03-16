@@ -40,8 +40,6 @@ type TransactionInfo interface {
 	TransactionFeesEnabled() bool
 	LimitAccountStorage() bool
 
-	SigningAccounts() []common.Address
-
 	IsServiceAccountAuthorizer() bool
 
 	// Cadence's runtime API.  Note that the script variant will return
@@ -50,12 +48,12 @@ type TransactionInfo interface {
 }
 
 type ParseRestrictedTransactionInfo struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     TransactionInfo
 }
 
 func NewParseRestrictedTransactionInfo(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl TransactionInfo,
 ) TransactionInfo {
 	return ParseRestrictedTransactionInfo{
@@ -80,10 +78,6 @@ func (info ParseRestrictedTransactionInfo) LimitAccountStorage() bool {
 	return info.impl.LimitAccountStorage()
 }
 
-func (info ParseRestrictedTransactionInfo) SigningAccounts() []common.Address {
-	return info.impl.SigningAccounts()
-}
-
 func (info ParseRestrictedTransactionInfo) IsServiceAccountAuthorizer() bool {
 	return info.impl.IsServiceAccountAuthorizer()
 }
@@ -103,7 +97,7 @@ type transactionInfo struct {
 
 	tracer tracing.TracerSpan
 
-	authorizers                []common.Address
+	runtimeAuthorizers         []common.Address
 	isServiceAccountAuthorizer bool
 }
 
@@ -120,7 +114,9 @@ func NewTransactionInfo(
 		len(params.TxBody.Authorizers))
 
 	for _, auth := range params.TxBody.Authorizers {
-		runtimeAddresses = append(runtimeAddresses, common.Address(auth))
+		runtimeAddresses = append(
+			runtimeAddresses,
+			common.MustBytesToAddress(auth.Bytes()))
 		if auth == serviceAccount {
 			isServiceAccountAuthorizer = true
 		}
@@ -129,7 +125,7 @@ func NewTransactionInfo(
 	return &transactionInfo{
 		params:                     params,
 		tracer:                     tracer,
-		authorizers:                runtimeAddresses,
+		runtimeAuthorizers:         runtimeAddresses,
 		isServiceAccountAuthorizer: isServiceAccountAuthorizer,
 	}
 }
@@ -150,10 +146,6 @@ func (info *transactionInfo) LimitAccountStorage() bool {
 	return info.params.LimitAccountStorage
 }
 
-func (info *transactionInfo) SigningAccounts() []common.Address {
-	return info.authorizers
-}
-
 func (info *transactionInfo) IsServiceAccountAuthorizer() bool {
 	return info.isServiceAccountAuthorizer
 }
@@ -162,7 +154,7 @@ func (info *transactionInfo) GetSigningAccounts() ([]common.Address, error) {
 	defer info.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGetSigningAccounts).End()
 
-	return info.authorizers, nil
+	return info.runtimeAuthorizers, nil
 }
 
 var _ TransactionInfo = NoTransactionInfo{}
@@ -185,10 +177,6 @@ func (NoTransactionInfo) TransactionFeesEnabled() bool {
 
 func (NoTransactionInfo) LimitAccountStorage() bool {
 	return false
-}
-
-func (NoTransactionInfo) SigningAccounts() []common.Address {
-	return nil
 }
 
 func (NoTransactionInfo) IsServiceAccountAuthorizer() bool {

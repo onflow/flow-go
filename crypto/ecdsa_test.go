@@ -22,15 +22,6 @@ var ecdsaCurves = []SigningAlgorithm{
 	ECDSAP256,
 	ECDSASecp256k1,
 }
-var ecdsaMinSeed = map[SigningAlgorithm]int{
-	ECDSAP256:      KeyGenSeedMinLenECDSAP256,
-	ECDSASecp256k1: KeyGenSeedMinLenECDSASecp256k1,
-}
-
-var ecdsaMaxSeed = map[SigningAlgorithm]int{
-	ECDSAP256:      KeyGenSeedMaxLenECDSA,
-	ECDSASecp256k1: KeyGenSeedMaxLenECDSA,
-}
 var ecdsaPrKeyLen = map[SigningAlgorithm]int{
 	ECDSAP256:      PrKeyLenECDSAP256,
 	ECDSASecp256k1: PrKeyLenECDSASecp256k1,
@@ -50,7 +41,7 @@ func TestECDSA(t *testing.T) {
 	for _, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		// test key generation seed limits
-		testKeyGenSeed(t, curve, ecdsaMinSeed[curve], ecdsaMaxSeed[curve])
+		testKeyGenSeed(t, curve, KeyGenSeedMinLen, KeyGenSeedMaxLen)
 		// test consistency
 		halg := hash.NewSHA3_256()
 		testGenSignVerify(t, curve, halg)
@@ -72,9 +63,9 @@ func TestECDSAHasher(t *testing.T) {
 	for _, curve := range ecdsaCurves {
 
 		// generate a key pair
-		seed := make([]byte, ecdsaMinSeed[curve])
+		seed := make([]byte, KeyGenSeedMinLen)
 		n, err := crand.Read(seed)
-		require.Equal(t, n, ecdsaMinSeed[curve])
+		require.Equal(t, n, KeyGenSeedMinLen)
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
 		require.NoError(t, err)
@@ -155,9 +146,9 @@ func TestECDSAUtils(t *testing.T) {
 
 	for _, curve := range ecdsaCurves {
 		// generate a key pair
-		seed := make([]byte, ecdsaMinSeed[curve])
+		seed := make([]byte, KeyGenSeedMinLen)
 		n, err := crand.Read(seed)
-		require.Equal(t, n, ecdsaMinSeed[curve])
+		require.Equal(t, n, KeyGenSeedMinLen)
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
 		require.NoError(t, err)

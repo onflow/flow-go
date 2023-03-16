@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -111,7 +112,7 @@ type ExecutionNode struct {
 
 	collector               module.ExecutionMetrics
 	executionState          state.ExecutionState
-	followerState           protocol.MutableState
+	followerState           protocol.FollowerState
 	committee               hotstuff.DynamicCommittee
 	ledgerStorage           *ledger.Ledger
 	events                  *storage.Events
@@ -123,7 +124,6 @@ type ExecutionNode struct {
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
 	pendingBlocks           *buffer.PendingBlocks // used in follower engine
-	deltas                  *ingestion.Deltas
 	syncEngine              *synchronization.Engine
 	followerCore            *hotstuff.FollowerLoop // follower hotstuff logic
 	followerEng             *followereng.Engine    // to sync blocks from consensus nodes
@@ -176,7 +176,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
-		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -219,14 +218,7 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 	}
 	var err error
-	exeNode.followerState, err = badgerState.NewFollowerState(
-		bState,
-		node.Storage.Index,
-		node.Storage.Payloads,
-		node.Tracer,
-		node.ProtocolEvents,
-		blocktimer.DefaultBlockTimer,
-	)
+	exeNode.followerState, err = badgerState.NewFollowerState(bState, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	return err
 }
 
@@ -520,16 +512,26 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	ctx := context.Background()
 	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+		return nil, fmt.Errorf(
+			"cannot get the latest executed block id: %w",
+			err)
 	}
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(ctx, blockID)
+	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(
+		ctx,
+		blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the state commitment at latest executed block id %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf(
+			"cannot get the state commitment at latest executed block id %s: %w",
+			blockID.String(),
+			err)
 	}
-	blockView := exeNode.executionState.NewView(stateCommit)
+	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.
-	contractEpochCounter, err := getContractEpochCounter(exeNode.computationManager.VM(), vmCtx, blockView)
+	contractEpochCounter, err := getContractEpochCounter(
+		exeNode.computationManager.VM(),
+		vmCtx,
+		blockSnapshot)
 	// Failing to fetch the epoch counter from the smart contract is a fatal error.
 	if err != nil {
 		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
@@ -564,12 +566,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 
 	return exeNode.providerEngine, nil
-}
-
-func (exeNode *ExecutionNode) LoadDeltasMempool(node *NodeConfig) error {
-	var err error
-	exeNode.deltas, err = ingestion.NewDeltas(exeNode.exeConf.stateDeltasLimit)
-	return err
 }
 
 func (exeNode *ExecutionNode) LoadAuthorizationCheckingFunction(
@@ -786,15 +782,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
-	preferredExeFilter := filter.Any
-	preferredExeNodeID, err := flow.HexStringToIdentifier(exeNode.exeConf.preferredExeNodeIDStr)
-	if err == nil {
-		node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
-		preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-	} else if exeNode.exeConf.preferredExeNodeIDStr != "" {
-		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
-	}
-
 	exeNode.ingestionEng, err = ingestion.New(
 		node.Logger,
 		node.Network,
@@ -812,10 +799,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collector,
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
-		preferredExeFilter,
-		exeNode.deltas,
-		exeNode.exeConf.syncThreshold,
-		exeNode.exeConf.syncFast,
 		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
@@ -1077,8 +1060,16 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	return nil
 }
 
-// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
-func getContractEpochCounter(vm fvm.VM, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart
+// contract from the snapshot provided.
+func getContractEpochCounter(
+	vm fvm.VM,
+	vmCtx fvm.Context,
+	snapshot fvmState.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
@@ -1093,7 +1084,7 @@ func getContractEpochCounter(vm fvm.VM, vmCtx fvm.Context, view *delta.View) (ui
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.Run(vmCtx, script, view)
+	err = vm.Run(vmCtx, script, delta.NewDeltaView(snapshot))
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

@@ -110,24 +110,57 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+// tests the key generation constraints with regards to the input seed, mainly
+// the seed length constraints and the result determinicity.
 func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
-	// valid seed lengths
-	seed := make([]byte, minLen)
-	_, err := GeneratePrivateKey(salg, seed)
-	assert.NoError(t, err)
-	seed = make([]byte, maxLen)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.NoError(t, err)
-	// invalid seed lengths
-	seed = make([]byte, minLen-1)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.Error(t, err)
-	assert.True(t, IsInvalidInputsError(err))
-	seed = make([]byte, maxLen+1)
-	_, err = GeneratePrivateKey(salg, seed)
-	assert.Error(t, err)
-	assert.True(t, IsInvalidInputsError(err))
+	t.Run("seed length check", func(t *testing.T) {
+		// valid seed lengths
+		seed := make([]byte, minLen)
+		_, err := GeneratePrivateKey(salg, seed)
+		assert.NoError(t, err)
+		if maxLen > 0 {
+			seed = make([]byte, maxLen)
+			_, err = GeneratePrivateKey(salg, seed)
+			assert.NoError(t, err)
+		}
+		// invalid seed lengths
+		seed = make([]byte, minLen-1)
+		_, err = GeneratePrivateKey(salg, seed)
+		assert.Error(t, err)
+		assert.True(t, IsInvalidInputsError(err))
+		if maxLen > 0 {
+			seed = make([]byte, maxLen+1)
+			_, err = GeneratePrivateKey(salg, seed)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+		}
+	})
+
+	t.Run("deterministic generation", func(t *testing.T) {
+		r := time.Now().UnixNano()
+		mrand.Seed(r)
+		t.Logf("math rand seed is %d", r)
+		// same seed results in the same key
+		seed := make([]byte, minLen)
+		read, err := mrand.Read(seed)
+		require.Equal(t, read, minLen)
+		require.NoError(t, err)
+		sk1, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		sk2, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		assert.True(t, sk1.Equals(sk2))
+		// different seed results in a different key
+		seed[0] ^= 1 // alter a seed bit
+		sk2, err = GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		assert.False(t, sk1.Equals(sk2))
+	})
 }
+
+var BLS12381Order = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
+	0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
+	0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
@@ -193,9 +226,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 			255, 255, 255, 255, 255, 254, 186, 174, 220, 230,
 			175, 72, 160, 59, 191, 210, 94, 140, 208, 54, 65, 65}
 
-		groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
-			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
-			0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
+		groupOrder[BLSBLS12381] = BLS12381Order
 
 		sk, err := DecodePrivateKey(salg, groupOrder[salg])
 		require.Error(t, err, "the key decoding should fail - private key value is too large")

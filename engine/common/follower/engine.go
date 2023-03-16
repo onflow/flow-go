@@ -47,7 +47,7 @@ type Engine struct {
 	cleaner               storage.Cleaner
 	headers               storage.Headers
 	payloads              storage.Payloads
-	state                 protocol.MutableState
+	state                 protocol.FollowerState
 	pending               module.PendingBlockBuffer
 	follower              module.HotStuffFollower
 	validator             hotstuff.Validator
@@ -89,7 +89,7 @@ func New(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.MutableState,
+	state protocol.FollowerState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
@@ -140,19 +140,22 @@ func New(
 	return e, nil
 }
 
-// OnBlockProposal errors when called since follower engine doesn't support direct ingestion via internal method.
-func (e *Engine) OnBlockProposal(_ flow.Slashable[messages.BlockProposal]) {
+// OnBlockProposal logs an error and drops the proposal. This is because the follower ingests new
+// blocks directly from the networking layer (channel `channels.ReceiveBlocks` by default), which
+// delivers its messages by calling the generic `Process` method. Receiving block proposal as
+// from another internal component is likely an implementation bug.
+func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
 	e.log.Error().Msg("received unexpected block proposal via internal method")
 }
 
-// OnSyncedBlock performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) OnSyncedBlock(synced flow.Slashable[messages.BlockProposal]) {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
-	// a block that is synced has to come locally, from the synchronization engine
-	// the block itself will contain the proposer to indicate who created it
+// OnSyncedBlocks consumes incoming blocks by pushing into queue and notifying worker.
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
+	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
+	// states which node forwarded the batch to us. Each block contains its proposer and signature.
 
 	// queue proposal
-	if e.pendingBlocks.Push(synced) {
+	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }
@@ -162,7 +165,7 @@ func (e *Engine) OnSyncedBlock(synced flow.Slashable[messages.BlockProposal]) {
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
-		e.onBlockProposal(flow.Slashable[messages.BlockProposal]{
+		e.onBlockProposal(flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
@@ -205,12 +208,14 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			in := msg.(flow.Slashable[messages.BlockProposal])
-			err := e.processBlockProposal(in.OriginID, in.Message)
-			if err != nil {
-				return fmt.Errorf("could not handle block proposal: %w", err)
+			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			for _, block := range batch.Message {
+				err := e.processBlockProposal(batch.OriginID, block)
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
+				e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			}
-			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
 
@@ -221,10 +226,14 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) onBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
+func (e *Engine) onBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message:  []*messages.BlockProposal{proposal.Message},
+	}
 	// queue proposal
-	if e.pendingBlocks.Push(proposal) {
+	if e.pendingBlocks.Push(proposalAsList) {
 		e.pendingBlocksNotifier.Notify()
 	}
 }
@@ -404,10 +413,11 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *flow.
 	}
 
 	// check whether the block is a valid extension of the chain.
-	// it only checks the block header, since checking block body is expensive.
-	// The full block check is done by the consensus participants.
-	// TODO: CAUTION we write a block to disk, without validating its payload yet. This is vulnerable to malicious primaries.
-	err = e.state.Extend(ctx, proposal)
+	// The follower engine only checks the block's header. The more expensive payload validation
+	// is only done by the consensus committee. For safety, we require that a QC for the extending
+	// block is provided while inserting the block. This ensures that all stored blocks are fully validated
+	// by the consensus committee before being stored here.
+	err = e.state.ExtendCertified(ctx, proposal, nil)
 	if err != nil {
 		// block is outdated by the time we started processing it
 		// => some other node generating the proposal is probably behind is catching up.

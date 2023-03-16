@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -25,8 +26,8 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -68,19 +69,21 @@ func (vmt vmTest) run(
 	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		chain, vm := createChainAndVm(flow.Testnet)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		baseOpts := []fvm.Option{
-			fvm.WithChain(chain),
+			// default chain is Testnet
+			fvm.WithChain(flow.Testnet.Chain()),
 			fvm.WithDerivedBlockData(derivedBlockData),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
-
 		ctx := fvm.NewContext(opts...)
 
-		view := utils.NewSimpleView()
+		chain := ctx.Chain
+		vm := fvm.NewVirtualMachine()
+
+		view := delta.NewDeltaView(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -100,24 +103,25 @@ func (vmt vmTest) run(
 func (vmt vmTest) bootstrapWith(
 	bootstrap func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error,
 ) (bootstrappedVmTest, error) {
-	chain, vm := createChainAndVm(flow.Testnet)
 
 	baseOpts := []fvm.Option{
-		fvm.WithChain(chain),
+		// default chain is Testnet
+		fvm.WithChain(flow.Testnet.Chain()),
 	}
 
 	opts := append(baseOpts, vmt.contextOptions...)
-
 	ctx := fvm.NewContext(opts...)
 
-	view := utils.NewSimpleView()
+	chain := ctx.Chain
+	vm := fvm.NewVirtualMachine()
+
+	view := delta.NewDeltaView(nil)
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
-
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
 	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
@@ -478,7 +482,7 @@ func TestWithServiceAccount(t *testing.T) {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
-	view := utils.NewSimpleView()
+	view := delta.NewDeltaView(nil)
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
@@ -980,7 +984,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
-			address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address := flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -1493,7 +1498,7 @@ func TestStorageUsed(t *testing.T) {
 	accountStatusId := flow.AccountStatusRegisterID(
 		flow.BytesToAddress(address))
 
-	simpleView := utils.NewSimpleView()
+	simpleView := delta.NewDeltaView(nil)
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
 	err = simpleView.Set(accountStatusId, status.ToBytes())
@@ -1511,7 +1516,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Testnet)
-	simpleView := utils.NewSimpleView()
+	simpleView := delta.NewDeltaView(nil)
 
 	const computationLimit = 5
 
@@ -2038,7 +2043,8 @@ func TestInteractionLimit(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+			address = flow.ConvertAddress(
+				data.(cadence.Event).Fields[0].(cadence.Address))
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -2102,4 +2108,81 @@ func TestInteractionLimit(t *testing.T) {
 			}),
 		)
 	}
+}
+
+func TestAuthAccountCapabilities(t *testing.T) {
+	test := func(t *testing.T, allowAccountLinking bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						1,
+						runtime.Config{
+							AccountLinkingEnabled: true,
+						},
+					),
+				),
+			).
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					view state.View,
+					derivedBlockData *derived.DerivedBlockData,
+				) {
+					// Create an account private key.
+					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+					privateKey := privateKeys[0]
+					require.NoError(t, err)
+					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+					accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
+					require.NoError(t, err)
+					account := accounts[0]
+
+					var pragma string
+					if allowAccountLinking {
+						pragma = "#allowAccountLinking"
+					}
+					code := fmt.Sprintf(
+						`
+						  %s
+
+						  transaction {
+						      prepare(acct: AuthAccount) {
+						          acct.linkAccount(/private/foo)
+						      }
+						  }
+						`,
+						pragma,
+					)
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(code)).
+						AddAuthorizer(account).
+						SetPayer(chain.ServiceAddress()).
+						SetProposalKey(chain.ServiceAddress(), 0, 0)
+					_ = testutil.SignPayload(txBody, account, privateKey)
+					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+					tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+					err = vm.Run(ctx, tx, view)
+					require.NoError(t, err)
+
+					if allowAccountLinking {
+						require.NoError(t, tx.Err)
+					} else {
+						require.Error(t, tx.Err)
+					}
+				},
+			)(t)
+	}
+
+	t.Run("account linking allowed", func(t *testing.T) {
+		test(t, true)
+	})
+
+	t.Run("account linking disallowed", func(t *testing.T) {
+		test(t, false)
+	})
 }

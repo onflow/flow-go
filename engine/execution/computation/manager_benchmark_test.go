@@ -17,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
@@ -105,16 +104,17 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	vm := fvm.NewVirtualMachine()
 
-	chain := flow.Emulator.Chain()
+	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chain),
+		fvm.WithChain(chainID.Chain()),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{})),
+				runtime.Config{},
+			)),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,
@@ -129,6 +129,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -161,13 +162,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           tracer,
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
-
-	view := delta.NewDeltaView(ledger.Get)
-	blockView := view.NewChild()
 
 	b.SetParallelism(1)
 
@@ -192,9 +188,18 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 			b.StartTimer()
 			start := time.Now()
-			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+			res, err := engine.ComputeBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				executableBlock,
+				ledger)
 			elapsed += time.Since(start)
 			b.StopTimer()
+
+			for _, snapshot := range res.StateSnapshots {
+				err := ledger.Merge(snapshot)
+				require.NoError(b, err)
+			}
 
 			require.NoError(b, err)
 			for j, r := range res.TransactionResults {

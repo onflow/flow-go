@@ -7,13 +7,56 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// ProgramDependencies are the locations of the programs this program depends on.
-type ProgramDependencies map[common.Address]struct{}
+type DerivedTransaction interface {
+	GetOrComputeProgram(
+		txState state.NestedTransaction,
+		addressLocation common.AddressLocation,
+		programComputer ValueComputer[common.AddressLocation, *Program],
+	) (
+		*Program,
+		error,
+	)
+
+	GetProgram(
+		addressLocation common.AddressLocation,
+	) (
+		*Program,
+		*state.ExecutionSnapshot,
+		bool,
+	)
+
+	SetProgram(
+		addressLocation common.AddressLocation,
+		program *Program,
+		snapshot *state.ExecutionSnapshot,
+	)
+
+	GetMeterParamOverrides(
+		txnState state.NestedTransaction,
+		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+	) (
+		MeterParamOverrides,
+		error,
+	)
+
+	AddInvalidator(invalidator TransactionInvalidator)
+}
+
+type DerivedTransactionCommitter interface {
+	DerivedTransaction
+
+	Validate() error
+	Commit() error
+}
+
+// ProgramDependencies are the programs' addresses used by this program.
+type ProgramDependencies map[flow.Address]struct{}
 
 // AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(address common.Address) {
+func (d ProgramDependencies) AddDependency(address flow.Address) {
 	d[address] = struct{}{}
 }
 
@@ -90,7 +133,7 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
@@ -117,7 +160,7 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 	snapshotTime LogicalTime,
 	executionTime LogicalTime,
 ) (
-	*DerivedTransactionData,
+	DerivedTransactionCommitter,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewTableTransaction(
@@ -158,11 +201,25 @@ func (block *DerivedBlockData) CachedPrograms() int {
 	return len(block.programs.items)
 }
 
+func (transaction *DerivedTransactionData) GetOrComputeProgram(
+	txState state.NestedTransaction,
+	addressLocation common.AddressLocation,
+	programComputer ValueComputer[common.AddressLocation, *Program],
+) (
+	*Program,
+	error,
+) {
+	return transaction.programs.GetOrCompute(
+		txState,
+		addressLocation,
+		programComputer)
+}
+
 func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
 	*Program,
-	*state.State,
+	*state.ExecutionSnapshot,
 	bool,
 ) {
 	return transaction.programs.Get(addressLocation)
@@ -171,9 +228,9 @@ func (transaction *DerivedTransactionData) GetProgram(
 func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
 	program *Program,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) {
-	transaction.programs.Set(addressLocation, program, state)
+	transaction.programs.Set(addressLocation, program, snapshot)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(
@@ -189,7 +246,7 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 }
 
 func (transaction *DerivedTransactionData) GetMeterParamOverrides(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 ) (
 	MeterParamOverrides,

@@ -14,20 +14,22 @@ import (
 
 // AccountInfo exposes various account balance and storage statistics.
 type AccountInfo interface {
-	GetStorageUsed(address common.Address) (uint64, error)
-	GetStorageCapacity(address common.Address) (uint64, error)
-	GetAccountBalance(address common.Address) (uint64, error)
-	GetAccountAvailableBalance(address common.Address) (uint64, error)
+	// Cadence's runtime APIs.
+	GetStorageUsed(runtimeaddress common.Address) (uint64, error)
+	GetStorageCapacity(runtimeAddress common.Address) (uint64, error)
+	GetAccountBalance(runtimeAddress common.Address) (uint64, error)
+	GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error)
+
 	GetAccount(address flow.Address) (*flow.Account, error)
 }
 
 type ParseRestrictedAccountInfo struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountInfo
 }
 
 func NewParseRestrictedAccountInfo(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountInfo,
 ) AccountInfo {
 	return ParseRestrictedAccountInfo{
@@ -37,7 +39,7 @@ func NewParseRestrictedAccountInfo(
 }
 
 func (info ParseRestrictedAccountInfo) GetStorageUsed(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -46,11 +48,11 @@ func (info ParseRestrictedAccountInfo) GetStorageUsed(
 		info.txnState,
 		trace.FVMEnvGetStorageUsed,
 		info.impl.GetStorageUsed,
-		address)
+		runtimeAddress)
 }
 
 func (info ParseRestrictedAccountInfo) GetStorageCapacity(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -59,11 +61,11 @@ func (info ParseRestrictedAccountInfo) GetStorageCapacity(
 		info.txnState,
 		trace.FVMEnvGetStorageCapacity,
 		info.impl.GetStorageCapacity,
-		address)
+		runtimeAddress)
 }
 
 func (info ParseRestrictedAccountInfo) GetAccountBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -72,11 +74,11 @@ func (info ParseRestrictedAccountInfo) GetAccountBalance(
 		info.txnState,
 		trace.FVMEnvGetAccountBalance,
 		info.impl.GetAccountBalance,
-		address)
+		runtimeAddress)
 }
 
 func (info ParseRestrictedAccountInfo) GetAccountAvailableBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -85,7 +87,7 @@ func (info ParseRestrictedAccountInfo) GetAccountAvailableBalance(
 		info.txnState,
 		trace.FVMEnvGetAccountAvailableBalance,
 		info.impl.GetAccountAvailableBalance,
-		address)
+		runtimeAddress)
 }
 
 func (info ParseRestrictedAccountInfo) GetAccount(
@@ -128,7 +130,7 @@ func NewAccountInfo(
 }
 
 func (info *accountInfo) GetStorageUsed(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -140,7 +142,8 @@ func (info *accountInfo) GetStorageUsed(
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
 
-	value, err := info.accounts.GetStorageUsed(flow.Address(address))
+	value, err := info.accounts.GetStorageUsed(
+		flow.ConvertAddress(runtimeAddress))
 	if err != nil {
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
@@ -157,7 +160,7 @@ func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 }
 
 func (info *accountInfo) GetStorageCapacity(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -169,7 +172,8 @@ func (info *accountInfo) GetStorageCapacity(
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountStorageCapacity(address)
+	result, invokeErr := info.systemContracts.AccountStorageCapacity(
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -181,7 +185,7 @@ func (info *accountInfo) GetStorageCapacity(
 }
 
 func (info *accountInfo) GetAccountBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -193,7 +197,8 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(address)
+	result, invokeErr := info.systemContracts.AccountBalance(
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -201,7 +206,7 @@ func (info *accountInfo) GetAccountBalance(
 }
 
 func (info *accountInfo) GetAccountAvailableBalance(
-	address common.Address,
+	runtimeAddress common.Address,
 ) (
 	uint64,
 	error,
@@ -216,7 +221,8 @@ func (info *accountInfo) GetAccountAvailableBalance(
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountAvailableBalance(address)
+	result, invokeErr := info.systemContracts.AccountAvailableBalance(
+		flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -237,7 +243,8 @@ func (info *accountInfo) GetAccount(
 	}
 
 	if info.serviceAccountEnabled {
-		balance, err := info.GetAccountBalance(common.Address(address))
+		balance, err := info.GetAccountBalance(
+			common.MustBytesToAddress(address.Bytes()))
 		if err != nil {
 			return nil, err
 		}

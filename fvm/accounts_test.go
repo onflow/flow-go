@@ -20,6 +20,28 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type errorOnAddressSnapshotWrapper struct {
+	view  state.View
+	owner flow.Address
+}
+
+func (s errorOnAddressSnapshotWrapper) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	// return error if id.Owner is the same as the owner of the wrapper
+	if id.Owner == string(s.owner.Bytes()) {
+		return nil, fmt.Errorf("error getting register %s", id)
+	}
+	// fetch from underlying view if set
+	if s.view != nil {
+		return s.view.Get(id)
+	}
+	return nil, nil
+}
+
 func createAccount(
 	t *testing.T,
 	vm fvm.VM,
@@ -50,7 +72,8 @@ func createAccount(
 
 	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
-	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+	address := flow.ConvertAddress(
+		data.(cadence.Event).Fields[0].(cadence.Address))
 
 	return address
 }
@@ -370,7 +393,8 @@ func TestCreateAccount(t *testing.T) {
 
 				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
-				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				address := flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
 
 				account, err := vm.GetAccount(ctx, address, view)
 				require.NoError(t, err)
@@ -405,7 +429,8 @@ func TestCreateAccount(t *testing.T) {
 
 					data, err := jsoncdc.Decode(nil, tx.Events[i].Payload)
 					require.NoError(t, err)
-					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+					address := flow.ConvertAddress(
+						data.(cadence.Event).Fields[0].(cadence.Address))
 
 					account, err := vm.GetAccount(ctx, address, view)
 					require.NoError(t, err)
@@ -1300,8 +1325,8 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, _ state.View, derivedBlockData *derived.DerivedBlockData) {
-				address := chain.ServiceAddress()
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+				address := createAccount(t, vm, chain, ctx, view, derivedBlockData)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					pub fun main(): UFix64 {
@@ -1310,12 +1335,11 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-					if id.Key == flow.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s", id)
-					}
-					return nil, nil
-				})
+				view = delta.NewDeltaView(
+					errorOnAddressSnapshotWrapper{
+						view:  view,
+						owner: address,
+					})
 
 				err := vm.Run(ctx, script, view)
 				require.ErrorContains(
@@ -1323,7 +1347,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					err,
 					fmt.Sprintf(
 						"error getting register %s",
-						flow.AccountStatusRegisterID(address)))
+						address.Hex()))
 			}),
 	)
 
@@ -1523,12 +1547,11 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				newview := delta.NewDeltaView(func(id flow.RegisterID) (flow.RegisterValue, error) {
-					if id.Key == flow.AccountStatusKey {
-						return nil, fmt.Errorf("error getting register %s", id)
-					}
-					return nil, nil
-				})
+				newview := delta.NewDeltaView(
+					errorOnAddressSnapshotWrapper{
+						owner: address,
+						view:  view,
+					})
 
 				err := vm.Run(ctx, script, newview)
 				require.ErrorContains(
@@ -1536,7 +1559,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					err,
 					fmt.Sprintf(
 						"error getting register %s",
-						flow.AccountStatusRegisterID(address)))
+						address.Hex()))
 			}),
 	)
 }

@@ -108,6 +108,7 @@ where we treat everything beyond the known benign errors as critical failures. I
 broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.
 Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
    * Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
+   * Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26) to denote an unexpected error (and strip any sentinel information from the error stack)
 
     
 3. _Optional Simplification for components that solely return benign errors._
@@ -123,7 +124,7 @@ For example, a statement like the following would be sufficient:
 
 ### Hands-on suggestions
 
-* avoid generic errors, such as
+* Avoid generic errors, such as
   ```golang
   return fmt.Errorf("x failed")
   ```
@@ -159,7 +160,7 @@ For example, a statement like the following would be sufficient:
 * Handle errors at a level, where you still have enough context to decide whether the error is expected during normal
   operations.
 * Errors of unexpected types are indicators that the node's internal state might be corrupted.
-
+    - Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26) at the point an unexpected error is being returned, or when an error returned from another function is interpreted as unexpected
 ### Anti-Pattern
 
 Continuing on a best-effort basis is not an option, i.e. the following is an anti-pattern in the context of Flow:

@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -267,13 +268,13 @@ func (h *handler) GetTransactionResult(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	reqTxID := req.GetTransactionId()
 	txID, err := convert.TransactionID(reqTxID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transactionID: %v", err)
 	}
 
 	var statusCode uint32 = 0
@@ -329,7 +330,7 @@ func (h *handler) GetTransactionResultByIndex(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	index := req.GetIndex()
@@ -387,7 +388,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	// Get all tx results
@@ -483,15 +484,21 @@ func (h *handler) GetAccountAtBlockID(
 	blockID := req.GetBlockId()
 	blockFlowID, err := convert.BlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	flowAddress, err := convert.Address(req.GetAddress(), h.chain.Chain())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+	}
+	if fvmerrors.IsAccountNotFoundError(err) {
+		return nil, status.Errorf(codes.NotFound, "account not found")
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}

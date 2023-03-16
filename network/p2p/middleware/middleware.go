@@ -32,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
@@ -65,8 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware        = (*Middleware)(nil)
-	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
+	_ network.Middleware                   = (*Middleware)(nil)
+	_ p2p.DisallowListNotificationConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -87,7 +87,7 @@ type Middleware struct {
 	// and worker routines.
 	wg                         sync.WaitGroup
 	libP2PNode                 p2p.LibP2PNode
-	preferredUnicasts          []unicast.ProtocolName
+	preferredUnicasts          []protocols.ProtocolName
 	me                         flow.Identifier
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
@@ -111,7 +111,7 @@ func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOpt
 	}
 }
 
-func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOption {
+func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.preferredUnicasts = unicasts
 	}
@@ -346,9 +346,10 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	return peerIDs
 }
 
-// OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
-func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
-	for _, pid := range m.peerIDs(blockList) {
+// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+// It disconnects from all peers in the disallow list.
+func (m *Middleware) OnDisallowListNotification(notification *p2p.DisallowListUpdateNotification) {
+	for _, pid := range m.peerIDs(notification.DisallowList) {
 		err := m.libP2PNode.RemovePeer(pid)
 		if err != nil {
 			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")

@@ -47,7 +47,7 @@ type MessageHubSuite struct {
 	// mocked dependencies
 	payloads          *storage.Payloads
 	me                *module.Local
-	state             *protocol.MutableState
+	state             *protocol.State
 	net               *mocknetwork.Network
 	con               *mocknetwork.Conduit
 	pushBlocksCon     *mocknetwork.Conduit
@@ -77,7 +77,7 @@ func (s *MessageHubSuite) SetupTest() {
 
 	s.payloads = storage.NewPayloads(s.T())
 	s.me = module.NewLocal(s.T())
-	s.state = protocol.NewMutableState(s.T())
+	s.state = protocol.NewState(s.T())
 	s.net = mocknetwork.NewNetwork(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.pushBlocksCon = mocknetwork.NewConduit(s.T())
@@ -87,17 +87,16 @@ func (s *MessageHubSuite) SetupTest() {
 	s.compliance = mockconsensus.NewCompliance(s.T())
 
 	// set up protocol state mock
-	s.state = &protocol.MutableState{}
 	s.state.On("Final").Return(
 		func() protint.Snapshot {
 			return s.snapshot
 		},
-	)
+	).Maybe()
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protint.Snapshot {
 			return s.snapshot
 		},
-	)
+	).Maybe()
 
 	// set up local module mock
 	s.me.On("NodeID").Return(
@@ -178,7 +177,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.BlockFixture()
 
 		blockProposalMsg := messages.NewBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[messages.BlockProposal]{
+		expectedComplianceMsg := flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}

@@ -7,9 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +29,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 		nil,
 		nil)
 
-	address := cadence.BytesToAddress([]byte{1, 2, 3, 4})
+	address := flow.BytesToAddress([]byte{1, 2, 3, 4})
 
 	// emulate encoded public key (which comes as a user input)
 	// containing bytes which are invalid UTF8
@@ -44,9 +42,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
 	require.NoError(t, err)
 
-	err = akh.InternalAddEncodedAccountKey(
-		common.Address(address),
-		encodedPublicKey)
+	err = akh.InternalAddEncodedAccountKey(address, encodedPublicKey)
 	require.Error(t, err)
 
 	require.True(t, errors.IsValueError(err))
@@ -219,10 +215,8 @@ func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error   { 
 func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error          { return nil }
 func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error { return nil }
 func (f FakeAccounts) GetValue(_ flow.RegisterID) (flow.RegisterValue, error) { return nil, nil }
-func (f FakeAccounts) CheckAccountNotFrozen(_ flow.Address) error             { return nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
 func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
 	return atree.StorageIndex{}, nil
 }
-func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error { return nil }

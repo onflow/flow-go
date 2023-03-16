@@ -160,6 +160,8 @@ func (pm *PeerManager) SetPeersProvider(peersProvider p2p.PeersProvider) {
 	pm.peersProvider = peersProvider
 }
 
+// OnRateLimitedPeer rate limiter distributor consumer func that will be called when a peer is rate limited, the rate limited peer
+// is disconnected immediately after being rate limited.
 func (pm *PeerManager) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 	pm.logger.Warn().
 		Str("peer_id", pid.String()).

@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -189,14 +188,6 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		return nil, err
 	}
 
-	// grabbing TrieUpdates from BlockExecutionData
-	var trieUpdates []*ledger.TrieUpdate
-	for _, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		if chunkExecutionData.TrieUpdate != nil {
-			trieUpdates = append(trieUpdates, chunkExecutionData.TrieUpdate)
-		}
-	}
-
 	// retrieving events from local BadgerDB
 	events, err := b.events.ByBlockID(blockID)
 	if err != nil {
@@ -254,7 +245,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		},
 		Events:             []flow.EventsList{events},
 		TransactionResults: transactionResults,
-		StateCommitments:   []flow.StateCommitment{endState},
-		TrieUpdates:        trieUpdates,
+		BlockExecutionData: executionData,
+		EndState:           endState,
 	}, nil
 }

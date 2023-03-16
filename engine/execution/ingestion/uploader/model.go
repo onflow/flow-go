@@ -35,13 +35,21 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		}
 	}
 
+	trieUpdates := make(
+		[]*ledger.TrieUpdate,
+		0,
+		len(computationResult.ChunkExecutionDatas))
+	for _, chunk := range computationResult.ChunkExecutionDatas {
+		trieUpdates = append(trieUpdates, chunk.TrieUpdate)
+	}
+
 	return &BlockData{
 		Block:                computationResult.ExecutableBlock.Block,
 		Collections:          computationResult.ExecutableBlock.Collections(),
 		TxResults:            txResults,
 		Events:               events,
-		TrieUpdates:          computationResult.TrieUpdates,
-		FinalStateCommitment: computationResult.StateCommitments[len(computationResult.StateCommitments)-1],
+		TrieUpdates:          trieUpdates,
+		FinalStateCommitment: computationResult.EndState,
 	}
 }
 

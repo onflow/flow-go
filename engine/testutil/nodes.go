@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -172,25 +173,26 @@ func GenericNodeWithStateFixture(t testing.TB,
 	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
-		Ctx:            ctx,
-		Cancel:         cancel,
-		Errs:           errs,
-		Log:            log,
-		Metrics:        metrics,
-		Tracer:         tracer,
-		PublicDB:       stateFixture.PublicDB,
-		SecretsDB:      stateFixture.SecretsDB,
-		State:          stateFixture.State,
-		Headers:        stateFixture.Storage.Headers,
-		Guarantees:     stateFixture.Storage.Guarantees,
-		Seals:          stateFixture.Storage.Seals,
-		Payloads:       stateFixture.Storage.Payloads,
-		Blocks:         stateFixture.Storage.Blocks,
-		Me:             me,
-		Net:            net,
-		DBDir:          stateFixture.DBDir,
-		ChainID:        chainID,
-		ProtocolEvents: stateFixture.ProtocolEvents,
+		Ctx:                ctx,
+		Cancel:             cancel,
+		Errs:               errs,
+		Log:                log,
+		Metrics:            metrics,
+		Tracer:             tracer,
+		PublicDB:           stateFixture.PublicDB,
+		SecretsDB:          stateFixture.SecretsDB,
+		State:              stateFixture.State,
+		Headers:            stateFixture.Storage.Headers,
+		Guarantees:         stateFixture.Storage.Guarantees,
+		Seals:              stateFixture.Storage.Seals,
+		Payloads:           stateFixture.Storage.Payloads,
+		Blocks:             stateFixture.Storage.Blocks,
+		QuorumCertificates: stateFixture.Storage.QuorumCertificates,
+		Me:                 me,
+		Net:                net,
+		DBDir:              stateFixture.DBDir,
+		ChainID:            chainID,
+		ProtocolEvents:     stateFixture.ProtocolEvents,
 	}
 }
 
@@ -232,11 +234,22 @@ func CompleteStateFixture(
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
+	state, err := badgerstate.Bootstrap(
+		metric,
+		db,
+		s.Headers,
+		s.Seals,
+		s.Results,
+		s.Blocks,
+		s.QuorumCertificates,
+		s.Setups,
+		s.EpochCommits,
+		s.Statuses,
+		rootSnapshot,
+	)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer,
-		util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -529,11 +542,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
-	protoState, ok := node.State.(*badgerstate.MutableState)
+	protoState, ok := node.State.(*badgerstate.ParticipantState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer,
-		node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
@@ -631,21 +643,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		committer,
 		prov,
 		computation.ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       computation.DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: computation.DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)
 
-	computation := &testmock.ComputerWrap{
-		Manager: computationEngine,
-	}
-
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
-	require.NoError(t, err)
-
-	deltas, err := ingestion.NewDeltas(1000)
 	require.NoError(t, err)
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
@@ -668,15 +672,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		eventsStorage,
 		serviceEventsStorage,
 		txResultStorage,
-		computation,
+		computationEngine,
 		pusherEngine,
 		execState,
 		node.Metrics,
 		node.Tracer,
-		false,
-		filter.Any,
-		deltas,
-		syncThreshold,
 		false,
 		checkAuthorizedAtBlock,
 		nil,
@@ -727,12 +727,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
-		MutableState:        followerState,
+		FollowerState:       followerState,
 		IngestionEngine:     ingestionEngine,
 		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
 		SyncEngine:          syncEngine,
-		ExecutionEngine:     computation,
+		ExecutionEngine:     computationEngine,
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
 		BadgerDB:            node.PublicDB,

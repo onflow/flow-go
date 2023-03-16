@@ -81,12 +81,40 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
+// GossipSubLocalMeshMetrics encapsulates the metrics collectors for GossipSub mesh of the networking layer.
+type GossipSubLocalMeshMetrics interface {
+	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
+	OnLocalMeshSizeUpdated(topic string, size int)
+}
+
+// UnicastManagerMetrics unicast manager metrics.
+type UnicastManagerMetrics interface {
+	// OnStreamCreated tracks the overall time it takes to create a stream successfully and the number of retry attempts.
+	OnStreamCreated(duration time.Duration, attempts int)
+	// OnStreamCreationFailure tracks the amount of time taken and number of retry attempts used when the unicast manager fails to create a stream.
+	OnStreamCreationFailure(duration time.Duration, attempts int)
+	// OnPeerDialed tracks the time it takes to dial a peer during stream creation and the number of retry attempts before a peer
+	// is dialed successfully.
+	OnPeerDialed(duration time.Duration, attempts int)
+	// OnPeerDialFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot dial a peer
+	// to establish the initial connection between the two.
+	OnPeerDialFailure(duration time.Duration, attempts int)
+	// OnStreamEstablished tracks the time it takes to create a stream successfully on the available open connection during stream
+	// creation and the number of retry attempts.
+	OnStreamEstablished(duration time.Duration, attempts int)
+	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
+	// a stream on the open connection between two peers.
+	OnEstablishStreamFailure(duration time.Duration, attempts int)
+}
+
 type LibP2PMetrics interface {
 	GossipSubRouterMetrics
+	GossipSubLocalMeshMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
+	UnicastManagerMetrics
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -681,7 +709,7 @@ type HeroCacheMetrics interface {
 	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 	// This normally happens -- and is expected -- when the cache is full.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectionDueToFullCapacity()
+	OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)
 
 	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.

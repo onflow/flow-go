@@ -11,12 +11,13 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
-	cr := generateComputationResult(t)
+	cr, expectedTrieUpdates := generateComputationResult(t)
 
 	blockData := ComputationResultToBlockData(cr)
 
@@ -37,12 +38,17 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 		assert.Equal(t, event, *blockData.Events[i])
 	}
 
-	assert.Equal(t, cr.TrieUpdates, blockData.TrieUpdates)
+	assert.Equal(t, expectedTrieUpdates, blockData.TrieUpdates)
 
-	assert.Equal(t, cr.StateCommitments[len(cr.StateCommitments)-1], blockData.FinalStateCommitment)
+	assert.Equal(t, cr.EndState, blockData.FinalStateCommitment)
 }
 
-func generateComputationResult(t *testing.T) *execution.ComputationResult {
+func generateComputationResult(
+	t *testing.T,
+) (
+	*execution.ComputationResult,
+	[]*ledger.TrieUpdate,
+) {
 
 	update1, err := ledger.NewUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
@@ -101,53 +107,79 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 	require.NoError(t, err)
 
 	return &execution.ComputationResult{
-		ExecutableBlock: unittest.ExecutableBlockFixture([][]flow.Identifier{
-			{unittest.IdentifierFixture()},
-			{unittest.IdentifierFixture()},
-			{unittest.IdentifierFixture()},
-		}),
-		StateSnapshots: nil,
-		StateCommitments: []flow.StateCommitment{
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-		},
-		Proofs: nil,
-		Events: []flow.EventsList{
-			{
-				unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+			ExecutableBlock: unittest.ExecutableBlockFixture([][]flow.Identifier{
+				{unittest.IdentifierFixture()},
+				{unittest.IdentifierFixture()},
+				{unittest.IdentifierFixture()},
+			}),
+			StateSnapshots: nil,
+			Events: []flow.EventsList{
+				{
+					unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+				},
+				{},
+				{
+					unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
+					unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+				},
+				{}, // system chunk events
 			},
-			{},
-			{
-				unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
-				unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+			EventsHashes:  nil,
+			ServiceEvents: nil,
+			TransactionResults: []flow.TransactionResult{
+				{
+					TransactionID:   unittest.IdentifierFixture(),
+					ErrorMessage:    "",
+					ComputationUsed: 23,
+				},
+				{
+					TransactionID:   unittest.IdentifierFixture(),
+					ErrorMessage:    "fail",
+					ComputationUsed: 1,
+				},
 			},
-			{}, // system chunk events
-		},
-		EventsHashes:  nil,
-		ServiceEvents: nil,
-		TransactionResults: []flow.TransactionResult{
-			{
-				TransactionID:   unittest.IdentifierFixture(),
-				ErrorMessage:    "",
-				ComputationUsed: 23,
+			TransactionResultIndex: []int{1, 1, 2, 2},
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate1,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate2,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate3,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate4,
+					},
+				},
 			},
-			{
-				TransactionID:   unittest.IdentifierFixture(),
-				ErrorMessage:    "fail",
-				ComputationUsed: 1,
+			ExecutionReceipt: &flow.ExecutionReceipt{
+				ExecutionResult: flow.ExecutionResult{
+					Chunks: flow.ChunkList{
+						{
+							EndState: unittest.StateCommitmentFixture(),
+						},
+						{
+							EndState: unittest.StateCommitmentFixture(),
+						},
+						{
+							EndState: unittest.StateCommitmentFixture(),
+						},
+						{
+							EndState: unittest.StateCommitmentFixture(),
+						},
+					},
+				},
 			},
-		},
-		TransactionResultIndex: []int{1, 1, 2, 2},
-		TrieUpdates: []*ledger.TrieUpdate{
+		}, []*ledger.TrieUpdate{
 			trieUpdate1,
 			trieUpdate2,
 			trieUpdate3,
 			trieUpdate4,
-		},
-	}
+		}
 }

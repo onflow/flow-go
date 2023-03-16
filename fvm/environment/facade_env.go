@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -37,7 +38,6 @@ type facadeEnvironment struct {
 	UUIDGenerator
 
 	AccountCreator
-	AccountFreezer
 
 	AccountKeyReader
 	AccountKeyUpdater
@@ -47,14 +47,13 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
-	txnState *state.TransactionState
+	txnState storage.Transaction
 }
 
 func newFacadeEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	txnState storage.Transaction,
 	meter Meter,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
@@ -110,7 +109,6 @@ func newFacadeEnvironment(
 			txnState),
 
 		AccountCreator: NoAccountCreator{},
-		AccountFreezer: NoAccountFreezer{},
 
 		AccountKeyReader: NewAccountKeyReader(
 			tracer,
@@ -130,8 +128,7 @@ func newFacadeEnvironment(
 			meter,
 			params.MetricsReporter,
 			txnState,
-			accounts,
-			derivedTxnData),
+			accounts),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -142,18 +139,34 @@ func newFacadeEnvironment(
 	return env
 }
 
+// TODO(patrick): remove once emulator is updated.
 func NewScriptEnvironment(
 	ctx context.Context,
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	nestedTxn state.NestedTransaction,
+	derivedTxn derived.DerivedTransactionCommitter,
+) *facadeEnvironment {
+	return NewScriptEnv(
+		ctx,
+		tracer,
+		params,
+		storage.SerialTransaction{
+			NestedTransaction:           nestedTxn,
+			DerivedTransactionCommitter: derivedTxn,
+		})
+}
+
+func NewScriptEnv(
+	ctx context.Context,
+	tracer tracing.TracerSpan,
+	params EnvironmentParams,
+	txnState storage.Transaction,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
-		derivedTxnData,
 		NewCancellableMeter(ctx, txnState))
 
 	env.addParseRestrictedChecks()
@@ -164,14 +177,12 @@ func NewScriptEnvironment(
 func NewTransactionEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	txnState storage.Transaction,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
-		derivedTxnData,
 		NewMeter(txnState),
 	)
 
@@ -196,15 +207,11 @@ func NewTransactionEnvironment(
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
-	env.AccountFreezer = NewAccountFreezer(
-		params.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
 		tracer,
 		env.Meter,
 		env.accounts,
-		env.TransactionInfo,
+		params.TransactionInfoParams.TxBody.Authorizers,
 		params.Chain,
 		params.ContractUpdaterParams,
 		env.ProgramLogger,
@@ -234,9 +241,6 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
 		env.AccountCreator)
-	env.AccountFreezer = NewParseRestrictedAccountFreezer(
-		env.txnState,
-		env.AccountFreezer)
 	env.AccountInfo = NewParseRestrictedAccountInfo(
 		env.txnState,
 		env.AccountInfo)
@@ -273,21 +277,15 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	derived.TransactionInvalidator,
+	[]ContractUpdateKey,
 	error,
 ) {
-	contractKeys, err := env.ContractUpdater.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDerivedDataInvalidator(contractKeys, env), nil
+	return env.ContractUpdater.Commit()
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
-	env.AccountFreezer.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.
