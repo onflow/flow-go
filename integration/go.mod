@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.20
+go 1.19
 
 require (
 	cloud.google.com/go/bigquery v1.43.0
