@@ -86,6 +86,8 @@ type Cache struct {
 	// lastTelemetryDump keeps track of the last time telemetry logs dumped.
 	// Its purpose is to manage the speed at which telemetry logs are printed.
 	lastTelemetryDump *atomic.Int64
+	// tracer reports ejection events, initially nil but can be injection using CacheOpt
+	tracer Tracer
 }
 
 // DefaultOversizeFactor determines the default oversizing factor of HeroCache.
@@ -110,7 +112,8 @@ func NewCache(sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
-	collector module.HeroCacheMetrics) *Cache {
+	collector module.HeroCacheMetrics,
+	opts ...CacheOpt) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
@@ -131,6 +134,11 @@ func NewCache(sizeLimit uint32,
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 		interactionCounter:     atomic.NewUint64(0),
 		lastTelemetryDump:      atomic.NewInt64(0),
+	}
+
+	// apply extra options
+	for _, opt := range opts {
+		opt(bd)
 	}
 
 	return bd
@@ -277,7 +285,10 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		ejectedEntity := c.invalidateEntity(b, slotToUse)
-		c.collector.OnEntityEjectionDueToEmergency(ejectedEntity)
+		if c.tracer != nil {
+			c.tracer.EntityEjectionDueToEmergency(ejectedEntity)
+		}
+		c.collector.OnEntityEjectionDueToEmergency()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
@@ -293,7 +304,10 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 
 	if ejectedEntity != nil {
 		// cache is at its full size and ejection happened to make room for this new entity.
-		c.collector.OnEntityEjectionDueToFullCapacity(ejectedEntity)
+		if c.tracer != nil {
+			c.tracer.EntityEjectionDueToFullCapacity(ejectedEntity)
+		}
+		c.collector.OnEntityEjectionDueToFullCapacity()
 	}
 
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount

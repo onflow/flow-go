@@ -2,25 +2,22 @@ package cache
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 )
 
 type OnEntityEjected func(ejectedEntity flow.Entity)
 
-// HeroCacheDistributor wraps module.HeroCacheMetrics and allows subscribers to receive events
-// for ejected entries from cache.
+// HeroCacheDistributor implements herocache.Tracer and allows subscribers to receive events
+// for ejected entries from cache using herocache.Tracer API.
 // This structure is NOT concurrency safe.
 type HeroCacheDistributor struct {
-	module.HeroCacheMetrics
 	consumers []OnEntityEjected
 }
 
-var _ module.HeroCacheMetrics = (*HeroCacheDistributor)(nil)
+var _ herocache.Tracer = (*HeroCacheDistributor)(nil)
 
-func NewDistributor(heroCacheMetrics module.HeroCacheMetrics) *HeroCacheDistributor {
-	return &HeroCacheDistributor{
-		HeroCacheMetrics: heroCacheMetrics,
-	}
+func NewDistributor() *HeroCacheDistributor {
+	return &HeroCacheDistributor{}
 }
 
 // AddConsumer adds subscriber for entity ejected events.
@@ -29,19 +26,13 @@ func (d *HeroCacheDistributor) AddConsumer(consumer OnEntityEjected) {
 	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *HeroCacheDistributor) OnEntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
-	// report to parent metrics
-	d.HeroCacheMetrics.OnEntityEjectionDueToEmergency(ejectedEntity)
-	// report to extra consumers
+func (d *HeroCacheDistributor) EntityEjectionDueToEmergency(ejectedEntity flow.Entity) {
 	for _, consumer := range d.consumers {
 		consumer(ejectedEntity)
 	}
 }
 
-func (d *HeroCacheDistributor) OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity) {
-	// report to parent metrics
-	d.HeroCacheMetrics.OnEntityEjectionDueToFullCapacity(ejectedEntity)
-	// report to extra consumers
+func (d *HeroCacheDistributor) EntityEjectionDueToFullCapacity(ejectedEntity flow.Entity) {
 	for _, consumer := range d.consumers {
 		consumer(ejectedEntity)
 	}
