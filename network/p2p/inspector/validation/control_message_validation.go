@@ -71,7 +71,7 @@ var _ component.Component = (*ControlMsgValidationInspector)(nil)
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
 func NewControlMsgValidationInspector(logger zerolog.Logger, validationConfig *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotificationDistributor) *ControlMsgValidationInspector {
 	c := &ControlMsgValidationInspector{
-		logger:           logger.With().Str("component", "gossip-sub-rpc-validation-inspector").Logger(),
+		logger:           logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger(),
 		inspectMessageQ:  make(chan *inspectMsgReq),
 		validationConfig: validationConfig,
 		distributor:      distributor,
@@ -138,7 +138,7 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.Co
 			Err(upperThresholdErr).
 			Uint64("upper_threshold", upperThresholdErr.upperThreshold).
 			Bool(logging.KeySuspicious, true).
-			Msg("rejecting RPC message")
+			Msg("rejecting rpc message")
 
 		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, upperThresholdErr))
 		if err != nil {
@@ -166,7 +166,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *inspectMsgReq)
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.topicIDS)
 	default:
 		lg.Info().
-			Msg(fmt.Sprintf("skipping RPC control message %s inspection validation message count %d below safety threshold", req.validationConfig.ControlMsg, req.count))
+			Msg(fmt.Sprintf("skipping rpc control message %s inspection validation message count %d below safety threshold", req.validationConfig.ControlMsg, req.count))
 	}
 	if validationErr != nil {
 		lg.Error().
