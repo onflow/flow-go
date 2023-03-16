@@ -164,7 +164,7 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 
 // preparePeerScoreParams prepares the peer score parameters for the pubsub system.
 // It is based on the default parameters defined in libp2p pubsub peer scoring.
-func (s *ScoreOption) preparePeerScoreParams() {
+func (s *ScoreOption) defaultPeerScoreParams() {
 	// we don't set all the parameters, so we skip the atomic validation.
 	// atomic validation fails initialization if any parameter is not set.
 	s.peerScoreParams.SkipAtomicValidation = true
