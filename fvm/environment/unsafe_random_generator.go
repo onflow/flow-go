@@ -82,7 +82,10 @@ func (gen *unsafeRandomGenerator) seed() {
 		// extract the entropy from `id` and expand it into the required seed
 		hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, id[:], nil, nil)
 		seed := make([]byte, random.Chacha20SeedLen)
-		hkdf.Read(seed)
+		n, err := hkdf.Read(seed)
+		if n != len(seed) || err != nil {
+			return
+		}
 		// initialize a fresh CSPRNG with the seed (crypto-secure PRG)
 		source, err := random.NewChacha20PRG(seed, []byte{})
 		if err != nil {

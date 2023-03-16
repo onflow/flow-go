@@ -1,8 +1,8 @@
 package crypto_test
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 	"unicode/utf8"
 
