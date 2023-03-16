@@ -339,7 +339,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 
-	var peerManager *connection.PeerManager
+	var peerManager p2p.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
 		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
 		if err != nil {
