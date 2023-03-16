@@ -166,7 +166,8 @@ func TestSHA2(t *testing.T) {
 	t.Run("SHA2_256", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha256.Sum256(value)
 
 			// test hash computation using the hasher
@@ -184,7 +185,8 @@ func TestSHA2(t *testing.T) {
 	t.Run("SHA2_384", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha512.Sum384(value)
 
 			hasher := NewSHA2_384()
@@ -201,7 +203,8 @@ func TestSHA3(t *testing.T) {
 	t.Run("SHA3_256", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha3.Sum256(value)
 
 			// test hash computation using the hasher
@@ -219,7 +222,8 @@ func TestSHA3(t *testing.T) {
 	t.Run("SHA3_384", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha3.Sum384(value)
 
 			hasher := NewSHA3_384()
@@ -235,7 +239,8 @@ func TestSHA3(t *testing.T) {
 func TestKeccak(t *testing.T) {
 	for i := 0; i < 5000; i++ {
 		value := make([]byte, i)
-		rand.Read(value)
+		_, err := rand.Read(value)
+		require.NoError(t, err)
 		k := sha3.NewLegacyKeccak256()
 		k.Write(value)
 		expected := k.Sum(nil)

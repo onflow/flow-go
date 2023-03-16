@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	cryhash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
@@ -24,7 +25,8 @@ func TestHash(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
 			rand.Read(path[:])
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			h := hash.HashLeaf(path, value)
 
 			hasher := sha3.New256()
