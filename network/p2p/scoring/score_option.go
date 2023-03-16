@@ -135,7 +135,7 @@ func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) {
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
-	s.preparePeerScoreParams()
+	s.defaultPeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
