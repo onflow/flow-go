@@ -82,7 +82,7 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 // SetGossipSubPeerScoring sets the gossipsub peer scoring of the builder.
 // If the gossipsub peer scoring flag has already been set, a fatal error is logged.
 func (g *Builder) SetGossipSubPeerScoring(gossipSubPeerScoring bool) {
-	if g.gossipSubPeerScoring != false {
+	if g.gossipSubPeerScoring {
 		g.logger.Fatal().Msg("gossipsub peer scoring has already been set")
 		return
 	}
