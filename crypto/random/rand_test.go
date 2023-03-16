@@ -310,6 +310,7 @@ func TestSamples(t *testing.T) {
 
 	seed := make([]byte, Chacha20SeedLen)
 	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	_, err = rand.Read(customizer)
 	require.NoError(t, err)
@@ -403,8 +404,10 @@ func TestStateRestore(t *testing.T) {
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
 	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 	t.Logf("seed is %x, customizer is %x\n", seed, customizer)
 
 	// create an rng
