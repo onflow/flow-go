@@ -190,7 +190,7 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, 
 		//  - crypto.invalidSignatureError if some signature(s) could not be decoded, which should be impossible since
 		//    we check all signatures before adding them (there is no `TrustedAdd` method in this module)
 		if crypto.IsBLSAggregateEmptyListError(err) {
-			return nil, nil, NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
+			return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
 		}
 		// any other error here is a symptom of an internal bug
 		return nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
