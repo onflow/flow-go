@@ -61,20 +61,19 @@ func (g *Builder) SetSubscriptionFilter(subscriptionFilter pubsub.SubscriptionFi
 }
 
 // SetGossipSubFactory sets the gossipsub factory of the builder.
-// If the gossipsub factory has already been set, a fatal error is logged.
+// We expect the node to initialize with a default gossipsub factory. Hence, this function overrides the default config.
 func (g *Builder) SetGossipSubFactory(gossipSubFactory p2p.GossipSubFactoryFunc) {
 	if g.gossipSubFactory != nil {
-		g.logger.Fatal().Msg("gossipsub factory has already been set")
-		return
+		g.logger.Warn().Msg("gossipsub factory has already been set, overriding the previous factory.")
 	}
 	g.gossipSubFactory = gossipSubFactory
 }
 
 // SetGossipSubConfigFunc sets the gossipsub config function of the builder.
-// If the gossipsub config function has already been set, a fatal error is logged.
+// We expect the node to initialize with a default gossipsub config. Hence, this function overrides the default config.
 func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapterConfigFunc) {
 	if g.gossipSubConfigFunc != nil {
-		g.logger.Fatal().Msg("gossipsub config function has already been set")
+		g.logger.Warn().Msg("gossipsub config function has already been set, overriding the previous config function.")
 	}
 	g.gossipSubConfigFunc = gossipSubConfigFunc
 }

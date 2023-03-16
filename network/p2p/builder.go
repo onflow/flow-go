@@ -36,11 +36,11 @@ type GossipSubBuilder interface {
 	SetSubscriptionFilter(pubsub.SubscriptionFilter)
 
 	// SetGossipSubFactory sets the gossipsub factory of the builder.
-	// If the gossipsub factory has already been set, a fatal error is logged.
+	// We expect the node to initialize with a default gossipsub factory. Hence, this function overrides the default config.
 	SetGossipSubFactory(GossipSubFactoryFunc)
 
 	// SetGossipSubConfigFunc sets the gossipsub config function of the builder.
-	// If the gossipsub config function has already been set, a fatal error is logged.
+	// We expect the node to initialize with a default gossipsub config. Hence, this function overrides the default config.
 	SetGossipSubConfigFunc(GossipSubAdapterConfigFunc)
 
 	// SetGossipSubPeerScoring sets the gossipsub peer scoring of the builder.
