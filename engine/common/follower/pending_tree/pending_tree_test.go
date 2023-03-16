@@ -105,6 +105,18 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	require.ElementsMatch(s.T(), append(longestFork, shortFork...), connectedBlocks)
 }
 
+// TestAddingConnectedBlocks tests that adding blocks that were already reported as connected is no-op.
+func (s *PendingTreeSuite) TestAddingConnectedBlocks() {
+	blocks := certifiedBlocksFixture(3, s.finalized)
+	connectedBlocks, err := s.pendingTree.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocks, connectedBlocks)
+
+	connectedBlocks, err = s.pendingTree.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), connectedBlocks)
+}
+
 // TestByzantineThresholdExceeded tests that submitting two certified blocks for the same view is reported as
 // byzantine threshold reached exception. This scenario is possible only if network has reached more than 1/3 byzantine participants.
 func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
