@@ -332,10 +332,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	h, err := DefaultLibP2PHost(builder.addr, builder.networkKey, opts...)
-
 	if err != nil {
 		return nil, err
 	}
+	builder.gossipSubBuilder.SetHost(h)
 
 	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
 	if err != nil {
@@ -366,16 +366,21 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.metrics)
 	node.SetUnicastManager(unicastManager)
 
+	var rsys routing.Routing
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			rsys, err := builder.buildRouting(ctx, h)
+			// routing system is created here, because it needs to be created during the node startup.
+			rsys, err = builder.buildRouting(ctx, h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create rsys system: %w", err))
 			}
 			node.SetRouting(rsys)
-
 			builder.gossipSubBuilder.SetRoutingSystem(rsys)
-			builder.gossipSubBuilder.SetHost(h)
+
+			ready()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// gossipsub is created here, because it needs to be created during the node startup.
 			gossipSub, socreTracer, err := builder.gossipSubBuilder.Build(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
@@ -383,11 +388,15 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			if socreTracer != nil {
 				node.SetPeerScoreExposer(socreTracer)
 			}
-
 			node.SetPubSub(gossipSub)
 
 			ready()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// encapsulates shutdown logic for the libp2p node.
+			ready()
 			<-ctx.Done()
+			// we wait till the context is done, and then we stop the libp2p node.
 
 			err = node.Stop()
 			if err != nil {
@@ -396,18 +405,19 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
 				}
 			}
-		})
-	cm = cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		if builder.gossipSubTracer == nil {
-			builder.logger.Warn().Msg("libp2p tracer is not set")
-			ready()
-			return
-		}
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// encapsulates the startup logic for the libp2p node.
+			if builder.gossipSubTracer == nil {
+				builder.logger.Warn().Msg("libp2p tracer is not set")
+				ready()
+				return
+			}
 
-		builder.logger.Debug().Msg("starting libp2p tracer")
-		builder.gossipSubTracer.Start(ctx)
-		ready()
-	})
+			builder.logger.Debug().Msg("starting libp2p tracer")
+			builder.gossipSubTracer.Start(ctx)
+			ready()
+		})
 
 	node.SetComponentManager(cm.Build())
 
