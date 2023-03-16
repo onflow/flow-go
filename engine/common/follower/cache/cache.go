@@ -123,7 +123,7 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 // Expected errors during normal operations:
 //   - ErrDisconnectedBatch
 func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, certifyingQC *flow.QuorumCertificate, err error) {
-	batch = filterBlocksByView(c.lowestPrunedView.Value(), batch)
+	batch = c.trimLeadingBlocksBelowPruningThreshold(batch)
 
 	batchSize := len(batch)
 	if batchSize < 1 { // empty batch is no-op
