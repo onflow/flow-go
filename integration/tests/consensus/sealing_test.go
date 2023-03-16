@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 

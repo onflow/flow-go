@@ -53,8 +53,6 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
-		flagFastKG = true
-
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
@@ -85,8 +83,6 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		flagPartnerNodeInfoDir = partnerDir
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagFastKG = true
 
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName

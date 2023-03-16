@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	flagFastKG        bool
 	flagRootChain     string
 	flagRootParent    string
 	flagRootHeight    uint64
@@ -22,7 +21,7 @@ var (
 var rootBlockCmd = &cobra.Command{
 	Use:   "rootblock",
 	Short: "Generate root block data",
-	Long:  `Run DKG, generate root block and votes for root block needed for constructing QC. Serialize all info into file`,
+	Long:  `Run Beacon KeyGen, generate root block and votes for root block needed for constructing QC. Serialize all info into file`,
 	Run:   rootBlock,
 }
 
@@ -58,9 +57,6 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
-
-	// optional parameters to influence various aspects of identity generation
-	rootBlockCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
@@ -93,7 +89,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
-	dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
+	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")

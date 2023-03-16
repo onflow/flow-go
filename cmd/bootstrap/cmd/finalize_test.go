@@ -63,7 +63,6 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
-		flagFastKG = true
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight

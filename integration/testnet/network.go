@@ -5,7 +5,6 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	gonet "net"
 	"os"
 	"path/filepath"
@@ -1146,7 +1145,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	dkg, err := runDKG(stakedConfs)
+	dkg, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1383,11 +1382,11 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	return confs, nil
 }
 
-// runDKG simulates the distributed key generation process for all consensus nodes
+// runBeaconKG simulates the distributed key generation process for all consensus nodes
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
@@ -1399,7 +1398,7 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}
