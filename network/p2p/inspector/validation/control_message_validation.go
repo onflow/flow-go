@@ -165,8 +165,10 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *inspectMsgReq)
 	case req.count > req.validationConfig.SafetyThreshold: // check if peer RPC messages count greater than safety threshold further inspect each message individually
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.topicIDS)
 	default:
-		lg.Info().
-			Msg(fmt.Sprintf("skipping rpc control message %s inspection validation message count %d below safety threshold", req.validationConfig.ControlMsg, req.count))
+		lg.Trace().
+			Uint64("upper_threshold", req.validationConfig.UpperThreshold).
+			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
+			Msg("control message inspection passed")
 	}
 	if validationErr != nil {
 		lg.Error().
