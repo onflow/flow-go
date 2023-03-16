@@ -24,17 +24,17 @@ func Test_Programs(t *testing.T) {
 	addressC := flow.HexToAddress("0c")
 
 	contractALocation := common.AddressLocation{
-		Address: common.Address(addressA),
+		Address: common.MustBytesToAddress(addressA.Bytes()),
 		Name:    "A",
 	}
 
 	contractBLocation := common.AddressLocation{
-		Address: common.Address(addressB),
+		Address: common.MustBytesToAddress(addressB.Bytes()),
 		Name:    "B",
 	}
 
 	contractCLocation := common.AddressLocation{
-		Address: common.Address(addressC),
+		Address: common.MustBytesToAddress(addressC.Bytes()),
 		Name:    "C",
 	}
 
@@ -56,7 +56,7 @@ func Test_Programs(t *testing.T) {
 
 	contractBCode := `
 		import A from 0xa
-	
+
 		pub contract B {
 			pub fun hello(): String {
        		return "hello from B but also ".concat(A.hello())
@@ -66,7 +66,7 @@ func Test_Programs(t *testing.T) {
 
 	contractCCode := `
 		import B from 0xb
-	
+
 		pub contract C {
 			pub fun hello(): String {
 	   		return "hello from C, ".concat(B.hello())
@@ -141,8 +141,8 @@ func Test_Programs(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData))
 
-	var contractAView *delta.View = nil
-	var contractBView *delta.View = nil
+	var contractASnapshot *state.ExecutionSnapshot
+	var contractBSnapshot *state.ExecutionSnapshot
 	var txAView *delta.View = nil
 
 	t.Run("contracts can be updated", func(t *testing.T) {
@@ -224,18 +224,14 @@ func Test_Programs(t *testing.T) {
 		require.Len(t, entry.Value.Dependencies, 1)
 		require.NotNil(t, entry.Value.Dependencies[addressA])
 
-		// type assertion for further inspections
-		require.IsType(t, entry.State.View(), &delta.View{})
-
 		// assert some reads were recorded (at least loading of code)
-		deltaView := entry.State.View().(*delta.View)
-		require.NotEmpty(t, deltaView.Interactions().Reads)
+		require.NotEmpty(t, entry.ExecutionSnapshot.ReadSet)
 
-		contractAView = deltaView
+		contractASnapshot = entry.ExecutionSnapshot
 		txAView = viewExecA
 
 		// merge it back
-		err = mainView.Merge(viewExecA)
+		err = mainView.Merge(viewExecA.Finalize())
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
@@ -264,7 +260,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecA, viewExecA2)
 
 		// merge it back
-		err = mainView.Merge(viewExecA2)
+		err = mainView.Merge(viewExecA2.Finalize())
 		require.NoError(t, err)
 	})
 
@@ -313,10 +309,7 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entry)
 
 		// state should be essentially the same as one which we got in tx with contract A
-		require.IsType(t, entry.State.View(), &delta.View{})
-		deltaA := entry.State.View().(*delta.View)
-
-		compareViews(t, contractAView, deltaA)
+		require.Equal(t, contractASnapshot, entry.ExecutionSnapshot)
 
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
@@ -327,29 +320,17 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryB.Value.Dependencies[addressB])
 
 		// program B should contain all the registers used by program A, as it depends on it
-		require.IsType(t, entryB.State.View(), &delta.View{})
-		deltaB := entryB.State.View().(*delta.View)
+		contractBSnapshot = entryB.ExecutionSnapshot
 
-		entriesA := deltaA.Delta().UpdatedRegisters()
-		for _, entry := range entriesA {
-			v, has := deltaB.Delta().Get(entry.Key)
-			require.True(t, has)
+		require.Empty(t, contractASnapshot.WriteSet)
 
-			require.Equal(t, entry.Value, v)
+		for id := range contractASnapshot.ReadSet {
+			_, ok := contractBSnapshot.ReadSet[id]
+			require.True(t, ok)
 		}
-
-		for id, registerA := range deltaA.Interactions().Reads {
-
-			registerB, has := deltaB.Interactions().Reads[id]
-			require.True(t, has)
-
-			require.Equal(t, registerA, registerB)
-		}
-
-		contractBView = deltaB
 
 		// merge it back
-		err = mainView.Merge(viewExecB)
+		err = mainView.Merge(viewExecB.Finalize())
 		require.NoError(t, err)
 
 		// rerun transaction
@@ -382,7 +363,7 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, viewExecB, viewExecB2)
 
 		// merge it back
-		err = mainView.Merge(viewExecB2)
+		err = mainView.Merge(viewExecB2.Finalize())
 		require.NoError(t, err)
 	})
 
@@ -413,12 +394,12 @@ func Test_Programs(t *testing.T) {
 		compareViews(t, txAView, viewExecA)
 
 		// merge it back
-		err = mainView.Merge(viewExecA)
+		err = mainView.Merge(viewExecA.Finalize())
 		require.NoError(t, err)
 	})
 
 	t.Run("deploying contract C invalidates C", func(t *testing.T) {
-		require.NotNil(t, contractBView)
+		require.NotNil(t, contractBSnapshot)
 
 		// deploy contract C
 		procContractC := fvm.Transaction(
@@ -456,17 +437,13 @@ func Test_Programs(t *testing.T) {
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		require.NotNil(t, entryA)
 
-		require.IsType(t, entryA.State.View(), &delta.View{})
-		deltaA := entryA.State.View().(*delta.View)
-		compareViews(t, contractAView, deltaA)
+		require.Equal(t, contractASnapshot, entryA.ExecutionSnapshot)
 
 		// program B is the same
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
 
-		require.IsType(t, entryB.State.View(), &delta.View{})
-		deltaB := entryB.State.View().(*delta.View)
-		compareViews(t, contractBView, deltaB)
+		require.Equal(t, contractBSnapshot, entryB.ExecutionSnapshot)
 
 		// program C assertions
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)

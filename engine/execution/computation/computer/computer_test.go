@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
@@ -39,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -63,7 +63,7 @@ type fakeCommitter struct {
 }
 
 func (committer *fakeCommitter) CommitView(
-	view state.View,
+	view *state.ExecutionSnapshot,
 	startState flow.StateCommitment,
 ) (
 	flow.StateCommitment,
@@ -101,7 +101,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
 		)
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Run(func(args mock.Arguments) {
@@ -119,6 +119,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionBlockExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(1)
+
 		exemetrics.On("ExecutionCollectionExecuted",
 			mock.Anything,  // duration
 			mock.Anything). // stats
@@ -277,7 +283,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -416,7 +422,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -665,7 +671,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -760,7 +766,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -1005,9 +1011,6 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	accounts := environment.NewAccounts(testutils.NewSimpleTransaction(view))
 
-	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
-	// as freeze check should happen before a transaction signature is checked
-	// but we currently discard all the touches if it fails and any point
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
@@ -1086,6 +1089,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedCachedPrograms := 0
 
 	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionBlockExecuted",
+		mock.Anything,  // duration
+		mock.Anything). // stats
+		Return(nil).
+		Times(1)
+
 	metrics.On("ExecutionCollectionExecuted",
 		mock.Anything,  // duration
 		mock.Anything). // stats
@@ -1160,23 +1169,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	assert.Len(t, result.TransactionResults, 1)
 
 	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
-
-	stats := result.CollectionStats(0)
-	// ignore computation and memory used
-	stats.ComputationUsed = 0
-	stats.MemoryUsed = 0
-
-	assert.Equal(
-		t,
-		module.ExecutionResultStats{
-			EventCounts:                     expectedNumberOfEvents,
-			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        66,
-			NumberOfBytesWrittenToRegisters: 4214,
-			NumberOfCollections:             1,
-			NumberOfTransactions:            1,
-		},
-		stats)
 
 	committer.AssertExpectations(t)
 }
@@ -1274,7 +1266,7 @@ func getSetAProgram(t *testing.T, derivedBlockData *derived.DerivedBlockData) {
 	derivedTxnData.SetProgram(
 		loc,
 		&derived.Program{},
-		&state.State{},
+		&state.ExecutionSnapshot{},
 	)
 	err = derivedTxnData.Commit()
 	require.NoError(t, err)

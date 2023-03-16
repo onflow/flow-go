@@ -96,6 +96,8 @@ var (
 		common.MemoryKindCadenceTypeValue:              17,
 		common.MemoryKindCadenceStorageCapabilityValue: 1,
 		common.MemoryKindCadenceFunctionValue:          1,
+		common.MemoryKindCadenceAttachmentValueBase:    33,
+		common.MemoryKindCadenceAttachmentValueSize:    16,
 
 		// Cadence Types
 
@@ -117,6 +119,7 @@ var (
 		common.MemoryKindCadenceRestrictedType:         57,
 		common.MemoryKindCadenceCapabilityType:         17,
 		common.MemoryKindCadenceEnumType:               97,
+		common.MemoryKindCadenceAttachmentType:         81,
 
 		// Misc
 
@@ -162,6 +165,7 @@ var (
 		common.MemoryKindVariableDeclaration:        97,
 		common.MemoryKindSpecialFunctionDeclaration: 17,
 		common.MemoryKindPragmaDeclaration:          17,
+		common.MemoryKindAttachmentDeclaration:      70,
 
 		common.MemoryKindAssignmentStatement: 41,
 		common.MemoryKindBreakStatement:      1,
@@ -174,6 +178,7 @@ var (
 		common.MemoryKindSwapStatement:       33,
 		common.MemoryKindSwitchStatement:     41,
 		common.MemoryKindWhileStatement:      25,
+		common.MemoryKindRemoveStatement:     33,
 
 		common.MemoryKindBooleanExpression:     9,
 		common.MemoryKindNilExpression:         1,
@@ -196,6 +201,7 @@ var (
 		common.MemoryKindReferenceExpression:   33,
 		common.MemoryKindForceExpression:       17,
 		common.MemoryKindPathExpression:        1,
+		common.MemoryKindAttachExpression:      33,
 
 		common.MemoryKindConstantSizedType: 25,
 		common.MemoryKindDictionaryType:    33,

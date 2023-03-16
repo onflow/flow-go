@@ -16,7 +16,7 @@ func NewNoop() *Noop {
 
 func (n Noop) BlockFinalized(block *flow.Header) {}
 
-func (n Noop) BlockProcessable(block *flow.Header) {}
+func (n Noop) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {}
 
 func (n Noop) EpochTransition(newEpoch uint64, first *flow.Header) {}
 

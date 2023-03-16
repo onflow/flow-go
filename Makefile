@@ -63,8 +63,8 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.13.1; \
-    go install github.com/golang/mock/mockgen@v1.3.1;
+    go install github.com/vektra/mockery/v2@v2.21.4; \
+    go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
 install-tools: crypto_setup_gopath check-go-version install-mock-generators
@@ -158,6 +158,8 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
+	rm -rf ./fvm/mock
+	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
 	rm -rf ./fvm/environment/mock
 	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"

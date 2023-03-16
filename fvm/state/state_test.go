@@ -19,6 +19,52 @@ func createByteArray(size int) []byte {
 	return bytes
 }
 
+func TestState_Finalize(t *testing.T) {
+	view := delta.NewDeltaView(nil)
+	parent := state.NewState(view, state.DefaultParameters())
+
+	child := parent.NewChild()
+
+	readId := flow.NewRegisterID("0", "x")
+
+	_, err := child.Get(readId)
+	require.NoError(t, err)
+
+	writeId := flow.NewRegisterID("1", "y")
+	writeValue := flow.RegisterValue("a")
+
+	err = child.Set(writeId, writeValue)
+	require.NoError(t, err)
+
+	childSnapshot := child.Finalize()
+
+	require.Equal(
+		t,
+		map[flow.RegisterID]struct{}{
+			readId:  struct{}{},
+			writeId: struct{}{}, // TODO(patrick): rm from read set
+		},
+		childSnapshot.ReadSet)
+
+	require.Equal(
+		t,
+		map[flow.RegisterID]flow.RegisterValue{
+			writeId: writeValue,
+		},
+		childSnapshot.WriteSet)
+
+	require.NotNil(t, childSnapshot.SpockSecret)
+	require.NotNil(t, childSnapshot.Meter)
+
+	parentSnapshot := parent.Finalize()
+	// empty read / write set since child was not merged.
+	require.Empty(t, parentSnapshot.ReadSet)
+	require.Empty(t, parentSnapshot.WriteSet)
+	require.NotNil(t, parentSnapshot.SpockSecret)
+	require.NotNil(t, parentSnapshot.Meter)
+
+}
+
 func TestState_ChildMergeFunctionality(t *testing.T) {
 	view := delta.NewDeltaView(nil)
 	st := state.NewState(view, state.DefaultParameters())
@@ -67,7 +113,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// merge to parent
-		err = st.Merge(stChild)
+		err = st.Merge(stChild.Finalize())
 		require.NoError(t, err)
 
 		// read key3 on parent
@@ -190,7 +236,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.Merge(stChild)
+	err = st.Merge(stChild.Finalize())
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), key1Size+value1Size)
 

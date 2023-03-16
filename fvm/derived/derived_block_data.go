@@ -11,18 +11,27 @@ import (
 )
 
 type DerivedTransaction interface {
+	GetOrComputeProgram(
+		txState state.NestedTransaction,
+		addressLocation common.AddressLocation,
+		programComputer ValueComputer[common.AddressLocation, *Program],
+	) (
+		*Program,
+		error,
+	)
+
 	GetProgram(
 		addressLocation common.AddressLocation,
 	) (
 		*Program,
-		*state.State,
+		*state.ExecutionSnapshot,
 		bool,
 	)
 
 	SetProgram(
 		addressLocation common.AddressLocation,
 		program *Program,
-		state *state.State,
+		snapshot *state.ExecutionSnapshot,
 	)
 
 	GetMeterParamOverrides(
@@ -192,11 +201,25 @@ func (block *DerivedBlockData) CachedPrograms() int {
 	return len(block.programs.items)
 }
 
+func (transaction *DerivedTransactionData) GetOrComputeProgram(
+	txState state.NestedTransaction,
+	addressLocation common.AddressLocation,
+	programComputer ValueComputer[common.AddressLocation, *Program],
+) (
+	*Program,
+	error,
+) {
+	return transaction.programs.GetOrCompute(
+		txState,
+		addressLocation,
+		programComputer)
+}
+
 func (transaction *DerivedTransactionData) GetProgram(
 	addressLocation common.AddressLocation,
 ) (
 	*Program,
-	*state.State,
+	*state.ExecutionSnapshot,
 	bool,
 ) {
 	return transaction.programs.Get(addressLocation)
@@ -205,9 +228,9 @@ func (transaction *DerivedTransactionData) GetProgram(
 func (transaction *DerivedTransactionData) SetProgram(
 	addressLocation common.AddressLocation,
 	program *Program,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) {
-	transaction.programs.Set(addressLocation, program, state)
+	transaction.programs.Set(addressLocation, program, snapshot)
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(

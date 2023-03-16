@@ -212,13 +212,6 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 			{unittest.IdentifierFixture()},
 		}),
 		StateSnapshots: nil,
-		StateCommitments: []flow.StateCommitment{
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-		},
-		Proofs: nil,
 		Events: []flow.EventsList{
 			{
 				unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
@@ -263,6 +256,24 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 				},
 				&execution_data.ChunkExecutionData{
 					TrieUpdate: trieUpdate4,
+				},
+			},
+		},
+		ExecutionReceipt: &flow.ExecutionReceipt{
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{
+						EndState: unittest.StateCommitmentFixture(),
+					},
+					{
+						EndState: unittest.StateCommitmentFixture(),
+					},
+					{
+						EndState: unittest.StateCommitmentFixture(),
+					},
+					{
+						EndState: unittest.StateCommitmentFixture(),
+					},
 				},
 			},
 		},

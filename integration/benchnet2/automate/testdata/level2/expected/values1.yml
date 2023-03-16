@@ -8,6 +8,8 @@ access:
   defaults:
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc
@@ -109,6 +111,8 @@ collection:
   defaults:
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc
@@ -316,6 +320,8 @@ consensus:
   defaults:
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc
@@ -442,6 +448,8 @@ execution:
   defaults:
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc
@@ -530,6 +538,8 @@ verification:
   defaults:
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc

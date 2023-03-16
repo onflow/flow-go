@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	DefaultPeerScoringEnabled = true // enable peer scoring by default on node builder
-
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
 	MinAppSpecificPenalty         = -1

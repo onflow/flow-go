@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,7 +41,7 @@ type Programs struct {
 	dependencyStack *dependencyStack
 }
 
-// NewPrograms construts a new ProgramHandler
+// NewPrograms constructs a new ProgramHandler
 func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
@@ -77,13 +78,13 @@ func (programs *Programs) set(
 		return nil
 	}
 
-	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
+	snapshot, err := programs.txnState.CommitParseRestrictedNestedTransaction(
 		address)
 	if err != nil {
 		return err
 	}
 
-	if state.BytesWritten() > 0 {
+	if len(snapshot.WriteSet) > 0 {
 		// This should never happen. Loading a program should not write to the state.
 		// If this happens, it indicates an implementation error.
 		return fmt.Errorf("cannot set program. State was written to during program parsing")
@@ -109,10 +110,13 @@ func (programs *Programs) set(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 
-	programs.txnState.SetProgram(address, &derived.Program{
-		Program:      program,
-		Dependencies: dependencies,
-	}, state)
+	programs.txnState.SetProgram(
+		address,
+		&derived.Program{
+			Program:      program,
+			Dependencies: dependencies,
+		},
+		snapshot)
 	return nil
 }
 
@@ -133,12 +137,12 @@ func (programs *Programs) get(
 		return program, ok
 	}
 
-	program, state, has := programs.txnState.GetProgram(address)
+	program, snapshot, has := programs.txnState.GetProgram(address)
 	if has {
 		programs.cacheHit()
 
 		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommitNestedTransaction(state)
+		err := programs.txnState.AttachAndCommitNestedTransaction(snapshot)
 		if err != nil {
 			panic(fmt.Sprintf(
 				"merge error while getting program, panic: %s",
@@ -168,43 +172,186 @@ func (programs *Programs) get(
 	return nil, false
 }
 
-// GetAndSetProgram gets the program from the cache,
+// GetOrLoadProgram gets the program from the cache,
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
 // to load the dependencies of the program.
-//
-// TODO: this function currently just calls GetProgram and SetProgram in pair.
-// This method can be re-written in a far better way by removing the individual
-// GetProgram and SetProgram methods.
-func (programs *Programs) GetAndSetProgram(
+func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
+	// TODO: check why this exists and try to remove.
+	// ignore empty locations
+	if location == nil {
+		return nil, nil
+	}
 
-	prog, err := programs.GetProgram(location)
+	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
+	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
+
+	// non-address location program is not reusable across transactions.
+	switch location := location.(type) {
+	case common.AddressLocation:
+		return programs.getOrLoadAddressProgram(location, load)
+	default:
+		return programs.getOrLoadNonAddressProgram(location, load)
+	}
+}
+
+func (programs *Programs) getOrLoadAddressProgram(
+	location common.AddressLocation,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+
+	loader := newProgramLoader(load, programs.dependencyStack, location)
+	program, err := programs.txnState.GetOrComputeProgram(
+		programs.txnState,
+		location,
+		loader,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting program: %w", err)
+	}
+
+	// Add dependencies to the stack.
+	// This is only really needed if loader was not called,
+	// but there is no harm in doing it always.
+	programs.dependencyStack.addDependencies(program.Dependencies)
+
+	if loader.Called() {
+		programs.cacheMiss()
+	} else {
+		programs.cacheHit()
+	}
+
+	return program.Program, nil
+}
+
+// programLoader is used to load a program from a location.
+type programLoader struct {
+	loadFunc        func() (*interpreter.Program, error)
+	dependencyStack *dependencyStack
+	called          bool
+	location        common.AddressLocation
+}
+
+var _ derived.ValueComputer[common.AddressLocation, *derived.Program] = (*programLoader)(nil)
+
+func newProgramLoader(
+	loadFunc func() (*interpreter.Program, error),
+	dependencyStack *dependencyStack,
+	location common.AddressLocation,
+) *programLoader {
+	return &programLoader{
+		loadFunc:        loadFunc,
+		dependencyStack: dependencyStack,
+		// called will be true if the loader was called.
+		called:   false,
+		location: location,
+	}
+}
+
+func (loader *programLoader) Compute(
+	txState state.NestedTransaction,
+	location common.AddressLocation,
+) (
+	*derived.Program,
+	error,
+) {
+	if loader.called {
+		// This should never happen, as the program loader is only called once per
+		// program. The same loader is never reused. This is only here to make
+		// this more apparent.
+		panic("program loader called twice")
+	}
+	if loader.location != location {
+		// This should never happen, as the program loader constructed specifically
+		// to load one location once. This is only a sanity check.
+		panic("program loader called with unexpected location")
+	}
+
+	loader.called = true
+
+	interpreterProgram, dependencies, err :=
+		loader.loadWithDependencyTracking(location, loader.loadFunc)
+	if err != nil {
+		return nil, fmt.Errorf("load program failed: %w", err)
+	}
+
+	return &derived.Program{
+		Program:      interpreterProgram,
+		Dependencies: dependencies,
+	}, nil
+}
+
+func (loader *programLoader) Called() bool {
+	return loader.called
+}
+
+func (loader *programLoader) loadWithDependencyTracking(
+	address common.AddressLocation,
+	load func() (*interpreter.Program, error),
+) (
+	*interpreter.Program,
+	derived.ProgramDependencies,
+	error,
+) {
+	// this program is not in cache, so we need to load it into the cache.
+	// tho have proper invalidation, we need to track the dependencies of the program.
+	// If this program depends on another program,
+	// that program will be loaded before this one finishes loading (calls set).
+	// That is why this is a stack.
+	loader.dependencyStack.push(address)
+
+	program, err := load()
+
+	// Get collected dependencies of the loaded program.
+	// Pop the dependencies from the stack even if loading errored.
+	stackLocation, dependencies, depErr := loader.dependencyStack.pop()
+	if depErr != nil {
+		err = multierror.Append(err, depErr).ErrorOrNil()
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if stackLocation != address {
+		// This should never happen, and indicates an implementation error.
+		// GetProgram and SetProgram should be always called in pair, this check depends on this assumption.
+		// Get pushes the stack and set pops the stack.
+		// Example: if loading B that depends on A (and none of them are in cache yet),
+		//   - get(A): pushes A
+		//   - get(B): pushes B
+		//   - set(B): pops B
+		//   - set(A): pops A
+		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
+		return nil, nil, fmt.Errorf(
+			"cannot set program. Popped dependencies are for an unexpeced address"+
+				" (expected %s, got %s)", address, stackLocation)
+	}
+	return program, dependencies, nil
+}
+
+func (programs *Programs) getOrLoadNonAddressProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+	program, ok := programs.nonAddressPrograms[location]
+	if ok {
+		return program, nil
+	}
+
+	program, err := load()
 	if err != nil {
 		return nil, err
 	}
-	if prog != nil {
-		return prog, nil
-	}
 
-	prog, err = load()
-	if err != nil {
-		// if loading fails, we still need to call set with nil program
-		// to pop the loading stack.
-		setErr := programs.SetProgram(location, nil)
-		if setErr != nil {
-			err = multierror.Append(err, setErr).ErrorOrNil()
-		}
-		return nil, err
-	}
-	err = programs.SetProgram(location, prog)
-	if err != nil {
-		return nil, err
-	}
-
-	return prog, nil
+	programs.nonAddressPrograms[location] = program
+	return program, nil
 }
 
 func (programs *Programs) GetProgram(
@@ -218,15 +365,6 @@ func (programs *Programs) GetProgram(
 	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.ConvertAddress(addressLocation.Address)
-
-		freezeError := programs.accounts.CheckAccountNotFrozen(address)
-		if freezeError != nil {
-			return nil, fmt.Errorf("get program failed: %w", freezeError)
-		}
 	}
 
 	program, has := programs.get(location)

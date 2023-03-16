@@ -159,7 +159,7 @@ func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.Execut
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
-func (ec *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
+func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
@@ -245,6 +245,12 @@ func (nc *NoopCollector) AddInflightRequests(context.Context, httpmetrics.HTTPPr
 func (nc *NoopCollector) AddTotalRequests(context.Context, string, string)                     {}
 func (nc *NoopCollector) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 }
+func (nc *NoopCollector) OnStreamCreated(duration time.Duration, attempts int)          {}
+func (nc *NoopCollector) OnStreamCreationFailure(duration time.Duration, attempts int)  {}
+func (nc *NoopCollector) OnPeerDialed(duration time.Duration, attempts int)             {}
+func (nc *NoopCollector) OnPeerDialFailure(duration time.Duration, attempts int)        {}
+func (nc *NoopCollector) OnStreamEstablished(duration time.Duration, attempts int)      {}
+func (nc *NoopCollector) OnEstablishStreamFailure(duration time.Duration, attempts int) {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
@@ -257,18 +263,19 @@ func (nc *NoopCollector) OnPruneReceived(int)                                   
 func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                     {}
 func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                    {}
 func (nc *NoopCollector) OnIncomingRpcRejected()                                          {}
-func (nc *NoopCollector) OnPublishedGossipMessagesReceived(count int)                     {}
-func (nc *NoopCollector) AllowConn(dir network.Direction, usefd bool)                     {}
-func (nc *NoopCollector) BlockConn(dir network.Direction, usefd bool)                     {}
-func (nc *NoopCollector) AllowStream(p peer.ID, dir network.Direction)                    {}
-func (nc *NoopCollector) BlockStream(p peer.ID, dir network.Direction)                    {}
-func (nc *NoopCollector) AllowPeer(p peer.ID)                                             {}
-func (nc *NoopCollector) BlockPeer(p peer.ID)                                             {}
-func (nc *NoopCollector) AllowProtocol(proto protocol.ID)                                 {}
-func (nc *NoopCollector) BlockProtocol(proto protocol.ID)                                 {}
-func (nc *NoopCollector) BlockProtocolPeer(proto protocol.ID, p peer.ID)                  {}
-func (nc *NoopCollector) AllowService(svc string)                                         {}
-func (nc *NoopCollector) BlockService(svc string)                                         {}
-func (nc *NoopCollector) BlockServicePeer(svc string, p peer.ID)                          {}
-func (nc *NoopCollector) AllowMemory(size int)                                            {}
-func (nc *NoopCollector) BlockMemory(size int)                                            {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(int)                           {}
+func (nc *NoopCollector) OnLocalMeshSizeUpdated(string, int)                              {}
+func (nc *NoopCollector) AllowConn(network.Direction, bool)                               {}
+func (nc *NoopCollector) BlockConn(network.Direction, bool)                               {}
+func (nc *NoopCollector) AllowStream(peer.ID, network.Direction)                          {}
+func (nc *NoopCollector) BlockStream(peer.ID, network.Direction)                          {}
+func (nc *NoopCollector) AllowPeer(peer.ID)                                               {}
+func (nc *NoopCollector) BlockPeer(peer.ID)                                               {}
+func (nc *NoopCollector) AllowProtocol(protocol.ID)                                       {}
+func (nc *NoopCollector) BlockProtocol(protocol.ID)                                       {}
+func (nc *NoopCollector) BlockProtocolPeer(protocol.ID, peer.ID)                          {}
+func (nc *NoopCollector) AllowService(string)                                             {}
+func (nc *NoopCollector) BlockService(string)                                             {}
+func (nc *NoopCollector) BlockServicePeer(string, peer.ID)                                {}
+func (nc *NoopCollector) AllowMemory(int)                                                 {}
+func (nc *NoopCollector) BlockMemory(int)                                                 {}
