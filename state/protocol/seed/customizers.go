@@ -30,7 +30,7 @@ func ExecutionChunk(chunkIndex uint16) []byte {
 }
 
 // customizerFromIndices maps the input indices into a slice of bytes.
-// The implementation insures there are no collisions of mapping of different indices.
+// The implementation ensures there are no collisions of mapping of different indices.
 //
 // The output is built as a concatenation of indices, each index encoded over 2 bytes.
 // (the implementation could be updated to map the indices differently depending on the
