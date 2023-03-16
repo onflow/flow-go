@@ -177,14 +177,30 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 // sentinel errors to distinguish between internal problems and external byzantine inputs.
 func Test_VerifyQC_EmptySigners(t *testing.T) {
 	committee := &mocks.DynamicCommittee{}
+	dkg := &mocks.DKG{}
+	pk := &modulemock.PublicKey{}
+	pk.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	dkg.On("GroupKey").Return(pk)
+	committee.On("DKG", mock.Anything).Return(dkg, nil)
+
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
 	block := model.BlockFromFlow(header)
-	sigData := unittest.QCSigDataFixture()
 
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
+	// sigData with empty signers
+	emptySignersInput := model.SignatureData{
+		SigType:                      []byte{},
+		AggregatedStakingSig:         unittest.SignatureFixture(),
+		AggregatedRandomBeaconSig:    unittest.SignatureFixture(),
+		ReconstructedRandomBeaconSig: unittest.SignatureFixture(),
+	}
+	encoder := new(model.SigDataPacker)
+	sigData, err := encoder.Encode(&emptySignersInput)
+	require.NoError(t, err)
+
+	err = verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)

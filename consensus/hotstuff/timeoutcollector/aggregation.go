@@ -33,8 +33,10 @@ type sigInfo struct {
 // View and the identities of all authorized replicas are
 // specified when the TimeoutSignatureAggregator is instantiated.
 // Each signer is allowed to sign at most once.
-// Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
-// This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
+// Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP).
+// Implementation is only safe under the assumption that all proofs of possession (PoP) of the public keys
+// are valid. This module does not perform the PoPs validity checks, it assumes verification was done
+// outside the module.
 // Implementation is thread-safe.
 type TimeoutSignatureAggregator struct {
 	lock          sync.RWMutex
@@ -51,6 +53,8 @@ var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 // for which we aggregate signatures, list of flow identities,
 // their respective public keys and a domain separation tag. The identities
 // represent the list of all authorized signers.
+// The constructor does not verify PoPs of input public keys, it assumes verification was done outside
+// this module.
 // The constructor errors if:
 // - the list of identities is empty
 // - if one of the keys is not a valid public key.
@@ -168,9 +172,6 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, 
 	defer a.lock.RUnlock()
 
 	sharesNum := len(a.idToSignature)
-	if sharesNum == 0 {
-		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
-	}
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	signersData := make([]hotstuff.TimeoutSignerInfo, 0, sharesNum)
 	for id, info := range a.idToSignature {
@@ -183,12 +184,26 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]hotstuff.TimeoutSignerInfo, 
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		// unexpected error for:
-		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
-		//  * if some signature(s) could not be decoded, which should be impossible since we check all signatures before adding them
-		// Hence, any error here is a symptom of an internal bug
+		// `AggregateBLSSignatures` returns two possible errors:
+		//  - crypto.BLSAggregateEmptyListError if `signatures` slice is empty, i.e no signatures have been added yet:
+		//    respond with model.InsufficientSignaturesError
+		//  - crypto.invalidSignatureError if some signature(s) could not be decoded, which should be impossible since
+		//    we check all signatures before adding them (there is no `TrustedAdd` method in this module)
+		if crypto.IsBLSAggregateEmptyListError(err) {
+			return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures: %w", err)
+		}
+		// any other error here is a symptom of an internal bug
 		return nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
+	// TODO-1: add logic to check if only one `NewestQCView` is used. In that case
+	// check the aggregated signature is not identity (that's enough to ensure
+	// aggregated key is not identity, given all signatures are individually valid)
+	// This is not implemented for now because `VerifyTC` does not error for an identity public key
+	// (that's because the crypto layer currently does not return false when verifying signatures using `VerifyBLSSignatureManyMessages`
+	//  and encountering identity public keys)
+	//
+	// TODO-2: check if the logic should be extended to look at the partial aggregated signatures of all
+	// signatures against the same message.
 	return signersData, aggSignature, nil
 }
