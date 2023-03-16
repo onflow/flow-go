@@ -121,9 +121,12 @@ type PubSubTracer interface {
 
 // PeerScoreSnapshot is a snapshot of the overall peer score at a given time.
 type PeerScoreSnapshot struct {
-	Score            float64                        // the overall score of the peer.
-	Topics           map[string]*TopicScoreSnapshot // score of the peer per topic.
-	AppSpecificScore float64                        // application specific score (set by Flow protocol).
+        // Score the overall score of the peer.
+	Score            float64
+	// Topics map that stores the score of the peer per topic.                        
+	Topics           map[string]*TopicScoreSnapshot
+	 // AppSpecificScore application specific score (set by Flow protocol).
+	AppSpecificScore float64                      
 
 	// A positive value indicates that the peer is colocated with other nodes on the same network id,
 	// and can be used to warn of sybil attacks.
@@ -133,12 +136,16 @@ type PeerScoreSnapshot struct {
 }
 
 // TopicScoreSnapshot is a snapshot of the peer score within a topic at a given time.
+// Note that float64 is used for the counters as they are decayed over the time.
 type TopicScoreSnapshot struct {
-	// Note that float64 is used for the counters as they are decayed over the time.
-	TimeInMesh               time.Duration // total time in mesh.
-	FirstMessageDeliveries   float64       // counter of first message deliveries.
-	MeshMessageDeliveries    float64       // total mesh message deliveries (in the mesh).
-	InvalidMessageDeliveries float64       // counter of invalid message deliveries.
+	// TimeInMesh total time in mesh.
+	TimeInMesh               time.Duration
+	 // FirstMessageDeliveries counter of first message deliveries.
+	FirstMessageDeliveries   float64
+	// MeshMessageDeliveries total mesh message deliveries (in the mesh).     
+	MeshMessageDeliveries    float64
+	// InvalidMessageDeliveries counter of invalid message deliveries.      
+	InvalidMessageDeliveries float64
 }
 
 // IsWarning returns true if the peer score is in warning state. When the peer score is in warning state, the peer is
