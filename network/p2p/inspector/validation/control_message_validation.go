@@ -128,15 +128,15 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.Co
 	count, topicIDS := c.getCtrlMsgData(ctrlMsgType, ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", from.String()).
-		Str("control_msg_type", string(ctrlMsgType)).
-		Uint64("count", count).Logger()
+		Str("ctrl_msg_type", string(ctrlMsgType)).
+		Uint64("ctrl_msg_count", count).Logger()
 
 	// if count greater than upper threshold drop message and penalize
 	if count > validationConfig.UpperThreshold {
 		upperThresholdErr := NewUpperThresholdErr(validationConfig.ControlMsg, count, validationConfig.UpperThreshold)
 		lg.Warn().
 			Err(upperThresholdErr).
-			Uint64("upper-threshold", upperThresholdErr.upperThreshold).
+			Uint64("upper_threshold", upperThresholdErr.upperThreshold).
 			Bool(logging.KeySuspicious, true).
 			Msg("rejecting RPC message")
 
@@ -155,9 +155,9 @@ func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.Co
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *inspectMsgReq) {
 	lg := c.logger.With().
-		Uint64("count", req.count).
 		Str("peer_id", req.peer.String()).
-		Str("control_msg_type", string(req.validationConfig.ControlMsg)).Logger()
+		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
+		Uint64("ctrl_msg_count", req.count).Logger()
 	var validationErr error
 	switch {
 	case !req.validationConfig.RateLimiter.Allow(req.peer, int(req.count)): // check if peer RPC messages are rate limited
