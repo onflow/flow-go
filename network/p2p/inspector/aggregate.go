@@ -13,7 +13,7 @@ import (
 // AggregateRPCInspector gossip sub RPC inspector that combines multiple RPC inspectors into a single inspector. Each
 // individual inspector will be invoked synchronously.
 type AggregateRPCInspector struct {
-	lock       sync.Mutex
+	lock       sync.RWMutex
 	inspectors []p2p.GossipSubRPCInspector
 }
 
@@ -35,8 +35,8 @@ func (a *AggregateRPCInspector) AddInspector(inspector p2p.GossipSubRPCInspector
 
 // Inspect func with the p2p.GossipSubRPCInspector func signature that will invoke all the configured inspectors.
 func (a *AggregateRPCInspector) Inspect(peerID peer.ID, rpc *pubsub.RPC) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 	var errs *multierror.Error
 	for _, inspector := range a.inspectors {
 		err := inspector.Inspect(peerID, rpc)
