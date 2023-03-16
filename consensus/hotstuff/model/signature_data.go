@@ -32,22 +32,26 @@ func (p *SigDataPacker) Encode(sigData *SignatureData) ([]byte, error) {
 }
 
 // Decode performs decoding of SignatureData
+// This function is side-effect free. It only ever returns
+// a model.InvalidFormatError, which indicates an invalid encoding.
 func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	bs := bytes.NewReader(data)
 	decoder := p.codec.NewDecoder(bs)
 	var sigData SignatureData
 	err := decoder.Decode(&sigData)
-	return &sigData, err
+	if err != nil {
+		return nil, NewInvalidFormatErrorf("given data is not a valid encoding of SignatureData: %w", err)
+	}
+	return &sigData, nil
 }
 
 // UnpackRandomBeaconSig takes sigData previously packed by packer,
-// decodes it and extracts random beacon signature
+// decodes it and extracts random beacon signature.
+// This function is side-effect free. It only ever returns a
+// model.InvalidFormatError, which indicates an invalid encoding.
 func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	// decode into typed data
 	packer := SigDataPacker{}
 	sig, err := packer.Decode(sigData)
-	if err != nil {
-		return nil, NewInvalidFormatErrorf("could not decode sig data: %w", err)
-	}
-	return sig.ReconstructedRandomBeaconSig, nil
+	return sig.ReconstructedRandomBeaconSig, err
 }
