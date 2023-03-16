@@ -179,7 +179,7 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 	require.NoError(s.T(), err)
 	require.Empty(s.T(), connectedBlocks)
 
-	connectedBlocks, err = s.pendingTree.FinalizeForkAtLevel(longestFork[1].Block.Header)
+	connectedBlocks, err = s.pendingTree.FinalizeFork(longestFork[1].Block.Header)
 	require.NoError(s.T(), err)
 	require.ElementsMatch(s.T(), longestFork[2:], connectedBlocks)
 }
@@ -188,7 +188,7 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	newFinalized := unittest.BlockWithParentFixture(block.Header)
-	_, err := s.pendingTree.FinalizeForkAtLevel(newFinalized.Header)
+	_, err := s.pendingTree.FinalizeFork(newFinalized.Header)
 	require.NoError(s.T(), err)
 	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
@@ -208,7 +208,7 @@ func (s *PendingTreeSuite) TestAddingBlockAfterFinalization() {
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), blocks[:3], connectedBlocks)
 
-	_, err = s.pendingTree.FinalizeForkAtLevel(blocks[0].Block.Header)
+	_, err = s.pendingTree.FinalizeFork(blocks[0].Block.Header)
 	require.NoError(s.T(), err)
 
 	connectedBlocks, err = s.pendingTree.AddBlocks(blocks)

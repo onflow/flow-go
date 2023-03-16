@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // CertifiedBlock holds a certified block, it consists of a block and a QC which proves validity of block (QC.BlockID = Block.ID())
@@ -148,10 +149,10 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 	return false
 }
 
-// FinalizeForkAtLevel takes last finalized block and prunes all blocks below the finalized view.
+// FinalizeFork takes last finalized block and prunes all blocks below the finalized view.
 // PendingTree treats its input as a potentially repetitive stream of information: repeated
 // and older inputs (out of order) are already consistent with the current state. Repetitive
-// inputs might cause repetitive outputs. 
+// inputs might cause repetitive outputs.
 // When a block is finalized we don't care for any blocks below it, since they were already finalized.
 // Finalizing a block might causes the pending PendingTree to detect _additional_ blocks as now
 // being connected to the latest finalized block. This happens of some connecting blocks are missing
@@ -169,18 +170,17 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 // returns these blocks. Returned blocks are ordered such that parents appear before their children.
 //
 // No errors are expected during normal operation.
-func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) ([]CertifiedBlock, error) {
+func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]CertifiedBlock, error) {
 	var connectedBlocks []CertifiedBlock
-	blockID := finalized.ID()
-	if t.forest.LowestLevel >= finalized.View {
-		return connectedBlocks, nil
-	}
 
-	t.lastFinalizedID = blockID
 	err := t.forest.PruneUpToLevel(finalized.View)
 	if err != nil {
+		if mempool.IsBelowPrunedThresholdError(err) {
+			return nil, nil
+		}
 		return connectedBlocks, fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
 	}
+	t.lastFinalizedID = finalized.ID()
 
 	iter := t.forest.GetChildren(t.lastFinalizedID)
 	for iter.HasNext() {
@@ -207,16 +207,16 @@ func (t *PendingTree) FinalizeForkAtLevel(finalized *flow.Header) ([]CertifiedBl
 //   - any connected certified blocks are appended to `queue`
 //   - we return the _resulting slice_ after all appends
 func (t *PendingTree) updateAndCollectFork(queue []CertifiedBlock, vertex *PendingBlockVertex) []CertifiedBlock {
+	if vertex.connectedToFinalized {
+		return queue // no-op if already connected
+	}
 	vertex.connectedToFinalized = true
 	queue = append(queue, vertex.CertifiedBlock)
 
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
 		nextVertex := iter.NextVertex().(*PendingBlockVertex)
-		// if it's already connected then it was already reported
-		if !nextVertex.connectedToFinalized {
-			queue = t.updateAndCollectFork(queue, nextVertex)
-		}
+		queue = t.updateAndCollectFork(queue, nextVertex)
 	}
 	return queue
 }
