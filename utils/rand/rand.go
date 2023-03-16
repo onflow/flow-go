@@ -134,12 +134,12 @@ func Uintn(n uint) (uint, error) {
 //
 // O(1) space and O(n) time
 func Shuffle(n uint, swap func(i, j uint)) error {
-	for i := n - 1; i > 0; i-- {
-		j, err := Uintn(i + 1)
+	for i := int(n - 1); i > 0; i-- {
+		j, err := Uintn(uint(i + 1))
 		if err != nil {
 			return err
 		}
-		swap(i, j)
+		swap(uint(i), j)
 	}
 	return nil
 }
