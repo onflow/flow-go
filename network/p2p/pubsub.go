@@ -136,12 +136,16 @@ type PeerScoreSnapshot struct {
 }
 
 // TopicScoreSnapshot is a snapshot of the peer score within a topic at a given time.
+// Note that float64 is used for the counters as they are decayed over the time.
 type TopicScoreSnapshot struct {
-	// Note that float64 is used for the counters as they are decayed over the time.
-	TimeInMesh               time.Duration // total time in mesh.
-	FirstMessageDeliveries   float64       // counter of first message deliveries.
-	MeshMessageDeliveries    float64       // total mesh message deliveries (in the mesh).
-	InvalidMessageDeliveries float64       // counter of invalid message deliveries.
+	// TimeInMesh total time in mesh.
+	TimeInMesh               time.Duration
+	 // FirstMessageDeliveries counter of first message deliveries.
+	FirstMessageDeliveries   float64
+	// MeshMessageDeliveries total mesh message deliveries (in the mesh).     
+	MeshMessageDeliveries    float64
+	// InvalidMessageDeliveries counter of invalid message deliveries.      
+	InvalidMessageDeliveries float64
 }
 
 // IsWarning returns true if the peer score is in warning state. When the peer score is in warning state, the peer is
