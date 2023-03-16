@@ -144,38 +144,38 @@ type TopicScoreSnapshot struct {
 // IsWarning returns true if the peer score is in warning state. When the peer score is in warning state, the peer is
 // considered to be misbehaving.
 func (p PeerScoreSnapshot) IsWarning() bool {
+	// Check if any topic is in warning state.
 	for _, topic := range p.Topics {
 		if topic.IsWarning() {
-			// if any topic is in warning state, the peer is in warning state.
 			return true
 		}
 	}
 
-	if p.Score < 0 {
-		// if the overall score is negative, the peer is in warning state, it means that the peer is suspected to be
+	// Check overall score.
+	switch {
+	case p.Score < 0:
+		// If the overall score is negative, the peer is in warning state, it means that the peer is suspected to be
 		// misbehaving at the GossipSub level.
 		return true
-	}
-
-	if p.AppSpecificScore < 0 {
-		// if the app specific score is negative, the peer is in warning state, it means that the peer behaves in a way
+	// Check app-specific score.
+	case p.AppSpecificScore < 0:
+		// If the app specific score is negative, the peer is in warning state, it means that the peer behaves in a way
 		// that is not allowed by the Flow protocol.
 		return true
-	}
-
-	if p.IPColocationFactor > 0 {
-		// if the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
+	// Check IP colocation factor.
+	case p.IPColocationFactor > 0:
+		// If the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
 		// same IP as another peer and is suspected to be a sybil node.
 		return true
-	}
-
-	if p.BehaviourPenalty > 0 {
-		// if the behaviour penalty is positive, the peer is in warning state, it means that the peer is suspected to be
+	// Check behaviour penalty.
+	case p.BehaviourPenalty > 0:
+		// If the behaviour penalty is positive, the peer is in warning state, it means that the peer is suspected to be
 		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages.
 		return true
+	// If none of the conditions are met, return false.
+	default:
+		return false
 	}
-
-	return false
 }
 
 // String returns the string representation of the peer score snapshot.
