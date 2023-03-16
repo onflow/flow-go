@@ -8,13 +8,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -25,6 +26,7 @@ type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConf
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
 type GossipSubBuilder interface {
+	PeerScoringBuilder
 	// SetHost sets the host of the builder.
 	// If the host has already been set, a fatal error is logged.
 	SetHost(host.Host)
@@ -61,10 +63,6 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// SetPeerScoringParameterOptions sets the peer scoring parameter options of the builder.
-	// If the peer scoring parameter options have already been set, a fatal error is logged.
-	SetPeerScoringParameterOptions(options ...scoring.PeerScoreParamsOption)
-
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
@@ -79,6 +77,16 @@ type GossipSubBuilder interface {
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, PeerScoreTracer, error)
 }
 
+type PeerScoringBuilder interface {
+	// SetTopicScoreParams sets the topic score parameters for the given topic.
+	// If the topic score parameters have already been set for the given topic, it is overwritten.
+	SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams)
+
+	// SetAppSpecificScoreParams sets the application specific score parameters for the given topic.
+	// If the application specific score parameters have already been set for the given topic, it is overwritten.
+	SetAppSpecificScoreParams(func(peer.ID) float64)
+}
+
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
@@ -87,13 +95,26 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) NodeBuilder
-	EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) NodeBuilder
+	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
+
+	// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
+	// Arguments:
+	// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
+	// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
+	EnableGossipSubPeerScoring(module.IdentityProvider, *PeerScoringConfig) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) NodeBuilder
-	SetRateLimiterDistributor(consumer UnicastRateLimiterDistributor) NodeBuilder
-	SetGossipSubTracer(tracer PubSubTracer) NodeBuilder
-	SetGossipSubScoreTracerInterval(interval time.Duration) NodeBuilder
+	SetStreamCreationRetryInterval(time.Duration) NodeBuilder
+	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
+	SetGossipSubTracer(PubSubTracer) NodeBuilder
+	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
 	Build() (LibP2PNode, error)
+}
+
+// PeerScoringConfig is a configuration for peer scoring parameters for a GossipSub pubsub system.
+type PeerScoringConfig struct {
+	// TopicScoreParams is a map of topic score parameters for each topic.
+	TopicScoreParams map[channels.Topic]*pubsub.TopicScoreParams
+	// AppSpecificScoreParams is a function that returns the application specific score parameters for a given peer.
+	AppSpecificScoreParams func(peer.ID) float64
 }

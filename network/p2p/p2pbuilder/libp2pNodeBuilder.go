@@ -38,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -212,11 +211,24 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-// EnableGossipSubPeerScoring sets builder.gossipSubPeerScoring to true.
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, ops ...scoring.PeerScoreParamsOption) p2p.NodeBuilder {
+// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
+// Arguments:
+// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
+// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, config *p2p.PeerScoringConfig) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubPeerScoring(true)
 	builder.gossipSubBuilder.SetIDProvider(provider)
-	builder.gossipSubBuilder.SetPeerScoringParameterOptions(ops...)
+	if config != nil {
+		if config.AppSpecificScoreParams != nil {
+			builder.gossipSubBuilder.SetAppSpecificScoreParams(config.AppSpecificScoreParams)
+		}
+		if config.TopicScoreParams != nil {
+			for topic, params := range config.TopicScoreParams {
+				builder.gossipSubBuilder.SetTopicScoreParams(topic, params)
+			}
+		}
+	}
+
 	return builder
 }
 
@@ -508,7 +520,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if gossipCfg.PeerScoring {
-		builder.EnableGossipSubPeerScoring(idProvider)
+		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
+		builder.EnableGossipSubPeerScoring(idProvider, nil)
 	}
 
 	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)

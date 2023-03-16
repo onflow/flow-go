@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -129,22 +130,21 @@ func (g *Builder) SetRoutingSystem(rsys routing.Routing) {
 	g.rsys = rsys
 }
 
-// SetPeerScoringParameterOptions sets the peer scoring parameter options of the builder.
-// If the peer scoring parameter options have already been set, a fatal error is logged.
-func (g *Builder) SetPeerScoringParameterOptions(options ...scoring.PeerScoreParamsOption) {
-	if g.peerScoringParameterOptions != nil {
-		g.logger.Fatal().Msg("peer scoring parameter options has already been set")
-		return
-	}
-	g.peerScoringParameterOptions = options
+func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
+	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithTopicScoreParams(topic, topicScoreParams))
+}
+
+func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
+	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
 }
 
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
 	return &Builder{
-		logger:              logger.With().Str("component", "gossipsub").Logger(),
-		metrics:             metrics,
-		gossipSubFactory:    defaultGossipSubFactory(),
-		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		logger:                      logger.With().Str("component", "gossipsub").Logger(),
+		metrics:                     metrics,
+		gossipSubFactory:            defaultGossipSubFactory(),
+		gossipSubConfigFunc:         defaultGossipSubAdapterConfig(),
+		peerScoringParameterOptions: make([]scoring.PeerScoreParamsOption, 0),
 	}
 }
 

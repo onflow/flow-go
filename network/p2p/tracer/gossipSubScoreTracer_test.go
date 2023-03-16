@@ -21,7 +21,6 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -84,43 +83,46 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		p2ptest.WithLogger(logger),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
 		p2ptest.WithPeerScoringEnabled(idProvider),         // enable peer scoring for sake of testing.
-		p2ptest.WithPeerScoreParamsOption(
-			scoring.WithAppSpecificScoreFunction(
-				func(pid peer.ID) float64 {
-					id, ok := idProvider.ByPeerID(pid)
-					require.True(t, ok)
+		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{
+			AppSpecificScoreParams: func(pid peer.ID) float64 {
+				id, ok := idProvider.ByPeerID(pid)
+				require.True(t, ok)
 
-					switch id.Role {
-					case flow.RoleConsensus:
-						return consensusScore
-					case flow.RoleAccess:
-						return accessScore
-					default:
-						t.Fatalf("unexpected role: %s", id.Role)
-					}
-					return 0
-				})),
+				switch id.Role {
+				case flow.RoleConsensus:
+					return consensusScore
+				case flow.RoleAccess:
+					return accessScore
+				default:
+					t.Fatalf("unexpected role: %s", id.Role)
+				}
+				return 0
+			},
+		}),
 		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
-		p2ptest.WithPeerScoreParamsOption(scoring.WithTopicScoreParams(topic1, &pubsub.TopicScoreParams{
-			// set the topic score params to some fixed values for sake of testing.
-			// Note that these values are not realistic and should not be used in production.
-			TopicWeight:                     1,
-			TimeInMeshQuantum:               1 * time.Second,
-			TimeInMeshWeight:                1,
-			TimeInMeshCap:                   1000,
-			FirstMessageDeliveriesWeight:    1,
-			FirstMessageDeliveriesDecay:     0.999,
-			FirstMessageDeliveriesCap:       1000,
-			MeshMessageDeliveriesWeight:     -1,
-			MeshMessageDeliveriesDecay:      0.999,
-			MeshMessageDeliveriesThreshold:  100,
-			MeshMessageDeliveriesActivation: 1 * time.Second,
-			MeshMessageDeliveriesCap:        1000,
-			MeshFailurePenaltyWeight:        -1,
-			MeshFailurePenaltyDecay:         0.999,
-			InvalidMessageDeliveriesWeight:  -1,
-			InvalidMessageDeliveriesDecay:   0.999,
-		})),
+		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
+			topic1: {
+				// set the topic score params to some fixed values for sake of testing.
+				// Note that these values are not realistic and should not be used in production.
+				TopicWeight:                     1,
+				TimeInMeshQuantum:               1 * time.Second,
+				TimeInMeshWeight:                1,
+				TimeInMeshCap:                   1000,
+				FirstMessageDeliveriesWeight:    1,
+				FirstMessageDeliveriesDecay:     0.999,
+				FirstMessageDeliveriesCap:       1000,
+				MeshMessageDeliveriesWeight:     -1,
+				MeshMessageDeliveriesDecay:      0.999,
+				MeshMessageDeliveriesThreshold:  100,
+				MeshMessageDeliveriesActivation: 1 * time.Second,
+				MeshMessageDeliveriesCap:        1000,
+				MeshFailurePenaltyWeight:        -1,
+				MeshFailurePenaltyDecay:         0.999,
+				InvalidMessageDeliveriesWeight:  -1,
+				InvalidMessageDeliveriesDecay:   0.999,
+			},
+		},
+		}),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
