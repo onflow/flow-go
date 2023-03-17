@@ -3,7 +3,6 @@ package pending_tree
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +26,6 @@ type PendingTreeSuite struct {
 }
 
 func (s *PendingTreeSuite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	s.finalized = unittest.BlockHeaderFixture()
 	s.pendingTree = NewPendingTree(s.finalized)
 }
