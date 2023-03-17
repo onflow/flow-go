@@ -97,7 +97,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 		testTxnSnapshotTime,
 		testTxn.ToValidateTimeForTestingOnly())
 
-	testTxn.Set("key1", nil, nil)
+	testTxn.SetForTestingOnly("key1", nil, nil)
 	require.Equal(
 		t,
 		testTxnSnapshotTime,
@@ -174,7 +174,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 
 	// Setting a value derived from snapshot time will reset the validate time
 
-	testTxn.Set("key2", nil, nil)
+	testTxn.SetForTestingOnly("key2", nil, nil)
 	require.Equal(
 		t,
 		testTxnSnapshotTime,
@@ -328,7 +328,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 	expectedValue := &valueString
 	expectedSnapshot := &state.ExecutionSnapshot{}
 
-	testSetupTxn1.Set(key, expectedValue, expectedSnapshot)
+	testSetupTxn1.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
 	testSetupTxn1.AddInvalidator(&testInvalidator{})
 
@@ -338,7 +338,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 	validateErr := testTxn.Validate()
 	require.NoError(t, validateErr)
 
-	actualProg, actualSnapshot, ok := testTxn.Get(key)
+	actualProg, actualSnapshot, ok := testTxn.GetForTestingOnly(key)
 	require.True(t, ok)
 	require.Same(t, expectedValue, actualProg)
 	require.Same(t, expectedSnapshot, actualSnapshot)
@@ -373,7 +373,7 @@ func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
 	require.NoError(t, err)
 
 	value := "value"
-	testTxn.Set("key", &value, &state.ExecutionSnapshot{})
+	testTxn.SetForTestingOnly("key", &value, &state.ExecutionSnapshot{})
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated write set")
@@ -396,7 +396,7 @@ func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.
 	require.NoError(t, err)
 
 	value := "value"
-	testTxn.Set("key", &value, &state.ExecutionSnapshot{})
+	testTxn.SetForTestingOnly("key", &value, &state.ExecutionSnapshot{})
 
 	err = testTxn.Validate()
 	require.NoError(t, err)
@@ -458,7 +458,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) 
 
 	key := "234"
 
-	actualValue, actualSnapshot, ok := testTxn.Get(key)
+	actualValue, actualSnapshot, ok := testTxn.GetForTestingOnly(key)
 	require.False(t, ok)
 	require.Nil(t, actualValue)
 	require.Nil(t, actualSnapshot)
@@ -467,9 +467,9 @@ func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) 
 	expectedValue := &valueString
 	expectedSnapshot := &state.ExecutionSnapshot{}
 
-	testTxn.Set(key, expectedValue, expectedSnapshot)
+	testTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get(key)
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly(key)
 	require.True(t, ok)
 	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedSnapshot, actualSnapshot)
@@ -507,7 +507,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T
 
 	key := "999"
 
-	actualValue, actualSnapshot, ok := testTxn.Get(key)
+	actualValue, actualSnapshot, ok := testTxn.GetForTestingOnly(key)
 	require.False(t, ok)
 	require.Nil(t, actualValue)
 	require.Nil(t, actualSnapshot)
@@ -516,9 +516,9 @@ func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T
 	expectedValue := &valueString
 	expectedSnapshot := &state.ExecutionSnapshot{}
 
-	testTxn.Set(key, expectedValue, expectedSnapshot)
+	testTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get(key)
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly(key)
 	require.True(t, ok)
 	require.Same(t, expectedValue, actualValue)
 	require.Same(t, expectedSnapshot, actualSnapshot)
@@ -564,7 +564,7 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 	expectedValue := &valueString
 	expectedSnapshot := &state.ExecutionSnapshot{}
 
-	testSetupTxn.Set(key, expectedValue, expectedSnapshot)
+	testSetupTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -579,7 +579,7 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 	otherValue := &otherString
 	otherSnapshot := &state.ExecutionSnapshot{}
 
-	testTxn.Set(key, otherValue, otherSnapshot)
+	testTxn.SetForTestingOnly(key, otherValue, otherSnapshot)
 
 	err = testTxn.Commit()
 	require.NoError(t, err)
@@ -612,29 +612,29 @@ func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	expectedValue1 := &valStr1
 	expectedSnapshot1 := &state.ExecutionSnapshot{}
 
-	testSetupTxn.Set(key1, expectedValue1, expectedSnapshot1)
+	testSetupTxn.SetForTestingOnly(key1, expectedValue1, expectedSnapshot1)
 
 	key2 := "key2"
 	valStr2 := "value2"
 	expectedValue2 := &valStr2
 	expectedSnapshot2 := &state.ExecutionSnapshot{}
 
-	testSetupTxn.Set(key2, expectedValue2, expectedSnapshot2)
+	testSetupTxn.SetForTestingOnly(key2, expectedValue2, expectedSnapshot2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	actualValue, actualSnapshot, ok := testTxn.Get(key1)
+	actualValue, actualSnapshot, ok := testTxn.GetForTestingOnly(key1)
 	require.True(t, ok)
 	require.Same(t, expectedValue1, actualValue)
 	require.Same(t, expectedSnapshot1, actualSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get(key2)
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly(key2)
 	require.True(t, ok)
 	require.Same(t, expectedValue2, actualValue)
 	require.Same(t, expectedSnapshot2, actualSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get("key3")
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly("key3")
 	require.False(t, ok)
 	require.Nil(t, actualValue)
 	require.Nil(t, actualSnapshot)
@@ -696,29 +696,29 @@ func TestDerivedDataTableCommitReadOnlyTransactionWithInvalidation(t *testing.T)
 	expectedValue1 := &valStr1
 	expectedSnapshot1 := &state.ExecutionSnapshot{}
 
-	testSetupTxn2.Set(key1, expectedValue1, expectedSnapshot1)
+	testSetupTxn2.SetForTestingOnly(key1, expectedValue1, expectedSnapshot1)
 
 	key2 := "key2"
 	valStr2 := "v2"
 	expectedValue2 := &valStr2
 	expectedSnapshot2 := &state.ExecutionSnapshot{}
 
-	testSetupTxn2.Set(key2, expectedValue2, expectedSnapshot2)
+	testSetupTxn2.SetForTestingOnly(key2, expectedValue2, expectedSnapshot2)
 
 	err = testSetupTxn2.Commit()
 	require.NoError(t, err)
 
-	actualValue, actualSnapshot, ok := testTxn.Get(key1)
+	actualValue, actualSnapshot, ok := testTxn.GetForTestingOnly(key1)
 	require.True(t, ok)
 	require.Same(t, expectedValue1, actualValue)
 	require.Same(t, expectedSnapshot1, actualSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get(key2)
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly(key2)
 	require.True(t, ok)
 	require.Same(t, expectedValue2, actualValue)
 	require.Same(t, expectedSnapshot2, actualSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get("key3")
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly("key3")
 	require.False(t, ok)
 	require.Nil(t, actualValue)
 	require.Nil(t, actualSnapshot)
@@ -875,8 +875,8 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	readValue2 := &readValStr2
 	readSnapshot2 := &state.ExecutionSnapshot{}
 
-	testSetupTxn.Set(readKey1, readValue1, readSnapshot1)
-	testSetupTxn.Set(readKey2, readValue2, readSnapshot2)
+	testSetupTxn.SetForTestingOnly(readKey1, readValue1, readSnapshot1)
+	testSetupTxn.SetForTestingOnly(readKey2, readValue2, readSnapshot2)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
@@ -888,12 +888,12 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	testTxn, err := block.NewTableTransaction(1, testTxnTime)
 	require.NoError(t, err)
 
-	actualValue, actualSnapshot, ok := testTxn.Get(readKey1)
+	actualValue, actualSnapshot, ok := testTxn.GetForTestingOnly(readKey1)
 	require.True(t, ok)
 	require.Same(t, readValue1, actualValue)
 	require.Same(t, readSnapshot1, actualSnapshot)
 
-	actualValue, actualSnapshot, ok = testTxn.Get(readKey2)
+	actualValue, actualSnapshot, ok = testTxn.GetForTestingOnly(readKey2)
 	require.True(t, ok)
 	require.Same(t, readValue2, actualValue)
 	require.Same(t, readSnapshot2, actualSnapshot)
@@ -908,8 +908,8 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	writeValue2 := &writeValStr2
 	writeSnapshot2 := &state.ExecutionSnapshot{}
 
-	testTxn.Set(writeKey1, writeValue1, writeSnapshot1)
-	testTxn.Set(writeKey2, writeValue2, writeSnapshot2)
+	testTxn.SetForTestingOnly(writeKey1, writeValue1, writeSnapshot1)
+	testTxn.SetForTestingOnly(writeKey2, writeValue2, writeSnapshot2)
 
 	// Actual test.  Invalidate one pre-existing entry and one new entry.
 
@@ -989,7 +989,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 	value := &valStr
 	state := &state.ExecutionSnapshot{}
 
-	txn.Set(key, value, state)
+	txn.SetForTestingOnly(key, value, state)
 
 	err = txn.Commit()
 	require.NoError(t, err)
