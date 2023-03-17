@@ -32,7 +32,8 @@ func WithChannel(channel channels.Channel) EngineOption {
 }
 
 // defaultBlockProcessingWorkers number of concurrent workers that process incoming blocks.
-const defaultBlockProcessingWorkers = 4
+// TODO: update this constant to use multiple workers when Core is ready.
+const defaultBlockProcessingWorkers = 1
 
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
@@ -112,12 +113,14 @@ func New(
 	}
 	e.con = con
 
-	// TODO: start multiple workers for processing blocks
-	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.processBlocksLoop).
+	cmBuilder := component.NewComponentManagerBuilder().
 		AddWorker(e.finalizationProcessingLoop).
-		AddWorker(e.processCoreSeqEvents).
-		Build()
+		AddWorker(e.processCoreSeqEvents)
+
+	for i := 0; i < defaultBlockProcessingWorkers; i++ {
+		cmBuilder.AddWorker(e.processBlocksLoop)
+	}
+	e.ComponentManager = cmBuilder.Build()
 
 	return e, nil
 }
@@ -187,7 +190,7 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-// processCoreSeqEvents processes events that need to be dispatched dedicated core's goroutine.
+// processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
 func (e *Engine) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()

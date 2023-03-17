@@ -25,6 +25,7 @@ func TestFollowerEngine(t *testing.T) {
 	suite.Run(t, new(EngineSuite))
 }
 
+// EngineSuite wraps CoreSuite and stores additional state needed for Engine specific logic.
 type EngineSuite struct {
 	CoreSuite
 
@@ -116,3 +117,5 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
+
+// TODO: add test for processing finalized block. Can't be implemented at this point since Core doesn't support it.

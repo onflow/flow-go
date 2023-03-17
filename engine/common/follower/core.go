@@ -33,6 +33,8 @@ func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
 	}
 }
 
+// Core implements main processing logic for follower engine.
+// Generally is NOT concurrency safe but some functions can be used in concurrent setup.
 type Core struct {
 	log                 zerolog.Logger
 	mempoolMetrics      module.MempoolMetrics
