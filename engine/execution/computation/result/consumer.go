@@ -15,8 +15,8 @@ type ExecutedCollection interface {
 	// RegisterUpdates returns all registers that were updated during collection execution
 	UpdatedRegisters() flow.RegisterEntries
 
-	// TouchedRegisters returns all registers that has been touched (read/written) during collection execution
-	TouchedRegisters() flow.RegisterIDs
+	// ReadRegisterIDs returns all registers that has been read during collection execution
+	ReadRegisterIDs() flow.RegisterIDs
 
 	// EmittedEvents returns a list of events emitted during collection execution
 	EmittedEvents() flow.EventsList

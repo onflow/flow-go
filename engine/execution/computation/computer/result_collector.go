@@ -231,6 +231,13 @@ func (collector *resultCollector) commitCollection(
 		NumberOfCollections: 1,
 	}
 
+	for _, consumer := range collector.consumers {
+		err = consumer.OnExecutedCollection(collector.result.CollectionResult(collection.collectionIndex))
+		if err != nil {
+			return fmt.Errorf("consumer failed: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -277,14 +284,6 @@ func (collector *resultCollector) processTransactionResult(
 
 	if !txn.lastTransactionInCollection {
 		return nil
-	}
-
-	// TODO(ramtin): trigger consumers concurrently
-	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionResult(txn.collectionIndex))
-		if err != nil {
-			return fmt.Errorf("consumer failed: %w", err)
-		}
 	}
 
 	return collector.commitCollection(

@@ -53,69 +53,60 @@ func NewEmptyComputationResult(
 	}
 }
 
+func (cr ComputationResult) TxResByColIndex(colIndex int) []flow.TransactionResult {
+	var startTxnIndex int
+	if colIndex > 0 {
+		startTxnIndex = cr.TransactionResultIndex[colIndex-1]
+	}
+	endTxnIndex := cr.TransactionResultIndex[colIndex]
+	return cr.TransactionResults[startTxnIndex:endTxnIndex]
+}
+
 func (cr *ComputationResult) CollectionResult(colIndex int) *ColResSnapshot {
 	if colIndex < 0 && colIndex > len(cr.CompleteCollections) {
 		return nil
 	}
 	return &ColResSnapshot{
-		BlockHeaderFunc: func() *flow.Header {
-			return cr.Block.Header
+		blockHeader: cr.Block.Header,
+		collection: &flow.Collection{
+			Transactions: cr.CollectionAt(colIndex).Transactions,
 		},
-		CollectionFunc: func() *flow.Collection {
-			return &flow.Collection{
-				Transactions: cr.CollectionAt(colIndex).Transactions,
-			}
-		},
-		UpdatedRegistersFunc: func() flow.RegisterEntries {
-			return cr.StateSnapshots[colIndex].UpdatedRegisters()
-		},
-		TouchedRegistersFunc: func() flow.RegisterIDs {
-			return cr.StateSnapshots[colIndex].AllRegisterIDs()
-		},
-		EmittedEventsFunc: func() flow.EventsList {
-			return cr.Events[colIndex]
-		},
-		TransactionResultsFunc: func() flow.TransactionResults {
-			var startTxnIndex int
-			if colIndex > 0 {
-				startTxnIndex = cr.TransactionResultIndex[colIndex-1]
-			}
-			endTxnIndex := cr.TransactionResultIndex[colIndex]
-			return cr.TransactionResults[startTxnIndex:endTxnIndex]
-		},
+		updatedRegisters:   cr.StateSnapshots[colIndex].UpdatedRegisters(),
+		readRegisterIDs:    cr.StateSnapshots[colIndex].ReadRegisterIDs(),
+		emittedEvents:      cr.Events[colIndex],
+		transactionResults: cr.TxResByColIndex(colIndex),
 	}
-
 }
 
 type ColResSnapshot struct {
-	BlockHeaderFunc        func() *flow.Header
-	CollectionFunc         func() *flow.Collection
-	UpdatedRegistersFunc   func() flow.RegisterEntries
-	TouchedRegistersFunc   func() flow.RegisterIDs
-	EmittedEventsFunc      func() flow.EventsList
-	TransactionResultsFunc func() flow.TransactionResults
+	blockHeader        *flow.Header
+	collection         *flow.Collection
+	updatedRegisters   flow.RegisterEntries
+	readRegisterIDs    flow.RegisterIDs
+	emittedEvents      flow.EventsList
+	transactionResults flow.TransactionResults
 }
 
-func (cr *ColResSnapshot) BlockHeader() *flow.Header {
-	return cr.BlockHeaderFunc()
+func (c *ColResSnapshot) BlockHeader() *flow.Header {
+	return c.blockHeader
 }
 
-func (cr *ColResSnapshot) Collection() *flow.Collection {
-	return cr.CollectionFunc()
+func (c *ColResSnapshot) Collection() *flow.Collection {
+	return c.collection
 }
 
-func (cr *ColResSnapshot) UpdatedRegisters() flow.RegisterEntries {
-	return cr.UpdatedRegistersFunc()
+func (c *ColResSnapshot) UpdatedRegisters() flow.RegisterEntries {
+	return c.updatedRegisters
 }
 
-func (cr *ColResSnapshot) TouchedRegisters() flow.RegisterIDs {
-	return cr.TouchedRegistersFunc()
+func (c *ColResSnapshot) ReadRegisterIDs() flow.RegisterIDs {
+	return c.readRegisterIDs
 }
 
-func (cr *ColResSnapshot) EmittedEvents() flow.EventsList {
-	return cr.EmittedEventsFunc()
+func (c *ColResSnapshot) EmittedEvents() flow.EventsList {
+	return c.emittedEvents
 }
 
-func (cr *ColResSnapshot) TransactionResults() flow.TransactionResults {
-	return cr.TransactionResultsFunc()
+func (c *ColResSnapshot) TransactionResults() flow.TransactionResults {
+	return c.transactionResults
 }
