@@ -46,7 +46,7 @@ type Core struct {
 	follower            module.HotStuffFollower
 	validator           hotstuff.Validator
 	sync                module.BlockRequester
-	certifiedBlocksChan chan<- struct{}
+	certifiedBlocksChan chan<- CertifiedBlocks
 }
 
 func NewCore(log zerolog.Logger,
@@ -324,12 +324,25 @@ func (c *Core) processPendingChildren(ctx context.Context, header *flow.Header) 
 	return result.ErrorOrNil()
 }
 
-func (c *Core) OnFinalizedBlock(block *flow.Header) error {
-	//TODO implement me
+// PruneUpToView performs pruning of core follower state.
+// Effectively this prunes cache of pending blocks and sets a new lower limit for incoming blocks.
+// Concurrency safe.
+func (c *Core) PruneUpToView(view uint64) {
 	panic("implement me")
 }
 
-func (c *Core) OnCertifiedBlocks() error {
+// OnFinalizedBlock updates local state of pending tree using received finalized block.
+// Is NOT concurrency safe, has to be used by the same goroutine as OnCertifiedBlocks.
+// OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
+func (c *Core) OnFinalizedBlock(final *flow.Header) error {
+	panic("implement me")
+}
+
+// OnCertifiedBlocks processes batch of certified blocks by applying them to tree of certified blocks.
+// As result of this operation we might extend protocol state.
+// Is NOT concurrency safe, has to be used by the same goroutine as OnFinalizedBlock.
+// OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
+func (c *Core) OnCertifiedBlocks(blocks CertifiedBlocks) error {
 	panic("implement me")
 }
 

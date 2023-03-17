@@ -2,6 +2,7 @@ package follower
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 
 	"github.com/rs/zerolog"
 
@@ -30,6 +31,9 @@ func WithChannel(channel channels.Channel) EngineOption {
 	}
 }
 
+// defaultBlockProcessingWorkers number of concurrent workers that process incoming blocks.
+const defaultBlockProcessingWorkers = 4
+
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
 
@@ -37,26 +41,34 @@ const defaultBlockQueueCapacity = 10_000
 // certified blocks between workers.
 const defaultCertifiedBlocksChannelCapacity = 100
 
-// Engine follows and maintains the local copy of the protocol state. It is a
-// passive (read-only) version of the compliance engine. The compliance engine
+type CertifiedBlocks []pending_tree.CertifiedBlock
+
+// Engine is the highest level structure that consumes events from other components.
+// It's an entry point to the follower engine which follows and maintains the local copy of the protocol state.
+// It is a passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
+// Engine is responsible for:
+// 1. Consuming events from external sources such as sync engine.
+// 2. Providing worker goroutines for concurrent processing of incoming blocks.
+// 3. Ordering events that is not safe to perform in concurrent environment.
+// 4. Handling of finalization events.
 // Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
-	log                    zerolog.Logger
-	me                     module.Local
-	engMetrics             module.EngineMetrics
-	con                    network.Conduit
-	channel                channels.Channel
-	headers                storage.Headers
-	pendingBlocks          *fifoqueue.FifoQueue // queues for processing inbound blocks
-	pendingBlocksNotifier  engine.Notifier
-	finalizedBlockTracker  *tracker.NewestBlockTracker
-	finalizedBlockNotifier engine.Notifier
-	certifiedBlocksChan    chan struct{}
-
-	core *Core
+	log                     zerolog.Logger
+	me                      module.Local
+	engMetrics              module.EngineMetrics
+	con                     network.Conduit
+	channel                 channels.Channel
+	headers                 storage.Headers
+	pendingBlocks           *fifoqueue.FifoQueue        // queue for processing inbound blocks
+	pendingBlocksNotifier   engine.Notifier             // notifies that new blocks are ready to be processed
+	finalizedBlockTracker   *tracker.NewestBlockTracker // tracks the latest finalization block
+	finalizedBlockNotifier  engine.Notifier             // notifies when the latest finalized block changes
+	coreCertifiedBlocksChan chan CertifiedBlocks        // delivers batches of certified blocks to main core worker
+	coreFinalizedBlocksChan chan *flow.Header           // delivers finalized blocks to main core worker.
+	core                    *Core                       // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -77,21 +89,22 @@ func New(
 	}
 
 	e := &Engine{
-		log:                   log.With().Str("engine", "follower").Logger(),
-		me:                    me,
-		engMetrics:            engMetrics,
-		channel:               channels.ReceiveBlocks,
-		pendingBlocks:         pendingBlocks,
-		pendingBlocksNotifier: engine.NewNotifier(),
-		core:                  core,
-		certifiedBlocksChan:   make(chan struct{}, defaultCertifiedBlocksChannelCapacity),
+		log:                     log.With().Str("engine", "follower").Logger(),
+		me:                      me,
+		engMetrics:              engMetrics,
+		channel:                 channels.ReceiveBlocks,
+		pendingBlocks:           pendingBlocks,
+		pendingBlocksNotifier:   engine.NewNotifier(),
+		core:                    core,
+		coreCertifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
+		coreFinalizedBlocksChan: make(chan *flow.Header, 10),
 	}
 
 	for _, apply := range opts {
 		apply(e)
 	}
 
-	e.core.certifiedBlocksChan = e.certifiedBlocksChan
+	e.core.certifiedBlocksChan = e.coreCertifiedBlocksChan
 
 	con, err := net.Register(e.channel, e)
 	if err != nil {
@@ -99,10 +112,11 @@ func New(
 	}
 	e.con = con
 
+	// TODO: start multiple workers for processing blocks
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processBlocksLoop).
 		AddWorker(e.finalizationProcessingLoop).
-		AddWorker(e.processCertifiedBlocksLoop).
+		AddWorker(e.processCoreSeqEvents).
 		Build()
 
 	return e, nil
@@ -173,8 +187,9 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-// processCertifiedBlocksLoop processes certified blocks that were pushed by core and will be dispatched on dedicated core's goroutine.
-func (e *Engine) processCertifiedBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processCoreSeqEvents processes events that need to be dispatched dedicated core's goroutine.
+// Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
+func (e *Engine) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
@@ -182,8 +197,13 @@ func (e *Engine) processCertifiedBlocksLoop(ctx irrecoverable.SignalerContext, r
 		select {
 		case <-doneSignal:
 			return
-		case <-e.certifiedBlocksChan:
-			err := e.core.OnCertifiedBlocks() // no errors expected during normal operations
+		case finalized := <-e.coreFinalizedBlocksChan:
+			err := e.core.OnFinalizedBlock(finalized) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		case blocks := <-e.coreCertifiedBlocksChan:
+			err := e.core.OnCertifiedBlocks(blocks) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -239,10 +259,8 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			if err != nil { // no expected errors
 				ctx.Throw(err)
 			}
-			err = e.core.OnFinalizedBlock(finalHeader)
-			if err != nil {
-				ctx.Throw(err)
-			}
+			e.core.PruneUpToView(finalHeader.View)
+			e.coreFinalizedBlocksChan <- finalHeader
 		}
 	}
 }
