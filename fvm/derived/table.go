@@ -351,7 +351,7 @@ func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
 }
 
 // Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Get(key TKey) (
+func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
 	*state.ExecutionSnapshot,
 	bool,
@@ -377,8 +377,15 @@ func (txn *TableTransaction[TKey, TVal]) Get(key TKey) (
 	return defaultValue, nil, false
 }
 
-// Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Set(
+func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
+	TVal,
+	*state.ExecutionSnapshot,
+	bool,
+) {
+	return txn.get(key)
+}
+
+func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
 	snapshot *state.ExecutionSnapshot,
@@ -392,6 +399,14 @@ func (txn *TableTransaction[TKey, TVal]) Set(
 	// Since value is derived from snapshot's view.  We need to reset the
 	// toValidateTime back to snapshot time to re-validate the entry.
 	txn.toValidateTime = txn.snapshotTime
+}
+
+func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
+	key TKey,
+	value TVal,
+	snapshot *state.ExecutionSnapshot,
+) {
+	txn.set(key, value, snapshot)
 }
 
 // GetOrCompute returns the key's value.  If a pre-computed value is available,
@@ -411,7 +426,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 ) {
 	var defaultVal TVal
 
-	val, state, ok := txn.Get(key)
+	val, state, ok := txn.get(key)
 	if ok {
 		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
@@ -442,7 +457,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
-	txn.Set(key, val, committedState)
+	txn.set(key, val, committedState)
 
 	return val, nil
 }
