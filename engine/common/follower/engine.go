@@ -2,7 +2,6 @@ package follower
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 
 	"github.com/rs/zerolog"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
