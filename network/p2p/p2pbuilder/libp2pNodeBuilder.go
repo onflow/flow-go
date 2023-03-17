@@ -21,6 +21,7 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -165,7 +166,7 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 }
 
 // DefaultRPCValidationConfig returns default RPC control message inspector config.
-func DefaultRPCValidationConfig() *validation.ControlMsgValidationInspectorConfig {
+func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
 	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
 		validation.UpperThresholdMapKey:  validation.DefaultGraftUpperThreshold,
 		validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
@@ -176,10 +177,12 @@ func DefaultRPCValidationConfig() *validation.ControlMsgValidationInspectorConfi
 		validation.SafetyThresholdMapKey: validation.DefaultPruneSafetyThreshold,
 		validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
 	})
+
 	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:    validation.DefaultNumberOfWorkers,
-		GraftValidationCfg: graftCfg,
-		PruneValidationCfg: pruneCfg,
+		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts: opts,
+		GraftValidationCfg:  graftCfg,
+		PruneValidationCfg:  pruneCfg,
 	}
 }
 
@@ -429,7 +432,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	node.SetUnicastManager(unicastManager)
 
 	// create gossip control message validation inspector
-	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(builder.logger, builder.rpcValidationInspectorConfig, builder.gossipSubInspectorNotifDistributor)
+	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(
+		builder.logger,
+		builder.rpcValidationInspectorConfig,
+		builder.gossipSubInspectorNotifDistributor,
+	)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

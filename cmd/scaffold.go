@@ -223,6 +223,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// networking event notifications
 	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorCacheSize, "gossipsub-rpc-inspector-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for gossipsub RPC validation inspector events worker pool.")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
@@ -377,7 +378,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		// setup gossip sub RPC control message inspector config
-		controlMsgRPCInspectorCfg, err := fnb.gossipSubRPCInspectorConfig()
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.GossipSubRPCInspectorCacheSize)}
+		if fnb.HeroCacheMetricsEnable {
+			collector := metrics.GossipSubRPCInspectorQueueMetricFactory(fnb.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+		controlMsgRPCInspectorCfg, err := fnb.gossipSubRPCInspectorConfig(heroStoreOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -1864,7 +1870,7 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 }
 
 // gossipSubRPCInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig() (*validation.ControlMsgValidationInspectorConfig, error) {
+func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig(opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
 	// setup rpc validation configuration for each control message type
 	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, fnb.GossipSubRPCValidationConfigs.Graft)
 	if err != nil {
@@ -1874,11 +1880,13 @@ func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig() (*validation.ControlMs
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
+
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:    fnb.GossipSubRPCValidationConfigs.NumberOfWorkers,
-		GraftValidationCfg: graftValidationCfg,
-		PruneValidationCfg: pruneValidationCfg,
+		NumberOfWorkers:     fnb.GossipSubRPCValidationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts: opts,
+		GraftValidationCfg:  graftValidationCfg,
+		PruneValidationCfg:  pruneValidationCfg,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }

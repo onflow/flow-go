@@ -201,6 +201,7 @@ type NetworkConfig struct {
 	DisallowListNotificationCacheSize uint32
 	// size of the queue for notifications about gossipsub RPC inspections.
 	GossipSubRPCInspectorNotificationCacheSize uint32
+	GossipSubRPCInspectorCacheSize             uint32
 	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
 	GossipSubRPCValidationConfigs              *GossipSubRPCValidationConfigs
 }
@@ -328,6 +329,7 @@ func DefaultBaseConfig() *BaseConfig {
 			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
 			GossipSubConfig:                            p2pbuilder.DefaultGossipSubConfig(),
 			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
+			GossipSubRPCInspectorCacheSize:             validation.DefaultControlMsgValidationInspectorQueueCacheSize,
 			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,

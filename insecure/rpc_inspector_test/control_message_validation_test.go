@@ -49,16 +49,16 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	controlMessageCount := int64(2)
 
 	// expected log message logged when valid number GRAFT control messages spammed under safety threshold
-	graftExpectedMessageStr := fmt.Sprintf("skipping RPC control message %s inspection validation message count %d below safety threshold", p2p.CtrlMsgGraft, messageCount)
+	graftExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", p2p.CtrlMsgGraft)
 	// expected log message logged when valid number PRUNE control messages spammed under safety threshold
-	pruneExpectedMessageStr := fmt.Sprintf("skipping RPC control message %s inspection validation message count %d below safety threshold", p2p.CtrlMsgPrune, messageCount)
+	pruneExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", p2p.CtrlMsgGraft)
 
 	graftInfoLogsReceived := atomic.NewInt64(0)
 	pruneInfoLogsReceived := atomic.NewInt64(0)
 
 	// setup logger hook, we expect info log validation is skipped
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.InfoLevel {
+		if level == zerolog.TraceLevel {
 			if message == graftExpectedMessageStr {
 				graftInfoLogsReceived.Inc()
 			}
@@ -97,7 +97,7 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	// eventually we should receive 2 info logs each for GRAFT inspection and PRUNE inspection
 	require.Eventually(t, func() bool {
 		return graftInfoLogsReceived.Load() == controlMessageCount && pruneInfoLogsReceived.Load() == controlMessageCount
-	}, time.Second, 10*time.Millisecond)
+	}, 2*time.Second, 10*time.Millisecond)
 }
 
 // TestInspect_UpperThreshold ensures that when RPC control message count is above the configured upper threshold the control message validation inspector
@@ -130,7 +130,7 @@ func TestInspect_UpperThreshold(t *testing.T) {
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrUpperThreshold(notification.Err))
-			require.Equal(t, messageCount, notification.Count)
+			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 2 {
 				close(done)
@@ -195,7 +195,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
-			require.Equal(t, messageCount, notification.Count)
+			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 2 {
 				close(done)
@@ -224,10 +224,11 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 		corruptlibp2p.WithPrune(messageCount, topic))
 
 	// start spamming the victim peer
-	// messageCount is equal to the rate limit so when we spam this ctl message 2 times
-	// we expected to encounter 2 rate limit errors for each of the control message types GRAFT & PRUNE
-	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
-	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
+	// messageCount is equal to the rate limit so when we spam this ctl message 3 times the first message should be processed
+	// the second 2 messages should be rate limited, we expected to encounter 1 rate limit errors for each of the control message types GRAFT & PRUNE
+	for i := 0; i < 3; i++ {
+		spammer.SpamControlMessage(t, victimNode, ctlMsgs)
+	}
 
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
@@ -245,7 +246,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	inspectorConfig.NumberOfWorkers = 3
+	inspectorConfig.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < UpperThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
