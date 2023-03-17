@@ -10,6 +10,7 @@ metadata:
     branch: {{ $.Values.branch }}
     nodeType: collection
     service: flow
+    project: {{ $.Values.commit }}
 
 spec:
   serviceName: {{ $k }}
@@ -27,6 +28,7 @@ spec:
         branch: {{ $.Values.branch }}
         nodeType: collection
         service: flow
+        project: {{ $.Values.commit }}
     spec:
       containers:
         - name: {{ $k }}
@@ -139,6 +141,7 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
+    project: {{ $.Values.commit }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}

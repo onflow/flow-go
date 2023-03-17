@@ -8,6 +8,8 @@ for f in bootstrap/execution-state/*; do
     # Example start bootstrap/execution-state/00000000
     # Example result 00000000
     PREFIXREMOVED=${f//bootstrap\/execution-state\//};
+    PREFIXREMOVED="$PROJECT_NAME$PREFIXREMOVED";
+
 
     # Create the secret after string manipulation
     kubectl create secret generic $PREFIXREMOVED --from-file=$f;
@@ -22,6 +24,7 @@ for f in bootstrap/private-root-information/*/*; do
     # Remove the bootstrap/private-root-information/private-node-info_ prefix to ensure NodeId is retained
     # Example result 416c65782048656e74736368656c00e4e3235298a4b91382ecd84f13b9c237e6/node-info.priv.json
     PREFIXREMOVED=${f//bootstrap\/private-root-information\/private-node-info_/};
+    PREFIXREMOVED="$PROJECT_NAME$PREFIXREMOVED";
 
     # Substitute the forward slash "/" for a period "."
     # Example $PREFIXREMOVED value 416c65782048656e74736368656c00e4e3235298a4b91382ecd84f13b9c237e6/node-info.priv.json
@@ -41,6 +44,7 @@ for f in bootstrap/public-root-information/*.json; do
     # Example start bootstrap/public-root-information/node-infos.pub.json
     # Example result node-info.pub.json
     PREFIXREMOVED=${f//bootstrap\/public-root-information\//};
+    PREFIXREMOVED="$PROJECT_NAME$PREFIXREMOVED";
 
     # Create the secret after string manipulation
     kubectl create secret generic $PREFIXREMOVED --from-file=$f ; 

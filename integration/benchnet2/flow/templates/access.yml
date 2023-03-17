@@ -10,6 +10,7 @@ metadata:
     branch: {{ $.Values.branch }}
     nodeType: access
     service: flow
+    project: {{ $.Values.commit }} # Prefixing the project name as label
 
 spec:
   serviceName: {{ $k }}
@@ -19,6 +20,7 @@ spec:
       app: {{ $k }}
       nodeType: access
       service: flow
+      project: {{ $.Values.commit }}
 
   template:
     metadata:
@@ -27,6 +29,7 @@ spec:
         branch: {{ $.Values.branch }}
         nodeType: access
         service: flow
+        project: {{ $.Values.commit }}
     spec:
       containers:
         - name: {{ $k }}
@@ -130,6 +133,7 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
+    project: {{ $.Values.commit }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}
