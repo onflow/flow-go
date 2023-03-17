@@ -5,8 +5,11 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,7 +47,17 @@ func TestDerivedChainData(t *testing.T) {
 	txn, err := block1.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	txn.SetProgram(loc1, prog1, nil)
+	view := delta.NewDeltaView(nil)
+	txState := state.NewTransactionState(view, state.DefaultParameters())
+
+	_, err = txn.GetOrComputeProgram(txState, loc1, newProgramLoader(
+		func(
+			txnState state.NestedTransaction,
+			key common.AddressLocation,
+		) (*Program, error) {
+			return prog1, nil
+		}))
+	require.NoError(t, err)
 	err = txn.Commit()
 	require.NoError(t, err)
 
@@ -70,7 +83,17 @@ func TestDerivedChainData(t *testing.T) {
 	txn, err = block2.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	txn.SetProgram(loc2, prog2, nil)
+	view = delta.NewDeltaView(nil)
+	txState = state.NewTransactionState(view, state.DefaultParameters())
+
+	_, err = txn.GetOrComputeProgram(txState, loc2, newProgramLoader(
+		func(
+			txnState state.NestedTransaction,
+			key common.AddressLocation,
+		) (*Program, error) {
+			return prog2, nil
+		}))
+	require.NoError(t, err)
 	err = txn.Commit()
 	require.NoError(t, err)
 
@@ -158,4 +181,31 @@ func TestDerivedChainData(t *testing.T) {
 
 	foundBlock = programs.Get(blockId2)
 	require.Nil(t, foundBlock)
+}
+
+type programLoader struct {
+	f func(
+		txnState state.NestedTransaction,
+		key common.AddressLocation,
+	) (*Program, error)
+}
+
+var _ ValueComputer[common.AddressLocation, *Program] = &programLoader{}
+
+func newProgramLoader(
+	f func(
+		txnState state.NestedTransaction,
+		key common.AddressLocation,
+	) (*Program, error),
+) *programLoader {
+	return &programLoader{
+		f: f,
+	}
+}
+
+func (p *programLoader) Compute(
+	txnState state.NestedTransaction,
+	key common.AddressLocation,
+) (*Program, error) {
+	return p.f(txnState, key)
 }

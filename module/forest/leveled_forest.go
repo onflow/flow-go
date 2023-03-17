@@ -134,9 +134,11 @@ func (f *LevelledForest) GetSize() uint64 {
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id`.
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
-	container := f.vertices[id]
-	// if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
-	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
+	// if vertex does not exist, container will be nil
+	if container, ok := f.vertices[id]; ok {
+		return newVertexIterator(container.children)
+	}
+	return newVertexIterator(nil) // VertexIterator gracefully handles nil slices
 }
 
 // GetNumberOfChildren returns number of children of given vertex

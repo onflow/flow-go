@@ -62,7 +62,8 @@ var (
 // in the protocol and abstracts the hasher details from the protocol logic.
 //
 // The hasher returned is the the expand-message step in the BLS hash-to-curve.
-// It uses a xof (extendable output function) based on KMAC128.
+// It uses a xof (extendable output function) based on KMAC128. It therefore has
+// 128-bytes outputs.
 func NewBLSHasher(tag string) hash.Hasher {
 	return crypto.NewExpandMsgXOFKMAC128(tag)
 }

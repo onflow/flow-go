@@ -108,10 +108,6 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return derived.EndOfBlockExecutionTime
-}
-
 func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
 	return derived.EndOfBlockExecutionTime
 }

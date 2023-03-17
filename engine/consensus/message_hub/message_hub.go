@@ -456,7 +456,7 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
-		h.compliance.OnBlockProposal(flow.Slashable[messages.BlockProposal]{
+		h.compliance.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
