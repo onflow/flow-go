@@ -10,6 +10,7 @@ type Tracer interface {
 	// EntityEjectionDueToEmergency reports ejected entity whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
+	// This ejection happens with very low, but still cryptographically non-negligible probability.
 	EntityEjectionDueToEmergency(ejectedEntity flow.Entity)
 	// EntityEjectionDueToFullCapacity reports ejected entity whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 	// This normally happens -- and is expected -- when the cache is full.

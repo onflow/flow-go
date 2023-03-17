@@ -254,14 +254,6 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// add blocks to underlying cache, check for equivocation and report if detected
-	for i, block := range fullBlocks {
-		equivocation := c.cache(blockIDs[i], block)
-		if equivocation != nil {
-			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Block{equivocation, block})
-		}
-	}
-
 	// check whether we have the parent of first block already in our cache:
 	if parent, ok := c.backend.ByID(fullBlocks[0].Header.ParentID); ok {
 		bc.batchParent = parent.(*flow.Block)
@@ -278,6 +270,15 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 			break
 		}
 	}
+
+	// add blocks to underlying cache, check for equivocation and report if detected
+	for i, block := range fullBlocks {
+		equivocation := c.cache(blockIDs[i], block)
+		if equivocation != nil {
+			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Block{equivocation, block})
+		}
+	}
+
 	return bc
 }
 
