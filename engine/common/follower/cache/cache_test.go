@@ -169,7 +169,7 @@ func (s *CacheSuite) TestAddBatch() {
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
 func (s *CacheSuite) TestPruneUpToView() {
 	blocks := unittest.ChainFixtureFrom(3, unittest.BlockHeaderFixture())
-	s.cache.PruneUpToView(blocks[0].Header.View)
+	s.cache.PruneUpToView(blocks[1].Header.View)
 	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
