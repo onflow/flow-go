@@ -286,6 +286,7 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
+	env.Programs.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.
