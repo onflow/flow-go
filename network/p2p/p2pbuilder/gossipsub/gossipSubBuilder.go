@@ -197,10 +197,6 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 				g.metrics,
 				g.gossipSubScoreTracerInterval)
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
-			g.logger.Debug().Msg("starting gossipsub score tracer")
-			scoreTracer.Start(ctx)
-			<-scoreTracer.Ready()
-			g.logger.Debug().Msg("gossipsub score tracer started")
 		}
 	}
 

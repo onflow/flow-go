@@ -25,6 +25,7 @@ type TopicValidatorFunc func(context.Context, peer.ID, *pubsub.Message) Validati
 
 // PubSubAdapter is the abstraction of the underlying pubsub logic that is used by the Flow network.
 type PubSubAdapter interface {
+	component.Component
 	// RegisterTopicValidator registers a validator for topic.
 	RegisterTopicValidator(topic string, topicValidator TopicValidatorFunc) error
 
