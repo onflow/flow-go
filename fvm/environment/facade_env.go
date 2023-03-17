@@ -38,7 +38,6 @@ type facadeEnvironment struct {
 	UUIDGenerator
 
 	AccountCreator
-	AccountFreezer
 
 	AccountKeyReader
 	AccountKeyUpdater
@@ -110,7 +109,6 @@ func newFacadeEnvironment(
 			txnState),
 
 		AccountCreator: NoAccountCreator{},
-		AccountFreezer: NoAccountFreezer{},
 
 		AccountKeyReader: NewAccountKeyReader(
 			tracer,
@@ -209,10 +207,6 @@ func NewTransactionEnvironment(
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
-	env.AccountFreezer = NewAccountFreezer(
-		params.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
 		tracer,
 		env.Meter,
@@ -247,9 +241,6 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
 		env.AccountCreator)
-	env.AccountFreezer = NewParseRestrictedAccountFreezer(
-		env.txnState,
-		env.AccountFreezer)
 	env.AccountInfo = NewParseRestrictedAccountInfo(
 		env.txnState,
 		env.AccountInfo)
@@ -286,21 +277,15 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	derived.TransactionInvalidator,
+	[]ContractUpdateKey,
 	error,
 ) {
-	contractKeys, err := env.ContractUpdater.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDerivedDataInvalidator(contractKeys, env), nil
+	return env.ContractUpdater.Commit()
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
-	env.AccountFreezer.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.

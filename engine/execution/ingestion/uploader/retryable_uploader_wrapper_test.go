@@ -212,7 +212,6 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		TransactionResults: []flow.TransactionResult{
 			testTransactionResult,
 		},
-		StateCommitments: []flow.StateCommitment{testStateCommit},
 		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID: testBlockID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -223,6 +222,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 				},
 			},
 		},
+		EndState: testStateCommit,
 	}
 
 	assert.DeepEqual(

@@ -12,7 +12,7 @@ import (
 
 	common "github.com/onflow/cadence/runtime/common"
 
-	derived "github.com/onflow/flow-go/fvm/derived"
+	environment "github.com/onflow/flow-go/fvm/environment"
 
 	flow "github.com/onflow/flow-go/model/flow"
 
@@ -443,19 +443,19 @@ func (_m *Environment) Events() flow.EventsList {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, error) {
+func (_m *Environment) FlushPendingUpdates() ([]environment.ContractUpdateKey, error) {
 	ret := _m.Called()
 
-	var r0 derived.TransactionInvalidator
+	var r0 []environment.ContractUpdateKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (derived.TransactionInvalidator, error)); ok {
+	if rf, ok := ret.Get(0).(func() ([]environment.ContractUpdateKey, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() derived.TransactionInvalidator); ok {
+	if rf, ok := ret.Get(0).(func() []environment.ContractUpdateKey); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(derived.TransactionInvalidator)
+			r0 = ret.Get(0).([]environment.ContractUpdateKey)
 		}
 	}
 
@@ -466,22 +466,6 @@ func (_m *Environment) FlushPendingUpdates() (derived.TransactionInvalidator, er
 	}
 
 	return r0, r1
-}
-
-// FrozenAccounts provides a mock function with given fields:
-func (_m *Environment) FrozenAccounts() []flow.Address {
-	ret := _m.Called()
-
-	var r0 []flow.Address
-	if rf, ok := ret.Get(0).(func() []flow.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Address)
-		}
-	}
-
-	return r0
 }
 
 // GenerateUUID provides a mock function with given fields:
@@ -1210,20 +1194,6 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.EventsList)
 		}
-	}
-
-	return r0
-}
-
-// SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *Environment) SetAccountFrozen(address flow.Address, frozen bool) error {
-	ret := _m.Called(address, frozen)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address, bool) error); ok {
-		r0 = rf(address, frozen)
-	} else {
-		r0 = ret.Error(0)
 	}
 
 	return r0
