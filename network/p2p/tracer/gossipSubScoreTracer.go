@@ -129,12 +129,12 @@ func (g *GossipSubScoreTracer) GetTopicScores(peerID peer.ID) (map[string]p2p.To
 	g.snapshotLock.RLock()
 	defer g.snapshotLock.RUnlock()
 
-	topicsSnapshot := make(map[string]p2p.TopicScoreSnapshot)
 	snapshot, ok := g.snapshot[peerID]
 	if !ok {
 		return nil, false
 	}
 
+	topicsSnapshot := make(map[string]p2p.TopicScoreSnapshot)
 	// copy the topic scores into a new map
 	for topic, topicSnapshot := range snapshot.Topics {
 		topicsSnapshot[topic] = *topicSnapshot
