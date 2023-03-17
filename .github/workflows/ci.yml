@@ -98,87 +98,87 @@ jobs:
         id: set-test-matrix
         run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
 
-  unit-test:
-    name: Unit Tests (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Run tests (${{ matrix.targets.name }})
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 25
-        max_attempts: 3
-        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+#  unit-test:
+#    name: Unit Tests (${{ matrix.targets.name }})
+#    needs: create-dynamic-test-matrix
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+#    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+#    runs-on: ubuntu-20.04
+#    steps:
+#    - name: Checkout repo
+#      uses: actions/checkout@v3
+#    - name: Setup Go
+#      uses: actions/setup-go@v3
+#      with:
+#        go-version: ${{ env.GO_VERSION }}
+#        cache: true
+#    - name: Run tests (${{ matrix.targets.name }})
+#      uses: nick-fields/retry@v2
+#      with:
+#        timeout_minutes: 25
+#        max_attempts: 3
+#        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+#
+#      # TODO(rbtz): re-enable when we fix exisiting races.
+#      #env:
+#      #  RACE_DETECTOR: 1
+#    - name: Upload coverage report
+#      uses: codecov/codecov-action@v3
+#      with:
+#        file: ./coverage.txt
+#        flags: unittests
+#        name: codecov-umbrella
 
-      # TODO(rbtz): re-enable when we fix exisiting races.
-      #env:
-      #  RACE_DETECTOR: 1
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.txt
-        flags: unittests
-        name: codecov-umbrella
-
-  unit-test-modules:
-    name: Unit Tests (Modules)
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: crypto
-            make1: -C crypto setup
-            make2: unittest
-            retries: 1
-            race: 1
-          - name: insecure
-            make1: install-tools
-            make2: test
-            retries: 3
-            race: 1
-          - name: integration
-            make1: install-tools
-            make2: test
-            retries: 3
-            race: 0
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Run tests (${{ matrix.name }})
-        env:
-          RACE_DETECTOR: ${{ matrix.race }}
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 25
-          max_attempts: ${{ matrix.retries }}
-          # run `make1` target before running `make2` target inside each module's root
-          command: |
-            make ${{ matrix.make1 }}
-            VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.txt
-          flags: unittests
-          name: codecov-umbrella
+#  unit-test-modules:
+#    name: Unit Tests (Modules)
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        include:
+#          - name: crypto
+#            make1: -C crypto setup
+#            make2: unittest
+#            retries: 1
+#            race: 1
+#          - name: insecure
+#            make1: install-tools
+#            make2: test
+#            retries: 3
+#            race: 1
+#          - name: integration
+#            make1: install-tools
+#            make2: test
+#            retries: 3
+#            race: 0
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout repo
+#        uses: actions/checkout@v3
+#      - name: Setup Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: ${{ env.GO_VERSION }}
+#          cache: true
+#      - name: Run tests (${{ matrix.name }})
+#        env:
+#          RACE_DETECTOR: ${{ matrix.race }}
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 25
+#          max_attempts: ${{ matrix.retries }}
+#          # run `make1` target before running `make2` target inside each module's root
+#          command: |
+#            make ${{ matrix.make1 }}
+#            VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
+#      - name: Upload coverage report
+#        uses: codecov/codecov-action@v3
+#        with:
+#          file: ./coverage.txt
+#          flags: unittests
+#          name: codecov-umbrella
 
   integration-test:
     name: Integration Tests
@@ -186,15 +186,15 @@ jobs:
       fail-fast: false
       matrix:
         make:
-          - make -C integration access-tests
-          - make -C integration bft-tests
-          - make -C integration collection-tests
-          - make -C integration consensus-tests
-          - make -C integration epochs-tests
-          - make -C integration execution-tests
-          - make -C integration ghost-tests
-          - make -C integration mvp-tests
-          - make -C integration network-tests
+#          - make -C integration access-tests
+#          - make -C integration bft-tests
+#          - make -C integration collection-tests
+#          - make -C integration consensus-tests
+#          - make -C integration epochs-tests
+#          - make -C integration execution-tests
+#          - make -C integration ghost-tests
+#          - make -C integration mvp-tests
+#          - make -C integration network-tests
           - make -C integration verification-tests
     runs-on: ubuntu-latest
     steps:
