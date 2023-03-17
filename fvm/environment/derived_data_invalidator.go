@@ -26,21 +26,28 @@ type DerivedDataInvalidator struct {
 
 var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
 
+// TODO(patrick): extract contractKeys from executionSnapshot
 func NewDerivedDataInvalidator(
 	contractKeys []ContractUpdateKey,
-	env *facadeEnvironment,
+	serviceAddress flow.Address,
+	executionSnapshot *state.ExecutionSnapshot,
 ) DerivedDataInvalidator {
 	return DerivedDataInvalidator{
-		ContractUpdateKeys:         contractKeys,
-		MeterParamOverridesUpdated: meterParamOverridesUpdated(env),
+		ContractUpdateKeys: contractKeys,
+		MeterParamOverridesUpdated: meterParamOverridesUpdated(
+			serviceAddress,
+			executionSnapshot),
 	}
 }
 
-func meterParamOverridesUpdated(env *facadeEnvironment) bool {
-	serviceAccount := string(env.chain.ServiceAddress().Bytes())
+func meterParamOverridesUpdated(
+	serviceAddress flow.Address,
+	executionSnapshot *state.ExecutionSnapshot,
+) bool {
+	serviceAccount := string(serviceAddress.Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
 
-	for _, registerId := range env.txnState.UpdatedRegisterIDs() {
+	for registerId := range executionSnapshot.WriteSet {
 		// The meter param override values are stored in the service account.
 		if registerId.Owner != serviceAccount {
 			continue
@@ -86,15 +93,16 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	location common.AddressLocation,
 	program *derived.Program,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) bool {
 	if invalidator.MeterParamOverridesUpdated {
 		// if meter parameters changed we need to invalidate all programs
 		return true
 	}
 
-	// invalidate all programs depending on any of the contracts that were updated
-	// A program has itself listed as a dependency, so that this simpler.
+	// invalidate all programs depending on any of the contracts that were
+	// updated.  A program has itself listed as a dependency, so that this
+	// simpler.
 	for _, key := range invalidator.ContractUpdateKeys {
 		_, ok := program.Dependencies[key.Address]
 		if ok {
@@ -115,7 +123,7 @@ func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntries() bool
 func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntry(
 	_ struct{},
 	_ derived.MeterParamOverrides,
-	_ *state.State,
+	_ *state.ExecutionSnapshot,
 ) bool {
 	return invalidator.MeterParamOverridesUpdated
 }

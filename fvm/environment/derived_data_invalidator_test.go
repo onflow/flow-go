@@ -13,8 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -279,21 +277,20 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		txnState := testutils.NewSimpleTransaction(nil)
+		snapshot := &state.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				id: flow.RegisterValue("blah"),
+			},
+		}
 
-		err := txnState.Set(id, flow.RegisterValue("blah"))
-		require.NoError(t, err)
-
-		env := environment.NewTransactionEnvironment(
-			tracing.NewTracerSpan(),
-			ctx.EnvironmentParams,
-			txnState)
-
-		invalidator := environment.NewDerivedDataInvalidator(nil, env)
+		invalidator := environment.NewDerivedDataInvalidator(
+			nil,
+			ctx.Chain.ServiceAddress(),
+			snapshot)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for _, registerId := range view.AllRegisterIDs() {
+	for _, registerId := range view.Finalize().AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),

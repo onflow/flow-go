@@ -458,9 +458,9 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, messages.UntrustedBlockFromInternal(&unprocessable))
 
-	ss.comp.On("OnSyncedBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[messages.BlockProposal])
-		converted := res.Message.Block.ToInternal()
+	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
+		res := args.Get(0).(flow.Slashable[[]*messages.BlockProposal])
+		converted := res.Message[0].Block.ToInternal()
 		ss.Assert().Equal(processable.Header, converted.Header)
 		ss.Assert().Equal(processable.Payload, converted.Payload)
 		ss.Assert().Equal(originID, res.OriginID)

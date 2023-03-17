@@ -85,6 +85,34 @@ func TestPackUnpack(t *testing.T) {
 	require.Equal(t, expectedSignerIDs, signers.NodeIDs())
 }
 
+// TestUnpack_EmptySignerList verifies that `Unpack` gracefully handles the edge case
+// of an empty signer list, as such could be an input from a byzantine node.
+func TestPackUnpack_EmptySigners(t *testing.T) {
+	// encode SignatureData with empty SigType vector (this could be an input from a byzantine node)
+	byzantineInput := model.SignatureData{
+		SigType:                      []byte{},
+		AggregatedStakingSig:         unittest.SignatureFixture(),
+		AggregatedRandomBeaconSig:    unittest.SignatureFixture(),
+		ReconstructedRandomBeaconSig: unittest.SignatureFixture(),
+	}
+	encoder := new(model.SigDataPacker)
+	sig, err := encoder.Encode(&byzantineInput)
+	require.NoError(t, err)
+
+	// create packer with a non-empty committee (honest node trying to decode the sig data)
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	packer := newPacker(committee)
+	unpacked, err := packer.Unpack(make([]*flow.Identity, 0), sig)
+	require.NoError(t, err)
+
+	// check that the unpack data match with the original data
+	require.Empty(t, unpacked.StakingSigners)
+	require.Empty(t, unpacked.RandomBeaconSigners)
+	require.Equal(t, byzantineInput.AggregatedStakingSig, unpacked.AggregatedStakingSig)
+	require.Equal(t, byzantineInput.AggregatedRandomBeaconSig, unpacked.AggregatedRandomBeaconSig)
+	require.Equal(t, byzantineInput.ReconstructedRandomBeaconSig, unpacked.ReconstructedRandomBeaconSig)
+}
+
 // if signed by 60 staking nodes, and 50 random beacon nodes among a 200 nodes committee,
 // it's able to pack and unpack
 func TestPackUnpackManyNodes(t *testing.T) {
