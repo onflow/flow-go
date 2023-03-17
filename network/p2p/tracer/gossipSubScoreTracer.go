@@ -28,10 +28,11 @@ type GossipSubScoreTracer struct {
 	logger         zerolog.Logger
 	collector      module.GossipSubScoringMetrics
 
-	snapshotUpdate chan struct{} // a channel to notify the snapshot update.
-	snapshotLock   sync.RWMutex
-	snapshot       map[peer.ID]*p2p.PeerScoreSnapshot
-	idProvider     module.IdentityProvider
+	snapshotUpdate    chan struct{} // a channel to notify the snapshot update.
+	snapshotLock      sync.RWMutex
+	snapshot          map[peer.ID]*p2p.PeerScoreSnapshot
+	snapShotUpdateReq chan map[peer.ID]*p2p.PeerScoreSnapshot
+	idProvider        module.IdentityProvider
 }
 
 var _ p2p.PeerScoreTracer = (*GossipSubScoreTracer)(nil)
@@ -42,12 +43,13 @@ func NewGossipSubScoreTracer(
 	collector module.GossipSubScoringMetrics,
 	updateInterval time.Duration) *GossipSubScoreTracer {
 	g := &GossipSubScoreTracer{
-		logger:         logger.With().Str("component", "gossipsub_score_tracer").Logger(),
-		updateInterval: updateInterval,
-		collector:      collector,
-		snapshotUpdate: make(chan struct{}, 1),
-		snapshot:       make(map[peer.ID]*p2p.PeerScoreSnapshot),
-		idProvider:     provider,
+		logger:            logger.With().Str("component", "gossipsub_score_tracer").Logger(),
+		updateInterval:    updateInterval,
+		collector:         collector,
+		snapshotUpdate:    make(chan struct{}, 1),
+		snapShotUpdateReq: make(chan map[peer.ID]*p2p.PeerScoreSnapshot, 1),
+		snapshot:          make(map[peer.ID]*p2p.PeerScoreSnapshot),
+		idProvider:        provider,
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
@@ -60,14 +62,18 @@ func NewGossipSubScoreTracer(
 	return g
 }
 
-// UpdatePeerScoreSnapshots updates the tracer's snapshot of the peer scores.
+// UpdatePeerScoreSnapshots updates the tracer's snapshot of the peer scores. It is called by the gossipsub router.
+// It is non-blocking and asynchrounous. If there is no update pending, it queues an update. If there is an update pending,
+// it drops the update.
 func (g *GossipSubScoreTracer) UpdatePeerScoreSnapshots(snapshot map[peer.ID]*p2p.PeerScoreSnapshot) {
-	g.snapshotLock.Lock()
-	// critical section
-	g.snapshot = snapshot
-	g.snapshotLock.Unlock()
-
-	g.requestSnapshotUpdate() // notify the log loop that there is a new snapshot.
+	select {
+	case g.snapShotUpdateReq <- snapshot:
+	default:
+		// if the channel is full, we drop the update. This should rarely happen as the log loop should be able to keep up.
+		// if it does happen, it means that the log loop is not running or is blocked. In this case, we don't want to block
+		// the main thread.
+		g.logger.Warn().Msg("dropping peer score snapshot update, channel full")
+	}
 }
 
 // UpdateInterval returns the interval at which the tracer expects to receive updates from the gossipsub router.
@@ -157,22 +163,23 @@ func (g *GossipSubScoreTracer) logLoop(ctx irrecoverable.SignalerContext) {
 		case <-ctx.Done():
 			g.logger.Debug().Msg("stopping log loop")
 			return
-		case <-g.snapshotUpdate:
+		case snapshot := <-g.snapShotUpdateReq:
 			g.logger.Debug().Msg("received snapshot update")
+			g.updateSnapshot(snapshot)
+			g.logger.Debug().Msg("snapshot updated")
 			g.logPeerScores()
+			g.logger.Debug().Msg("peer scores logged")
 		}
 	}
 }
 
-// requestSnapshotUpdate requests a snapshot update from the gossipsub router.
-// It is thread-safe and can be called from multiple goroutines. It is non-blocking.
-// If there is already a pending request, it will not send another one and will return immediately (no-op).
-func (g *GossipSubScoreTracer) requestSnapshotUpdate() {
-	select {
-	case g.snapshotUpdate <- struct{}{}:
-		g.logger.Debug().Msg("requested snapshot update")
-	default:
-	}
+// updateSnapshot updates the tracer's snapshot of the peer scores.
+// It is called by the log loop, it is a blocking and synchronous call.
+func (g *GossipSubScoreTracer) updateSnapshot(snapshot map[peer.ID]*p2p.PeerScoreSnapshot) {
+	g.snapshotLock.Lock()
+	defer g.snapshotLock.Unlock()
+
+	g.snapshot = snapshot
 }
 
 // logPeerScores logs the peer score snapshots for all peers.
