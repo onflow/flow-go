@@ -25,6 +25,7 @@ const (
 	FailureCodeHasherFailure                           ErrorCode = 2005
 	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
 	FailureCodePayerBalanceCheckFailure                ErrorCode = 2007
+	FailureCodeDerivedDataCacheImplementationFailure   ErrorCode = 2008
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )

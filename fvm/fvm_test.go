@@ -1993,7 +1993,7 @@ func TestInteractionLimit(t *testing.T) {
 		},
 		{
 			name:             "even lower low limit fails, and has only 3 events",
-			interactionLimit: 10000,
+			interactionLimit: 5000,
 			require: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.Error(t, tx.Err)
 				require.Len(t, tx.Events, 3)
