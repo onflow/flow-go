@@ -36,7 +36,7 @@ type Builder struct {
 	gossipSubTracer             p2p.PubSubTracer
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	idProvider                  module.IdentityProvider
-	rsys                        routing.Routing
+	routingSystem               routing.Routing
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -121,12 +121,12 @@ func (g *Builder) SetIDProvider(idProvider module.IdentityProvider) {
 
 // SetRoutingSystem sets the routing system of the builder.
 // If the routing system has already been set, a fatal error is logged.
-func (g *Builder) SetRoutingSystem(rsys routing.Routing) {
-	if g.rsys != nil {
+func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
+	if g.routingSystem != nil {
 		g.logger.Fatal().Msg("routing system has already been set")
 		return
 	}
-	g.rsys = rsys
+	g.routingSystem = routingSystem
 }
 
 func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
@@ -175,10 +175,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	})
 	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
 
-	if g.rsys == nil {
+	if g.routingSystem == nil {
 		return nil, nil, fmt.Errorf("could not create gossipsub: routing system is nil")
 	}
-	gossipSubConfigs.WithRoutingDiscovery(g.rsys)
+	gossipSubConfigs.WithRoutingDiscovery(g.routingSystem)
 
 	if g.subscriptionFilter != nil {
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)

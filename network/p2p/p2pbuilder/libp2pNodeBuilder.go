@@ -202,7 +202,7 @@ func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGat
 	return builder
 }
 
-// SetRoutingSystem sets the rsys factory function.
+// SetRoutingSystem sets the routing system factory function.
 func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.Host) (routing.Routing, error)) p2p.NodeBuilder {
 	builder.routingFactory = f
 	return builder
@@ -271,7 +271,7 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	if builder.routingFactory == nil {
-		return nil, errors.New("rsys factory is not set")
+		return nil, errors.New("routing system factory is not set")
 	}
 
 	var opts []libp2p.Option
@@ -366,12 +366,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// routing system is created here, because it needs to be created during the node startup.
-			rsys, err := builder.buildRouting(ctx, h)
+			routingSystem, err := builder.buildRouting(ctx, h)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create rsys system: %w", err))
+				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 			}
-			node.SetRouting(rsys)
-			builder.gossipSubBuilder.SetRoutingSystem(rsys)
+			node.SetRouting(routingSystem)
+			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
 
 			// gossipsub is created here, because it needs to be created during the node startup.
 			gossipSub, scoreTracer, err := builder.gossipSubBuilder.Build(ctx)
@@ -539,22 +539,22 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	return builder, nil
 }
 
-// buildRouting creates a new rsys system for a libp2p node using the provided host.
-// It returns the newly created rsys system and any errors encountered during its creation.
+// buildRouting creates a new routing system factory for a libp2p node using the provided host.
+// It returns the newly created routing system and any errors encountered during its creation.
 //
 // Arguments:
 // - ctx: a context.Context object used to manage the lifecycle of the node.
-// - h: a libp2p host.Host object used to initialize the rsys system.
+// - h: a libp2p host.Host object used to initialize the routing system.
 //
 // Returns:
-// - rsys.Routing: a rsys system for the libp2p node.
-// - error: if an error occurs during the creation of the rsys system, it is returned. Otherwise, nil is returned.
-// Note that on happy path, the returned error is nil. Any non-nil error indicates that the rsys system could not be created
+// - routing.Routing: a routing system for the libp2p node.
+// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
 // and is non-recoverable. In case of an error the node should be stopped.
 func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
-	rsys, err := builder.routingFactory(ctx, h)
+	routingSystem, err := builder.routingFactory(ctx, h)
 	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node rsys: %w", err)
+		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
 	}
-	return rsys, nil
+	return routingSystem, nil
 }
