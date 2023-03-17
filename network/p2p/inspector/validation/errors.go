@@ -30,48 +30,6 @@ func IsErrUpperThreshold(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrMalformedTopic indicates that the rpc control message has an invalid topic ID.
-type ErrMalformedTopic struct {
-	controlMsg p2p.ControlMessageType
-	topic      channels.Topic
-}
-
-func (e ErrMalformedTopic) Error() string {
-	return fmt.Sprintf("malformed topic ID in control message %s could not get channel from topic: %s", e.controlMsg, e.topic)
-}
-
-// NewMalformedTopicErr returns a new ErrMalformedTopic
-func NewMalformedTopicErr(controlMsg p2p.ControlMessageType, topic channels.Topic) ErrMalformedTopic {
-	return ErrMalformedTopic{controlMsg: controlMsg, topic: topic}
-}
-
-// IsErrMalformedTopic returns true if an error is ErrMalformedTopic
-func IsErrMalformedTopic(err error) bool {
-	var e ErrMalformedTopic
-	return errors.As(err, &e)
-}
-
-// ErrUnknownTopicChannel indicates that the rpc control message has a topic ID associated with an unknown channel.
-type ErrUnknownTopicChannel struct {
-	controlMsg p2p.ControlMessageType
-	topic      channels.Topic
-}
-
-func (e ErrUnknownTopicChannel) Error() string {
-	return fmt.Sprintf("unknown the channel for topic ID %s in control message %s", e.topic, e.controlMsg)
-}
-
-// NewUnknownTopicChannelErr returns a new ErrMalformedTopic
-func NewUnknownTopicChannelErr(controlMsg p2p.ControlMessageType, topic channels.Topic) ErrUnknownTopicChannel {
-	return ErrUnknownTopicChannel{controlMsg: controlMsg, topic: topic}
-}
-
-// IsErrUnknownTopicChannel returns true if an error is ErrUnknownTopicChannel
-func IsErrUnknownTopicChannel(err error) bool {
-	var e ErrMalformedTopic
-	return errors.As(err, &e)
-}
-
 // ErrValidationLimit indicates the validation limit is < 0.
 type ErrValidationLimit struct {
 	controlMsg p2p.ControlMessageType
@@ -111,5 +69,26 @@ func NewRateLimitedControlMsgErr(controlMsg p2p.ControlMessageType) ErrRateLimit
 // IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg
 func IsErrRateLimitedControlMsg(err error) bool {
 	var e ErrRateLimitedControlMsg
+	return errors.As(err, &e)
+}
+
+// ErrInvalidTopic error wrapper that indicates an error when checking if a Topic is a valid Flow Topic.
+type ErrInvalidTopic struct {
+	topic channels.Topic
+	err   error
+}
+
+func (e ErrInvalidTopic) Error() string {
+	return fmt.Errorf("invalid topic %s: %w", e.topic, e.err).Error()
+}
+
+// NewInvalidTopicErr returns a new ErrMalformedTopic
+func NewInvalidTopicErr(topic channels.Topic, err error) ErrInvalidTopic {
+	return ErrInvalidTopic{topic: topic, err: err}
+}
+
+// IsErrInvalidTopic returns true if an error is ErrInvalidTopic
+func IsErrInvalidTopic(err error) bool {
+	var e ErrInvalidTopic
 	return errors.As(err, &e)
 }

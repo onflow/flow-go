@@ -434,6 +434,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	// create gossip control message validation inspector
 	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(
 		builder.logger,
+		builder.sporkID,
 		builder.rpcValidationInspectorConfig,
 		builder.gossipSubInspectorNotifDistributor,
 	)

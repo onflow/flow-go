@@ -2,20 +2,19 @@ package validation
 
 import (
 	"fmt"
-	"math/rand"
-
-	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+	"math/rand"
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -71,7 +70,8 @@ func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() Ct
 // when some validation rule is broken feedback is given via the Peer scoring notifier.
 type ControlMsgValidationInspector struct {
 	component.Component
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	sporkID flow.Identifier
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -90,12 +90,14 @@ func NewInspectMsgReq(from peer.ID, validationConfig *CtrlMsgValidationConfig, c
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
 func NewControlMsgValidationInspector(
 	logger zerolog.Logger,
+	sporkID flow.Identifier,
 	config *ControlMsgValidationInspectorConfig,
 	distributor p2p.GossipSubInspectorNotificationDistributor,
 ) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
 		logger:      lg,
+		sporkID:     sporkID,
 		config:      config,
 		distributor: distributor,
 	}
@@ -186,7 +188,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq)
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateCtrlMsgTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
+		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("upper_threshold", req.validationConfig.UpperThreshold).
@@ -227,38 +229,40 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 	}
 }
 
-// validateCtrlMsgTopics ensures all topics in the specified control message are valid flow topic/channel.
+// validateTopics ensures all topics in the specified control message are valid flow topic/channel.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateCtrlMsgTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
-	topicIDS := make([]string, 0)
+
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
-			topicIDS = append(topicIDS, graft.GetTopicID())
+			err := c.validateTopic(func() channels.Topic {
+				return channels.Topic(graft.GetTopicID())
+			})
+			if err != nil {
+				return err
+			}
 		}
 	case p2p.CtrlMsgPrune:
 		for _, prune := range ctrlMsg.GetPrune() {
-			topicIDS = append(topicIDS, prune.GetTopicID())
+			err := c.validateTopic(func() channels.Topic {
+				return channels.Topic(prune.GetTopicID())
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return c.validateTopics(ctrlMsgType, topicIDS)
+	return nil
 }
 
-// validateTopics ensures all topics are valid flow topic/channel.
+// validateTopic the topic is a valid flow topic/channel.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, topicIDS []string) error {
-	var errs *multierror.Error
-	for _, t := range topicIDS {
-		topic := channels.Topic(t)
-		channel, ok := channels.ChannelFromTopic(topic)
-		if !ok {
-			errs = multierror.Append(errs, NewMalformedTopicErr(ctrlMsgType, topic))
-			continue
-		}
-
-		if !channels.ChannelExists(channel) {
-			errs = multierror.Append(errs, NewUnknownTopicChannelErr(ctrlMsgType, topic))
-		}
+func (c *ControlMsgValidationInspector) validateTopic(getTopic func() channels.Topic) error {
+	topic := getTopic()
+	err := channels.IsValidFlowTopic(topic, c.sporkID)
+	if err != nil {
+		return NewInvalidTopicErr(topic, err)
 	}
-	return errs.ErrorOrNil()
+	return nil
 }
