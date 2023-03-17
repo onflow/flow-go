@@ -29,6 +29,11 @@ const (
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
 
+// ControlMessageTypes returns list of all libp2p control message types.
+func ControlMessageTypes() []ControlMessageType {
+	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
+}
+
 // DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
 type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList

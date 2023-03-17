@@ -33,10 +33,8 @@ type InspectMsgReq struct {
 	Nonce uint64
 	// Peer sender of the message.
 	Peer peer.ID
-	// TopicIDS list of topic IDs in the control message.
-	TopicIDS []string
-	// Count the amount of control messages.
-	Count            uint64
+	// CtrlMsg the control message that will be inspected.
+	ctrlMsg          *pubsub_pb.ControlMessage
 	validationConfig *CtrlMsgValidationConfig
 }
 
@@ -52,7 +50,8 @@ type ControlMsgValidationInspectorConfig struct {
 	PruneValidationCfg *CtrlMsgValidationConfig
 }
 
-func (conf *ControlMsgValidationInspectorConfig) config(controlMsg p2p.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
+// getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
+func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
 	switch controlMsg {
 	case p2p.CtrlMsgGraft:
 		return conf.GraftValidationCfg, true
@@ -63,8 +62,8 @@ func (conf *ControlMsgValidationInspectorConfig) config(controlMsg p2p.ControlMe
 	}
 }
 
-// configs returns all control message validation configs in a list.
-func (conf *ControlMsgValidationInspectorConfig) configs() CtrlMsgValidationConfigs {
+// allCtrlMsgValidationConfig returns all control message validation configs in a list.
+func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
 	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg}
 }
 
@@ -84,8 +83,8 @@ type ControlMsgValidationInspector struct {
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgReq returns a new *InspectMsgReq.
-func NewInspectMsgReq(from peer.ID, validationConfig *CtrlMsgValidationConfig, topicIDS []string, count uint64) *InspectMsgReq {
-	return &InspectMsgReq{Nonce: rand.Uint64(), Peer: from, validationConfig: validationConfig, TopicIDS: topicIDS, Count: count}
+func NewInspectMsgReq(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgReq {
+	return &InspectMsgReq{Nonce: rand.Uint64(), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}
 }
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -117,7 +116,7 @@ func NewControlMsgValidationInspector(
 
 	builder := component.NewComponentManagerBuilder()
 	// start rate limiters cleanup loop in workers
-	for _, conf := range c.config.configs() {
+	for _, conf := range c.config.allCtrlMsgValidationConfig() {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			conf.RateLimiter.CleanupLoop(ctx)
@@ -137,78 +136,62 @@ func NewControlMsgValidationInspector(
 // All errors returned from this function can be considered benign.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
-
-	err := c.inspect(from, p2p.CtrlMsgGraft, control)
-	if err != nil {
-		return fmt.Errorf("validation failed for control message %s: %w", p2p.CtrlMsgGraft, err)
-	}
-
-	err = c.inspect(from, p2p.CtrlMsgPrune, control)
-	if err != nil {
-		return fmt.Errorf("validation failed for control message %s: %w", p2p.CtrlMsgPrune, err)
-	}
-
-	return nil
-}
-
-// inspect performs initial inspection of RPC control message and queues up message for further inspection if required.
-// All errors returned from this function can be considered benign.
-// errors returned:
-//
-//	ErrUpperThreshold if message Count greater than the configured upper threshold.
-func (c *ControlMsgValidationInspector) inspect(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
-	validationConfig, ok := c.config.config(ctrlMsgType)
-	if !ok {
-		return fmt.Errorf("failed to get validation configuration for control message %s", ctrlMsg)
-	}
-	count, topicIDS := c.getCtrlMsgData(ctrlMsgType, ctrlMsg)
-	lg := c.logger.With().
-		Str("peer_id", from.String()).
-		Str("ctrl_msg_type", string(ctrlMsgType)).
-		Uint64("ctrl_msg_count", count).Logger()
-
-	// if Count greater than upper threshold drop message and penalize
-	if count > validationConfig.UpperThreshold {
-		upperThresholdErr := NewUpperThresholdErr(validationConfig.ControlMsg, count, validationConfig.UpperThreshold)
-		lg.Warn().
-			Err(upperThresholdErr).
-			Uint64("upper_threshold", upperThresholdErr.upperThreshold).
-			Bool(logging.KeySuspicious, true).
-			Msg("rejecting rpc message")
-
-		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, upperThresholdErr))
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("failed to distribute invalid control message notification")
-			return err
+	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
+		lg := c.logger.With().
+			Str("peer_id", from.String()).
+			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
+		validationConfig, ok := c.config.getCtrlMsgValidationConfig(ctrlMsgType)
+		if !ok {
+			lg.Trace().Msg("validation configuration for control type does not exists skipping")
+			continue
 		}
-		return upperThresholdErr
+		count := c.getCtrlMsgCount(ctrlMsgType, control)
+		// if Count greater than upper threshold drop message and penalize
+		if count > validationConfig.UpperThreshold {
+			upperThresholdErr := NewUpperThresholdErr(validationConfig.ControlMsg, count, validationConfig.UpperThreshold)
+			lg.Warn().
+				Err(upperThresholdErr).
+				Uint64("ctrl_msg_count", count).
+				Uint64("upper_threshold", upperThresholdErr.upperThreshold).
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting rpc message")
+			err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, upperThresholdErr))
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Bool(logging.KeySuspicious, true).
+					Msg("failed to distribute invalid control message notification")
+				return err
+			}
+			return upperThresholdErr
+		}
+
+		// queue further async inspection
+		c.requestMsgInspection(NewInspectMsgReq(from, validationConfig, control))
 	}
-	// queue further async inspection
-	c.requestMsgInspection(NewInspectMsgReq(from, validationConfig, topicIDS, count))
+
 	return nil
 }
 
 // processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq) error {
+	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", req.Peer.String()).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
-		Uint64("ctrl_msg_count", req.Count).Logger()
+		Uint64("ctrl_msg_count", count).Logger()
 	var validationErr error
 	switch {
-	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(req.Count)): // check if Peer RPC messages are rate limited
+	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
-	case req.Count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.TopicIDS)
+	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
+		validationErr = c.validateCtrlMsgTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("upper_threshold", req.validationConfig.UpperThreshold).
 			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
-			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, req.Count))
+			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
 		return nil
 	}
 	if validationErr != nil {
@@ -216,7 +199,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq)
 			Err(validationErr).
 			Bool(logging.KeySuspicious, true).
 			Msg(fmt.Sprintf("rpc control message async inspection failed"))
-		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, req.Count, validationErr))
+		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
 		if err != nil {
 			lg.Error().
 				Err(err).
@@ -232,41 +215,49 @@ func (c *ControlMsgValidationInspector) requestMsgInspection(req *InspectMsgReq)
 	c.workerPool.Submit(req)
 }
 
-// getCtrlMsgData returns the amount of specified control message type in the rpc ControlMessage as well as the topic ID for each message.
-func (c *ControlMsgValidationInspector) getCtrlMsgData(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) (uint64, []string) {
-	topicIDS := make([]string, 0)
-	count := 0
+// getCtrlMsgCount returns the amount of specified control message type in the rpc ControlMessage.
+func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) uint64 {
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
-		grafts := ctrlMsg.GetGraft()
-		for _, graft := range grafts {
-			topicIDS = append(topicIDS, graft.GetTopicID())
-		}
-		count = len(grafts)
+		return uint64(len(ctrlMsg.GetGraft()))
 	case p2p.CtrlMsgPrune:
-		prunes := ctrlMsg.GetPrune()
-		for _, prune := range prunes {
-			topicIDS = append(topicIDS, prune.GetTopicID())
-		}
-		count = len(prunes)
+		return uint64(len(ctrlMsg.GetPrune()))
+	default:
+		return 0
 	}
-	return uint64(count), topicIDS
 }
 
-// validateTopics ensures the topic is a valid flow topic/channel and the node has a subscription to that topic.
+// validateCtrlMsgTopics ensures all topics in the specified control message are valid flow topic/channel.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsg p2p.ControlMessageType, topics []string) error {
+func (c *ControlMsgValidationInspector) validateCtrlMsgTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+	topicIDS := make([]string, 0)
+	switch ctrlMsgType {
+	case p2p.CtrlMsgGraft:
+		for _, graft := range ctrlMsg.GetGraft() {
+			topicIDS = append(topicIDS, graft.GetTopicID())
+		}
+	case p2p.CtrlMsgPrune:
+		for _, prune := range ctrlMsg.GetPrune() {
+			topicIDS = append(topicIDS, prune.GetTopicID())
+		}
+	}
+	return c.validateTopics(ctrlMsgType, topicIDS)
+}
+
+// validateTopics ensures all topics are valid flow topic/channel.
+// All errors returned from this function can be considered benign.
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, topicIDS []string) error {
 	var errs *multierror.Error
-	for _, t := range topics {
+	for _, t := range topicIDS {
 		topic := channels.Topic(t)
 		channel, ok := channels.ChannelFromTopic(topic)
 		if !ok {
-			errs = multierror.Append(errs, NewMalformedTopicErr(ctrlMsg, topic))
+			errs = multierror.Append(errs, NewMalformedTopicErr(ctrlMsgType, topic))
 			continue
 		}
 
 		if !channels.ChannelExists(channel) {
-			errs = multierror.Append(errs, NewUnknownTopicChannelErr(ctrlMsg, topic))
+			errs = multierror.Append(errs, NewUnknownTopicChannelErr(ctrlMsgType, topic))
 		}
 	}
 	return errs.ErrorOrNil()
