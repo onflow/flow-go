@@ -143,8 +143,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           trace.NewNoopTracer(),
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
@@ -256,8 +254,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           trace.NewNoopTracer(),
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
@@ -525,9 +521,9 @@ func createTestBlockAndRun(
 	}
 
 	view := delta.NewDeltaView(snapshot)
-	for _, delta := range returnedComputationResult.StateSnapshots {
-		for id, val := range delta.Delta.Data {
-			err := view.Set(id, val)
+	for _, snapshot := range returnedComputationResult.StateSnapshots {
+		for _, entry := range snapshot.UpdatedRegisters() {
+			err := view.Set(entry.Key, entry.Value)
 			require.NoError(t, err)
 		}
 	}

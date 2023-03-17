@@ -154,6 +154,9 @@ func (h *handler) SendTransaction(_ context.Context, req *access.SendTransaction
 	}
 
 	err = h.backend.ProcessTransaction(&tx)
+	if engine.IsInvalidInputError(err) {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	if err != nil {
 		return nil, err
 	}

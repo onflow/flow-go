@@ -99,16 +99,8 @@ func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
 	controller.enforceLimits = current
 }
 
-func (s *State) SpockSecret() []byte {
-	return s.view.SpockSecret()
-}
-
 func (s *State) View() View {
 	return s.view
-}
-
-func (s *State) Meter() *meter.Meter {
-	return s.meter
 }
 
 // NewState constructs a new state
@@ -148,25 +140,6 @@ func (s *State) InteractionUsed() uint64 {
 // BytesWritten returns the amount of total ledger bytes written
 func (s *State) BytesWritten() uint64 {
 	return s.meter.TotalBytesWrittenToStorage()
-}
-
-// UpdatedRegisterIDs returns the lists of register ids that were updated.
-func (s *State) UpdatedRegisterIDs() []flow.RegisterID {
-	return s.view.UpdatedRegisterIDs()
-}
-
-// UpdatedRegisters returns the lists of register entries that were updated.
-func (s *State) UpdatedRegisters() flow.RegisterEntries {
-	return s.view.UpdatedRegisters()
-}
-
-// UpdatedRegisterIDs returns the lists of register entries that were updated.
-func (s *State) AllRegisterIDs() []flow.RegisterID {
-	return s.view.AllRegisterIDs()
-}
-
-func (s *State) Finalize() {
-	s.finalized = true
 }
 
 func (s *State) DropChanges() error {
@@ -296,8 +269,15 @@ func (s *State) TotalEmittedEventBytes() uint64 {
 	return s.meter.TotalEmittedEventBytes()
 }
 
+func (s *State) Finalize() *ExecutionSnapshot {
+	s.finalized = true
+	snapshot := s.view.Finalize()
+	snapshot.Meter = s.meter
+	return snapshot
+}
+
 // MergeState the changes from a the given view to this view.
-func (s *State) Merge(other ExecutionSnapshot) error {
+func (s *State) Merge(other *ExecutionSnapshot) error {
 	if s.finalized {
 		return fmt.Errorf("cannot Merge on a finalized view")
 	}
@@ -307,7 +287,7 @@ func (s *State) Merge(other ExecutionSnapshot) error {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	s.meter.MergeMeter(other.Meter())
+	s.meter.MergeMeter(other.Meter)
 	return nil
 }
 

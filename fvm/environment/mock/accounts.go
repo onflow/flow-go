@@ -55,20 +55,6 @@ func (_m *Accounts) AppendPublicKey(address flow.Address, key flow.AccountPublic
 	return r0
 }
 
-// CheckAccountNotFrozen provides a mock function with given fields: address
-func (_m *Accounts) CheckAccountNotFrozen(address flow.Address) error {
-	ret := _m.Called(address)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address) error); ok {
-		r0 = rf(address)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // ContractExists provides a mock function with given fields: contractName, address
 func (_m *Accounts) ContractExists(contractName string, address flow.Address) (bool, error) {
 	ret := _m.Called(contractName, address)
@@ -319,20 +305,6 @@ func (_m *Accounts) GetValue(id flow.RegisterID) ([]byte, error) {
 	}
 
 	return r0, r1
-}
-
-// SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
-	ret := _m.Called(address, frozen)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Address, bool) error); ok {
-		r0 = rf(address, frozen)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SetContract provides a mock function with given fields: contractName, address, contract

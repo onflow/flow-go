@@ -29,15 +29,11 @@ const (
 // AccountStatus holds meta information about an account
 //
 // currently modelled as a byte array with on-demand encoding/decoding of sub arrays
-// the first byte captures flags (e.g. frozen)
+// the first byte captures flags
 // the next 8 bytes (big-endian) captures storage used by an account
 // the next 8 bytes (big-endian) captures the storage index of an account
 // and the last 8 bytes (big-endian) captures the number of public keys stored on this account
 type AccountStatus [accountStatusSize]byte
-
-const (
-	maskFrozen byte = 0b1000_0000
-)
 
 // NewAccountStatus returns a new AccountStatus
 // sets the storage index to the init value
@@ -67,22 +63,6 @@ func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
 	}
 	copy(as[:], inp)
 	return &as, nil
-}
-
-// IsAccountFrozen returns true if account's frozen flag is set
-func (a *AccountStatus) IsAccountFrozen() bool {
-	// accounts are never frozen
-	// TODO: remove the freezing feature entirely
-	return false
-}
-
-// SetFrozenFlag sets the frozen flag
-func (a *AccountStatus) SetFrozenFlag(frozen bool) {
-	if frozen {
-		a[flagIndex] = a[flagIndex] | maskFrozen
-		return
-	}
-	a[flagIndex] = a[flagIndex] & (0xFF - maskFrozen)
 }
 
 // SetStorageUsed updates the storage used by the account
