@@ -311,7 +311,7 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.Lib
 		node.Start(ctx)
 		rdas = append(rdas, node)
 
-		if peerManager := node.PeerManagerComponent(); peerManager != (*connection.PeerManager)(nil) {
+		if peerManager := node.PeerManagerComponent(); peerManager != nil {
 			// we need to start the peer manager post the node startup (if such component exists).
 			peerManager.Start(ctx)
 			rdas = append(rdas, peerManager)
