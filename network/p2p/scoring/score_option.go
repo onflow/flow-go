@@ -115,17 +115,20 @@ func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, o
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator()
+	appSpecificScore := defaultAppSpecificScoreFunction(logger, idProvider, validator)
 	s := &ScoreOption{
 		logger:                   logger,
 		validator:                validator,
 		idProvider:               idProvider,
-		appSpecificScoreFunction: defaultAppSpecificScoreFunction(logger, idProvider, validator),
-		peerScoreParams:          &pubsub.PeerScoreParams{},
+		appSpecificScoreFunction: appSpecificScore,
+		peerScoreParams:          defaultPeerScoreParams(),
 	}
-
+	
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	s.peerScoreParams.AppSpecificScore = s.appSpecificScoreFunction
 
 	return s
 }
@@ -135,7 +138,6 @@ func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) {
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
-	s.defaultPeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
@@ -162,16 +164,7 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 	}
 }
 
-// preparePeerScoreParams prepares the peer score parameters for the pubsub system.
-// It is based on the default parameters defined in libp2p pubsub peer scoring.
-func (s *ScoreOption) defaultPeerScoreParams() {
-	s.peerScoreParams = DefaultPeerScoreParams()
-	// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
-	// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
-	s.peerScoreParams.AppSpecificScore = s.appSpecificScoreFunction
-}
-
-func DefaultPeerScoreParams() *pubsub.PeerScoreParams {
+func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 	return &pubsub.PeerScoreParams{
 		// we don't set all the parameters, so we skip the atomic validation.
 		// atomic validation fails initialization if any parameter is not set.
@@ -191,7 +184,6 @@ func DefaultPeerScoreParams() *pubsub.PeerScoreParams {
 }
 
 func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
-	s.defaultPeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
