@@ -123,7 +123,7 @@ func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, o
 		appSpecificScoreFunction: appSpecificScore,
 		peerScoreParams:          defaultPeerScoreParams(),
 	}
-	
+
 	for _, opt := range opts {
 		opt(s)
 	}
