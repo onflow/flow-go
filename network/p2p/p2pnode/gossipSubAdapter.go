@@ -36,7 +36,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		return nil, err
 	}
 
-	cm := component.NewComponentManagerBuilder()
+	builder := component.NewComponentManagerBuilder()
 
 	a := &GossipSubAdapter{
 		gossipSub: gossipSub,
@@ -44,7 +44,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	}
 
 	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
-		cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("starting score tracer")
 			scoreTracer.Start(ctx)
@@ -56,7 +56,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	}
 
 	if tracer := gossipSubConfig.PubSubTracer(); tracer != nil {
-		cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("starting tracer")
 			tracer.Start(ctx)
@@ -67,7 +67,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		})
 	}
 
-	a.Component = cm.Build()
+	a.Component = builder.Build()
 
 	return a, nil
 }
