@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -118,10 +119,14 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
-	cm := component.NewComponentManagerBuilder()
+	builder := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-ctx.Done()
+		}).Build()
 
 	adapter := &CorruptGossipSubAdapter{
-		Component: cm.Build(),
+		Component: builder,
 		gossipSub: gossipSub,
 		router:    router,
 		logger:    logger,
