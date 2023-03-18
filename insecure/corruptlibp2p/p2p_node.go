@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
@@ -52,7 +51,7 @@ func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFun
 }
 
 // NewCorruptLibP2PNode returns corrupted libP2PNode that will subscribe to topics using the AcceptAllTopicValidator.
-func NewCorruptLibP2PNode(logger zerolog.Logger, host host.Host, pCache *p2pnode.ProtocolPeerCache, peerManager *connection.PeerManager) p2p.LibP2PNode {
+func NewCorruptLibP2PNode(logger zerolog.Logger, host host.Host, pCache p2p.ProtocolPeerCache, peerManager p2p.PeerManager) p2p.LibP2PNode {
 	node := p2pnode.NewNode(logger, host, pCache, peerManager)
 	return &CorruptP2PNode{Node: node, logger: logger, codec: cbor.NewCodec()}
 }

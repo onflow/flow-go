@@ -19,6 +19,7 @@ type PeersProvider func() peer.IDSlice
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager interface {
 	component.Component
+	RateLimiterConsumer
 
 	// RequestPeerUpdate requests an update to the peer connections of this node.
 	// If a peer update has already been requested (either as a periodic request or an on-demand
