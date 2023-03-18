@@ -165,23 +165,29 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 // preparePeerScoreParams prepares the peer score parameters for the pubsub system.
 // It is based on the default parameters defined in libp2p pubsub peer scoring.
 func (s *ScoreOption) defaultPeerScoreParams() {
-	// we don't set all the parameters, so we skip the atomic validation.
-	// atomic validation fails initialization if any parameter is not set.
-	s.peerScoreParams.SkipAtomicValidation = true
-	// DecayInterval is the interval over which we decay the effect of past behavior. So that
-	// a good or bad behavior will not have a permanent effect on the score.
-	s.peerScoreParams.DecayInterval = time.Hour
-	// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
-	// This is to prevent the counter from decaying to a very small value.
-	// The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
-	// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
-	// for a long time, and we can reset the counter.
-	s.peerScoreParams.DecayToZero = 0.01
+	s.peerScoreParams = DefaultPeerScoreParams()
 	// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
 	// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
 	s.peerScoreParams.AppSpecificScore = s.appSpecificScoreFunction
-	// AppSpecificWeight is the weight of the application specific score.
-	s.peerScoreParams.AppSpecificWeight = DefaultAppSpecificScoreWeight
+}
+
+func DefaultPeerScoreParams() *pubsub.PeerScoreParams {
+	return &pubsub.PeerScoreParams{
+		// we don't set all the parameters, so we skip the atomic validation.
+		// atomic validation fails initialization if any parameter is not set.
+		SkipAtomicValidation: true,
+		// DecayInterval is the interval over which we decay the effect of past behavior. So that
+		// a good or bad behavior will not have a permanent effect on the score.
+		DecayInterval: time.Hour,
+		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
+		// This is to prevent the counter from decaying to a very small value.
+		// The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
+		// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
+		// for a long time, and we can reset the counter.
+		DecayToZero: 0.01,
+		// AppSpecificWeight is the weight of the application specific score.
+		AppSpecificWeight: DefaultAppSpecificScoreWeight,
+	}
 }
 
 func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {

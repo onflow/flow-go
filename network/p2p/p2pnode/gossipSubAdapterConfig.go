@@ -13,7 +13,9 @@ import (
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
-	options []pubsub.Option
+	options      []pubsub.Option
+	scoreTracer  p2p.PeerScoreTracer
+	pubsubTracer p2p.PubSubTracer
 }
 
 var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)
@@ -47,10 +49,20 @@ func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(f func(peer.ID, *pu
 }
 
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
+	g.pubsubTracer = tracer
 	g.options = append(g.options, pubsub.WithRawTracer(tracer))
 }
 
+func (g *GossipSubAdapterConfig) ScoreTracer() p2p.PeerScoreTracer {
+	return g.scoreTracer
+}
+
+func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
+	return g.pubsubTracer
+}
+
 func (g *GossipSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {
+	g.scoreTracer = tracer
 	g.options = append(g.options, pubsub.WithPeerScoreInspect(func(snapshot map[peer.ID]*pubsub.PeerScoreSnapshot) {
 		tracer.UpdatePeerScoreSnapshots(convertPeerScoreSnapshots(snapshot))
 	}, tracer.UpdateInterval()))

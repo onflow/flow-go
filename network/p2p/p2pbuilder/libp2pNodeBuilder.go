@@ -382,8 +382,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				node.SetPeerScoreExposer(scoreTracer)
 			}
 			node.SetPubSub(gossipSub)
-
+			gossipSub.Start(ctx)
 			ready()
+
+			<-gossipSub.Done()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// encapsulates shutdown logic for the libp2p node.
@@ -398,18 +400,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
 				}
 			}
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// encapsulates the startup logic for the libp2p node.
-			if builder.gossipSubTracer == nil {
-				builder.logger.Warn().Msg("libp2p tracer is not set")
-				ready()
-				return
-			}
-
-			builder.logger.Debug().Msg("starting libp2p tracer")
-			builder.gossipSubTracer.Start(ctx)
-			ready()
 		})
 
 	node.SetComponentManager(cm.Build())
