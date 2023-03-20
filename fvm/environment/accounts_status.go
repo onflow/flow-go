@@ -71,9 +71,7 @@ func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
 
 // IsAccountFrozen returns true if account's frozen flag is set
 func (a *AccountStatus) IsAccountFrozen() bool {
-	// accounts are never frozen
-	// TODO: remove the freezing feature entirely
-	return false
+	return a[flagIndex]&maskFrozen > 0
 }
 
 // SetFrozenFlag sets the frozen flag
