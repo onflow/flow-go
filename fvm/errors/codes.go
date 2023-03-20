@@ -89,7 +89,8 @@ const (
 	ErrCodeAccountNotFoundError          ErrorCode = 1201
 	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
 	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
-	ErrCodeFrozenAccountError            ErrorCode = 1204
+	// Deprecated: No longer used.
+	ErrCodeFrozenAccountError ErrorCode = 1204
 	// Deprecated: No longer used.
 	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
 	ErrCodeAccountPublicKeyLimitError        ErrorCode = 1206

@@ -34,6 +34,11 @@ func (_m *PubSubAdapterConfig) WithScoreOption(_a0 p2p.ScoreOptionBuilder) {
 	_m.Called(_a0)
 }
 
+// WithScoreTracer provides a mock function with given fields: tracer
+func (_m *PubSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {
+	_m.Called(tracer)
+}
+
 // WithSubscriptionFilter provides a mock function with given fields: _a0
 func (_m *PubSubAdapterConfig) WithSubscriptionFilter(_a0 p2p.SubscriptionFilter) {
 	_m.Called(_a0)

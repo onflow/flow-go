@@ -90,32 +90,35 @@ type NestedTransaction interface {
 	// CommitNestedTransaction commits the changes in the current unrestricted
 	// nested transaction to the parent (nested) transaction.  This returns
 	// error if the expectedId does not match the current nested transaction.
-	// This returns the committed state otherwise.
+	// This returns the committed execution snapshot otherwise.
 	//
-	// Note: The returned committed state may be reused by another transaction
-	// via AttachAndCommitNestedTransaction to update the transaction
-	// bookkeeping, but the	caller must manually invalidate the state.
+	// Note: The returned committed execution snapshot may be reused by another
+	// transaction via AttachAndCommitNestedTransaction to update the
+	// transaction bookkeeping, but the caller must manually invalidate the
+	// state.
 	// USE WITH EXTREME CAUTION.
 	CommitNestedTransaction(
 		expectedId NestedTransactionId,
 	) (
-		*State,
+		*ExecutionSnapshot,
 		error,
 	)
 
 	// CommitParseRestrictedNestedTransaction commits the changes in the
 	// current restricted nested transaction to the parent (nested)
 	// transaction.  This returns error if the specified location does not
-	// match the tracked location. This returns the committed state otherwise.
+	// match the tracked location. This returns the committed execution
+	// snapshot otherwise.
 	//
-	// Note: The returned committed state may be reused by another transaction
-	// via AttachAndCommitNestedTransaction to update the transaction
-	// bookkeeping, but the caller must manually invalidate the state.
+	// Note: The returned committed execution snapshot may be reused by another
+	// transaction via AttachAndCommitNestedTransaction to update the
+	// transaction bookkeeping, but the caller must manually invalidate the
+	// state.
 	// USE WITH EXTREME CAUTION.
 	CommitParseRestrictedNestedTransaction(
 		location common.AddressLocation,
 	) (
-		*State,
+		*ExecutionSnapshot,
 		error,
 	)
 
@@ -140,9 +143,10 @@ type NestedTransaction interface {
 	// to the current transaction.
 	ResumeNestedTransaction(pausedState *State)
 
-	// AttachAndCommitNestedTransaction commits the changes in the cached
-	// nested transaction state to the current (nested) transaction.
-	AttachAndCommitNestedTransaction(cachedState *State) error
+	// AttachAndCommitNestedTransaction commits the changes from the cached
+	// nested transaction execution snapshot to the current (nested)
+	// transaction.
+	AttachAndCommitNestedTransaction(cachedSnapshot *ExecutionSnapshot) error
 
 	// RestartNestedTransaction merges all changes that belongs to the nested
 	// transaction about to be restart (for spock/meter bookkeeping), then
@@ -156,10 +160,6 @@ type NestedTransaction interface {
 	Set(id flow.RegisterID, value flow.RegisterValue) error
 
 	ViewForTestingOnly() View
-
-	UpdatedRegisterIDs() []flow.RegisterID
-
-	UpdatedRegisters() flow.RegisterEntries
 }
 
 type nestedTransactionStackFrame struct {
@@ -300,26 +300,26 @@ func (s *transactionState) pop(op string) (*State, error) {
 	return child.state, nil
 }
 
-func (s *transactionState) mergeIntoParent() (*State, error) {
+func (s *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) {
 	childState, err := s.pop("commit")
 	if err != nil {
 		return nil, err
 	}
 
-	childState.Finalize()
+	childSnapshot := childState.Finalize()
 
-	err = s.current().state.Merge(childState)
+	err = s.current().state.Merge(childSnapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return childState, nil
+	return childSnapshot, nil
 }
 
 func (s *transactionState) CommitNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
-	*State,
+	*ExecutionSnapshot,
 	error,
 ) {
 	if !s.IsCurrent(expectedId) {
@@ -341,7 +341,7 @@ func (s *transactionState) CommitNestedTransaction(
 func (s *transactionState) CommitParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
-	*State,
+	*ExecutionSnapshot,
 	error,
 ) {
 	currentFrame := s.current()
@@ -384,11 +384,9 @@ func (s *transactionState) ResumeNestedTransaction(pausedState *State) {
 }
 
 func (s *transactionState) AttachAndCommitNestedTransaction(
-	cachedState *State,
+	cachedSnapshot *ExecutionSnapshot,
 ) error {
-	s.push(cachedState, nil)
-	_, err := s.mergeIntoParent()
-	return err
+	return s.current().state.Merge(cachedSnapshot)
 }
 
 func (s *transactionState) RestartNestedTransaction(
@@ -484,14 +482,6 @@ func (s *transactionState) TotalEmittedEventBytes() uint64 {
 
 func (s *transactionState) ViewForTestingOnly() View {
 	return s.currentState().View()
-}
-
-func (s *transactionState) UpdatedRegisterIDs() []flow.RegisterID {
-	return s.currentState().UpdatedRegisterIDs()
-}
-
-func (s *transactionState) UpdatedRegisters() flow.RegisterEntries {
-	return s.currentState().UpdatedRegisters()
 }
 
 func (s *transactionState) RunWithAllLimitsDisabled(f func()) {

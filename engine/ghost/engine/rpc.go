@@ -82,7 +82,6 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 	channelList := channels.ChannelList{
 		channels.ConsensusCommittee,
 		channels.SyncCommittee,
-		channels.SyncExecution,
 		channels.PushTransactions,
 		channels.PushGuarantees,
 		channels.PushBlocks,

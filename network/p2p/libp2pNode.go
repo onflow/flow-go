@@ -20,11 +20,17 @@ import (
 // LibP2PNode represents a flow libp2p node. It provides the network layer with the necessary interface to
 // control the underlying libp2p node. It is essentially the flow wrapper around the libp2p node, and allows
 // us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
+// TODO: this interface is highly coupled with the current implementation of the libp2p node. We should
+//
+//	consider refactoring it to be more generic and less coupled with the current implementation.
+//	https://github.com/dapperlabs/flow-go/issues/6575
 type LibP2PNode interface {
 	module.ReadyDoneAware
 	Subscriptions
 	// PeerConnections connection status information per peer.
 	PeerConnections
+	// PeerScore exposes the peer score API.
+	PeerScore
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -79,6 +85,18 @@ type Subscriptions interface {
 	HasSubscription(topic channels.Topic) bool
 	// SetUnicastManager sets the unicast manager for the node.
 	SetUnicastManager(uniMgr UnicastManager)
+}
+
+// PeerScore is the interface for the peer score module. It is used to expose the peer score to other
+// components of the node. It is also used to set the peer score exposer implementation.
+type PeerScore interface {
+	// SetPeerScoreExposer sets the node's peer score exposer implementation.
+	// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
+	// method if the node's peer score exposer has already been set.
+	SetPeerScoreExposer(e PeerScoreExposer)
+	// PeerScoreExposer returns the node's peer score exposer implementation.
+	// If the node's peer score exposer has not been set, the second return value will be false.
+	PeerScoreExposer() (PeerScoreExposer, bool)
 }
 
 // PeerConnections subset of funcs related to underlying libp2p host connections.

@@ -401,10 +401,10 @@ func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration tim
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-type nodeBuilderOption func(p2pbuilder.NodeBuilder)
+type nodeBuilderOption func(p2p.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, pc.ID(protocols.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
@@ -412,25 +412,25 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 }
 
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
 	}
 }
 
 func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRateLimiterDistributor(distributor)
 	}
 }
 
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
 	}
 }
 
 func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetStreamCreationRetryInterval(delay)
 	}
 }

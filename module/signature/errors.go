@@ -19,6 +19,14 @@ var (
 
 	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
 	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
+
+	// ErrIdentityPublicKey indicates that the signer's public keys add up to the BLS identity public key.
+	// Any signature would fail the cryptographic verification if verified against the
+	// the identity public key. This case can only happen if public keys were forged to sum up to
+	// an identity public key. If private keys are sampled uniformly at random, there is vanishing
+	// probability of generating the aggregated identity public key. However, (colluding) byzantine
+	// signers could force the generation of private keys that result in the identity aggregated key.
+	ErrIdentityPublicKey = errors.New("aggregated public key is identity and aggregated signature is invalid")
 )
 
 /* ********************* InvalidSignatureIncludedError ********************* */

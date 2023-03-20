@@ -423,7 +423,7 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.ClusterBlockProposal:
-		h.compliance.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+		h.compliance.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})

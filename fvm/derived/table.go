@@ -16,8 +16,8 @@ type ValueComputer[TKey any, TVal any] interface {
 }
 
 type invalidatableEntry[TVal any] struct {
-	Value TVal         // immutable after initialization.
-	State *state.State // immutable after initialization.
+	Value             TVal                     // immutable after initialization.
+	ExecutionSnapshot *state.ExecutionSnapshot // immutable after initialization.
 
 	isInvalid bool // Guarded by DerivedDataTable' lock.
 }
@@ -114,9 +114,9 @@ func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKe
 		// entry may be valid in the parent table, but invalid in the child
 		// table.
 		items[key] = &invalidatableEntry[TVal]{
-			Value:     entry.Value,
-			State:     entry.State,
-			isInvalid: false,
+			Value:             entry.Value,
+			ExecutionSnapshot: entry.ExecutionSnapshot,
+			isInvalid:         false,
 		}
 	}
 
@@ -202,7 +202,11 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 		txn.toValidateTime)
 	if applicable.ShouldInvalidateEntries() {
 		for key, entry := range txn.writeSet {
-			if applicable.ShouldInvalidateEntry(key, entry.Value, entry.State) {
+			if applicable.ShouldInvalidateEntry(
+				key,
+				entry.Value,
+				entry.ExecutionSnapshot) {
+
 				return newRetryableError(
 					"invalid TableTransactions. outdated write set")
 			}
@@ -263,7 +267,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 			if txn.invalidators.ShouldInvalidateEntry(
 				key,
 				entry.Value,
-				entry.State) {
+				entry.ExecutionSnapshot) {
 
 				entry.isInvalid = true
 				delete(table.items, key)
@@ -347,47 +351,62 @@ func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
 }
 
 // Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Get(key TKey) (
+func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
-	*state.State,
+	*state.ExecutionSnapshot,
 	bool,
 ) {
 
 	writeEntry, ok := txn.writeSet[key]
 	if ok {
-		return writeEntry.Value, writeEntry.State, true
+		return writeEntry.Value, writeEntry.ExecutionSnapshot, true
 	}
 
 	readEntry := txn.readSet[key]
 	if readEntry != nil {
-		return readEntry.Value, readEntry.State, true
+		return readEntry.Value, readEntry.ExecutionSnapshot, true
 	}
 
 	readEntry = txn.table.get(key)
 	if readEntry != nil {
 		txn.readSet[key] = readEntry
-		return readEntry.Value, readEntry.State, true
+		return readEntry.Value, readEntry.ExecutionSnapshot, true
 	}
 
 	var defaultValue TVal
 	return defaultValue, nil, false
 }
 
-// Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Set(
+func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
+	TVal,
+	*state.ExecutionSnapshot,
+	bool,
+) {
+	return txn.get(key)
+}
+
+func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) {
 	txn.writeSet[key] = &invalidatableEntry[TVal]{
-		Value:     value,
-		State:     state,
-		isInvalid: false,
+		Value:             value,
+		ExecutionSnapshot: snapshot,
+		isInvalid:         false,
 	}
 
 	// Since value is derived from snapshot's view.  We need to reset the
 	// toValidateTime back to snapshot time to re-validate the entry.
 	txn.toValidateTime = txn.snapshotTime
+}
+
+func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
+	key TKey,
+	value TVal,
+	snapshot *state.ExecutionSnapshot,
+) {
+	txn.set(key, value, snapshot)
 }
 
 // GetOrCompute returns the key's value.  If a pre-computed value is available,
@@ -407,7 +426,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 ) {
 	var defaultVal TVal
 
-	val, state, ok := txn.Get(key)
+	val, state, ok := txn.get(key)
 	if ok {
 		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
@@ -438,7 +457,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
-	txn.Set(key, val, committedState)
+	txn.set(key, val, committedState)
 
 	return val, nil
 }
