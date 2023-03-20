@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	UpperThresholdMapKey  = "UpperThreshold"
-	SafetyThresholdMapKey = "SafetyThreshold"
-	RateLimitMapKey       = "RateLimit"
+	UpperThresholdMapKey  = "upperthreshold"
+	SafetyThresholdMapKey = "safetythreshold"
+	RateLimitMapKey       = "ratelimit"
 
 	DefaultGraftUpperThreshold  = 1000
 	DefaultGraftSafetyThreshold = 100
