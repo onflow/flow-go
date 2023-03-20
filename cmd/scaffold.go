@@ -384,13 +384,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			collector := metrics.GossipSubRPCInspectorQueueMetricFactory(fnb.MetricsRegisterer)
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
-		controlMsgRPCInspectorCfg, err := fnb.gossipSubRPCInspectorConfig(heroStoreOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
-		}
 
-		fnb.GossipSubInspectorNotifDistributor = distributor.DefaultGossipSubInspectorNotificationDistributor(fnb.Logger)
-		rpcValidationInspector := validation.NewControlMsgValidationInspector(fnb.Logger, fnb.SporkID, controlMsgRPCInspectorCfg, fnb.GossipSubInspectorNotifDistributor)
+		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := GossipSubRPCInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, heroStoreOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
+		}
+		fnb.GossipSubInspectorNotifDistributor = gossipSubInspectorNotifDistributor
+
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
@@ -1868,25 +1868,40 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 }
 
 // gossipSubRPCInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func (fnb *FlowNodeBuilder) gossipSubRPCInspectorConfig(opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
+func gossipSubRPCInspectorConfig(validationConfigs *GossipSubRPCValidationConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
 	// setup rpc validation configuration for each control message type
-	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, fnb.GossipSubRPCValidationConfigs.GraftLimits)
+	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
-	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, fnb.GossipSubRPCValidationConfigs.PruneLimits)
+	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validationConfigs.PruneLimits)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
 
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     fnb.GossipSubRPCValidationConfigs.NumberOfWorkers,
+		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: opts,
 		GraftValidationCfg:  graftValidationCfg,
 		PruneValidationCfg:  pruneValidationCfg,
 	}
 	return controlMsgRPCInspectorCfg, nil
+}
+
+// GossipSubRPCInspector helper that sets up the gossipsub RPC validation inspector and notification distributor.
+func GossipSubRPCInspector(logger zerolog.Logger,
+	sporkId flow.Identifier,
+	validationConfigs *GossipSubRPCValidationConfigs,
+	heroStoreOpts ...queue.HeroStoreConfigOption,
+) (*validation.ControlMsgValidationInspector, *distributor.GossipSubInspectorNotificationDistributor, error) {
+	controlMsgRPCInspectorCfg, err := gossipSubRPCInspectorConfig(validationConfigs, heroStoreOpts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
+	}
+	gossipSubInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
+	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, gossipSubInspectorNotifDistributor)
+	return rpcValidationInspector, gossipSubInspectorNotifDistributor, nil
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk

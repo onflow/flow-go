@@ -866,6 +866,17 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
+		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.GossipSubRPCInspectorCacheSize)}
+		if builder.HeroCacheMetricsEnable {
+			collector := metrics.GossipSubRPCInspectorQueueMetricFactory(builder.MetricsRegisterer)
+			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
+		}
+		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := cmd.GossipSubRPCInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, heroStoreOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
+		}
+		builder.GossipSubInspectorNotifDistributor = gossipSubInspectorNotifDistributor
+
 		node, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
 			builder.Metrics.Network,
@@ -889,6 +900,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+			SetGossipSubValidationInspector(rpcValidationInspector).
 			Build()
 
 		if err != nil {
