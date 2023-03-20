@@ -50,7 +50,7 @@ func (c CtrlMsgValidationLimits) SafetyThreshold() uint64 {
 }
 
 func (c CtrlMsgValidationLimits) RateLimit() int {
-	return int(c[RateLimitMapKey])
+	return c[RateLimitMapKey]
 }
 
 // CtrlMsgValidationConfigs list of *CtrlMsgValidationConfig

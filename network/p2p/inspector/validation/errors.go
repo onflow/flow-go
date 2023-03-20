@@ -10,8 +10,11 @@ import (
 
 // ErrDiscardThreshold indicates that the amount of RPC messages received exceeds discard threshold.
 type ErrDiscardThreshold struct {
-	controlMsg       p2p.ControlMessageType
-	amount           uint64
+	// controlMsg the control message type.
+	controlMsg p2p.ControlMessageType
+	// amount the amount of control messages.
+	amount uint64
+	// discardThreshold configured discard threshold.
 	discardThreshold uint64
 }
 
@@ -19,7 +22,7 @@ func (e ErrDiscardThreshold) Error() string {
 	return fmt.Sprintf("number of %s messges received exceeds the configured discard threshold: received %d discard threshold %d", e.controlMsg, e.amount, e.discardThreshold)
 }
 
-// NewDiscardThresholdErr returns a new ErrDiscardThreshold
+// NewDiscardThresholdErr returns a new ErrDiscardThreshold.
 func NewDiscardThresholdErr(controlMsg p2p.ControlMessageType, amount, discardThreshold uint64) ErrDiscardThreshold {
 	return ErrDiscardThreshold{controlMsg: controlMsg, amount: amount, discardThreshold: discardThreshold}
 }
@@ -32,9 +35,12 @@ func IsErrDiscardThreshold(err error) bool {
 
 // ErrInvalidLimitConfig indicates the validation limit is < 0.
 type ErrInvalidLimitConfig struct {
+	// controlMsg the control message type.
 	controlMsg p2p.ControlMessageType
-	limit      uint64
-	limitStr   string
+	// limit the value of the configuration limit.
+	limit uint64
+	// limitStr the string representation of the config limit.
+	limitStr string
 }
 
 func (e ErrInvalidLimitConfig) Error() string {
