@@ -14,21 +14,25 @@ const (
 
 	// DefaultGraftUpperThreshold upper bound for graft messages, RPC control messages with a count
 	// above the upper threshold are automatically discarded.
-	DefaultGraftUpperThreshold = 1000
+	DefaultGraftUpperThreshold = 30
 	// DefaultGraftSafetyThreshold a lower bound for graft messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultGraftSafetyThreshold = 100
+	DefaultGraftSafetyThreshold = .5 * DefaultGraftUpperThreshold
 	// DefaultGraftRateLimit the rate limit for graft control messages.
-	DefaultGraftRateLimit = 1000
+	// Currently, the default rate limit is equal to the upper threshold amount.
+	// This will result in a rate limit of 30 grafts/sec.
+	DefaultGraftRateLimit = DefaultGraftUpperThreshold
 
 	// DefaultPruneUpperThreshold upper bound for prune messages, RPC control messages with a count
 	// above the upper threshold are automatically discarded.
-	DefaultPruneUpperThreshold = 1000
+	DefaultPruneUpperThreshold = 30
 	// DefaultPruneSafetyThreshold a lower bound for prune messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultPruneSafetyThreshold = 20
+	DefaultPruneSafetyThreshold = .5 * DefaultPruneUpperThreshold
 	// DefaultPruneRateLimit the rate limit for prune control messages.
-	DefaultPruneRateLimit = 1000
+	// Currently, the default rate limit is equal to the upper threshold amount.
+	// This will result in a rate limit of 30 prunes/sec.
+	DefaultPruneRateLimit = DefaultPruneUpperThreshold
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.
