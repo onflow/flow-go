@@ -385,7 +385,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 		controlMsgRPCInspectorCfg, err := fnb.gossipSubRPCInspectorConfig(heroStoreOpts...)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 		}
 
 		fnb.GossipSubInspectorNotifDistributor = distributor.DefaultGossipSubInspectorNotificationDistributor(fnb.Logger)
