@@ -136,6 +136,8 @@ func NewControlMsgValidationInspector(
 // of messages in the control message. Further inspection is done asynchronously to check rate limits
 // and validate topic IDS each control message if initial validation is passed.
 // All errors returned from this function can be considered benign.
+// errors returned:
+// 	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
