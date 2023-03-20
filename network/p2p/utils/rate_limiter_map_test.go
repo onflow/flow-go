@@ -48,7 +48,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
 
-	// set short tick to kick of cleanup
+	// set short tick to kick off cleanup
 	tick := 10 * time.Millisecond
 
 	m := utils.NewLimiterMap(ttl, tick)
