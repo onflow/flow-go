@@ -418,7 +418,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		return libp2pNode, nil
 	})
-
+	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return fnb.GossipSubInspectorNotifDistributor, nil
+	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
@@ -1004,10 +1007,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return fnb.GossipSubInspectorNotifDistributor, nil
-	})
 	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// distributor is returned as a component to be started and stopped.
 		return fnb.NodeDisallowListDistributor, nil

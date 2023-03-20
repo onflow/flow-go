@@ -92,3 +92,23 @@ func IsErrInvalidTopic(err error) bool {
 	var e ErrInvalidTopic
 	return errors.As(err, &e)
 }
+
+// ErrDuplicateTopic error that indicates a duplicate topic in control message has been detected.
+type ErrDuplicateTopic struct {
+	topic channels.Topic
+}
+
+func (e ErrDuplicateTopic) Error() string {
+	return fmt.Errorf("duplicate topic %s", e.topic).Error()
+}
+
+// NewIDuplicateTopicErr returns a new ErrDuplicateTopic
+func NewIDuplicateTopicErr(topic channels.Topic) ErrDuplicateTopic {
+	return ErrDuplicateTopic{topic: topic}
+}
+
+// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic
+func IsErrDuplicateTopic(err error) bool {
+	var e ErrDuplicateTopic
+	return errors.As(err, &e)
+}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
@@ -255,20 +256,21 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	malformedTopic := channels.Topic("!@#$%^&**((")
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
+	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
 	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
-		Times(6).
+		Times(8).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrInvalidTopic(notification.Err))
-			require.Equal(t, messageCount, notification.Count)
+			require.True(t, validation.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))
+			require.True(t, messageCount == notification.Count || notification.Count == 2)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
-			if count.Load() == 6 {
+			if count.Load() == 8 {
 				close(done)
 			}
 		}).Return(nil)
@@ -293,17 +295,35 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), unknownTopic.String()))
 	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), malformedTopic.String()))
 	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), func(message *pb.ControlMessage) {
+		// inline ctl msg opt that adds 2 grafts with the same topic id
+		s := duplicateTopic.String()
+		message.Graft = []*pb.ControlGraft{
+			{TopicID: &s}, {TopicID: &s},
+		}
+	})
+
 	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), unknownTopic.String()))
 	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), malformedTopic.String()))
 	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), func(message *pb.ControlMessage) {
+		// inline ctl msg opt that adds 2 prunes with the same topic id
+		s := duplicateTopic.String()
+		message.Prune = []*pb.ControlPrune{
+			{TopicID: &s}, {TopicID: &s},
+		}
+	})
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithMalformedTopic)
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsInvalidSporkIDTopic)
+	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsDuplicateTopic)
+
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithUnknownTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
+	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }

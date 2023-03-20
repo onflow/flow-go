@@ -229,25 +229,34 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 	}
 }
 
-// validateTopics ensures all topics in the specified control message are valid flow topic/channel.
+// validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
 // All errors returned from this function can be considered benign.
-
 func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+	seen := make(map[channels.Topic]struct{})
+	validateTopic := func(topic channels.Topic) error {
+		if _, ok := seen[topic]; ok {
+			return NewIDuplicateTopicErr(topic)
+		}
+		seen[topic] = struct{}{}
+		err := c.validateTopic(topic)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
-			err := c.validateTopic(func() channels.Topic {
-				return channels.Topic(graft.GetTopicID())
-			})
+			topic := channels.Topic(graft.GetTopicID())
+			err := validateTopic(topic)
 			if err != nil {
 				return err
 			}
 		}
 	case p2p.CtrlMsgPrune:
 		for _, prune := range ctrlMsg.GetPrune() {
-			err := c.validateTopic(func() channels.Topic {
-				return channels.Topic(prune.GetTopicID())
-			})
+			topic := channels.Topic(prune.GetTopicID())
+			err := validateTopic(topic)
 			if err != nil {
 				return err
 			}
@@ -258,8 +267,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 
 // validateTopic the topic is a valid flow topic/channel.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopic(getTopic func() channels.Topic) error {
-	topic := getTopic()
+func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) error {
 	err := channels.IsValidFlowTopic(topic, c.sporkID)
 	if err != nil {
 		return NewInvalidTopicErr(topic, err)
