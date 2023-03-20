@@ -26,8 +26,8 @@ const (
 	DefaultControlMsgValidationInspectorQueueCacheSize = 100
 )
 
-// InspectMsgReq represents a short digest of an RPC control message. It is used for further message inspection by component workers.
-type InspectMsgReq struct {
+// InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
+type InspectMsgRequest struct {
 	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
 	Nonce uint64
 	// Peer sender of the message.
@@ -76,15 +76,15 @@ type ControlMsgValidationInspector struct {
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotificationDistributor
-	// workerPool queue that stores *InspectMsgReq that will be processed by component workers.
-	workerPool *worker.Pool[*InspectMsgReq]
+	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
+	workerPool *worker.Pool[*InspectMsgRequest]
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 
-// NewInspectMsgReq returns a new *InspectMsgReq.
-func NewInspectMsgReq(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgReq {
-	return &InspectMsgReq{Nonce: rand.Uint64(), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}
+// NewInspectMsgRequest returns a new *InspectMsgRequest.
+func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgRequest {
+	return &InspectMsgRequest{Nonce: rand.Uint64(), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}
 }
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -112,7 +112,7 @@ func NewControlMsgValidationInspector(
 	}
 
 	store := queue.NewHeroStore(cfg.SizeLimit, logger, cfg.Collector)
-	pool := worker.NewWorkerPoolBuilder[*InspectMsgReq](lg, store, c.processInspectMsgReq).Build()
+	pool := worker.NewWorkerPoolBuilder[*InspectMsgRequest](lg, store, c.processInspectMsgReq).Build()
 
 	c.workerPool = pool
 
@@ -169,7 +169,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		}
 
 		// queue further async inspection
-		c.requestMsgInspection(NewInspectMsgReq(from, validationConfig, control))
+		c.requestMsgInspection(NewInspectMsgRequest(from, validationConfig, control))
 	}
 
 	return nil
@@ -177,7 +177,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 
 // processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
-func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq) error {
+func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequest) error {
 	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", req.Peer.String()).
@@ -213,7 +213,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq)
 }
 
 // requestMsgInspection queues up an inspect message request.
-func (c *ControlMsgValidationInspector) requestMsgInspection(req *InspectMsgReq) {
+func (c *ControlMsgValidationInspector) requestMsgInspection(req *InspectMsgRequest) {
 	c.workerPool.Submit(req)
 }
 
