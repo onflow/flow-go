@@ -2,19 +2,20 @@ package validation
 
 import (
 	"fmt"
+	"math/rand"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
-	"math/rand"
 
 	"github.com/onflow/flow-go/engine/common/worker"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -137,7 +138,8 @@ func NewControlMsgValidationInspector(
 // and validate topic IDS each control message if initial validation is passed.
 // All errors returned from this function can be considered benign.
 // errors returned:
-// 	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
+//
+//	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
@@ -202,7 +204,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		lg.Error().
 			Err(validationErr).
 			Bool(logging.KeySuspicious, true).
-			Msg(fmt.Sprintf("rpc control message async inspection failed"))
+			Msg("rpc control message async inspection failed")
 		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
 		if err != nil {
 			lg.Error().
