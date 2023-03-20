@@ -11,6 +11,8 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -25,6 +27,7 @@ import (
 // implementation, it is designed to be completely isolated in the "insecure" package, and
 // totally separated from the rest of the codebase.
 type CorruptGossipSubAdapter struct {
+	component.Component
 	gossipSub *corrupt.PubSub
 	router    *corrupt.GossipSubRouter
 	logger    zerolog.Logger
@@ -116,7 +119,14 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
+	builder := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-ctx.Done()
+		}).Build()
+
 	adapter := &CorruptGossipSubAdapter{
+		Component: builder,
 		gossipSub: gossipSub,
 		router:    router,
 		logger:    logger,
