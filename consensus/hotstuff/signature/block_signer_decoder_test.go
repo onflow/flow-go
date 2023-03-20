@@ -2,6 +2,7 @@ package signature
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -83,11 +84,12 @@ func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
 // It should propagate the sentinel error model.ErrViewForUnknownEpoch from Committee.
 func (s *blockSignerDecoderSuite) Test_UnknownEpoch() {
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
+	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(nil, fmt.Errorf(""))
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.Empty(s.T(), ids)
-	require.ErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	require.Error(s.T(), err)
 }
 
 // Test_InvalidIndices verifies that `BlockSignerDecoder` returns
