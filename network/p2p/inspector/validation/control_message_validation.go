@@ -156,7 +156,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 				Uint64("ctrl_msg_count", count).
 				Uint64("upper_threshold", discardThresholdErr.discardThreshold).
 				Bool(logging.KeySuspicious, true).
-				Msg("rejecting rpc message")
+				Msg("rejecting rpc control message")
 			err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, discardThresholdErr))
 			if err != nil {
 				lg.Error().
