@@ -176,14 +176,14 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	cm := component.NewComponentManagerBuilder()
+	builder := component.NewComponentManagerBuilder()
 	for _, limiter := range mw.unicastRateLimiters.Limiters() {
-		cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			limiter.CleanupLoop(ctx)
 		})
 	}
-	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// TODO: refactor to avoid storing ctx altogether
 		mw.ctx = ctx
 
@@ -205,7 +205,7 @@ func NewMiddleware(
 
 	})
 
-	mw.Component = cm.Build()
+	mw.Component = builder.Build()
 	return mw
 }
 
