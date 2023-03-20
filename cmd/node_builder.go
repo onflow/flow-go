@@ -224,10 +224,10 @@ type UnicastRateLimitersConfig struct {
 // GossipSubRPCValidationConfigs validation limits used for gossipsub RPC control message inspection.
 type GossipSubRPCValidationConfigs struct {
 	NumberOfWorkers int
-	// Graft GRAFT control message validation limits.
-	Graft map[string]int
-	// Prune PRUNE control message validation limits.
-	Prune map[string]int
+	// GraftLimits GRAFT control message validation limits.
+	GraftLimits map[string]int
+	// PruneLimits PRUNE control message validation limits.
+	PruneLimits map[string]int
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -312,12 +312,12 @@ func DefaultBaseConfig() *BaseConfig {
 			},
 			GossipSubRPCValidationConfigs: &GossipSubRPCValidationConfigs{
 				NumberOfWorkers: validation.DefaultNumberOfWorkers,
-				Graft: map[string]int{
+				GraftLimits: map[string]int{
 					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
 					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
 					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
 				},
-				Prune: map[string]int{
+				PruneLimits: map[string]int{
 					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
 					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
