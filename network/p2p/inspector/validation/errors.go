@@ -30,25 +30,25 @@ func IsErrDiscardThreshold(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrValidationLimit indicates the validation limit is < 0.
-type ErrValidationLimit struct {
+// ErrInvalidLimitConfig indicates the validation limit is < 0.
+type ErrInvalidLimitConfig struct {
 	controlMsg p2p.ControlMessageType
 	limit      uint64
 	limitStr   string
 }
 
-func (e ErrValidationLimit) Error() string {
+func (e ErrInvalidLimitConfig) Error() string {
 	return fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", e.controlMsg, e.limitStr, e.limit)
 }
 
-// NewValidationLimitErr returns a new ErrValidationLimit.
-func NewValidationLimitErr(controlMsg p2p.ControlMessageType, limitStr string, limit uint64) ErrValidationLimit {
-	return ErrValidationLimit{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
+// NewInvalidLimitConfigErr returns a new ErrValidationLimit.
+func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, limitStr string, limit uint64) ErrInvalidLimitConfig {
+	return ErrInvalidLimitConfig{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
 }
 
-// IsErrValidationLimit returns whether an error is ErrValidationLimit
-func IsErrValidationLimit(err error) bool {
-	var e ErrValidationLimit
+// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig
+func IsErrInvalidLimitConfig(err error) bool {
+	var e ErrInvalidLimitConfig
 	return errors.As(err, &e)
 }
 

@@ -79,11 +79,11 @@ type CtrlMsgValidationConfig struct {
 func NewCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType, cfgLimitValues CtrlMsgValidationLimits) (*CtrlMsgValidationConfig, error) {
 	switch {
 	case cfgLimitValues.RateLimit() <= 0:
-		return nil, NewValidationLimitErr(controlMsg, RateLimitMapKey, uint64(cfgLimitValues.RateLimit()))
+		return nil, NewInvalidLimitConfigErr(controlMsg, RateLimitMapKey, uint64(cfgLimitValues.RateLimit()))
 	case cfgLimitValues.DiscardThreshold() <= 0:
-		return nil, NewValidationLimitErr(controlMsg, DiscardThresholdMapKey, cfgLimitValues.DiscardThreshold())
+		return nil, NewInvalidLimitConfigErr(controlMsg, DiscardThresholdMapKey, cfgLimitValues.DiscardThreshold())
 	case cfgLimitValues.RateLimit() <= 0:
-		return nil, NewValidationLimitErr(controlMsg, SafetyThresholdMapKey, cfgLimitValues.SafetyThreshold())
+		return nil, NewInvalidLimitConfigErr(controlMsg, SafetyThresholdMapKey, cfgLimitValues.SafetyThreshold())
 	default:
 		return &CtrlMsgValidationConfig{
 			ControlMsg:       controlMsg,
