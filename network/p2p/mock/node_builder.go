@@ -281,6 +281,22 @@ func (_m *NodeBuilder) SetSubscriptionFilter(_a0 pubsub.SubscriptionFilter) p2p.
 	return r0
 }
 
+// SetUnicastManagerFactoryFunc provides a mock function with given fields: _a0
+func (_m *NodeBuilder) SetUnicastManagerFactoryFunc(_a0 p2p.UnicastManagerFactoryFunc) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.UnicastManagerFactoryFunc) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewNodeBuilder interface {
 	mock.TestingT
 	Cleanup(func())
