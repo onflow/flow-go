@@ -122,7 +122,7 @@ type VM interface {
 	)
 
 	Run(Context, Procedure, state.View) error
-	GetAccount(Context, flow.Address, state.View) (*flow.Account, error)
+	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -235,13 +235,14 @@ func (vm *VirtualMachine) Run(
 func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
-	v state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
 ) {
 	nestedTxn := state.NewTransactionState(
-		v,
+		// TODO(patrick): initialize view inside TransactionState
+		delta.NewDeltaView(storageSnapshot),
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
