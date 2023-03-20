@@ -57,20 +57,20 @@ func (_m *VM) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.View) error {
 }
 
 // RunV2 provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VM) RunV2(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.StorageSnapshot) (state.ExecutionSnapshot, fvm.ProcedureOutput, error) {
+func (_m *VM) RunV2(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.StorageSnapshot) (*state.ExecutionSnapshot, fvm.ProcedureOutput, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 state.ExecutionSnapshot
+	var r0 *state.ExecutionSnapshot
 	var r1 fvm.ProcedureOutput
 	var r2 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, state.StorageSnapshot) (state.ExecutionSnapshot, fvm.ProcedureOutput, error)); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, state.StorageSnapshot) (*state.ExecutionSnapshot, fvm.ProcedureOutput, error)); ok {
 		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, state.StorageSnapshot) state.ExecutionSnapshot); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, state.StorageSnapshot) *state.ExecutionSnapshot); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(state.ExecutionSnapshot)
+			r0 = ret.Get(0).(*state.ExecutionSnapshot)
 		}
 	}
 

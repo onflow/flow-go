@@ -13,20 +13,40 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func registerIdToLedgerKey(id flow.RegisterID) ledger.Key {
+	keyParts := []ledger.KeyPart{
+		ledger.NewKeyPart(0, []byte(id.Owner)),
+		ledger.NewKeyPart(2, []byte(id.Key)),
+	}
+
+	return ledger.NewKey(keyParts)
+}
+
+func EntriesToPayloads(updates flow.RegisterEntries) []ledger.Payload {
+	ret := make([]ledger.Payload, 0, len(updates))
+	for _, entry := range updates {
+		key := registerIdToLedgerKey(entry.Key)
+		ret = append(ret, *ledger.NewPayload(key, ledger.Value(entry.Value)))
+	}
+
+	return ret
+}
 
 func TestFungibleTokenTracker(t *testing.T) {
 
 	// bootstrap ledger
 	payloads := []ledger.Payload{}
 	chain := flow.Testnet.Chain()
-	view := utils.NewSimpleViewFromPayloads(payloads)
+	view := delta.NewDeltaView(
+		reporters.NewStorageSnapshotFromPayload(payloads))
 
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
@@ -45,7 +65,10 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	snapshot, _, err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	require.NoError(t, err)
+
+	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -81,9 +104,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-	err = vm.Run(ctx, tx, view)
+	snapshot, output, err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
-	require.NoError(t, tx.Err)
+	require.NoError(t, output.Err)
+
+	err = view.Merge(snapshot)
+	require.NoError(t, err)
 
 	wrapTokenScript := []byte(fmt.Sprintf(`
 							import FungibleToken from 0x%s
@@ -107,16 +133,21 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-	err = vm.Run(ctx, tx, view)
+	snapshot, output, err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
-	require.NoError(t, tx.Err)
+	require.NoError(t, output.Err)
+
+	err = view.Merge(snapshot)
+	require.NoError(t, err)
 
 	dir := t.TempDir()
 	log := zerolog.Nop()
 	reporterFactory := reporters.NewReportFileWriterFactory(dir, log)
 
 	br := reporters.NewFungibleTokenTracker(log, reporterFactory, chain, []string{reporters.FlowTokenTypeID(chain)})
-	err = br.Report(view.UpdatedPayloads(), ledger.State{})
+	err = br.Report(
+		EntriesToPayloads(view.Finalize().UpdatedRegisters()),
+		ledger.State{})
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(reporterFactory.Filename(reporters.FungibleTokenTrackerReportPrefix))

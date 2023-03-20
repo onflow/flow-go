@@ -49,7 +49,7 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		TxResults:            txResults,
 		Events:               events,
 		TrieUpdates:          trieUpdates,
-		FinalStateCommitment: computationResult.StateCommitments[len(computationResult.StateCommitments)-1],
+		FinalStateCommitment: computationResult.EndState,
 	}
 }
 

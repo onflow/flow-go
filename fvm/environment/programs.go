@@ -60,115 +60,6 @@ func NewPrograms(
 	}
 }
 
-func (programs *Programs) set(
-	location common.Location,
-	program *interpreter.Program,
-) error {
-	// ignore empty locations
-	if location == nil {
-		return nil
-	}
-
-	// derivedTransactionData only cache program/state for AddressLocation.
-	// For non-address location, simply keep track of the program in the
-	// environment.
-	address, ok := location.(common.AddressLocation)
-	if !ok {
-		programs.nonAddressPrograms[location] = program
-		return nil
-	}
-
-	state, err := programs.txnState.CommitParseRestrictedNestedTransaction(
-		address)
-	if err != nil {
-		return err
-	}
-
-	if state.BytesWritten() > 0 {
-		// This should never happen. Loading a program should not write to the state.
-		// If this happens, it indicates an implementation error.
-		return fmt.Errorf("cannot set program. State was written to during program parsing")
-	}
-
-	// Get collected dependencies of the loaded program.
-	stackLocation, dependencies, err := programs.dependencyStack.pop()
-	if err != nil {
-		return err
-	}
-	if stackLocation != address {
-		// This should never happen, and indicates an implementation error.
-		// GetProgram and SetProgram should be always called in pair, this check depends on this assumption.
-		// Get pushes the stack and set pops the stack.
-		// Example: if loading B that depends on A (and none of them are in cache yet),
-		//   - get(A): pushes A
-		//   - get(B): pushes B
-		//   - set(B): pops B
-		//   - set(A): pops A
-		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return fmt.Errorf(
-			"cannot set program. Popped dependencies are for an unexpeced address"+
-				" (expected %s, got %s)", address, stackLocation)
-	}
-
-	programs.txnState.SetProgram(address, &derived.Program{
-		Program:      program,
-		Dependencies: dependencies,
-	}, state)
-	return nil
-}
-
-func (programs *Programs) get(
-	location common.Location,
-) (
-	*interpreter.Program,
-	bool,
-) {
-	// ignore empty locations
-	if location == nil {
-		return nil, false
-	}
-
-	address, ok := location.(common.AddressLocation)
-	if !ok {
-		program, ok := programs.nonAddressPrograms[location]
-		return program, ok
-	}
-
-	program, state, has := programs.txnState.GetProgram(address)
-	if has {
-		programs.cacheHit()
-
-		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommitNestedTransaction(state)
-		if err != nil {
-			panic(fmt.Sprintf(
-				"merge error while getting program, panic: %s",
-				err))
-		}
-
-		return program.Program, true
-	}
-	programs.cacheMiss()
-
-	// this program is not in cache, so we need to load it into the cache.
-	// tho have proper invalidation, we need to track the dependencies of the program.
-	// If this program depends on another program,
-	// that program will be loaded before this one finishes loading (calls set).
-	// That is why this is a stack.
-	programs.dependencyStack.push(address)
-
-	// Address location program is reusable across transactions.  Create
-	// a nested transaction here in order to capture the states read to
-	// parse the program.
-	_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
-		address)
-	if err != nil {
-		panic(err)
-	}
-
-	return nil, false
-}
-
 // GetOrLoadProgram gets the program from the cache,
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
@@ -177,12 +68,6 @@ func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
-	// TODO: check why this exists and try to remove.
-	// ignore empty locations
-	if location == nil {
-		return nil, nil
-	}
-
 	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
 	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
 	if err != nil {
@@ -225,6 +110,54 @@ func (programs *Programs) getOrLoadAddressProgram(
 	}
 
 	return program.Program, nil
+}
+
+func (programs *Programs) getOrLoadNonAddressProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+	program, ok := programs.nonAddressPrograms[location]
+	if ok {
+		return program, nil
+	}
+
+	program, err := load()
+	if err != nil {
+		return nil, err
+	}
+
+	programs.nonAddressPrograms[location] = program
+	return program, nil
+}
+
+func (programs *Programs) DecodeArgument(
+	bytes []byte,
+	_ cadence.Type,
+) (
+	cadence.Value,
+	error,
+) {
+	defer programs.tracer.StartExtensiveTracingChildSpan(
+		trace.FVMEnvDecodeArgument).End()
+
+	v, err := jsoncdc.Decode(programs.meter, bytes)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decodeing argument failed: %w",
+			errors.NewInvalidArgumentErrorf(
+				"argument is not json decodable: %w",
+				err))
+	}
+
+	return v, err
+}
+
+func (programs *Programs) cacheHit() {
+	programs.metrics.RuntimeTransactionProgramsCacheHit()
+}
+
+func (programs *Programs) cacheMiss() {
+	programs.metrics.RuntimeTransactionProgramsCacheMiss()
 }
 
 // programLoader is used to load a program from a location.
@@ -331,93 +264,6 @@ func (loader *programLoader) loadWithDependencyTracking(
 				" (expected %s, got %s)", address, stackLocation)
 	}
 	return program, dependencies, nil
-}
-
-func (programs *Programs) getOrLoadNonAddressProgram(
-	location common.Location,
-	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
-	program, ok := programs.nonAddressPrograms[location]
-	if ok {
-		return program, nil
-	}
-
-	program, err := load()
-	if err != nil {
-		return nil, err
-	}
-
-	programs.nonAddressPrograms[location] = program
-	return program, nil
-}
-
-func (programs *Programs) GetProgram(
-	location common.Location,
-) (
-	*interpreter.Program,
-	error,
-) {
-	defer programs.tracer.StartChildSpan(trace.FVMEnvGetProgram).End()
-
-	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	program, has := programs.get(location)
-	if has {
-		return program, nil
-	}
-
-	return nil, nil
-}
-
-func (programs *Programs) SetProgram(
-	location common.Location,
-	program *interpreter.Program,
-) error {
-	defer programs.tracer.StartChildSpan(trace.FVMEnvSetProgram).End()
-
-	err := programs.meter.MeterComputation(ComputationKindSetProgram, 1)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-
-	err = programs.set(location, program)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-	return nil
-}
-
-func (programs *Programs) DecodeArgument(
-	bytes []byte,
-	_ cadence.Type,
-) (
-	cadence.Value,
-	error,
-) {
-	defer programs.tracer.StartExtensiveTracingChildSpan(
-		trace.FVMEnvDecodeArgument).End()
-
-	v, err := jsoncdc.Decode(programs.meter, bytes)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"decodeing argument failed: %w",
-			errors.NewInvalidArgumentErrorf(
-				"argument is not json decodable: %w",
-				err))
-	}
-
-	return v, err
-}
-
-func (programs *Programs) cacheHit() {
-	programs.metrics.RuntimeTransactionProgramsCacheHit()
-}
-
-func (programs *Programs) cacheMiss() {
-	programs.metrics.RuntimeTransactionProgramsCacheMiss()
 }
 
 // dependencyTracker tracks dependencies for a location

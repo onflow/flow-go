@@ -91,10 +91,8 @@ const (
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
 	EXEComputeBlock           SpanName = "exe.computer.computeBlock"
-	EXEMergeCollectionView    SpanName = "exe.computer.mergeCollectionView"
 	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
 	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
-	EXEMergeTransactionView   SpanName = "exe.computer.mergeTransactionView"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
@@ -165,8 +163,6 @@ const (
 	FVMEnvResolveLocation            SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                    SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames    SpanName = "fvm.env.getAccountContractNames"
-	FVMEnvGetProgram                 SpanName = "fvm.env.getCachedProgram"
-	FVMEnvSetProgram                 SpanName = "fvm.env.cacheProgram"
 	FVMEnvGetOrLoadProgram           SpanName = "fvm.env.getOrLoadCachedProgram"
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"

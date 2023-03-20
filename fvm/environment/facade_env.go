@@ -277,15 +277,10 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	derived.TransactionInvalidator,
+	[]ContractUpdateKey,
 	error,
 ) {
-	contractKeys, err := env.ContractUpdater.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDerivedDataInvalidator(contractKeys, env), nil
+	return env.ContractUpdater.Commit()
 }
 
 func (env *facadeEnvironment) Reset() {

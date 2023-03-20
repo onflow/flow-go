@@ -324,6 +324,28 @@ func IsInvalidSignatureIncludedError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// InvalidAggregatedKeyError indicates that the aggregated key is invalid
+// which makes any aggregated signature invalid.
+type InvalidAggregatedKeyError struct {
+	error
+}
+
+func NewInvalidAggregatedKeyError(err error) error {
+	return InvalidAggregatedKeyError{err}
+}
+
+func NewInvalidAggregatedKeyErrorf(msg string, args ...interface{}) error {
+	return InvalidAggregatedKeyError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidAggregatedKeyError) Unwrap() error { return e.error }
+
+// IsInvalidAggregatedKeyError returns whether err is an InvalidAggregatedKeyError
+func IsInvalidAggregatedKeyError(err error) bool {
+	var e InvalidAggregatedKeyError
+	return errors.As(err, &e)
+}
+
 // InsufficientSignaturesError indicates that not enough signatures have been stored to complete the operation.
 type InsufficientSignaturesError struct {
 	err error

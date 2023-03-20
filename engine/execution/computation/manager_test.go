@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
@@ -146,9 +147,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(ledger)
@@ -164,9 +163,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
-	stats := returnedComputationResult.BlockStats()
-	assert.True(t, stats.ComputationUsed > 0)
-	assert.True(t, stats.MemoryUsed > 0)
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -205,9 +201,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	manager := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(
@@ -269,9 +263,8 @@ func TestExecuteScript(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)
@@ -334,9 +327,8 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)
@@ -380,9 +372,8 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
@@ -431,9 +422,11 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       1 * time.Millisecond,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   1 * time.Millisecond,
+				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
+			},
+			DerivedDataCacheSize: 10,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
@@ -482,9 +475,11 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       1 * time.Second,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   1 * time.Second,
+				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
@@ -511,7 +506,7 @@ func (p *PanickingVM) RunV2(
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
 ) (
-	state.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -542,13 +537,15 @@ func (l *LongRunningVM) RunV2(
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
 ) (
-	state.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	time.Sleep(l.duration)
 
-	return nil, fvm.ProcedureOutput{Value: cadence.NewVoid()}, nil
+	snapshot := &state.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{}
+	return snapshot, output, nil
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
@@ -602,9 +599,11 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 
@@ -646,9 +645,11 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 
@@ -784,9 +785,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(ledger)
@@ -850,9 +849,11 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	vm := manager.vm

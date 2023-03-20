@@ -385,15 +385,16 @@ func (e *blockComputer) executeTransaction(
 	// always merge the view, fvm take cares of reverting changes
 	// of failed transaction invocation
 
-	err = e.mergeView(stateView, txView, postProcessSpan, trace.EXEMergeTransactionView)
+	txnSnapshot := txView.Finalize()
+	collector.AddTransactionResult(txn, txnSnapshot)
+
+	err = stateView.Merge(txnSnapshot)
 	if err != nil {
 		return fmt.Errorf(
 			"merging tx view to collection view failed for tx %v: %w",
 			txn.txnIdStr,
 			err)
 	}
-
-	collector.AddTransactionResult(txn, txView)
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
 
@@ -436,15 +437,4 @@ func (e *blockComputer) executeTransaction(
 		txn.Err != nil,
 	)
 	return nil
-}
-
-func (e *blockComputer) mergeView(
-	parent, child state.View,
-	parentSpan otelTrace.Span,
-	mergeSpanName trace.SpanName) error {
-
-	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
-	defer mergeSpan.End()
-
-	return parent.Merge(child)
 }
