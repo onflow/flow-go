@@ -230,13 +230,15 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		if ok {
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
 			// NOTE: this loop might need tweaking, we might want to check channels that were passed as arguments more often.
+			blocks := make([]*flow.Block, 0, len(batch.Message))
 			for _, block := range batch.Message {
-				err := e.core.OnBlockProposal(batch.OriginID, block)
-				if err != nil {
-					return fmt.Errorf("could not handle block proposal: %w", err)
-				}
-				e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+				blocks = append(blocks, block.Block.ToInternal())
 			}
+			err := e.core.OnBlockBatch(batch.OriginID, blocks)
+			if err != nil {
+				return fmt.Errorf("could not handle block proposal: %w", err)
+			}
+			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
 

@@ -169,7 +169,7 @@ func (s *CoreSuite) TestHandleProposalSkipProposalThreshold() {
 	s.cache.AssertNotCalled(s.T(), "Add", originID, mock.Anything)
 }
 
-// TestHandleProposalWithPendingChildren tests processing a block which has a pending
+// TestHandleProposalWithPendingChildren tests processing a block which has a pendingCache
 // child cached.
 //   - the block should be processed
 //   - the cached child block should also be processed
@@ -201,7 +201,7 @@ func (s *CoreSuite) TestHandleProposalWithPendingChildren() {
 	s.follower.On("SubmitProposal", hotstuffProposal).Once()
 	s.follower.On("SubmitProposal", childHotstuffProposal).Once()
 
-	// we have one pending child cached
+	// we have one pendingCache child cached
 	pending := []flow.Slashable[*flow.Block]{
 		{
 			OriginID: originID,

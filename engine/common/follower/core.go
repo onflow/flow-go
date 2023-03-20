@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/flow-go/engine/common/follower/cache"
+	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
@@ -41,8 +40,8 @@ type Core struct {
 	config              compliance.Config
 	tracer              module.Tracer
 	headers             storage.Headers
-	payloads            storage.Payloads
-	pending             module.PendingBlockBuffer
+	pendingCache        *cache.Cache
+	pendingTree         *pending_tree.PendingTree
 	cleaner             storage.Cleaner
 	state               protocol.FollowerState
 	follower            module.HotStuffFollower
@@ -63,14 +62,15 @@ func NewCore(log zerolog.Logger,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 	opts ...ComplianceOption) *Core {
+	metricsCollector := metrics.NewNoopCollector()
+	onEquivocation := func(block, otherBlock *flow.Block) {}
 	c := &Core{
 		log:            log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics: mempoolMetrics,
 		cleaner:        cleaner,
 		headers:        headers,
-		payloads:       payloads,
 		state:          state,
-		pending:        pending,
+		pendingCache:   cache.NewCache(log, 1000, metricsCollector, onEquivocation),
 		follower:       follower,
 		validator:      validator,
 		sync:           sync,
@@ -87,129 +87,152 @@ func NewCore(log zerolog.Logger,
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operations.
-func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	block := proposal.Block.ToInternal()
-	header := block.Header
-	blockID := header.ID()
+//func (c *Core) OnBlockProposal(originID flow.Identifier, batch []*messages.BlockProposal) error {
+//	block := proposal.Block.ToInternal()
+//	header := block.Header
+//	blockID := header.ID()
+//
+//	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.FollowerOnBlockProposal)
+//	defer span.End()
+//
+//	log := c.log.With().
+//		Hex("origin_id", originID[:]).
+//		Str("chain_id", header.ChainID.String()).
+//		Uint64("block_height", header.Height).
+//		Uint64("block_view", header.View).
+//		Hex("block_id", blockID[:]).
+//		Hex("parent_id", header.ParentID[:]).
+//		Hex("payload_hash", header.PayloadHash[:]).
+//		Time("timestamp", header.Timestamp).
+//		Hex("proposer", header.ProposerID[:]).
+//		Logger()
+//
+//	log.Info().Msg("block proposal received")
+//
+//	// first, we reject all blocks that we don't need to process:
+//	// 1) blocks already in the cache; they will already be processed later
+//	// 2) blocks already on disk; they were processed and await finalization
+//	// 3) blocks at a height below finalized height; they can not be finalized
+//
+//	// ignore proposals that are already cached
+//	_, cached := c.pendingCache.ByID(blockID)
+//	if cached {
+//		log.Debug().Msg("skipping already cached proposal")
+//		return nil
+//	}
+//
+//	// ignore proposals that were already processed
+//	_, err := c.headers.ByBlockID(blockID)
+//	if err == nil {
+//		log.Debug().Msg("skipping already processed proposal")
+//		return nil
+//	}
+//	if !errors.Is(err, storage.ErrNotFound) {
+//		return fmt.Errorf("could not check proposal: %w", err)
+//	}
+//
+//	// ignore proposals which are too far ahead of our local finalized state
+//	// instead, rely on sync engine to catch up finalization more effectively, and avoid
+//	// large subtree of blocks to be cached.
+//	final, err := c.state.Final().Head()
+//	if err != nil {
+//		return fmt.Errorf("could not get latest finalized header: %w", err)
+//	}
+//	if header.Height > final.Height && header.Height-final.Height > c.config.SkipNewProposalsThreshold {
+//		log.Debug().
+//			Uint64("final_height", final.Height).
+//			Msg("dropping block too far ahead of locally finalized height")
+//		return nil
+//	}
+//	if header.Height <= final.Height {
+//		log.Debug().
+//			Uint64("final_height", final.Height).
+//			Msg("dropping block below finalized threshold")
+//		return nil
+//	}
+//
+//	// there are two possibilities if the proposal is neither already pendingCache
+//	// processing in the cache, nor has already been processed:
+//	// 1) the proposal is unverifiable because parent or ancestor is unknown
+//	// => we cache the proposal and request the missing link
+//	// 2) the proposal is connected to finalized state through an unbroken chain
+//	// => we verify the proposal and forward it to hotstuff if valid
+//
+//	// if the parent is a pendingCache block (disconnected from the incorporated state), we cache this block as well.
+//	// we don't have to request its parent block or its ancestor again, because as a
+//	// pendingCache block, its parent block must have been requested.
+//	// if there was problem requesting its parent or ancestors, the sync engine's forward
+//	// syncing with range requests for finalized blocks will request for the blocks.
+//	_, found := c.pendingCache.ByID(header.ParentID)
+//	if found {
+//
+//		// add the block to the cache
+//		_ = c.pendingCache.Add(originID, block)
+//		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pendingCache.Size())
+//
+//		return nil
+//	}
+//
+//	// if the proposal is connected to a block that is neither in the cache, nor
+//	// in persistent storage, its direct parent is missing; cache the proposal
+//	// and request the parent
+//	_, err = c.headers.ByBlockID(header.ParentID)
+//	if errors.Is(err, storage.ErrNotFound) {
+//
+//		_ = c.pendingCache.Add(originID, block)
+//
+//		log.Debug().Msg("requesting missing parent for proposal")
+//
+//		c.sync.RequestBlock(header.ParentID, header.Height-1)
+//
+//		return nil
+//	}
+//	if err != nil {
+//		return fmt.Errorf("could not check parent: %w", err)
+//	}
+//
+//	// at this point, we should be able to connect the proposal to the finalized
+//	// state and should process it to see whether to forward to hotstuff or not
+//	err = c.processBlockAndDescendants(ctx, block)
+//	if err != nil {
+//		return fmt.Errorf("could not process block proposal (id=%x, height=%d, view=%d): %w", blockID, header.Height, header.View, err)
+//	}
+//
+//	// most of the heavy database checks are done at this point, so this is a
+//	// good moment to potentially kick-off a garbage collection of the DB
+//	// NOTE: this is only effectively run every 1000th calls, which corresponds
+//	// to every 1000th successfully processed block
+//	c.cleaner.RunGC()
+//
+//	return nil
+//}
 
-	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.FollowerOnBlockProposal)
-	defer span.End()
-
-	log := c.log.With().
-		Hex("origin_id", originID[:]).
-		Str("chain_id", header.ChainID.String()).
-		Uint64("block_height", header.Height).
-		Uint64("block_view", header.View).
-		Hex("block_id", blockID[:]).
-		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
-		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
-		Logger()
-
-	log.Info().Msg("block proposal received")
-
-	c.prunePendingCache()
-
-	// first, we reject all blocks that we don't need to process:
-	// 1) blocks already in the cache; they will already be processed later
-	// 2) blocks already on disk; they were processed and await finalization
-	// 3) blocks at a height below finalized height; they can not be finalized
-
-	// ignore proposals that are already cached
-	_, cached := c.pending.ByID(blockID)
-	if cached {
-		log.Debug().Msg("skipping already cached proposal")
-		return nil
-	}
-
-	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(blockID)
-	if err == nil {
-		log.Debug().Msg("skipping already processed proposal")
-		return nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check proposal: %w", err)
-	}
-
-	// ignore proposals which are too far ahead of our local finalized state
-	// instead, rely on sync engine to catch up finalization more effectively, and avoid
-	// large subtree of blocks to be cached.
-	final, err := c.state.Final().Head()
+func (c *Core) OnBlockBatch(originID flow.Identifier, batch []*flow.Block) error {
+	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
-		return fmt.Errorf("could not get latest finalized header: %w", err)
+		return fmt.Errorf("could not add batch of pendingCache blocks: %w", err)
 	}
-	if header.Height > final.Height && header.Height-final.Height > c.config.SkipNewProposalsThreshold {
-		log.Debug().
-			Uint64("final_height", final.Height).
-			Msg("dropping block too far ahead of locally finalized height")
-		return nil
-	}
-	if header.Height <= final.Height {
-		log.Debug().
-			Uint64("final_height", final.Height).
-			Msg("dropping block below finalized threshold")
-		return nil
-	}
-
-	// there are two possibilities if the proposal is neither already pending
-	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => we cache the proposal and request the missing link
-	// 2) the proposal is connected to finalized state through an unbroken chain
-	// => we verify the proposal and forward it to hotstuff if valid
-
-	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
-	// we don't have to request its parent block or its ancestor again, because as a
-	// pending block, its parent block must have been requested.
-	// if there was problem requesting its parent or ancestors, the sync engine's forward
-	// syncing with range requests for finalized blocks will request for the blocks.
-	_, found := c.pending.ByID(header.ParentID)
-	if found {
-
-		// add the block to the cache
-		_ = c.pending.Add(originID, block)
-		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
-
-		return nil
+	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedBatch))
+	for i := 0; i < len(certifiedBatch); i++ {
+		block := certifiedBatch[i]
+		var qc *flow.QuorumCertificate
+		if i < len(certifiedBatch)-1 {
+			qc = certifiedBatch[i+1].Header.QuorumCertificate()
+		} else {
+			qc = certifyingQC
+		}
+		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
+			Block: block,
+			QC:    qc,
+		})
 	}
 
-	// if the proposal is connected to a block that is neither in the cache, nor
-	// in persistent storage, its direct parent is missing; cache the proposal
-	// and request the parent
-	_, err = c.headers.ByBlockID(header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
-
-		_ = c.pending.Add(originID, block)
-
-		log.Debug().Msg("requesting missing parent for proposal")
-
-		c.sync.RequestBlock(header.ParentID, header.Height-1)
-
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not check parent: %w", err)
-	}
-
-	// at this point, we should be able to connect the proposal to the finalized
-	// state and should process it to see whether to forward to hotstuff or not
-	err = c.processBlockAndDescendants(ctx, block)
-	if err != nil {
-		return fmt.Errorf("could not process block proposal (id=%x, height=%d, view=%d): %w", blockID, header.Height, header.View, err)
-	}
-
-	// most of the heavy database checks are done at this point, so this is a
-	// good moment to potentially kick-off a garbage collection of the DB
-	// NOTE: this is only effectively run every 1000th calls, which corresponds
-	// to every 1000th successfully processed block
-	c.cleaner.RunGC()
+	c.certifiedBlocksChan <- certifiedBlocks
 
 	return nil
 }
 
-// processBlockAndDescendants processes `proposal` and its pending descendants recursively.
+// processBlockAndDescendants processes `proposal` and its pendingCache descendants recursively.
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
@@ -281,59 +304,17 @@ func (c *Core) processBlockAndDescendants(ctx context.Context, proposal *flow.Bl
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
-	log.Info().Msg("forwarding block proposal to hotstuff")
-
-	// submit the model to follower for processing
-	c.follower.SubmitProposal(hotstuffProposal)
-
-	// check for any descendants of the block to process
-	err = c.processPendingChildren(ctx, header)
-	if err != nil {
-		return fmt.Errorf("could not process pending children: %w", err)
-	}
-
 	return nil
 }
 
-// processPendingChildren checks if there are proposals connected to the given
-// parent block that was just processed; if this is the case, they should now
-// all be validly connected to the finalized state and we should process them.
-func (c *Core) processPendingChildren(ctx context.Context, header *flow.Header) error {
-
-	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
-	defer span.End()
-
-	blockID := header.ID()
-
-	// check if there are any children for this parent in the cache
-	children, has := c.pending.ByParentID(blockID)
-	if !has {
-		return nil
-	}
-
-	// then try to process children only this once
-	var result *multierror.Error
-	for _, child := range children {
-		err := c.processBlockAndDescendants(ctx, child.Message)
-		if err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	// drop all the children that should have been processed now
-	c.pending.DropForParent(blockID)
-
-	return result.ErrorOrNil()
-}
-
 // PruneUpToView performs pruning of core follower state.
-// Effectively this prunes cache of pending blocks and sets a new lower limit for incoming blocks.
+// Effectively this prunes cache of pendingCache blocks and sets a new lower limit for incoming blocks.
 // Concurrency safe.
 func (c *Core) PruneUpToView(view uint64) {
 	panic("implement me")
 }
 
-// OnFinalizedBlock updates local state of pending tree using received finalized block.
+// OnFinalizedBlock updates local state of pendingCache tree using received finalized block.
 // Is NOT concurrency safe, has to be used by the same goroutine as OnCertifiedBlocks.
 // OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
 func (c *Core) OnFinalizedBlock(final *flow.Header) error {
@@ -345,22 +326,19 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) error {
 // Is NOT concurrency safe, has to be used by the same goroutine as OnFinalizedBlock.
 // OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
 func (c *Core) OnCertifiedBlocks(blocks CertifiedBlocks) error {
-	panic("implement me")
-}
+	for _, certifiedBlock := range blocks {
+		err := c.state.ExtendCertified(context.Background(), certifiedBlock.Block, certifiedBlock.QC)
+		if err != nil {
+			if state.IsOutdatedExtensionError(err) {
+				continue
+			}
+			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
+		}
 
-// prunePendingCache prunes the pending block cache.
-func (c *Core) prunePendingCache() {
+		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
 
-	// retrieve the finalized height
-	final, err := c.state.Final().Head()
-	if err != nil {
-		c.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
-		return
+		// submit the model to follower for processing
+		c.follower.SubmitProposal(hotstuffProposal)
 	}
-
-	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByView(final.View)
-
-	// always record the metric
-	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	return nil
 }
