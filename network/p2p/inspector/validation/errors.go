@@ -8,25 +8,25 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// ErrUpperThreshold indicates that the amount of RPC messages received exceeds upper threshold.
-type ErrUpperThreshold struct {
-	controlMsg     p2p.ControlMessageType
-	amount         uint64
-	upperThreshold uint64
+// ErrDiscardThreshold indicates that the amount of RPC messages received exceeds discard threshold.
+type ErrDiscardThreshold struct {
+	controlMsg       p2p.ControlMessageType
+	amount           uint64
+	discardThreshold uint64
 }
 
-func (e ErrUpperThreshold) Error() string {
-	return fmt.Sprintf("number of %s messges received exceeds the configured upper threshold: received %d upper threshold %d", e.controlMsg, e.amount, e.upperThreshold)
+func (e ErrDiscardThreshold) Error() string {
+	return fmt.Sprintf("number of %s messges received exceeds the configured discard threshold: received %d discard threshold %d", e.controlMsg, e.amount, e.discardThreshold)
 }
 
-// NewUpperThresholdErr returns a new ErrUpperThreshold
-func NewUpperThresholdErr(controlMsg p2p.ControlMessageType, amount, upperThreshold uint64) ErrUpperThreshold {
-	return ErrUpperThreshold{controlMsg: controlMsg, amount: amount, upperThreshold: upperThreshold}
+// NewDiscardThresholdErr returns a new ErrDiscardThreshold
+func NewDiscardThresholdErr(controlMsg p2p.ControlMessageType, amount, discardThreshold uint64) ErrDiscardThreshold {
+	return ErrDiscardThreshold{controlMsg: controlMsg, amount: amount, discardThreshold: discardThreshold}
 }
 
-// IsErrUpperThreshold returns true if an error is ErrUpperThreshold
-func IsErrUpperThreshold(err error) bool {
-	var e ErrUpperThreshold
+// IsErrDiscardThreshold returns true if an error is ErrDiscardThreshold
+func IsErrDiscardThreshold(err error) bool {
+	var e ErrDiscardThreshold
 	return errors.As(err, &e)
 }
 

@@ -313,14 +313,14 @@ func DefaultBaseConfig() *BaseConfig {
 			GossipSubRPCValidationConfigs: &GossipSubRPCValidationConfigs{
 				NumberOfWorkers: validation.DefaultNumberOfWorkers,
 				Graft: map[string]int{
-					validation.UpperThresholdMapKey:  validation.DefaultGraftUpperThreshold,
-					validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
-					validation.RateLimitMapKey:       validation.DefaultGraftRateLimit,
+					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
 				},
 				Prune: map[string]int{
-					validation.UpperThresholdMapKey:  validation.DefaultPruneUpperThreshold,
-					validation.SafetyThresholdMapKey: validation.DefaultPruneSafetyThreshold,
-					validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
+					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 				},
 			},
 			DNSCacheTTL:                                dns.DefaultTimeToLive,

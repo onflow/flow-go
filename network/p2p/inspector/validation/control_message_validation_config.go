@@ -8,38 +8,41 @@ import (
 )
 
 const (
-	UpperThresholdMapKey  = "upperthreshold"
+	// DiscardThresholdMapKey key used to set the  discard threshold config limit.
+	DiscardThresholdMapKey = "discardthreshold"
+	// SafetyThresholdMapKey key used to set the safety threshold config limit.
 	SafetyThresholdMapKey = "safetythreshold"
-	RateLimitMapKey       = "ratelimit"
+	// RateLimitMapKey key used to set the rate limit config limit.
+	RateLimitMapKey = "ratelimit"
 
-	// DefaultGraftUpperThreshold upper bound for graft messages, RPC control messages with a count
-	// above the upper threshold are automatically discarded.
-	DefaultGraftUpperThreshold = 30
+	// DefaultGraftDiscardThreshold upper bound for graft messages, RPC control messages with a count
+	// above the discard threshold are automatically discarded.
+	DefaultGraftDiscardThreshold = 30
 	// DefaultGraftSafetyThreshold a lower bound for graft messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultGraftSafetyThreshold = .5 * DefaultGraftUpperThreshold
+	DefaultGraftSafetyThreshold = .5 * DefaultGraftDiscardThreshold
 	// DefaultGraftRateLimit the rate limit for graft control messages.
-	// Currently, the default rate limit is equal to the upper threshold amount.
+	// Currently, the default rate limit is equal to the discard threshold amount.
 	// This will result in a rate limit of 30 grafts/sec.
-	DefaultGraftRateLimit = DefaultGraftUpperThreshold
+	DefaultGraftRateLimit = DefaultGraftDiscardThreshold
 
-	// DefaultPruneUpperThreshold upper bound for prune messages, RPC control messages with a count
-	// above the upper threshold are automatically discarded.
-	DefaultPruneUpperThreshold = 30
+	// DefaultPruneDiscardThreshold upper bound for prune messages, RPC control messages with a count
+	// above the discard threshold are automatically discarded.
+	DefaultPruneDiscardThreshold = 30
 	// DefaultPruneSafetyThreshold a lower bound for prune messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultPruneSafetyThreshold = .5 * DefaultPruneUpperThreshold
+	DefaultPruneSafetyThreshold = .5 * DefaultPruneDiscardThreshold
 	// DefaultPruneRateLimit the rate limit for prune control messages.
-	// Currently, the default rate limit is equal to the upper threshold amount.
+	// Currently, the default rate limit is equal to the discard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.
-	DefaultPruneRateLimit = DefaultPruneUpperThreshold
+	DefaultPruneRateLimit = DefaultPruneDiscardThreshold
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.
 type CtrlMsgValidationLimits map[string]int
 
-func (c CtrlMsgValidationLimits) UpperThreshold() uint64 {
-	return uint64(c[UpperThresholdMapKey])
+func (c CtrlMsgValidationLimits) DiscardThreshold() uint64 {
+	return uint64(c[DiscardThresholdMapKey])
 }
 
 func (c CtrlMsgValidationLimits) SafetyThreshold() uint64 {
@@ -57,9 +60,9 @@ type CtrlMsgValidationConfigs []*CtrlMsgValidationConfig
 type CtrlMsgValidationConfig struct {
 	// ControlMsg the type of RPC control message.
 	ControlMsg p2p.ControlMessageType
-	// UpperThreshold indicates the hard limit for size of the RPC control message
-	// any RPC messages with size > UpperThreshold should be dropped.
-	UpperThreshold uint64
+	// DiscardThreshold indicates the hard limit for size of the RPC control message
+	// any RPC messages with size > DiscardThreshold should be dropped.
+	DiscardThreshold uint64
 	// SafetyThreshold lower limit for the size of the RPC control message, any RPC messages
 	// with a size < SafetyThreshold can skip validation step to avoid resource wasting.
 	SafetyThreshold uint64
@@ -77,17 +80,17 @@ func NewCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType, cfgLimitValue
 	switch {
 	case cfgLimitValues.RateLimit() <= 0:
 		return nil, NewValidationLimitErr(controlMsg, RateLimitMapKey, uint64(cfgLimitValues.RateLimit()))
-	case cfgLimitValues.UpperThreshold() <= 0:
-		return nil, NewValidationLimitErr(controlMsg, UpperThresholdMapKey, cfgLimitValues.UpperThreshold())
+	case cfgLimitValues.DiscardThreshold() <= 0:
+		return nil, NewValidationLimitErr(controlMsg, DiscardThresholdMapKey, cfgLimitValues.DiscardThreshold())
 	case cfgLimitValues.RateLimit() <= 0:
 		return nil, NewValidationLimitErr(controlMsg, SafetyThresholdMapKey, cfgLimitValues.SafetyThreshold())
 	default:
 		return &CtrlMsgValidationConfig{
-			ControlMsg:      controlMsg,
-			UpperThreshold:  cfgLimitValues.UpperThreshold(),
-			SafetyThreshold: cfgLimitValues.SafetyThreshold(),
-			RateLimit:       cfgLimitValues.RateLimit(),
-			RateLimiter:     ratelimit.NewControlMessageRateLimiter(rate.Limit(cfgLimitValues.RateLimit()), cfgLimitValues.RateLimit()),
+			ControlMsg:       controlMsg,
+			DiscardThreshold: cfgLimitValues.DiscardThreshold(),
+			SafetyThreshold:  cfgLimitValues.SafetyThreshold(),
+			RateLimit:        cfgLimitValues.RateLimit(),
+			RateLimiter:      ratelimit.NewControlMessageRateLimiter(rate.Limit(cfgLimitValues.RateLimit()), cfgLimitValues.RateLimit()),
 		}, nil
 	}
 }

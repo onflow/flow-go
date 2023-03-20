@@ -100,22 +100,22 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
-// TestInspect_UpperThreshold ensures that when RPC control message count is above the configured upper threshold the control message validation inspector
+// TestInspect_DiscardThreshold ensures that when RPC control message count is above the configured discard threshold the control message validation inspector
 // returns the expected error.
-func TestInspect_UpperThreshold(t *testing.T) {
+func TestInspect_DiscardThreshold(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	// if GRAFT/PRUNE message count is higher than upper threshold the RPC validation should fail and expected error should be returned
-	upperThreshold := uint64(10)
+	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	discardThreshold := uint64(10)
 	// create our RPC validation inspector
 	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.GraftValidationCfg.UpperThreshold = upperThreshold
-	inspectorConfig.PruneValidationCfg.UpperThreshold = upperThreshold
+	inspectorConfig.GraftValidationCfg.DiscardThreshold = discardThreshold
+	inspectorConfig.PruneValidationCfg.DiscardThreshold = discardThreshold
 
 	messageCount := 50
 	controlMessageCount := int64(1)
@@ -129,7 +129,7 @@ func TestInspect_UpperThreshold(t *testing.T) {
 			count.Inc()
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrUpperThreshold(notification.Err))
+			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 2 {
@@ -180,16 +180,19 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 
 	// create our RPC validation inspector
 	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
-	inspectorConfig.NumberOfWorkers = 2
+	inspectorConfig.NumberOfWorkers = 1
 
-	messageCount := inspectorConfig.GraftValidationCfg.RateLimit - 10
+	// here we set the message count to the amount of flow channels
+	// so that we can generate a valid ctl msg with all valid topics.
+	flowChannels := channels.Channels()
+	messageCount := flowChannels.Len()
 	controlMessageCount := int64(1)
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
 	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
-		Twice().
+		Times(4).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
@@ -197,7 +200,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
-			if count.Load() == 2 {
+			if count.Load() == 4 {
 				close(done)
 			}
 		}).Return(nil)
@@ -217,17 +220,24 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
 	defer stopNodesAndInspector(t, cancel, nodes, inspector)
-	topic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
-	// prepare to spam - generate control messages
-	ctlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount),
-		corruptlibp2p.WithGraft(messageCount, topic),
-		corruptlibp2p.WithPrune(messageCount, topic))
+
+	// the first time we spam this message it will be processed completely so we need to ensure
+	// all topics are valid and no duplicates exists.
+	validCtlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount), func(message *pb.ControlMessage) {
+		grafts := make([]*pb.ControlGraft, messageCount)
+		prunes := make([]*pb.ControlPrune, messageCount)
+		for i := 0; i < messageCount; i++ {
+			topic := fmt.Sprintf("%s/%s", flowChannels[i].String(), sporkID)
+			grafts[i] = &pb.ControlGraft{TopicID: &topic}
+			prunes[i] = &pb.ControlPrune{TopicID: &topic}
+		}
+		message.Graft = grafts
+		message.Prune = prunes
+	})
 
 	// start spamming the victim peer
-	// messageCount is equal to the rate limit so when we spam this ctl message 3 times the first message should be processed
-	// the second 2 messages should be rate limited, we expected to encounter 1 rate limit errors for each of the control message types GRAFT & PRUNE
 	for i := 0; i < 3; i++ {
-		spammer.SpamControlMessage(t, victimNode, ctlMsgs)
+		spammer.SpamControlMessage(t, victimNode, validCtlMsgs)
 	}
 
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
@@ -241,14 +251,14 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	// if GRAFT/PRUNE message count is higher than upper threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < UpperThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
 	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
 	controlMessageCount := int64(1)
@@ -268,7 +278,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 			notification := args[0].(*p2p.InvalidControlMessageNotification)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))
-			require.True(t, messageCount == notification.Count || notification.Count == 2)
+			require.True(t, messageCount == notification.Count || notification.Count == 3)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 8 {
 				close(done)
@@ -295,24 +305,12 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), unknownTopic.String()))
 	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), malformedTopic.String()))
 	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), func(message *pb.ControlMessage) {
-		// inline ctl msg opt that adds 2 grafts with the same topic id
-		s := duplicateTopic.String()
-		message.Graft = []*pb.ControlGraft{
-			{TopicID: &s}, {TopicID: &s},
-		}
-	})
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(3, duplicateTopic.String()))
 
 	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), unknownTopic.String()))
 	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), malformedTopic.String()))
 	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), func(message *pb.ControlMessage) {
-		// inline ctl msg opt that adds 2 prunes with the same topic id
-		s := duplicateTopic.String()
-		message.Prune = []*pb.ControlPrune{
-			{TopicID: &s}, {TopicID: &s},
-		}
-	})
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(3, duplicateTopic.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
@@ -325,7 +323,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
-	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 }
 
 // StartNodesAndEnsureConnected starts the victim and spammer node and ensures they are both connected.

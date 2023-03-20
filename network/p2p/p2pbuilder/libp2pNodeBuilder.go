@@ -168,14 +168,14 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 // DefaultRPCValidationConfig returns default RPC control message inspector config.
 func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
 	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
-		validation.UpperThresholdMapKey:  validation.DefaultGraftUpperThreshold,
-		validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
-		validation.RateLimitMapKey:       validation.DefaultGraftRateLimit,
+		validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
 	})
 	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
-		validation.UpperThresholdMapKey:  validation.DefaultPruneUpperThreshold,
-		validation.SafetyThresholdMapKey: validation.DefaultPruneSafetyThreshold,
-		validation.RateLimitMapKey:       validation.DefaultPruneRateLimit,
+		validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 	})
 
 	return &validation.ControlMsgValidationInspectorConfig{

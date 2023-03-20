@@ -148,16 +148,16 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			continue
 		}
 		count := c.getCtrlMsgCount(ctrlMsgType, control)
-		// if Count greater than upper threshold drop message and penalize
-		if count > validationConfig.UpperThreshold {
-			upperThresholdErr := NewUpperThresholdErr(validationConfig.ControlMsg, count, validationConfig.UpperThreshold)
+		// if Count greater than discard threshold drop message and penalize
+		if count > validationConfig.DiscardThreshold {
+			discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
 			lg.Warn().
-				Err(upperThresholdErr).
+				Err(discardThresholdErr).
 				Uint64("ctrl_msg_count", count).
-				Uint64("upper_threshold", upperThresholdErr.upperThreshold).
+				Uint64("upper_threshold", discardThresholdErr.discardThreshold).
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting rpc message")
-			err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, upperThresholdErr))
+			err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, discardThresholdErr))
 			if err != nil {
 				lg.Error().
 					Err(err).
@@ -165,7 +165,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 					Msg("failed to distribute invalid control message notification")
 				return err
 			}
-			return upperThresholdErr
+			return discardThresholdErr
 		}
 
 		// queue further async inspection
@@ -191,7 +191,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgReq)
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
 	default:
 		lg.Trace().
-			Uint64("upper_threshold", req.validationConfig.UpperThreshold).
+			Uint64("upper_threshold", req.validationConfig.DiscardThreshold).
 			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
 			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
 		return nil
