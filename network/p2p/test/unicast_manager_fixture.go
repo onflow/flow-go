@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
@@ -23,7 +22,7 @@ type UnicastManagerFixture struct {
 }
 
 // UnicastManagerFixtureFactory returns a new UnicastManagerFixture.
-func UnicastManagerFixtureFactory() p2pbuilder.UnicastManagerFactoryFunc {
+func UnicastManagerFixtureFactory() p2p.UnicastManagerFactoryFunc {
 	return func(logger zerolog.Logger,
 		streamFactory stream.Factory,
 		sporkId flow.Identifier,
