@@ -17,8 +17,10 @@ var randFailure = errors.New("crypto/rand failed")
 
 // returns a random uint64
 func Uint64() (uint64, error) {
-	buffer := make([]byte, 8) // TODO: declare as a global variable and add a lock?
-	if _, err := rand.Read(buffer); err != nil {
+	// allocate a new memory at each call. Another possibility
+	// is to use a global variable but that would make the package non thread safe
+	buffer := make([]byte, 8)
+	if _, err := rand.Read(buffer); err != nil { // checking err in crypto/rand.Read is enough
 		return 0, randFailure
 	}
 	r := binary.LittleEndian.Uint64(buffer)
@@ -38,7 +40,9 @@ func Uint64n(n uint64) (uint64, error) {
 	for tmp := max; tmp != 0; tmp >>= 8 {
 		size++
 	}
-	buffer := make([]byte, 8) // TODO: declare as a global variable and add a lock?
+	// allocate a new memory at each call. Another possibility
+	// is to use a global variable but that would make the package non thread safe
+	buffer := make([]byte, 8)
 	// get the bit size of max
 	mask := uint64(0)
 	for max&mask != max {
@@ -55,7 +59,7 @@ func Uint64n(n uint64) (uint64, error) {
 	// and use big number modular reduction by `n`.
 	random := n
 	for random > max {
-		if _, err := rand.Read(buffer[:size]); err != nil {
+		if _, err := rand.Read(buffer[:size]); err != nil { // checking err in crypto/rand.Read is enough
 			return 0, randFailure
 		}
 		random = binary.LittleEndian.Uint64(buffer)
@@ -86,7 +90,9 @@ func Uint32n(n uint32) (uint32, error) {
 	for tmp := max; tmp != 0; tmp >>= 8 {
 		size++
 	}
-	buffer := make([]byte, 4) // TODO: declare as a global variable and add a lock?
+	// allocate a new memory at each call. Another possibility
+	// is to use a global variable but that would make the package non thread safe
+	buffer := make([]byte, 4)
 	// get the bit size of max
 	mask := uint32(0)
 	for max&mask != max {
@@ -103,7 +109,7 @@ func Uint32n(n uint32) (uint32, error) {
 	// and use big number modular reduction by `n`.
 	random := n
 	for random > max {
-		if _, err := rand.Read(buffer[:size]); err != nil {
+		if _, err := rand.Read(buffer[:size]); err != nil { // checking err in crypto/rand.Read is enough
 			return 0, randFailure
 		}
 		random = binary.LittleEndian.Uint32(buffer)
@@ -134,14 +140,7 @@ func Uintn(n uint) (uint, error) {
 //
 // O(1) space and O(n) time
 func Shuffle(n uint, swap func(i, j uint)) error {
-	for i := int(n - 1); i > 0; i-- {
-		j, err := Uintn(uint(i + 1))
-		if err != nil {
-			return err
-		}
-		swap(uint(i), j)
-	}
-	return nil
+	return Samples(n, n, swap)
 }
 
 // Samples picks randomly m elements out of n elemnts in a data structure
