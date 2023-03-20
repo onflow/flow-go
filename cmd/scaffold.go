@@ -390,7 +390,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		fnb.GossipSubInspectorNotifDistributor = distributor.DefaultGossipSubInspectorNotificationDistributor(fnb.Logger)
-
+		rpcValidationInspector := validation.NewControlMsgValidationInspector(fnb.Logger, fnb.SporkID, controlMsgRPCInspectorCfg, fnb.GossipSubInspectorNotifDistributor)
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
@@ -405,10 +405,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// run peer manager with the specified interval and let it also prune connections
 			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
-			controlMsgRPCInspectorCfg,
-			fnb.UnicastRateLimiterDistributor,
-			fnb.GossipSubInspectorNotifDistributor,
 			uniCfg,
+			rpcValidationInspector,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()

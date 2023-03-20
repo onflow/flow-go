@@ -85,10 +85,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
-	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor,
 	uniCfg *UnicastConfig,
+	rpcValidationInspector p2p.GossipSubRPCInspector,
 ) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -103,10 +101,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerManagerCfg,
 			gossipCfg,
 			rCfg,
-			rpcValidationInspectorConfig,
-			unicastRateLimiterDistributor,
-			gossipSubInspectorNotifDistributor,
-			uniCfg)
+			uniCfg,
+			rpcValidationInspector)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -171,19 +167,18 @@ type LibP2PNodeBuilder struct {
 	metrics          module.LibP2PMetrics
 	basicResolver    madns.BasicResolver
 
-	resourceManager                    network.ResourceManager
-	resourceManagerCfg                 *ResourceManagerConfig
-	connManager                        connmgr.ConnManager
-	connGater                          connmgr.ConnectionGater
-	routingFactory                     func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerEnablePruning           bool
-	peerManagerUpdateInterval          time.Duration
-	createNode                         p2p.CreateNodeFunc
-	createStreamRetryInterval          time.Duration
-	rateLimiterDistributor             p2p.UnicastRateLimiterDistributor
-	gossipSubTracer                    p2p.PubSubTracer
-	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
-	rpcValidationInspectorConfig       *validation.ControlMsgValidationInspectorConfig
+	resourceManager           network.ResourceManager
+	resourceManagerCfg        *ResourceManagerConfig
+	connManager               connmgr.ConnManager
+	connGater                 connmgr.ConnectionGater
+	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerEnablePruning  bool
+	peerManagerUpdateInterval time.Duration
+	createNode                p2p.CreateNodeFunc
+	createStreamRetryInterval time.Duration
+	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
+	gossipSubTracer           p2p.PubSubTracer
+	rpcValidationInspector    p2p.GossipSubRPCInspector
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -193,15 +188,14 @@ func NewNodeBuilder(logger zerolog.Logger,
 	sporkID flow.Identifier,
 	rCfg *ResourceManagerConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:                       logger,
-		sporkID:                      sporkID,
-		addr:                         addr,
-		networkKey:                   networkKey,
-		createNode:                   DefaultCreateNodeFunc,
-		metrics:                      metrics,
-		resourceManagerCfg:           rCfg,
-		gossipSubBuilder:             gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
-		rpcValidationInspectorConfig: DefaultRPCValidationConfig(),
+		logger:             logger,
+		sporkID:            sporkID,
+		addr:               addr,
+		networkKey:         networkKey,
+		createNode:         DefaultCreateNodeFunc,
+		metrics:            metrics,
+		resourceManagerCfg: rCfg,
+		gossipSubBuilder:   gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
 	}
 }
 
@@ -296,18 +290,14 @@ func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRet
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubInspectorNotificationDistributor(distributor p2p.GossipSubInspectorNotificationDistributor) p2p.NodeBuilder {
-	builder.gossipSubInspectorNotifDistributor = distributor
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetRPCValidationInspectorConfig(cfg *validation.ControlMsgValidationInspectorConfig) p2p.NodeBuilder {
-	builder.rpcValidationInspectorConfig = cfg
-	return builder
-}
-
 func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubScoreTracerInterval(interval)
+	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubValidationInspector(inspector)
+	builder.rpcValidationInspector = inspector
 	return builder
 }
 
@@ -406,18 +396,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.metrics)
 	node.SetUnicastManager(unicastManager)
 
-	// create gossip control message validation inspector
-	rpcControlMsgInspector := validation.NewControlMsgValidationInspector(
-		builder.logger,
-		builder.sporkID,
-		builder.rpcValidationInspectorConfig,
-		builder.gossipSubInspectorNotifDistributor,
-	)
-
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			rpcControlMsgInspector.Start(ctx)
-			<-rpcControlMsgInspector.Ready()
+			builder.rpcValidationInspector.Start(ctx)
+			<-builder.rpcValidationInspector.Ready()
 			ready()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -540,10 +522,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	rpcValidationInspectorConfig *validation.ControlMsgValidationInspectorConfig,
-	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor,
-	gossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor,
-	uniCfg *UnicastConfig) (p2p.NodeBuilder, error) {
+	uniCfg *UnicastConfig,
+	rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -569,10 +549,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(unicastRateLimiterDistributor).
-		SetRPCValidationInspectorConfig(rpcValidationInspectorConfig).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubInspectorNotificationDistributor(gossipSubInspectorNotifDistributor)
+		SetGossipSubValidationInspector(rpcValidationInspector)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.

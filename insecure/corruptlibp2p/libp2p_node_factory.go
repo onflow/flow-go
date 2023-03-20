@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -42,6 +42,8 @@ func NewCorruptLibP2PNodeFactory(
 		if chainID != flow.BftTestnet {
 			panic("illegal chain id for using corrupt libp2p node")
 		}
+
+		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
@@ -55,10 +57,8 @@ func NewCorruptLibP2PNodeFactory(
 			peerManagerCfg,
 			gossipSubCfg,
 			p2pbuilder.DefaultResourceManagerConfig(),
-			p2pbuilder.DefaultRPCValidationConfig(),
-			ratelimit.NewUnicastRateLimiterDistributor(),
-			distributor.DefaultGossipSubInspectorNotificationDistributor(log),
-			uniCfg)
+			uniCfg,
+			rpcValidationInspector)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

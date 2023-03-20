@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -37,6 +38,7 @@ type Builder struct {
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	idProvider                  module.IdentityProvider
 	routingSystem               routing.Routing
+	rpcValidationInspector      p2p.GossipSubRPCInspector
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -137,6 +139,16 @@ func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
 }
 
+// SetGossipSubValidationInspector sets the rpc validation inspector.
+// If the rpc validation inspector has already been set, a fatal error is logged.
+func (g *Builder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) {
+	if g.rpcValidationInspector != nil {
+		g.logger.Fatal().Msg("rpc validation inspector has already been set")
+		return
+	}
+	g.rpcValidationInspector = inspector
+}
+
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
 	return &Builder{
 		logger:                      logger.With().Str("component", "gossipsub").Logger(),
@@ -201,10 +213,12 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	}
 
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(g.metrics, g.logger)
-	gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
-		gossipSubMetrics.ObserveRPC(from, rpc)
-		return nil
-	})
+
+	aggregateInspector := inspector.NewAggregateRPCInspector()
+	metricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
+	aggregateInspector.AddInspector(metricsInspector)
+	aggregateInspector.AddInspector(g.rpcValidationInspector)
+	gossipSubConfigs.WithAppSpecificRpcInspector(aggregateInspector)
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)
