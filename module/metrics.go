@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type EntriesFunc func() uint
@@ -107,14 +108,44 @@ type UnicastManagerMetrics interface {
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
 }
 
-type LibP2PMetrics interface {
+type GossipSubMetrics interface {
+	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	GossipSubLocalMeshMetrics
+}
+
+type LibP2PMetrics interface {
+	GossipSubMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
 	UnicastManagerMetrics
+}
+
+// GossipSubScoringMetrics encapsulates the metrics collectors for the peer scoring module of GossipSub protocol.
+// It tracks the scores of the peers in the local mesh and the different factors that contribute to the score of a peer.
+// It also tracks the scores of the topics in the local mesh and the different factors that contribute to the score of a topic.
+type GossipSubScoringMetrics interface {
+	// OnOverallPeerScoreUpdated tracks the overall score of peers in the local mesh.
+	OnOverallPeerScoreUpdated(float64)
+	// OnAppSpecificScoreUpdated tracks the application specific score of peers in the local mesh.
+	OnAppSpecificScoreUpdated(float64)
+	// OnIPColocationFactorUpdated tracks the IP colocation factor of peers in the local mesh.
+	OnIPColocationFactorUpdated(float64)
+	// OnBehaviourPenaltyUpdated tracks the behaviour penalty of peers in the local mesh.
+	OnBehaviourPenaltyUpdated(float64)
+	// OnTimeInMeshUpdated tracks the time in mesh factor of peers in the local mesh for a given topic.
+	OnTimeInMeshUpdated(channels.Topic, time.Duration)
+	// OnFirstMessageDeliveredUpdated tracks the first message delivered factor of peers in the local mesh for a given topic.
+	OnFirstMessageDeliveredUpdated(channels.Topic, float64)
+	// OnMeshMessageDeliveredUpdated tracks the mesh message delivered factor of peers in the local mesh for a given topic.
+	OnMeshMessageDeliveredUpdated(channels.Topic, float64)
+	// OnInvalidMessageDeliveredUpdated tracks the invalid message delivered factor of peers in the local mesh for a given topic.
+	OnInvalidMessageDeliveredUpdated(channels.Topic, float64)
+	// SetWarningStateCount tracks the warning score state of peers in the local mesh. It updates the total number of
+	// peers in the local mesh that are in the warning state based on their score.
+	SetWarningStateCount(uint)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
