@@ -164,7 +164,7 @@ func TestViewMerge(t *testing.T) {
 		err = chView.Set(registerID2, flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		b1, err := v.Get(registerID1)
@@ -185,7 +185,7 @@ func TestViewMerge(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		b1, err := v.Get(registerID1)
@@ -207,7 +207,7 @@ func TestViewMerge(t *testing.T) {
 		err = chView.Set(registerID2, flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		b1, err := v.Get(registerID1)
@@ -228,7 +228,7 @@ func TestViewMerge(t *testing.T) {
 		chView := v.NewChild()
 		err = chView.Set(registerID1, flow.RegisterValue("orange"))
 		assert.NoError(t, err)
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		b, err := v.Get(registerID1)
@@ -245,7 +245,7 @@ func TestViewMerge(t *testing.T) {
 		chView := v.NewChild()
 		err = chView.Set(registerID1, flow.RegisterValue("orange"))
 		assert.NoError(t, err)
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		b, err := v.Get(registerID1)
@@ -276,7 +276,7 @@ func TestViewMerge(t *testing.T) {
 		hash2 := expSpock2.SumHash()
 		assert.Equal(t, chView.(*delta.View).SpockSecret(), []uint8(hash2))
 
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		hashIt(t, expSpock1, hash2)
@@ -295,7 +295,7 @@ func TestViewMerge(t *testing.T) {
 		err = chView.Set(registerID3, flow.RegisterValue("milk"))
 		assert.NoError(t, err)
 
-		err = v.Merge(chView)
+		err = v.Merge(chView.Finalize())
 		assert.NoError(t, err)
 
 		reads := v.Interactions().Reads
@@ -405,7 +405,7 @@ func TestView_AllRegisterIDs(t *testing.T) {
 		err = vv.Set(idF, flow.RegisterValue("f_value"))
 		assert.NoError(t, err)
 
-		err = v.Merge(vv)
+		err = v.Merge(vv.Finalize())
 		assert.NoError(t, err)
 		allRegs := v.Interactions().AllRegisterIDs()
 		assert.Len(t, allRegs, 6)

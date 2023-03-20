@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -122,9 +121,6 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 //   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //   - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
-	if len(signers) == 0 {
-		return model.NewInsufficientSignaturesErrorf("empty list of signers")
-	}
 	dkg, err := c.committee.DKG(view)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
@@ -147,31 +143,9 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 		return fmt.Errorf("invalid reconstructed random beacon sig for block (%x): %w", blockID, model.ErrInvalidSignature)
 	}
 
-	// aggregate public staking keys of all signers (more costly)
-	// TODO: update to use module/signature.PublicKeyAggregator
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
+	err = verifyAggregatedSignatureOneMessage(signers.PublicStakingKeys(), blockSigData.AggregatedStakingSig, c.stakingHasher, msg)
 	if err != nil {
-		// `AggregateBLSPublicKeys` returns a `crypto.invalidInputsError` in two distinct cases:
-		//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
-		//      This scenario _is expected_ during normal operations, because a byzantine
-		//      proposer might construct an (invalid) QC with an empty list of signers.
-		// (ii) In case some provided public keys type is not BLS.
-		//      This scenario is _not expected_ during normal operations, because all keys are
-		//      guaranteed by the protocol to be BLS keys.
-		//
-		// By checking `len(signers) == 0` upfront , we can rule out case (i) as a source of error.
-		// Hence, if we encounter an error here, we know it is case (ii). Thereby, we can clearly
-		// distinguish a faulty _external_ input from an _internal_ uncovered edge-case.
-		return fmt.Errorf("could not compute aggregated key for block %x: %w", blockID, err)
-	}
-
-	// verify aggregated signature with aggregated keys from last step
-	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
-	if err != nil {
-		return fmt.Errorf("internal error while verifying staking signature for block %x: %w", blockID, err)
-	}
-	if !stakingValid {
-		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", blockID, model.ErrInvalidSignature)
+		return fmt.Errorf("verifying aggregated staking signature failed for block %v: %w", blockID, err)
 	}
 
 	return nil
@@ -187,5 +161,6 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(signers, sigData, view, highQCViews, c.timeoutObjectHasher)
+	stakingPks := signers.PublicStakingKeys()
+	return verifyTCSignatureManyMessages(stakingPks, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

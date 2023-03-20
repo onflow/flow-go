@@ -41,7 +41,9 @@ func TestLedgerViewCommitter(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		newState, proof, _, err := com.CommitView(view, utils.StateCommitmentFixture())
+		newState, proof, _, err := com.CommitView(
+			view.Finalize(),
+			utils.StateCommitmentFixture())
 		require.NoError(t, err)
 		require.Equal(t, flow.StateCommitment(expectedStateCommitment), newState)
 		require.Equal(t, []uint8(expectedProof), proof)

@@ -163,8 +163,6 @@ type ContractUpdaterStubs interface {
 	RestrictedRemovalEnabled() bool
 
 	GetAuthorizedAccounts(path cadence.Path) []flow.Address
-
-	UseContractAuditVoucher(address flow.Address, code []byte) (bool, error)
 }
 
 type contractUpdaterStubsImpl struct {
@@ -265,18 +263,6 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	return addresses
 }
 
-func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
-	address flow.Address,
-	code []byte,
-) (
-	bool,
-	error,
-) {
-	return impl.systemContracts.UseContractAuditVoucher(
-		address,
-		string(code[:]))
-}
-
 type ContractUpdaterImpl struct {
 	tracer          tracing.TracerSpan
 	meter           Meter
@@ -353,10 +339,6 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("update account contract code failed: %w", err)
-	}
 
 	err = updater.SetContract(
 		address,
@@ -385,10 +367,6 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
 
 	err = updater.RemoveContract(
 		address,
@@ -407,8 +385,7 @@ func (updater *ContractUpdaterImpl) SetContract(
 	code []byte,
 	signingAccounts []flow.Address,
 ) error {
-	// Initial contract deployments must be authorized by signing accounts,
-	// or there must be an audit voucher available.
+	// Initial contract deployments must be authorized by signing accounts.
 	//
 	// Contract updates are always allowed.
 	exists, err := updater.accounts.ContractExists(name, address)
@@ -417,23 +394,13 @@ func (updater *ContractUpdaterImpl) SetContract(
 	}
 
 	if !exists && !updater.isAuthorizedForDeployment(signingAccounts) {
-		// check if there's an audit voucher for the contract
-		voucherAvailable, err := updater.UseContractAuditVoucher(address, code)
-		if err != nil {
-			errInner := errors.NewOperationAuthorizationErrorf(
+		return fmt.Errorf(
+			"deploying contract failed: %w",
+			errors.NewOperationAuthorizationErrorf(
 				"SetContract",
-				"failed to check audit vouchers",
-			)
-			return fmt.Errorf("setting contract failed: %w - %s", errInner, err)
-		}
-		if !voucherAvailable {
-			return fmt.Errorf(
-				"deploying contract failed: %w",
-				errors.NewOperationAuthorizationErrorf(
-					"SetContract",
-					"deploying contracts requires authorization from specific "+
-						"accounts"))
-		}
+				"deploying contracts requires authorization from specific "+
+					"accounts"))
+
 	}
 
 	contractUpdateKey := ContractUpdateKey{
