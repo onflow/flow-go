@@ -12,13 +12,23 @@ const (
 	SafetyThresholdMapKey = "safetythreshold"
 	RateLimitMapKey       = "ratelimit"
 
-	DefaultGraftUpperThreshold  = 1000
+	// DefaultGraftUpperThreshold upper bound for graft messages, RPC control messages with a count
+	// above the upper threshold are automatically discarded.
+	DefaultGraftUpperThreshold = 1000
+	// DefaultGraftSafetyThreshold a lower bound for graft messages, RPC control messages with a message count
+	// lower than the safety threshold bypass validation.
 	DefaultGraftSafetyThreshold = 100
-	DefaultGraftRateLimit       = 1000
+	// DefaultGraftRateLimit the rate limit for graft control messages.
+	DefaultGraftRateLimit = 1000
 
-	DefaultPruneUpperThreshold  = 1000
+	// DefaultPruneUpperThreshold upper bound for prune messages, RPC control messages with a count
+	// above the upper threshold are automatically discarded.
+	DefaultPruneUpperThreshold = 1000
+	// DefaultPruneSafetyThreshold a lower bound for prune messages, RPC control messages with a message count
+	// lower than the safety threshold bypass validation.
 	DefaultPruneSafetyThreshold = 20
-	DefaultPruneRateLimit       = 1000
+	// DefaultPruneRateLimit the rate limit for prune control messages.
+	DefaultPruneRateLimit = 1000
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.
