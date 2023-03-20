@@ -74,7 +74,8 @@ type CtrlMsgValidationConfig struct {
 // NewCtrlMsgValidationConfig ensures each config limit value is greater than 0 before returning a new CtrlMsgValidationConfig.
 // errors returned:
 //
-//	ErrValidationLimit if any of the validation limits provided are less than 0.
+//	ErrValidationLimit - if any of the validation limits provided are less than 0. This error is non-recoverable
+//	and the node should crash if this error is encountered.
 func NewCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType, cfgLimitValues CtrlMsgValidationLimits) (*CtrlMsgValidationConfig, error) {
 	switch {
 	case cfgLimitValues.RateLimit() <= 0:
