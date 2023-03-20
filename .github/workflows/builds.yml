@@ -7,7 +7,11 @@ on:
     inputs:
       tag:
         type: string
-        description: 'Tag/commit'
+        description: 'Git tag/commit'
+        required: true
+      docker_tag:
+        type: string
+        description: 'Docker tag'
         required: true
       # GHA doesn't support multi-selects, so simulating it with one boolean for each option
       build_access:
@@ -67,15 +71,17 @@ jobs:
         username: _json_key
         password: ${{ secrets.GCR_SERVICE_KEY }}
 
-    - name: Build/Push Node images
+    - name: Build/Push ${{ matrix.role }} images
       if: ${{ (inputs.build_access && matrix.role == 'access') ||
               (inputs.build_collection && matrix.role == 'collection') ||
               (inputs.build_consensus && matrix.role == 'consensus') ||
               (inputs.build_execution && matrix.role == 'execution') ||
               (inputs.build_verification && matrix.role == 'verification') ||
               (inputs.build_observer && matrix.role == 'observer') }}
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
       run: |
         make docker-build-${{ matrix.role }} docker-push-${{ matrix.role }}
-        if [[ "${{ inputs.include_without_netgo }}" = true ]]; then
+        if [[ "${{ inputs.include_without_netgo }}" = "true" ]]; then
           make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo
         fi
