@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -51,23 +50,24 @@ const (
 type Node struct {
 	component.Component
 	sync.RWMutex
-	uniMgr      p2p.UnicastManager
-	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub      p2p.PubSubAdapter
-	logger      zerolog.Logger                      // used to provide logging
-	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
-	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
-	routing     routing.Routing
-	pCache      *ProtocolPeerCache
-	peerManager *connection.PeerManager
+	uniMgr           p2p.UnicastManager
+	host             host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub           p2p.PubSubAdapter
+	logger           zerolog.Logger                      // used to provide logging
+	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
+	routing          routing.Routing
+	pCache           p2p.ProtocolPeerCache
+	peerManager      p2p.PeerManager
+	peerScoreExposer p2p.PeerScoreExposer
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
 func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
-	pCache *ProtocolPeerCache,
-	peerManager *connection.PeerManager,
+	pCache p2p.ProtocolPeerCache,
+	peerManager p2p.PeerManager,
 ) *Node {
 	return &Node{
 		host:        host,
@@ -393,6 +393,27 @@ func (n *Node) SetRouting(r routing.Routing) {
 // Routing returns the node's routing implementation.
 func (n *Node) Routing() routing.Routing {
 	return n.routing
+}
+
+// SetPeerScoreExposer sets the node's peer score exposer implementation.
+// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
+// method if the node's peer score exposer has already been set.
+func (n *Node) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
+	if n.peerScoreExposer != nil {
+		n.logger.Fatal().Msg("peer score exposer already set")
+	}
+
+	n.peerScoreExposer = e
+}
+
+// PeerScoreExposer returns the node's peer score exposer implementation.
+// If the node's peer score exposer has not been set, the second return value will be false.
+func (n *Node) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+	if n.peerScoreExposer == nil {
+		return nil, false
+	}
+
+	return n.peerScoreExposer, true
 }
 
 // SetPubSub sets the node's pubsub implementation.

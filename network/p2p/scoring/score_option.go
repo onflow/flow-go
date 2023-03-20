@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -92,6 +93,18 @@ func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64
 	}
 }
 
+// WithTopicScoreParams adds the topic score parameters to the peer score parameters.
+// It is used to configure the topic score parameters for the pubsub system.
+// If there is already a topic score parameter for the given topic, it will be overwritten.
+func WithTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) PeerScoreParamsOption {
+	return func(s *ScoreOption) {
+		if s.peerScoreParams.Topics == nil {
+			s.peerScoreParams.Topics = make(map[string]*pubsub.TopicScoreParams)
+		}
+		s.peerScoreParams.Topics[topic.String()] = topicScoreParams
+	}
+}
+
 func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...PeerScoreParamsOption) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger = logger.With().
@@ -102,16 +115,20 @@ func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, o
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator()
+	appSpecificScore := defaultAppSpecificScoreFunction(logger, idProvider, validator)
 	s := &ScoreOption{
 		logger:                   logger,
 		validator:                validator,
 		idProvider:               idProvider,
-		appSpecificScoreFunction: defaultAppSpecificScoreFunction(logger, idProvider, validator),
+		appSpecificScoreFunction: appSpecificScore,
+		peerScoreParams:          defaultPeerScoreParams(),
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	s.peerScoreParams.AppSpecificScore = s.appSpecificScoreFunction
 
 	return s
 }
@@ -121,7 +138,6 @@ func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) {
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
-	s.preparePeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
@@ -148,35 +164,26 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 	}
 }
 
-// preparePeerScoreParams prepares the peer score parameters for the pubsub system.
-// It is based on the default parameters defined in libp2p pubsub peer scoring.
-func (s *ScoreOption) preparePeerScoreParams() {
-	s.peerScoreParams = &pubsub.PeerScoreParams{
+func defaultPeerScoreParams() *pubsub.PeerScoreParams {
+	return &pubsub.PeerScoreParams{
 		// we don't set all the parameters, so we skip the atomic validation.
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
-
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
 		// a good or bad behavior will not have a permanent effect on the score.
 		DecayInterval: time.Hour,
-
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
 		// The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
 		// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
 		// for a long time, and we can reset the counter.
 		DecayToZero: 0.01,
-
-		// AppSpecificScore is a function that takes a peer ID and returns an application specific score.
-		// At the current stage, we only use it to penalize and reward the peers based on their subscriptions.
-		AppSpecificScore: s.appSpecificScoreFunction,
 		// AppSpecificWeight is the weight of the application specific score.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
 }
 
 func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
-	s.preparePeerScoreParams()
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
