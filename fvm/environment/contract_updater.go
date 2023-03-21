@@ -67,14 +67,13 @@ type ContractUpdater interface {
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
 	UpdateAccountContractCode(
-		runtimeAddress common.Address,
-		name string,
+		location common.AddressLocation,
 		code []byte,
 	) error
 
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
-	RemoveAccountContractCode(runtimeAddress common.Address, name string) error
+	RemoveAccountContractCode(location common.AddressLocation) error
 
 	Commit() ([]ContractUpdateKey, error)
 
@@ -97,29 +96,25 @@ func NewParseRestrictedContractUpdater(
 }
 
 func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 	code []byte,
 ) error {
-	return parseRestrict3Arg(
+	return parseRestrict2Arg(
 		updater.txnState,
 		trace.FVMEnvUpdateAccountContractCode,
 		updater.impl.UpdateAccountContractCode,
-		runtimeAddress,
-		name,
+		location,
 		code)
 }
 
 func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 ) error {
-	return parseRestrict2Arg(
+	return parseRestrict1Arg(
 		updater.txnState,
 		trace.FVMEnvRemoveAccountContractCode,
 		updater.impl.RemoveAccountContractCode,
-		runtimeAddress,
-		name)
+		location)
 }
 
 func (updater ParseRestrictedContractUpdater) Commit() (
@@ -136,16 +131,14 @@ func (updater ParseRestrictedContractUpdater) Reset() {
 type NoContractUpdater struct{}
 
 func (NoContractUpdater) UpdateAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
-	code []byte,
+	_ common.AddressLocation,
+	_ []byte,
 ) error {
 	return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
 }
 
 func (NoContractUpdater) RemoveAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	_ common.AddressLocation,
 ) error {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
@@ -324,8 +317,7 @@ func NewContractUpdater(
 }
 
 func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 	code []byte,
 ) error {
 	defer updater.tracer.StartChildSpan(
@@ -338,11 +330,11 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(runtimeAddress)
+	address := flow.ConvertAddress(location.Address)
 
 	err = updater.SetContract(
 		address,
-		name,
+		location.Name,
 		code,
 		updater.signingAccounts)
 	if err != nil {
@@ -353,8 +345,7 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 }
 
 func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 ) error {
 	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvRemoveAccountContractCode).End()
@@ -366,11 +357,11 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(runtimeAddress)
+	address := flow.ConvertAddress(location.Address)
 
 	err = updater.RemoveContract(
 		address,
-		name,
+		location.Name,
 		updater.signingAccounts)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
