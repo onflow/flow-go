@@ -125,12 +125,12 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 }
 
 type balanceProcessor struct {
-	vm            fvm.VM
-	ctx           fvm.Context
-	view          state.View
-	env           environment.Environment
-	balanceScript []byte
-	momentsScript []byte
+	vm              fvm.VM
+	ctx             fvm.Context
+	storageSnapshot state.StorageSnapshot
+	env             environment.Environment
+	balanceScript   []byte
+	momentsScript   []byte
 
 	accounts environment.Accounts
 
@@ -174,11 +174,11 @@ func NewBalanceReporter(
 		txnState)
 
 	return &balanceProcessor{
-		vm:       vm,
-		ctx:      ctx,
-		view:     view,
-		accounts: accounts,
-		env:      env,
+		vm:              vm,
+		ctx:             ctx,
+		storageSnapshot: snapshot,
+		accounts:        accounts,
+		env:             env,
 	}
 }
 
@@ -343,15 +343,15 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, false, err
 	}
 
 	var balance uint64
 	var hasVault bool
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 		hasVault = true
 	} else {
 		hasVault = false
@@ -364,14 +364,14 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var balance uint64
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 	}
 	return balance, nil
 }
@@ -381,14 +381,14 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var m int
-	if script.Err == nil && script.Value != nil {
-		m = script.Value.(cadence.Int).Int()
+	if output.Err == nil && output.Value != nil {
+		m = output.Value.(cadence.Int).Int()
 	}
 	return m, nil
 }
