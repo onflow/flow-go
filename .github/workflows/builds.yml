@@ -64,20 +64,24 @@ jobs:
               (matrix.role == 'execution'    && !inputs.build_execution) ||
               (matrix.role == 'verification' && !inputs.build_verification) ||
               (matrix.role == 'observer'     && !inputs.build_observer) }}
-      run: exit 1
+      run: echo "role_enabled=true" >> $GITHUB_ENV
     - name: Setup Go
+      if: env.role_enabled
       uses: actions/setup-go@v2
       with:
         go-version: '1.19'
     - name: Checkout repo
+      if: env.role_enabled
       uses: actions/checkout@v2
       with:
         ref: ${{ inputs.tag }}
     - name: Build relic
+      if: env.role_enabled
       run: make crypto_setup_gopath
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
     - name: Docker login
+      if: env.role_enabled
       uses: docker/login-action@v1
       with:
         registry: gcr.io
@@ -85,6 +89,7 @@ jobs:
         password: ${{ secrets.GCR_SERVICE_KEY }}
 
     - name: Build/Push ${{ matrix.role }} images
+      if: env.role_enabled
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
       run: |
