@@ -72,7 +72,7 @@ jobs:
           roles+=( "observer" )
         fi
         rolesJSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${roles[@]}")
-        echo "matrix={\"roles\":$(echo $rolesJSON)}" >> $GITHUB_OUTPUT
+        echo "matrix={\"role\":$(echo $rolesJSON)}" >> $GITHUB_OUTPUT
   docker-push:
     name: ${{ matrix.role }} images
     runs-on: ubuntu-latest
