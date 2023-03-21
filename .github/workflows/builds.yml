@@ -44,19 +44,13 @@ on:
         required: false
 
 jobs:
-  docker-push:
-    name: ${{ matrix.role }} images
+  # matrix_builder generates a matrix that includes the roles selected in the input
+  matrix_builder:
     runs-on: ubuntu-latest
-
-    # setup jobs for each role
-    strategy:
-      fail-fast: false
-      matrix:
-        role: ${{ steps.set-matrix.outputs.roles }}
-
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
     steps:
-    # select the roles to add to the matrix based on the input selections
-    - id: set-matrix
+    - id: generate
       run: |
         roles=()
         if [[ "${{ inputs.build_access }}" = "true" ]]; then
@@ -78,7 +72,18 @@ jobs:
           roles+=( "observer" )
         fi
         rolesJSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${X[@]}")
-        echo "roles=${rolesJSON}" >> $GITHUB_OUTPUT
+        echo "matrix={\"roles\":$(echo $rolesJSON)}" >> $GITHUB_OUTPUT
+  docker-push:
+    name: ${{ matrix.role }} images
+    runs-on: ubuntu-latest
+    needs: matrix_builder
+
+    # setup jobs for each role
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix_builder.outputs.matrix) }}
+
+    steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
