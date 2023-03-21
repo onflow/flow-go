@@ -45,43 +45,51 @@ on:
 
 jobs:
   docker-push:
-    name: Push ${{ matrix.role }} to container registry
+    name: ${{ matrix.role }} images
     runs-on: ubuntu-latest
 
     # setup jobs for each role
     strategy:
       fail-fast: false
       matrix:
-        role: [access, collection, consensus, execution, verification, observer]
+        role: ${{ steps.set-matrix.outputs.roles }}
 
     steps:
-    - name: Check build selected
-      # gate the run based on whether or not the role was selected.
-      # this avoids running all the setup steps for roles that aren't enabled
-      if: ${{ (matrix.role == 'access'       && inputs.build_access) ||
-              (matrix.role == 'collection'   && inputs.build_collection) ||
-              (matrix.role == 'consensus'    && inputs.build_consensus) ||
-              (matrix.role == 'execution'    && inputs.build_execution) ||
-              (matrix.role == 'verification' && inputs.build_verification) ||
-              (matrix.role == 'observer'     && inputs.build_observer) }}
-      run: echo "role_enabled=true" >> $GITHUB_ENV
+    # select the roles to add to the matrix based on the input selections
+    - id: set-matrix
+      run: |
+        roles=()
+        if [[ "${{ inputs.build_access }}" = "true" ]]; then
+          roles+=( "access" )
+        fi
+        if [[ "${{ inputs.build_collection }}" = "true" ]]; then
+          roles+=( "collection" )
+        fi
+        if [[ "${{ inputs.build_consensus }}" = "true" ]]; then
+          roles+=( "consensus" )
+        fi
+        if [[ "${{ inputs.build_execution }}" = "true" ]]; then
+          roles+=( "execution" )
+        fi
+        if [[ "${{ inputs.build_verification }}" = "true" ]]; then
+          roles+=( "verification" )
+        fi
+        if [[ "${{ inputs.build_observer }}" = "true" ]]; then
+          roles+=( "observer" )
+        fi
+        rolesJSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${X[@]}")
+        echo "roles=${rolesJSON}" >> $GITHUB_OUTPUT
     - name: Setup Go
-      if: env.role_enabled
       uses: actions/setup-go@v2
       with:
         go-version: '1.19'
     - name: Checkout repo
-      if: env.role_enabled
       uses: actions/checkout@v2
       with:
         ref: ${{ inputs.tag }}
-    - name: Build relic
-      if: env.role_enabled
-      run: make crypto_setup_gopath
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
     - name: Docker login
-      if: env.role_enabled
       uses: docker/login-action@v1
       with:
         registry: gcr.io
@@ -89,11 +97,14 @@ jobs:
         password: ${{ secrets.GCR_SERVICE_KEY }}
 
     - name: Build/Push ${{ matrix.role }} images
-      if: env.role_enabled
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
       run: |
         make docker-build-${{ matrix.role }} docker-push-${{ matrix.role }}
-        if [[ "${{ inputs.include_without_netgo }}" = "true" ]]; then
-          make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo
-        fi
+
+    - name: Build/Push ${{ matrix.role }} without_netgo images
+      if: ${{ inputs.include_without_netgo }}
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
+      run: |
+        make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo
