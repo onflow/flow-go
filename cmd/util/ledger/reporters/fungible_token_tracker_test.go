@@ -65,7 +65,10 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	snapshot, _, err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	require.NoError(t, err)
+
+	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
 	// deploy wrapper resource
@@ -101,9 +104,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-	err = vm.Run(ctx, tx, view)
+	snapshot, output, err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
-	require.NoError(t, tx.Err)
+	require.NoError(t, output.Err)
+
+	err = view.Merge(snapshot)
+	require.NoError(t, err)
 
 	wrapTokenScript := []byte(fmt.Sprintf(`
 							import FungibleToken from 0x%s
@@ -127,9 +133,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-	err = vm.Run(ctx, tx, view)
+	snapshot, output, err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
-	require.NoError(t, tx.Err)
+	require.NoError(t, output.Err)
+
+	err = view.Merge(snapshot)
+	require.NoError(t, err)
 
 	dir := t.TempDir()
 	log := zerolog.Nop()
