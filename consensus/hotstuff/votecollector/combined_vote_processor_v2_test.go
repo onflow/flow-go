@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -818,7 +819,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(zerolog.Nop(), epochLookup, keys)
 
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
@@ -840,7 +841,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(zerolog.Nop(), epochLookup, keys)
 
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)

@@ -3,6 +3,8 @@ package signature
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
@@ -12,14 +14,16 @@ import (
 // for a given view.
 // Internally it indexes and caches the private keys by epoch.
 type EpochAwareRandomBeaconKeyStore struct {
+	log         zerolog.Logger
 	epochLookup module.EpochLookup     // used to fetch epoch counter by view
 	keys        storage.SafeBeaconKeys // used to fetch DKG private key by epoch
 
 	privateKeys map[uint64]crypto.PrivateKey // cache of privateKeys by epoch
 }
 
-func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys storage.SafeBeaconKeys) *EpochAwareRandomBeaconKeyStore {
+func NewEpochAwareRandomBeaconKeyStore(log zerolog.Logger, epochLookup module.EpochLookup, keys storage.SafeBeaconKeys) *EpochAwareRandomBeaconKeyStore {
 	return &EpochAwareRandomBeaconKeyStore{
+		log:         log.With().Str("component", "EpochAwareRandomBeaconKeyStore").Logger(),
 		epochLookup: epochLookup,
 		keys:        keys,
 		privateKeys: make(map[uint64]crypto.PrivateKey),
@@ -64,8 +68,19 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 
 	privKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve random beacon private key for epoch counter %v, at view %v, err: %w",
-			epoch, view, err)
+		// CAUTION HOT-FIX: this is a hotfix to get a consensus nodes out of the crash loop that
+		// missed the Epoch Setup Phase entirely and therefore has no private random beacon key.
+		// See issue https://github.com/onflow/flow-go/issues/4070
+		// Run ONLY on AFFECTED NODES. If this hot-fix is deployed on many nodes, it could undermine
+		// protocol liveness by potentially hiding other liveness-critical bugs!
+
+		// mature code:
+		// return nil, fmt.Errorf("could not retrieve random beacon private key for epoch counter %v, at view %v, err: %w", epoch, view, err)
+
+		// hot-fix: log error and set `safe` to false, emulating the behaviour of failed DKG for _any_ error case.
+		// Thereby, we potentially hide safety- or liveness-critical errors.
+		s.log.Error().Err(err).Msg(fmt.Sprintf("could not retrieve random beacon private key for epoch counter %v, at view %v", epoch, view))
+		safe = false
 	}
 
 	// if DKG failed, there will be no valid random beacon private key, since this fact

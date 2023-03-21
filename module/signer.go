@@ -14,7 +14,8 @@ var (
 
 // RandomBeaconKeyStore returns the random beacon private key for the given view,
 type RandomBeaconKeyStore interface {
-	// It returns:
+	// ByView returns the consensus node's _private_ random beacon key share for
+	// signing blocks at the given view. Possible returns:
 	//  - (signer, nil) if the node has beacon keys in the epoch of the view
 	//  - (nil, DKGFailError) if the node doesn't have beacon keys in the epoch of the view
 	//  - (nil, error) if there is any exception

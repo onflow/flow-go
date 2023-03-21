@@ -3,6 +3,7 @@ package verification
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -43,7 +44,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// there is DKG key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(zerolog.Nop(), epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -110,7 +111,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	// there is no DKG key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(zerolog.Nop(), epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()

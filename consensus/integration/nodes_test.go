@@ -487,7 +487,7 @@ func createNode(
 		nil)
 
 	// use epoch aware store for testing scenarios where epoch changes
-	beaconKeyStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := hsig.NewEpochAwareRandomBeaconKeyStore(log, epochLookup, keys)
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 

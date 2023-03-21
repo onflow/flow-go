@@ -537,7 +537,7 @@ func main() {
 			// wrap Main consensus committee with metrics
 			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(node.Logger, epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.Signer

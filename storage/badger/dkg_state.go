@@ -149,7 +149,7 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return fmt.Errorf("failed to read DKGEndState from database for epoch %d: %w", epochCounter, err)
 		}
 
 		// for any end state besides success, the key is not safe
@@ -165,7 +165,7 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return fmt.Errorf("failed to read random beacon private key from database for epoch %d: %w", epochCounter, err)
 		}
 
 		// return the key only for successful end state
