@@ -56,17 +56,16 @@ func SealingAndVerificationHappyPathTest(
 	require.Equal(t, receiptB1.ExecutionResult.ID(), receiptB2.ExecutionResult.ID(), "execution fork happened at blockB")
 	resultB := receiptB1.ExecutionResult
 	resultBId := resultB.ID()
-	// re-evaluates that resultB has more than one chunk.
+
+	// re-evaluates that resultB has more than one chunk (system chunk + at least 1 more transaction).
 	require.Greater(t, len(resultB.Chunks), 1)
 	t.Logf("receipt for blockB generated: result ID: %x with %d chunks\n", resultBId, len(resultB.Chunks))
 
 	// waits till result approval emits for all chunks of resultB
 	approvals := make([]*flow.ResultApproval, 0)
 	for i := 0; i < len(resultB.Chunks); i++ {
-		approval := approvalState.WaitForResultApproval(t, verId, resultBId, uint64(i))
-		approvals = append(approvals, approval)
-		approval2 := approvalState.WaitForResultApproval(t, ver2Id, resultBId, uint64(i))
-		approvals = append(approvals, approval2)
+		vnApprovals := approvalState.WaitForTotalApprovalsFrom(t, flow.IdentifierList{verId, ver2Id}, resultBId, uint64(i), 1)
+		approvals = append(approvals, vnApprovals[0])
 	}
 
 	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
