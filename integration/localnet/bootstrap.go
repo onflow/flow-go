@@ -367,7 +367,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(
 		service.Command,
-		"--chunk-alpha=1",
+		"--chunk-alpha=1", // how many verification nodes each chunk data pack assigned to
 	)
 
 	service.Ports = []string{
