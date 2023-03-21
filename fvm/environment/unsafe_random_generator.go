@@ -1,10 +1,14 @@
 package environment
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
-	"math/rand"
+	"hash"
 	"sync"
 
+	"golang.org/x/crypto/hkdf"
+
+	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -13,8 +17,7 @@ import (
 )
 
 type UnsafeRandomGenerator interface {
-	// UnsafeRandom returns a random uint64, where the process of random number
-	// derivation is not cryptographically secure.
+	// UnsafeRandom returns a random uint64
 	UnsafeRandom() (uint64, error)
 }
 
@@ -23,7 +26,7 @@ type unsafeRandomGenerator struct {
 
 	blockHeader *flow.Header
 
-	rng      *rand.Rand
+	rng      random.Rand
 	seedOnce sync.Once
 }
 
@@ -76,14 +79,24 @@ func (gen *unsafeRandomGenerator) seed() {
 		// header ID. The random number generator will be used by the
 		// UnsafeRandom function.
 		id := gen.blockHeader.ID()
-		source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-		gen.rng = rand.New(source)
+		// extract the entropy from `id` and expand it into the required seed
+		hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, id[:], nil, nil)
+		seed := make([]byte, random.Chacha20SeedLen)
+		n, err := hkdf.Read(seed)
+		if n != len(seed) || err != nil {
+			return
+		}
+		// initialize a fresh CSPRNG with the seed (crypto-secure PRG)
+		source, err := random.NewChacha20PRG(seed, []byte{})
+		if err != nil {
+			return
+		}
+		gen.rng = source
 	})
 }
 
-// UnsafeRandom returns a random uint64, where the process of random number
-// derivation is not cryptographically secure.
-// this is not thread safe, due to gen.rng.Read(buf).
+// UnsafeRandom returns a random uint64 using the underlying PRG (currently using a crypto-secure one).
+// this is not thread safe, due to the gen.rng instance currently used.
 // Its also not thread safe because each thread needs to be deterministically seeded with a different seed.
 // This is Ok because a single transaction has a single UnsafeRandomGenerator and is run in a single thread.
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
@@ -95,9 +108,7 @@ func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
 	}
 
-	// TODO (ramtin) return errors this assumption that this always succeeds
-	// might not be true
 	buf := make([]byte, 8)
-	_, _ = gen.rng.Read(buf) // Always succeeds, no need to check error
+	gen.rng.Read(buf)
 	return binary.LittleEndian.Uint64(buf), nil
 }
