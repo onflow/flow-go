@@ -53,7 +53,7 @@ func NewEmptyComputationResult(
 	}
 }
 
-func (cr ComputationResult) TxResByColIndex(colIndex int) []flow.TransactionResult {
+func (cr ComputationResult) transactionResultsByCollectionIndex(colIndex int) []flow.TransactionResult {
 	var startTxnIndex int
 	if colIndex > 0 {
 		startTxnIndex = cr.TransactionResultIndex[colIndex-1]
@@ -74,7 +74,7 @@ func (cr *ComputationResult) CollectionResult(colIndex int) *ColResSnapshot {
 		updatedRegisters:   cr.StateSnapshots[colIndex].UpdatedRegisters(),
 		readRegisterIDs:    cr.StateSnapshots[colIndex].ReadRegisterIDs(),
 		emittedEvents:      cr.Events[colIndex],
-		transactionResults: cr.TxResByColIndex(colIndex),
+		transactionResults: cr.transactionResultsByCollectionIndex(colIndex),
 	}
 }
 
