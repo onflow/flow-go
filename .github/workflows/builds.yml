@@ -46,6 +46,7 @@ on:
 jobs:
   # matrix_builder generates a matrix that includes the roles selected in the input
   matrix_builder:
+    name: Setup build jobs
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
