@@ -3,7 +3,6 @@ package rand
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
 	"fmt"
 )
 
@@ -13,15 +12,13 @@ import (
 // This package does not implement any determinstic RNG (Pseudo RNG)
 // unlike the package flow-go/crypto/random.
 
-var randFailure = errors.New("crypto/rand failed")
-
 // returns a random uint64
 func Uint64() (uint64, error) {
 	// allocate a new memory at each call. Another possibility
 	// is to use a global variable but that would make the package non thread safe
 	buffer := make([]byte, 8)
 	if _, err := rand.Read(buffer); err != nil { // checking err in crypto/rand.Read is enough
-		return 0, randFailure
+		return 0, fmt.Errorf("crypto/rand read failed: %w", err)
 	}
 	r := binary.LittleEndian.Uint64(buffer)
 	return r, nil
@@ -61,7 +58,7 @@ func Uint64n(n uint64) (uint64, error) {
 	random := n
 	for random > max {
 		if _, err := rand.Read(buffer[:size]); err != nil { // checking err in crypto/rand.Read is enough
-			return 0, randFailure
+			return 0, fmt.Errorf("crypto/rand read failed: %w", err)
 		}
 		random = binary.LittleEndian.Uint64(buffer)
 		random &= mask // adjust to the size of max in bits
