@@ -314,6 +314,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
+	flowCommonAddress := common.MustBytesToAddress(flowAddress.Bytes())
 	runtimeAddress := runtime.Address(flowAddress)
 	err := accounts.Create(nil, flowAddress)
 	require.NoError(t, err)
@@ -353,7 +354,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 		t,
 		[]environment.ContractUpdateKey{
 			{
-				Address: flowAddress,
+				Address: flowCommonAddress,
 				Name:    "TestContract",
 			},
 		},
@@ -412,6 +413,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
+	flowCommonAddress := common.MustBytesToAddress(flowAddress.Bytes())
 	runtimeAddress := runtime.Address(flowAddress)
 	err := accounts.Create(nil, flowAddress)
 	require.NoError(t, err)
@@ -451,7 +453,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 			t,
 			[]environment.ContractUpdateKey{
 				{
-					Address: flowAddress,
+					Address: flowCommonAddress,
 					Name:    "TestContract",
 				},
 			},
@@ -515,7 +517,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 			t,
 			[]environment.ContractUpdateKey{
 				{
-					Address: flowAddress,
+					Address: flowCommonAddress,
 					Name:    "TestContract",
 				},
 			},
