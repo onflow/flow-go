@@ -58,12 +58,12 @@ jobs:
     - name: Check build selected
       # gate the run based on whether or not the role was selected.
       # this avoids running all the setup steps for roles that aren't enabled
-      if: ${{ (matrix.role == 'access'       && !inputs.build_access) ||
-              (matrix.role == 'collection'   && !inputs.build_collection) ||
-              (matrix.role == 'consensus'    && !inputs.build_consensus) ||
-              (matrix.role == 'execution'    && !inputs.build_execution) ||
-              (matrix.role == 'verification' && !inputs.build_verification) ||
-              (matrix.role == 'observer'     && !inputs.build_observer) }}
+      if: ${{ (matrix.role == 'access'       && inputs.build_access) ||
+              (matrix.role == 'collection'   && inputs.build_collection) ||
+              (matrix.role == 'consensus'    && inputs.build_consensus) ||
+              (matrix.role == 'execution'    && inputs.build_execution) ||
+              (matrix.role == 'verification' && inputs.build_verification) ||
+              (matrix.role == 'observer'     && inputs.build_observer) }}
       run: echo "role_enabled=true" >> $GITHUB_ENV
     - name: Setup Go
       if: env.role_enabled
