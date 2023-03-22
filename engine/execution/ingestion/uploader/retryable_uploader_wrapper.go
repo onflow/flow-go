@@ -243,11 +243,11 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 			Block:               block,
 			CompleteCollections: completeCollections,
 		},
-		ExecutionResults: &execution.ExecutionResults{
+		BlockExecutionResults: &execution.BlockExecutionResults{
 			Events:             []flow.EventsList{events},
 			TransactionResults: transactionResults,
 		},
-		AttestationResults: &execution.AttestationResults{
+		BlockAttestationResults: &execution.BlockAttestationResults{
 			BlockExecutionData: executionData,
 			EndState:           endState,
 		},

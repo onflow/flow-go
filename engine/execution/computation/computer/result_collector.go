@@ -231,14 +231,12 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionResult(collection.collectionIndex))
+		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResult(collection.collectionIndex))
 		if err != nil {
 			return fmt.Errorf("consumer failed: %w", err)
 		}
 	}
 
-	collector.result.ExecutedColCounter++
-	collector.result.AttestedColCounter++
 	return nil
 }
 

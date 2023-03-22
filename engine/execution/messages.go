@@ -11,8 +11,8 @@ import (
 // TODO(patrick): rm unaccessed fields
 type ComputationResult struct {
 	*entity.ExecutableBlock
-	*ExecutionResults
-	*AttestationResults
+	*BlockExecutionResults
+	*BlockAttestationResults
 
 	*flow.ExecutionReceipt
 }
@@ -21,17 +21,17 @@ func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
 ) *ComputationResult {
 	return &ComputationResult{
-		ExecutableBlock:    block,
-		ExecutionResults:   NewEmptyExecutionResults(block),
-		AttestationResults: NewEmptyAttestationResults(block),
+		ExecutableBlock:         block,
+		BlockExecutionResults:   NewEmptyBlockExecutionResults(block),
+		BlockAttestationResults: NewEmptyBlockAttestationResults(block),
 	}
 }
 
-func (cr *ComputationResult) CollectionResult(colIndex int) *ColResSnapshot {
-	if colIndex < 0 && colIndex > cr.ExecutedColCounter {
+func (cr *ComputationResult) CollectionExecutionResult(colIndex int) *CollectionExecutionResult {
+	if colIndex < 0 && colIndex > len(cr.StateSnapshots) {
 		return nil
 	}
-	return &ColResSnapshot{
+	return &CollectionExecutionResult{
 		blockHeader: cr.Block.Header,
 		collection: &flow.Collection{
 			Transactions: cr.CollectionAt(colIndex).Transactions,
@@ -48,9 +48,8 @@ func (cr *ComputationResult) CollectionResult(colIndex int) *ColResSnapshot {
 	}
 }
 
-// ExecutionResults captures artifacts of execution of block collections
-type ExecutionResults struct {
-	ExecutedColCounter     int
+// BlockExecutionResults captures artifacts of execution of block collections
+type BlockExecutionResults struct {
 	StateSnapshots         []*state.ExecutionSnapshot
 	Events                 []flow.EventsList
 	ServiceEvents          []flow.EventsList
@@ -62,12 +61,11 @@ type ExecutionResults struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 }
 
-func NewEmptyExecutionResults(
+func NewEmptyBlockExecutionResults(
 	block *entity.ExecutableBlock,
-) *ExecutionResults {
+) *BlockExecutionResults {
 	numCollections := len(block.CompleteCollections) + 1
-	return &ExecutionResults{
-		ExecutedColCounter:     0,
+	return &BlockExecutionResults{
 		StateSnapshots:         make([]*state.ExecutionSnapshot, 0, numCollections),
 		Events:                 make([]flow.EventsList, numCollections),
 		ServiceEvents:          make([]flow.EventsList, numCollections),
@@ -78,7 +76,7 @@ func NewEmptyExecutionResults(
 	}
 }
 
-func (er *ExecutionResults) transactionResultsByCollectionIndex(colIndex int) []flow.TransactionResult {
+func (er *BlockExecutionResults) transactionResultsByCollectionIndex(colIndex int) []flow.TransactionResult {
 	var startTxnIndex int
 	if colIndex > 0 {
 		startTxnIndex = er.TransactionResultIndex[colIndex-1]
@@ -87,7 +85,7 @@ func (er *ExecutionResults) transactionResultsByCollectionIndex(colIndex int) []
 	return er.TransactionResults[startTxnIndex:endTxnIndex]
 }
 
-func (er *ExecutionResults) AllServiceEvents() flow.EventsList {
+func (er *BlockExecutionResults) AllServiceEvents() flow.EventsList {
 	res := make(flow.EventsList, 0)
 	for _, sv := range er.ServiceEvents {
 		if len(sv) > 0 {
@@ -97,7 +95,7 @@ func (er *ExecutionResults) AllServiceEvents() flow.EventsList {
 	return res
 }
 
-func (er *ExecutionResults) AllConvertedServiceEvents() flow.ServiceEventList {
+func (er *BlockExecutionResults) AllConvertedServiceEvents() flow.ServiceEventList {
 	res := make(flow.ServiceEventList, 0)
 	for _, sv := range er.ConvertedServiceEvents {
 		if len(sv) > 0 {
@@ -107,26 +105,24 @@ func (er *ExecutionResults) AllConvertedServiceEvents() flow.ServiceEventList {
 	return res
 }
 
-// AttestationResults captures results of post-processsing execution results
-type AttestationResults struct {
-	AttestedColCounter int
-	EventsHashes       []flow.Identifier
-	Chunks             []*flow.Chunk
-	ChunkDataPacks     []*flow.ChunkDataPack
-	EndState           flow.StateCommitment
+// BlockAttestationResults captures results of post-processsing execution results
+type BlockAttestationResults struct {
+	EventsHashes   []flow.Identifier
+	Chunks         []*flow.Chunk
+	ChunkDataPacks []*flow.ChunkDataPack
+	EndState       flow.StateCommitment
 	*execution_data.BlockExecutionData
 }
 
-func NewEmptyAttestationResults(
+func NewEmptyBlockAttestationResults(
 	block *entity.ExecutableBlock,
-) *AttestationResults {
+) *BlockAttestationResults {
 	numCollections := len(block.CompleteCollections) + 1
-	return &AttestationResults{
-		AttestedColCounter: 0,
-		EventsHashes:       make([]flow.Identifier, 0, numCollections),
-		Chunks:             make([]*flow.Chunk, 0, numCollections),
-		ChunkDataPacks:     make([]*flow.ChunkDataPack, 0, numCollections),
-		EndState:           *block.StartState,
+	return &BlockAttestationResults{
+		EventsHashes:   make([]flow.Identifier, 0, numCollections),
+		Chunks:         make([]*flow.Chunk, 0, numCollections),
+		ChunkDataPacks: make([]*flow.ChunkDataPack, 0, numCollections),
+		EndState:       *block.StartState,
 		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: make(
@@ -137,11 +133,11 @@ func NewEmptyAttestationResults(
 	}
 }
 
-func (cr *AttestationResults) AttestedCollection(colIndex int) *AttestedColSnapshot {
-	if colIndex < 0 && colIndex > cr.AttestedColCounter {
+func (cr *BlockAttestationResults) AttestedCollection(colIndex int) *CollectionAttestationResult {
+	if colIndex < 0 && colIndex > len(cr.Chunks) {
 		return nil
 	}
-	return &AttestedColSnapshot{
+	return &CollectionAttestationResult{
 		startStateCommit: cr.Chunks[colIndex].StartState,
 		endStateCommit:   cr.Chunks[colIndex].EndState,
 		stateProof:       cr.ChunkDataPacks[colIndex].Proof,
@@ -149,7 +145,7 @@ func (cr *AttestationResults) AttestedCollection(colIndex int) *AttestedColSnaps
 	}
 }
 
-type ColResSnapshot struct {
+type CollectionExecutionResult struct {
 	blockHeader            *flow.Header
 	collection             *flow.Collection
 	collectionIndex        int
@@ -163,78 +159,78 @@ type ColResSnapshot struct {
 	executionSnapshot      *state.ExecutionSnapshot
 }
 
-func (c *ColResSnapshot) BlockHeader() *flow.Header {
+func (c *CollectionExecutionResult) BlockHeader() *flow.Header {
 	return c.blockHeader
 }
 
-func (c *ColResSnapshot) Collection() *flow.Collection {
+func (c *CollectionExecutionResult) Collection() *flow.Collection {
 	return c.collection
 }
 
-func (c *ColResSnapshot) CollectionIndex() int {
+func (c *CollectionExecutionResult) CollectionIndex() int {
 	return c.collectionIndex
 }
 
-func (c *ColResSnapshot) IsSystemCollection() bool {
+func (c *CollectionExecutionResult) IsSystemCollection() bool {
 	return c.isSystemCollection
 }
 
-func (c *ColResSnapshot) UpdatedRegisters() flow.RegisterEntries {
+func (c *CollectionExecutionResult) UpdatedRegisters() flow.RegisterEntries {
 	return c.updatedRegisters
 }
 
-func (c *ColResSnapshot) ReadRegisterIDs() flow.RegisterIDs {
+func (c *CollectionExecutionResult) ReadRegisterIDs() flow.RegisterIDs {
 	return c.readRegisterIDs
 }
 
-func (c *ColResSnapshot) EmittedEvents() flow.EventsList {
+func (c *CollectionExecutionResult) EmittedEvents() flow.EventsList {
 	return c.emittedEvents
 }
 
-func (c *ColResSnapshot) ServiceEventList() flow.EventsList {
+func (c *CollectionExecutionResult) ServiceEventList() flow.EventsList {
 	return c.serviceEvents
 }
 
-func (c *ColResSnapshot) ConvertedServiceEvents() flow.ServiceEventList {
+func (c *CollectionExecutionResult) ConvertedServiceEvents() flow.ServiceEventList {
 	return c.convertedServiceEvents
 }
 
-func (c *ColResSnapshot) TransactionResults() flow.TransactionResults {
+func (c *CollectionExecutionResult) TransactionResults() flow.TransactionResults {
 	return c.transactionResults
 }
 
-func (c *ColResSnapshot) SpockData() []byte {
+func (c *CollectionExecutionResult) SpockData() []byte {
 	return c.executionSnapshot.SpockSecret
 }
 
-func (c *ColResSnapshot) TotalComputationUsed() uint {
+func (c *CollectionExecutionResult) TotalComputationUsed() uint {
 	return uint(c.executionSnapshot.TotalComputationUsed())
 }
 
-func (c *ColResSnapshot) ExecutionSnapshot() *state.ExecutionSnapshot {
+func (c *CollectionExecutionResult) ExecutionSnapshot() *state.ExecutionSnapshot {
 	return c.executionSnapshot
 }
 
-type AttestedColSnapshot struct {
-	ColResSnapshot
+type CollectionAttestationResult struct {
+	CollectionExecutionResult
 	startStateCommit flow.StateCommitment
 	endStateCommit   flow.StateCommitment
 	stateProof       flow.StorageProof
 	eventCommit      flow.Identifier
 }
 
-func (a *AttestedColSnapshot) StartStateCommitment() flow.StateCommitment {
+func (a *CollectionAttestationResult) StartStateCommitment() flow.StateCommitment {
 	return a.startStateCommit
 }
 
-func (a *AttestedColSnapshot) EndStateCommitment() flow.StateCommitment {
+func (a *CollectionAttestationResult) EndStateCommitment() flow.StateCommitment {
 	return a.endStateCommit
 }
 
-func (a *AttestedColSnapshot) StateProof() flow.StorageProof {
+func (a *CollectionAttestationResult) StateProof() flow.StorageProof {
 	return a.stateProof
 }
 
-func (a *AttestedColSnapshot) EventListCommitment() flow.Identifier {
+func (a *CollectionAttestationResult) EventListCommitment() flow.Identifier {
 	return a.eventCommit
 }

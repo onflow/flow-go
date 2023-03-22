@@ -208,13 +208,13 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 			Block:               testBlock,
 			CompleteCollections: expectedCompleteCollections,
 		},
-		ExecutionResults: &execution.ExecutionResults{
+		BlockExecutionResults: &execution.BlockExecutionResults{
 			Events: []flow.EventsList{testEvents},
 			TransactionResults: []flow.TransactionResult{
 				testTransactionResult,
 			},
 		},
-		AttestationResults: &execution.AttestationResults{
+		BlockAttestationResults: &execution.BlockAttestationResults{
 			EndState: testStateCommit,
 			BlockExecutionData: &execution_data.BlockExecutionData{
 				BlockID: testBlockID,

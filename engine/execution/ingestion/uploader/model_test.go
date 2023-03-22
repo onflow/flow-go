@@ -112,7 +112,7 @@ func generateComputationResult(
 				{unittest.IdentifierFixture()},
 				{unittest.IdentifierFixture()},
 			}),
-			ExecutionResults: &execution.ExecutionResults{
+			BlockExecutionResults: &execution.BlockExecutionResults{
 				Events: []flow.EventsList{
 					{
 						unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
@@ -141,7 +141,7 @@ func generateComputationResult(
 				},
 				TransactionResultIndex: []int{1, 1, 2, 2},
 			},
-			AttestationResults: &execution.AttestationResults{
+			BlockAttestationResults: &execution.BlockAttestationResults{
 				BlockExecutionData: &execution_data.BlockExecutionData{
 					ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 						&execution_data.ChunkExecutionData{

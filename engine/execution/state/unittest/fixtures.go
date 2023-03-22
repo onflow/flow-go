@@ -89,12 +89,12 @@ func ComputationResultForBlockFixture(
 
 	return &execution.ComputationResult{
 		ExecutableBlock: completeBlock,
-		ExecutionResults: &execution.ExecutionResults{
+		BlockExecutionResults: &execution.BlockExecutionResults{
 			StateSnapshots:         stateSnapshots,
 			Events:                 events,
 			TransactionResultIndex: make([]int, numChunks),
 		},
-		AttestationResults: &execution.AttestationResults{
+		BlockAttestationResults: &execution.BlockAttestationResults{
 			EventsHashes:   eventHashes,
 			ChunkDataPacks: chunkDataPacks,
 			EndState:       *completeBlock.StartState,

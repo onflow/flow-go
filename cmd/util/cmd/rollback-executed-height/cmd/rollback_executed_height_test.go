@@ -87,12 +87,12 @@ func TestReExecuteBlock(t *testing.T) {
 
 		computationResult := &execution.ComputationResult{
 			ExecutableBlock: executableBlock,
-			ExecutionResults: &execution.ExecutionResults{
+			BlockExecutionResults: &execution.BlockExecutionResults{
 				Events:             []flow.EventsList{blockEvents.Events},
 				ServiceEvents:      []flow.EventsList{se.Events},
 				TransactionResults: tes,
 			},
-			AttestationResults: &execution.AttestationResults{
+			BlockAttestationResults: &execution.BlockAttestationResults{
 				EndState:       endState,
 				ChunkDataPacks: cdp,
 			},
@@ -236,12 +236,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		computationResult := &execution.ComputationResult{
 			ExecutableBlock: executableBlock,
-			ExecutionResults: &execution.ExecutionResults{
+			BlockExecutionResults: &execution.BlockExecutionResults{
 				Events:             []flow.EventsList{blockEvents.Events},
 				ServiceEvents:      []flow.EventsList{se.Events},
 				TransactionResults: tes,
 			},
-			AttestationResults: &execution.AttestationResults{
+			BlockAttestationResults: &execution.BlockAttestationResults{
 				EndState:       endState,
 				ChunkDataPacks: cdp,
 			},
@@ -305,12 +305,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		computationResult2 := &execution.ComputationResult{
 			ExecutableBlock: executableBlock,
-			ExecutionResults: &execution.ExecutionResults{
+			BlockExecutionResults: &execution.BlockExecutionResults{
 				Events:             []flow.EventsList{blockEvents.Events},
 				ServiceEvents:      []flow.EventsList{se.Events},
 				TransactionResults: tes,
 			},
-			AttestationResults: &execution.AttestationResults{
+			BlockAttestationResults: &execution.BlockAttestationResults{
 				EndState:       endState2,
 				ChunkDataPacks: cdp2,
 			},
