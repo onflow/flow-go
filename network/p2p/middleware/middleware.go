@@ -178,9 +178,10 @@ func NewMiddleware(
 
 	builder := component.NewComponentManagerBuilder()
 	for _, limiter := range mw.unicastRateLimiters.Limiters() {
+		rateLimiter := limiter
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			limiter.CleanupLoop(ctx)
+			rateLimiter.Start(ctx)
 		})
 	}
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -200,9 +201,6 @@ func NewMiddleware(
 		mw.wg.Wait()
 
 		mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
-
-		mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
-
 	})
 
 	mw.Component = builder.Build()

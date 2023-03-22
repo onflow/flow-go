@@ -3,7 +3,6 @@
 package mockp2p
 
 import (
-	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -26,11 +25,6 @@ func (_m *RateLimiter) Allow(peerID peer.ID, msgSize int) bool {
 	}
 
 	return r0
-}
-
-// CleanupLoop provides a mock function with given fields: ctx
-func (_m *RateLimiter) CleanupLoop(ctx irrecoverable.SignalerContext) {
-	_m.Called(ctx)
 }
 
 // IsRateLimited provides a mock function with given fields: peerID

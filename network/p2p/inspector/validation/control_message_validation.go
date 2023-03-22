@@ -82,6 +82,8 @@ type ControlMsgValidationInspector struct {
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubAppSpecificRpcInspector = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
 func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgRequest {
@@ -120,9 +122,10 @@ func NewControlMsgValidationInspector(
 	builder := component.NewComponentManagerBuilder()
 	// start rate limiters cleanup loop in workers
 	for _, conf := range c.config.allCtrlMsgValidationConfig() {
+		validationConfig := conf
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			conf.RateLimiter.CleanupLoop(ctx)
+			validationConfig.RateLimiter.Start(ctx)
 		})
 	}
 	for i := 0; i < c.config.NumberOfWorkers; i++ {

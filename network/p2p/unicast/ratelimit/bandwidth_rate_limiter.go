@@ -7,20 +7,20 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 )
 
 // BandWidthRateLimiter unicast rate limiter that limits the bandwidth that can be sent
 // by a peer per some configured interval.
 type BandWidthRateLimiter struct {
-	*utils.RateLimiter
+	*ratelimiter.RateLimiter
 }
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiter. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
 func NewBandWidthRateLimiter(limit rate.Limit, burst int, lockout time.Duration, opts ...p2p.RateLimiterOpt) *BandWidthRateLimiter {
 	l := &BandWidthRateLimiter{
-		RateLimiter: utils.NewRateLimiter(limit, burst, lockout, opts...),
+		RateLimiter: ratelimiter.NewRateLimiter(limit, burst, lockout, opts...),
 	}
 
 	return l

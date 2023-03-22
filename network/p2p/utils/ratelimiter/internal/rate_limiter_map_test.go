@@ -1,7 +1,8 @@
-package utils_test
+package internal_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter/internal"
 	"testing"
 	"time"
 
@@ -10,13 +11,12 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
 func TestLimiterMap_get(t *testing.T) {
 	t.Parallel()
-	m := utils.NewLimiterMap(time.Second, time.Second)
+	m := internal.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -29,7 +29,7 @@ func TestLimiterMap_get(t *testing.T) {
 // TestLimiterMap_remove checks the map removes keys as expected.
 func TestLimiterMap_remove(t *testing.T) {
 	t.Parallel()
-	m := utils.NewLimiterMap(time.Second, time.Second)
+	m := internal.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
 
@@ -51,7 +51,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	// set short tick to kick off cleanup
 	tick := 10 * time.Millisecond
 
-	m := utils.NewLimiterMap(ttl, tick)
+	m := internal.NewLimiterMap(ttl, tick)
 
 	start := time.Now()
 
@@ -100,7 +100,7 @@ func TestLimiterMap_cleanupLoopCtxCanceled(t *testing.T) {
 	// set long tick so that clean up is only done when ctx is canceled
 	tick := time.Hour
 
-	m := utils.NewLimiterMap(ttl, tick)
+	m := internal.NewLimiterMap(ttl, tick)
 
 	start := time.Now()
 

@@ -1,4 +1,4 @@
-package utils
+package internal
 
 import (
 	"sync"
@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-type RateLimiterMetadata struct {
+type rateLimiterMetadata struct {
 	mu *sync.RWMutex
 	// limiter the rate limiter
 	limiter *rate.Limiter
@@ -20,9 +20,9 @@ type RateLimiterMetadata struct {
 	lastAccessed time.Time
 }
 
-// newRateLimiterMetadata returns a new RateLimiterMetadata
-func newRateLimiterMetadata(limiter *rate.Limiter) *RateLimiterMetadata {
-	return &RateLimiterMetadata{
+// newRateLimiterMetadata returns a new rateLimiterMetadata
+func newRateLimiterMetadata(limiter *rate.Limiter) *rateLimiterMetadata {
+	return &rateLimiterMetadata{
 		mu:            &sync.RWMutex{},
 		limiter:       limiter,
 		lastAccessed:  time.Now(),
@@ -30,42 +30,42 @@ func newRateLimiterMetadata(limiter *rate.Limiter) *RateLimiterMetadata {
 	}
 }
 
-// Limiter returns RateLimiterMetadata.limiter..
-func (m *RateLimiterMetadata) Limiter() *rate.Limiter {
+// Limiter returns rateLimiterMetadata.limiter..
+func (m *rateLimiterMetadata) Limiter() *rate.Limiter {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.limiter
 }
 
-// LastRateLimit returns RateLimiterMetadata.lastRateLimit.
-func (m *RateLimiterMetadata) LastRateLimit() time.Time {
+// LastRateLimit returns rateLimiterMetadata.lastRateLimit.
+func (m *rateLimiterMetadata) LastRateLimit() time.Time {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.lastRateLimit
 }
 
-// SetLastRateLimit sets RateLimiterMetadata.lastRateLimit.
-func (m *RateLimiterMetadata) SetLastRateLimit(lastRateLimit time.Time) {
+// SetLastRateLimit sets rateLimiterMetadata.lastRateLimit.
+func (m *rateLimiterMetadata) SetLastRateLimit(lastRateLimit time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lastRateLimit = lastRateLimit
 }
 
-// LastAccessed returns RateLimiterMetadata.lastAccessed.
-func (m *RateLimiterMetadata) LastAccessed() time.Time {
+// LastAccessed returns rateLimiterMetadata.lastAccessed.
+func (m *rateLimiterMetadata) LastAccessed() time.Time {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.lastAccessed
 }
 
-// SetLastAccessed sets RateLimiterMetadata.lastAccessed.
-func (m *RateLimiterMetadata) SetLastAccessed(lastAccessed time.Time) {
+// SetLastAccessed sets rateLimiterMetadata.lastAccessed.
+func (m *rateLimiterMetadata) SetLastAccessed(lastAccessed time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lastAccessed = lastAccessed
 }
 
-// RateLimiterMap stores a RateLimiterMetadata for each peer in an underlying map.
+// RateLimiterMap stores a rateLimiterMetadata for each peer in an underlying map.
 type RateLimiterMap struct {
 	// mu read write mutex used to synchronize updates to the rate limiter map.
 	mu sync.RWMutex
@@ -77,20 +77,20 @@ type RateLimiterMap struct {
 	// to free up unused resources.
 	cleanupInterval time.Duration
 	// limiters map that stores rate limiter metadata for each peer.
-	limiters map[peer.ID]*RateLimiterMetadata
+	limiters map[peer.ID]*rateLimiterMetadata
 }
 
 func NewLimiterMap(ttl, cleanupInterval time.Duration) *RateLimiterMap {
 	return &RateLimiterMap{
 		mu:              sync.RWMutex{},
-		limiters:        make(map[peer.ID]*RateLimiterMetadata),
+		limiters:        make(map[peer.ID]*rateLimiterMetadata),
 		ttl:             ttl,
 		cleanupInterval: cleanupInterval,
 	}
 }
 
 // Get returns limiter in RateLimiterMap map
-func (r *RateLimiterMap) Get(peerID peer.ID) (*RateLimiterMetadata, bool) {
+func (r *RateLimiterMap) Get(peerID peer.ID) (*rateLimiterMetadata, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if lmtr, ok := r.limiters[peerID]; ok {
@@ -107,7 +107,7 @@ func (r *RateLimiterMap) Store(peerID peer.ID, lmtr *rate.Limiter) {
 	r.limiters[peerID] = newRateLimiterMetadata(lmtr)
 }
 
-// UpdateLastRateLimit sets the lastRateLimit field of the RateLimiterMetadata for a peer.
+// UpdateLastRateLimit sets the lastRateLimit field of the rateLimiterMetadata for a peer.
 func (r *RateLimiterMap) UpdateLastRateLimit(peerID peer.ID, lastRateLimit time.Time) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

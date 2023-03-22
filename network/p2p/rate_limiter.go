@@ -3,7 +3,7 @@ package p2p
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/component"
 )
 
 // RateLimiter rate limiter with lockout feature that can be used via the IsRateLimited method.
@@ -16,12 +16,9 @@ type RateLimiter interface {
 
 // BasicRateLimiter rate limiter interface
 type BasicRateLimiter interface {
+	component.Component
 	// Allow returns true if a message with the give size should be allowed to be processed.
 	Allow(peerID peer.ID, msgSize int) bool
-
-	// CleanupLoop starts cleanup loop for underlying rate limiters and rate limited peers maps.
-	// This func blocks until the signaler context is canceled.
-	CleanupLoop(ctx irrecoverable.SignalerContext)
 }
 
 type RateLimiterOpt func(limiter RateLimiter)

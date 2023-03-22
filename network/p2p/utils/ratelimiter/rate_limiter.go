@@ -1,4 +1,4 @@
-package utils
+package ratelimiter
 
 import (
 	"time"
@@ -6,8 +6,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter/internal"
 )
 
 const (
@@ -17,8 +19,9 @@ const (
 
 // RateLimiter generic rate limiter
 type RateLimiter struct {
-	// limiters map that stores a rate limiter with metadata per peer.
-	limiters *RateLimiterMap
+	component.Component
+	// limiterMap map that stores a rate limiter with metadata per peer.
+	limiterMap *internal.RateLimiterMap
 	// limit amount of messages allowed per second.
 	limit rate.Limit
 	// burst amount of messages allowed at one time.
@@ -27,10 +30,13 @@ type RateLimiter struct {
 	rateLimitLockoutDuration time.Duration
 }
 
+var _ component.Component = (*RateLimiter)(nil)
+var _ p2p.RateLimiter = (*RateLimiter)(nil)
+
 // NewRateLimiter returns a new RateLimiter.
 func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, opts ...p2p.RateLimiterOpt) *RateLimiter {
 	l := &RateLimiter{
-		limiters:                 NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
+		limiterMap:               internal.NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
 		rateLimitLockoutDuration: lockoutDuration * time.Second,
@@ -40,16 +46,22 @@ func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, 
 		opt(l)
 	}
 
+	l.Component = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			l.limiterMap.CleanupLoop(ctx)
+		}).Build()
+
 	return l
 }
 
-// Allow checks the cached limiter for the peer and returns limiters.Allow().
+// Allow checks the cached limiter for the peer and returns limiterMap.Allow().
 // If a limiter is not cached for a peer one is created. This func can be overridden
 // and the message size parameter can be used with AllowN.
 func (r *RateLimiter) Allow(peerID peer.ID, _ int) bool {
 	limiter := r.GetLimiter(peerID)
 	if !limiter.AllowN(time.Now(), 1) {
-		r.limiters.UpdateLastRateLimit(peerID, time.Now())
+		r.limiterMap.UpdateLastRateLimit(peerID, time.Now())
 		return false
 	}
 
@@ -58,32 +70,26 @@ func (r *RateLimiter) Allow(peerID peer.ID, _ int) bool {
 
 // IsRateLimited returns true is a peer is currently rate limited.
 func (r *RateLimiter) IsRateLimited(peerID peer.ID) bool {
-	metadata, ok := r.limiters.Get(peerID)
+	metadata, ok := r.limiterMap.Get(peerID)
 	if !ok {
 		return false
 	}
 	return time.Since(metadata.LastRateLimit()) < r.rateLimitLockoutDuration
 }
 
-// CleanupLoop starts cleanup loop for underlying cache.
-// This func blocks until the signaler context is canceled.
-func (r *RateLimiter) CleanupLoop(ctx irrecoverable.SignalerContext) {
-	r.limiters.CleanupLoop(ctx)
-}
-
 // GetLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.
 func (r *RateLimiter) GetLimiter(peerID peer.ID) *rate.Limiter {
-	if metadata, ok := r.limiters.Get(peerID); ok {
+	if metadata, ok := r.limiterMap.Get(peerID); ok {
 		return metadata.Limiter()
 	}
 
 	limiter := rate.NewLimiter(r.limit, r.burst)
-	r.limiters.Store(peerID, limiter)
+	r.limiterMap.Store(peerID, limiter)
 
 	return limiter
 }
 
 // UpdateLastRateLimit updates the last time a peer was rate limited in the limiter map.
 func (r *RateLimiter) UpdateLastRateLimit(peerID peer.ID, lastRateLimit time.Time) {
-	r.limiters.UpdateLastRateLimit(peerID, lastRateLimit)
+	r.limiterMap.UpdateLastRateLimit(peerID, lastRateLimit)
 }

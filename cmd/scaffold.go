@@ -62,7 +62,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
-	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -318,7 +318,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
-		unicastMessageRateLimiter := utils.NewRateLimiter(
+		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
 			rate.Limit(fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit),
 			fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit,
 			fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration,
