@@ -42,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
@@ -379,12 +378,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		// setup gossip sub RPC control message inspector config
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.GossipSubRPCInspectorCacheSize)}
-		if fnb.HeroCacheMetricsEnable {
-			collector := metrics.GossipSubRPCInspectorQueueMetricFactory(fnb.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
-
+		heroStoreOpts := p2pbuilder.HeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, metrics.GossipSubRPCInspectorQueueMetricFactory(fnb.MetricsRegisterer))
 		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := p2pbuilder.GossipSubRPCInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, heroStoreOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
@@ -1017,11 +1011,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(fnb.DisallowListNotificationCacheSize)}
-		if fnb.HeroCacheMetricsEnable {
-			collector := metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
+		heroStoreOpts := p2pbuilder.HeroStoreOpts(fnb.DisallowListNotificationCacheSize, metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer))
 		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:

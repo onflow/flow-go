@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
@@ -45,6 +46,15 @@ type GossipSubRPCValidationConfigs struct {
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
+}
+
+// HeroStoreOpts returns hero store options.
+func HeroStoreOpts(cacheSize uint32, metricsCollector *metrics.HeroCacheCollector) []queue.HeroStoreConfigOption {
+	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(cacheSize)}
+	if metricsCollector != nil {
+		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(metricsCollector))
+	}
+	return heroStoreOpts
 }
 
 // GossipSubRPCInspector helper that sets up the gossipsub RPC validation inspector and notification distributor.
