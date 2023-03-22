@@ -281,14 +281,9 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 // All errors returned from this function can be considered benign.
 func SporkIDFromTopic(topic Topic) (flow.Identifier, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
-		sporkIDStr := string(topic)[index+1:]
-		if len(sporkIDStr) == 0 {
-			return flow.Identifier{}, nil
-		}
-		return flow.HexStringToIdentifier(sporkIDStr)
+		return flow.HexStringToIdentifier(string(topic)[index+1:])
 	}
-
-	return flow.Identifier{}, nil
+	return flow.Identifier{}, fmt.Errorf("spork ID is missing")
 }
 
 // ConsensusCluster returns a dynamic cluster consensus channel based on
