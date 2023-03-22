@@ -1,8 +1,6 @@
 package inspector
 
 import (
-	"sync"
-
 	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -13,30 +11,20 @@ import (
 // AggregateRPCInspector gossip sub RPC inspector that combines multiple RPC inspectors into a single inspector. Each
 // individual inspector will be invoked synchronously.
 type AggregateRPCInspector struct {
-	lock       sync.RWMutex
 	inspectors []p2p.GossipSubAppSpecificRpcInspector
 }
 
 var _ p2p.GossipSubAppSpecificRpcInspector = (*AggregateRPCInspector)(nil)
 
 // NewAggregateRPCInspector returns new aggregate RPC inspector.
-func NewAggregateRPCInspector() *AggregateRPCInspector {
+func NewAggregateRPCInspector(inspectors ...p2p.GossipSubAppSpecificRpcInspector) *AggregateRPCInspector {
 	return &AggregateRPCInspector{
-		inspectors: make([]p2p.GossipSubAppSpecificRpcInspector, 0),
+		inspectors: inspectors,
 	}
-}
-
-// AddInspector adds a new inspector to the list of inspectors.
-func (a *AggregateRPCInspector) AddInspector(inspector p2p.GossipSubAppSpecificRpcInspector) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.inspectors = append(a.inspectors, inspector)
 }
 
 // Inspect func with the p2p.GossipSubAppSpecificRpcInspector func signature that will invoke all the configured inspectors.
 func (a *AggregateRPCInspector) Inspect(peerID peer.ID, rpc *pubsub.RPC) error {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
 	var errs *multierror.Error
 	for _, inspector := range a.inspectors {
 		err := inspector.Inspect(peerID, rpc)
@@ -44,6 +32,5 @@ func (a *AggregateRPCInspector) Inspect(peerID peer.ID, rpc *pubsub.RPC) error {
 			errs = multierror.Append(errs, err)
 		}
 	}
-
 	return errs.ErrorOrNil()
 }
