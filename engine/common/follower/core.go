@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/module/component"
@@ -51,6 +52,8 @@ type Core struct {
 	certifiedBlocksChan chan CertifiedBlocks // delivers batches of certified blocks to main core worker
 	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
 }
+
+var _ common.FollowerCore = (*Core)(nil)
 
 func NewCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
@@ -209,7 +212,7 @@ func NewCore(log zerolog.Logger,
 //	return nil
 //}
 
-func (c *Core) OnBlockBatch(originID flow.Identifier, batch []*flow.Block) error {
+func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
 	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
 		return fmt.Errorf("could not add batch of pendingCache blocks: %w", err)

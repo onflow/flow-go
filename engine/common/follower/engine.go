@@ -1,8 +1,8 @@
 package follower
 
 import (
-	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -67,7 +67,7 @@ type Engine struct {
 	pendingBlocksNotifier  engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker  *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier engine.Notifier             // notifies when the latest finalized block changes
-	core                   *Core                       // performs actual processing of incoming messages.
+	core                   common.FollowerCore         // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -78,7 +78,7 @@ func New(
 	net network.Network,
 	me module.Local,
 	engMetrics module.EngineMetrics,
-	core *Core,
+	core common.FollowerCore,
 	opts ...EngineOption,
 ) (*Engine, error) {
 	// FIFO queue for block proposals
@@ -211,7 +211,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 			indexOfLastConnected := 0
 			for i := 1; i < len(blocks); i++ {
 				if blocks[i].Header.ParentID != parentID {
-					err = e.core.OnBlockBatch(batch.OriginID, blocks[indexOfLastConnected:i])
+					err = e.core.OnBlockRange(batch.OriginID, blocks[indexOfLastConnected:i])
 					if err != nil {
 						return fmt.Errorf("could not process batch: %w", err)
 					}
@@ -219,7 +219,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 				}
 			}
 
-			err = e.core.OnBlockBatch(batch.OriginID, blocks[indexOfLastConnected:])
+			err = e.core.OnBlockRange(batch.OriginID, blocks[indexOfLastConnected:])
 			if err != nil {
 				return fmt.Errorf("could not process batch: %w", err)
 			}
@@ -246,35 +246,35 @@ func (e *Engine) validateAndFilterBatch(msg flow.Slashable[[]*messages.BlockProp
 			continue
 		}
 
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
-		// skip block if it's already in cache
-		if b := e.core.pendingCache.Peek(hotstuffProposal.Block.BlockID); b != nil {
-			continue
-		}
-
-		err := e.core.validator.ValidateProposal(hotstuffProposal)
-		if err != nil {
-			if model.IsInvalidBlockError(err) {
-				// TODO potential slashing
-				e.log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
-				continue
-			}
-			if errors.Is(err, model.ErrViewForUnknownEpoch) {
-				// We have received a proposal, but we don't know the epoch its view is within.
-				// We know:
-				//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
-				//  - if we then see this for the child, one of two things must have happened:
-				//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
-				//      -> in this case we can disregard the block
-				//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
-				//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
-				//      -> in this case, the network has encountered a critical failure
-				//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
-				e.log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
-				continue
-			}
-			return nil, fmt.Errorf("unexpected error validating proposal: %w", err)
-		}
+		//hotstuffProposal := model.ProposalFromFlow(block.Header)
+		//// skip block if it's already in cache
+		//if b := e.core.pendingCache.Peek(hotstuffProposal.Block.BlockID); b != nil {
+		//	continue
+		//}
+		//
+		//err := e.core.validator.ValidateProposal(hotstuffProposal)
+		//if err != nil {
+		//	if model.IsInvalidBlockError(err) {
+		//		// TODO potential slashing
+		//		e.log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+		//		continue
+		//	}
+		//	if errors.Is(err, model.ErrViewForUnknownEpoch) {
+		//		// We have received a proposal, but we don't know the epoch its view is within.
+		//		// We know:
+		//		//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+		//		//  - if we then see this for the child, one of two things must have happened:
+		//		//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+		//		//      -> in this case we can disregard the block
+		//		//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+		//		//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+		//		//      -> in this case, the network has encountered a critical failure
+		//		//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+		//		e.log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+		//		continue
+		//	}
+		//	return nil, fmt.Errorf("unexpected error validating proposal: %w", err)
+		//}
 		filtered = append(filtered, block)
 	}
 	return filtered, nil
