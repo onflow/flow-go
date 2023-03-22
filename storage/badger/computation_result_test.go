@@ -177,49 +177,50 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 			{unittest.IdentifierFixture()},
 			{unittest.IdentifierFixture()},
 		}),
-		StateSnapshots: nil,
-		Events: []flow.EventsList{
-			{
-				unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+		ExecutionResults: &execution.ExecutionResults{
+			Events: []flow.EventsList{
+				{
+					unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+				},
+				{},
+				{
+					unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
+					unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
+					unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+				},
+				{}, // system chunk events
 			},
-			{},
-			{
-				unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
-				unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
-				unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+			TransactionResults: []flow.TransactionResult{
+				{
+					TransactionID:   unittest.IdentifierFixture(),
+					ErrorMessage:    "",
+					ComputationUsed: 23,
+				},
+				{
+					TransactionID:   unittest.IdentifierFixture(),
+					ErrorMessage:    "fail",
+					ComputationUsed: 1,
+				},
 			},
-			{}, // system chunk events
+			TransactionResultIndex: []int{1, 1, 2, 2},
 		},
-		EventsHashes:  nil,
-		ServiceEvents: nil,
-		TransactionResults: []flow.TransactionResult{
-			{
-				TransactionID:   unittest.IdentifierFixture(),
-				ErrorMessage:    "",
-				ComputationUsed: 23,
-			},
-			{
-				TransactionID:   unittest.IdentifierFixture(),
-				ErrorMessage:    "fail",
-				ComputationUsed: 1,
-			},
-		},
-		TransactionResultIndex: []int{1, 1, 2, 2},
-		BlockExecutionData: &execution_data.BlockExecutionData{
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: trieUpdate1,
-				},
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: trieUpdate2,
-				},
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: trieUpdate3,
-				},
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: trieUpdate4,
+		AttestationResults: &execution.AttestationResults{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate1,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate2,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate3,
+					},
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: trieUpdate4,
+					},
 				},
 			},
 		},
