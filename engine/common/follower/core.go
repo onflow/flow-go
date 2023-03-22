@@ -4,24 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type ComplianceOption func(*Core)
@@ -218,27 +218,47 @@ func NewCore(log zerolog.Logger,
 //}
 
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
+	if len(batch) < 1 {
+		return nil
+	}
+
+	lastBlock := batch[len(batch)-1]
+	hotstuffProposal := model.ProposalFromFlow(lastBlock.Header)
+
+	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
+		// if last block is in cache it means that we can skip validation since it was already validated
+		// otherwise we must validate it to proof validity of blocks range.
+		err := c.validator.ValidateProposal(hotstuffProposal)
+		if err != nil {
+			if model.IsInvalidBlockError(err) {
+				// TODO potential slashing
+				log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+				return nil
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We have received a proposal, but we don't know the epoch its view is within.
+				// We know:
+				//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+				//  - if we then see this for the child, one of two things must have happened:
+				//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+				//      -> in this case we can disregard the block
+				//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+				//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+				//      -> in this case, the network has encountered a critical failure
+				//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+				log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+				return nil
+			}
+			return fmt.Errorf("unexpected error validating proposal: %w", err)
+		}
+	}
+
 	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
-		return fmt.Errorf("could not add batch of pendingCache blocks: %w", err)
-	}
-	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedBatch))
-	for i := 0; i < len(certifiedBatch); i++ {
-		block := certifiedBatch[i]
-		var qc *flow.QuorumCertificate
-		if i < len(certifiedBatch)-1 {
-			qc = certifiedBatch[i+1].Header.QuorumCertificate()
-		} else {
-			qc = certifyingQC
-		}
-		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
-			Block: block,
-			QC:    qc,
-		})
+		return fmt.Errorf("could not add a range of pending blocks: %w", err)
 	}
 
-	c.certifiedBlocksChan <- certifiedBlocks
-
+	c.certifiedBlocksChan <- rangeToCertifiedBlocks(certifiedBatch, certifyingQC)
 	return nil
 }
 
@@ -372,5 +392,31 @@ func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
 }
 
 func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
-	panic("implement me")
+	certifiedBlocks, err := c.pendingTree.FinalizeFork(finalized)
+	if err != nil {
+		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View)
+	}
+	err = c.processCertifiedBlocks(certifiedBlocks)
+	if err != nil {
+		return fmt.Errorf("could not process certified blocks resolved during finalization: %w", err)
+	}
+	return nil
+}
+
+func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) CertifiedBlocks {
+	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
+	for i := 0; i < len(certifiedRange); i++ {
+		block := certifiedRange[i]
+		var qc *flow.QuorumCertificate
+		if i < len(certifiedRange)-1 {
+			qc = certifiedRange[i+1].Header.QuorumCertificate()
+		} else {
+			qc = certifyingQC
+		}
+		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
+			Block: block,
+			QC:    qc,
+		})
+	}
+	return certifiedBlocks
 }
