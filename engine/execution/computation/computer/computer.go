@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -126,6 +127,7 @@ type blockComputer struct {
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
+	colResCons            []result.ExecutedCollectionConsumer
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -152,6 +154,7 @@ func NewBlockComputer(
 	committer ViewCommitter,
 	signer module.Local,
 	executionDataProvider *provider.Provider,
+	colResCons []result.ExecutedCollectionConsumer,
 ) (BlockComputer, error) {
 	systemChunkCtx := SystemChunkContext(vmCtx, logger)
 	vmCtx = fvm.NewContextFromParent(
@@ -170,6 +173,7 @@ func NewBlockComputer(
 		signer:                signer,
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
+		colResCons:            colResCons,
 	}, nil
 }
 
@@ -303,7 +307,8 @@ func (e *blockComputer) executeBlock(
 		e.receiptHasher,
 		parentBlockExecutionResultID,
 		block,
-		len(transactions))
+		len(transactions),
+		e.colResCons)
 	defer collector.Stop()
 
 	stateView := delta.NewDeltaView(snapshot)

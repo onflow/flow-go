@@ -139,7 +139,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -777,6 +778,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
+		nil,
 	)
 	require.NoError(t, err)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -41,6 +42,7 @@ type transactionResult struct {
 	*state.ExecutionSnapshot
 }
 
+// TODO(ramtin): move committer and other folks to consumers layer
 type resultCollector struct {
 	tracer    module.Tracer
 	blockSpan otelTrace.Span
@@ -62,7 +64,8 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result *execution.ComputationResult
+	result    *execution.ComputationResult
+	consumers []result.ExecutedCollectionConsumer
 
 	chunks                 []*flow.Chunk
 	spockSignatures        []crypto.Signature
@@ -88,6 +91,7 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numTransactions int,
+	consumers []result.ExecutedCollectionConsumer,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -104,6 +108,7 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
+		consumers:                    consumers,
 		chunks:                       make([]*flow.Chunk, 0, numCollections),
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
@@ -224,6 +229,13 @@ func (collector *resultCollector) commitCollection(
 	collector.currentCollectionView = delta.NewDeltaView(nil)
 	collector.currentCollectionStats = module.ExecutionResultStats{
 		NumberOfCollections: 1,
+	}
+
+	for _, consumer := range collector.consumers {
+		err = consumer.OnExecutedCollection(collector.result.CollectionResult(collection.collectionIndex))
+		if err != nil {
+			return fmt.Errorf("consumer failed: %w", err)
+		}
 	}
 
 	return nil
