@@ -127,7 +127,8 @@ func TestInspect_DiscardThreshold(t *testing.T) {
 		Twice().
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
@@ -195,7 +196,8 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 		Times(4).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
@@ -275,7 +277,8 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 		Times(8).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))
 			require.True(t, messageCount == notification.Count || notification.Count == 3)
