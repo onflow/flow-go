@@ -30,8 +30,8 @@ func NewControlMessageRateLimiter(limit rate.Limit, burst int) p2p.BasicRateLimi
 // If a limiter is not cached for a peer one is created.
 func (c *ControlMessageRateLimiter) Allow(peerID peer.ID, n int) bool {
 	limiter := c.GetLimiter(peerID)
-	if !limiter.AllowN(c.Now(), n) {
-		c.UpdateLastRateLimit(peerID, c.Now())
+	if !limiter.AllowN(time.Now(), n) {
+		c.UpdateLastRateLimit(peerID, time.Now())
 		return false
 	}
 

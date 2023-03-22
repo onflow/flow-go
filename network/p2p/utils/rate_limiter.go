@@ -10,10 +10,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-var (
-	defaultGetTimeNowFunc = time.Now
-)
-
 const (
 	cleanUpTickInterval = 10 * time.Minute
 	rateLimiterTTL      = 10 * time.Minute
@@ -27,9 +23,6 @@ type RateLimiter struct {
 	limit rate.Limit
 	// burst amount of messages allowed at one time.
 	burst int
-	// now func that returns timestamp used to rate limit.
-	// The default time.Now func is used.
-	now p2p.GetTimeNow
 	// rateLimitLockoutDuration the amount of time that has to pass before a peer is allowed to connect.
 	rateLimitLockoutDuration time.Duration
 }
@@ -40,7 +33,6 @@ func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, 
 		limiters:                 NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
-		now:                      defaultGetTimeNowFunc,
 		rateLimitLockoutDuration: lockoutDuration * time.Second,
 	}
 
@@ -56,8 +48,8 @@ func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, 
 // and the message size parameter can be used with AllowN.
 func (r *RateLimiter) Allow(peerID peer.ID, _ int) bool {
 	limiter := r.GetLimiter(peerID)
-	if !limiter.AllowN(r.now(), 1) {
-		r.limiters.UpdateLastRateLimit(peerID, r.now())
+	if !limiter.AllowN(time.Now(), 1) {
+		r.limiters.UpdateLastRateLimit(peerID, time.Now())
 		return false
 	}
 
@@ -77,16 +69,6 @@ func (r *RateLimiter) IsRateLimited(peerID peer.ID) bool {
 // This func blocks until the signaler context is canceled.
 func (r *RateLimiter) CleanupLoop(ctx irrecoverable.SignalerContext) {
 	r.limiters.CleanupLoop(ctx)
-}
-
-// SetTimeNowFunc overrides the default time.Now func with the GetTimeNow func provided.
-func (r *RateLimiter) SetTimeNowFunc(now p2p.GetTimeNow) {
-	r.now = now
-}
-
-// Now return the time according to the configured GetTimeNow func
-func (r *RateLimiter) Now() time.Time {
-	return r.now()
 }
 
 // GetLimiter returns limiter for the peerID, if a limiter does not exist one is created and stored.

@@ -1,8 +1,6 @@
 package p2p
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -21,28 +19,12 @@ type BasicRateLimiter interface {
 	// Allow returns true if a message with the give size should be allowed to be processed.
 	Allow(peerID peer.ID, msgSize int) bool
 
-	// SetTimeNowFunc allows users to override the underlying time module used.
-	SetTimeNowFunc(now GetTimeNow)
-
-	// Now returns the time using the configured GetTimeNow func.
-	Now() time.Time
-
 	// CleanupLoop starts cleanup loop for underlying rate limiters and rate limited peers maps.
 	// This func blocks until the signaler context is canceled.
 	CleanupLoop(ctx irrecoverable.SignalerContext)
 }
 
-// GetTimeNow callback used to get the current time. This allows us to improve testing by manipulating the current time
-// as opposed to using time.Now directly.
-type GetTimeNow func() time.Time
-
 type RateLimiterOpt func(limiter RateLimiter)
-
-func WithGetTimeNowFunc(now GetTimeNow) RateLimiterOpt {
-	return func(limiter RateLimiter) {
-		limiter.SetTimeNowFunc(now)
-	}
-}
 
 // UnicastRateLimiterDistributor consumes then distributes notifications from the ratelimit.RateLimiters whenever a peer is rate limited.
 type UnicastRateLimiterDistributor interface {

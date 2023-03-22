@@ -31,8 +31,8 @@ func NewBandWidthRateLimiter(limit rate.Limit, burst int, lockout time.Duration,
 // If a limiter is not cached one is created.
 func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msgSize int) bool {
 	limiter := b.GetLimiter(peerID)
-	if !limiter.AllowN(b.Now(), msgSize) {
-		b.UpdateLastRateLimit(peerID, b.Now())
+	if !limiter.AllowN(time.Now(), msgSize) {
+		b.UpdateLastRateLimit(peerID, time.Now())
 		return false
 	}
 
