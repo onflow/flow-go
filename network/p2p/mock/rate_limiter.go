@@ -3,6 +3,7 @@
 package mockp2p
 
 import (
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -27,6 +28,22 @@ func (_m *RateLimiter) Allow(peerID peer.ID, msgSize int) bool {
 	return r0
 }
 
+// Done provides a mock function with given fields:
+func (_m *RateLimiter) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // IsRateLimited provides a mock function with given fields: peerID
 func (_m *RateLimiter) IsRateLimited(peerID peer.ID) bool {
 	ret := _m.Called(peerID)
@@ -39,6 +56,27 @@ func (_m *RateLimiter) IsRateLimited(peerID peer.ID) bool {
 	}
 
 	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *RateLimiter) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *RateLimiter) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }
 
 type mockConstructorTestingTNewRateLimiter interface {
