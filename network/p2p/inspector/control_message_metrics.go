@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
-// ControlMsgMetricsInspector a gossip sub RPC inspector that will observe incoming RPC's and collect metrics related to control messages.
+// ControlMsgMetricsInspector a  GossipSub RPC inspector that will observe incoming RPC's and collect metrics related to control messages.
 type ControlMsgMetricsInspector struct {
 	metrics *p2pnode.GossipSubControlMessageMetrics
 }
