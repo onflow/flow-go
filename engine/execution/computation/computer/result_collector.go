@@ -68,7 +68,6 @@ type resultCollector struct {
 	consumers []result.ExecutedCollectionConsumer
 
 	spockSignatures []crypto.Signature
-	receipt         *flow.ExecutionReceipt
 
 	blockStartTime time.Time
 	blockStats     module.ExecutionResultStats
@@ -165,9 +164,9 @@ func (collector *resultCollector) commitCollection(
 		chunkExecData,
 	)
 
-	// collector.metrics.ExecutionChunkDataPackGenerated(
-	// 	len(proof),
-	// 	len(collection.Transactions))
+	collector.metrics.ExecutionChunkDataPackGenerated(
+		len(proof),
+		len(collection.Transactions))
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
