@@ -1,15 +1,15 @@
 # eventually, DOCKER_TAG will use the git commit hash
 # this isn't working fully yet so fow now we will specify the explicit Git tag to use as the Docker tag
 #DOCKER_TAG := $(shell git rev-parse --short HEAD)
-COMMIT_SHA:=$(shell git rev-parse --short=9 HEAD)
+FLOW_GO_TAG := v0.28.15
 BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
+DOCKER_TAG := $(FLOW_GO_TAG)
+COMMIT_SHA:=$(shell git rev-parse --short=9 HEAD)
 
-
-ifeq (${FLOW_GO_TAG},)
-FLOW_GO_TAG := ${COMMIT_SHA}
+ifeq ($(strip $(FLOW_GO_TAG)),)
+	$(eval FLOW_GO_TAG=$(BRANCH_NAME))
 endif
 
-DOCKER_TAG := $(FLOW_GO_TAG)
 
 
 # default value of the Docker base registry URL which can be overriden when invoking the Makefile
