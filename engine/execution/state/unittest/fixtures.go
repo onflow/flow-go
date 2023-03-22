@@ -88,16 +88,20 @@ func ComputationResultForBlockFixture(
 		flow.ZeroID)
 
 	return &execution.ComputationResult{
-		TransactionResultIndex: make([]int, numChunks),
-		ExecutableBlock:        completeBlock,
-		StateSnapshots:         stateSnapshots,
-		Events:                 events,
-		EventsHashes:           eventHashes,
-		ChunkDataPacks:         chunkDataPacks,
-		EndState:               *completeBlock.StartState,
-		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID:             completeBlock.ID(),
-			ChunkExecutionDatas: chunkExecutionDatas,
+		ExecutableBlock: completeBlock,
+		ExecutionResults: &execution.ExecutionResults{
+			StateSnapshots:         stateSnapshots,
+			Events:                 events,
+			TransactionResultIndex: make([]int, numChunks),
+		},
+		AttestationResults: &execution.AttestationResults{
+			EventsHashes:   eventHashes,
+			ChunkDataPacks: chunkDataPacks,
+			EndState:       *completeBlock.StartState,
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID:             completeBlock.ID(),
+				ChunkExecutionDatas: chunkExecutionDatas,
+			},
 		},
 		ExecutionReceipt: &flow.ExecutionReceipt{
 			ExecutionResult:   *executionResult,

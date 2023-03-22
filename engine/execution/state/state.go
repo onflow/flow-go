@@ -319,7 +319,7 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot store events: %w", err)
 	}
 
-	err = s.serviceEvents.BatchStore(blockID, result.ServiceEvents, batch)
+	err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}

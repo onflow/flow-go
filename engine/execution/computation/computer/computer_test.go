@@ -661,8 +661,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.Len(t, result.ServiceEvents, 2)
 
 		// events are ordered
-		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
-		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0][0].Type))
+		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[0][1].Type))
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 	})

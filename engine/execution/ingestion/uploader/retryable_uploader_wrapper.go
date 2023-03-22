@@ -243,9 +243,13 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 			Block:               block,
 			CompleteCollections: completeCollections,
 		},
-		Events:             []flow.EventsList{events},
-		TransactionResults: transactionResults,
-		BlockExecutionData: executionData,
-		EndState:           endState,
+		ExecutionResults: &execution.ExecutionResults{
+			Events:             []flow.EventsList{events},
+			TransactionResults: transactionResults,
+		},
+		AttestationResults: &execution.AttestationResults{
+			BlockExecutionData: executionData,
+			EndState:           endState,
+		},
 	}, nil
 }

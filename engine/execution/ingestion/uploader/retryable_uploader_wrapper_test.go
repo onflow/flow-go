@@ -208,21 +208,25 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 			Block:               testBlock,
 			CompleteCollections: expectedCompleteCollections,
 		},
-		Events: []flow.EventsList{testEvents},
-		TransactionResults: []flow.TransactionResult{
-			testTransactionResult,
+		ExecutionResults: &execution.ExecutionResults{
+			Events: []flow.EventsList{testEvents},
+			TransactionResults: []flow.TransactionResult{
+				testTransactionResult,
+			},
 		},
-		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID: testBlockID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: &ledger.TrieUpdate{
-						RootHash: testTrieUpdateRootHash,
+		AttestationResults: &execution.AttestationResults{
+			EndState: testStateCommit,
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: testBlockID,
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					&execution_data.ChunkExecutionData{
+						TrieUpdate: &ledger.TrieUpdate{
+							RootHash: testTrieUpdateRootHash,
+						},
 					},
 				},
 			},
 		},
-		EndState: testStateCommit,
 	}
 
 	assert.DeepEqual(

@@ -67,9 +67,8 @@ type resultCollector struct {
 	result    *execution.ComputationResult
 	consumers []result.ExecutedCollectionConsumer
 
-	chunks                 []*flow.Chunk
-	spockSignatures        []crypto.Signature
-	convertedServiceEvents flow.ServiceEventList
+	chunks          []*flow.Chunk
+	spockSignatures []crypto.Signature
 
 	blockStartTime time.Time
 	blockStats     module.ExecutionResultStats
@@ -238,6 +237,8 @@ func (collector *resultCollector) commitCollection(
 		}
 	}
 
+	collector.result.ExecutedColCounter++
+	collector.result.AttestedColCounter++
 	return nil
 }
 
@@ -245,16 +246,18 @@ func (collector *resultCollector) processTransactionResult(
 	txn transaction,
 	txnExecutionSnapshot *state.ExecutionSnapshot,
 ) error {
-	collector.convertedServiceEvents = append(
-		collector.convertedServiceEvents,
-		txn.ConvertedServiceEvents...)
 
 	collector.result.Events[txn.collectionIndex] = append(
 		collector.result.Events[txn.collectionIndex],
 		txn.Events...)
-	collector.result.ServiceEvents = append(
-		collector.result.ServiceEvents,
+
+	collector.result.ServiceEvents[txn.collectionIndex] = append(
+		collector.result.ServiceEvents[txn.collectionIndex],
 		txn.ServiceEvents...)
+
+	collector.result.ConvertedServiceEvents[txn.collectionIndex] = append(
+		collector.result.ConvertedServiceEvents[txn.collectionIndex],
+		txn.ConvertedServiceEvents...)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
@@ -355,7 +358,7 @@ func (collector *resultCollector) Finalize(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
 		collector.chunks,
-		collector.convertedServiceEvents,
+		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
 
 	executionReceipt, err := GenerateExecutionReceipt(
