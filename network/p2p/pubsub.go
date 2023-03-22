@@ -54,9 +54,9 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspector(inspector BasicGossipSubRPCInspector)
+	WithAppSpecificRpcInspector(BasicGossipSubRPCInspector)
+	WithRPCValidationInspector(GossipSubRPCInspector)
 	WithTracer(t PubSubTracer)
-
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)

@@ -86,6 +86,10 @@ func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ p2p.BasicGoss
 	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
 }
 
+func (c *CorruptPubSubAdapterConfig) WithRPCValidationInspector(_ p2p.GossipSubRPCInspector) {
+	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
+}
+
 func (c *CorruptPubSubAdapterConfig) WithTracer(_ p2p.PubSubTracer) {
 	// CorruptPubSub does not support tracer. This is a no-op. We can add this if needed,
 	// but feature-wise it is not needed for BFT testing and attack vector implementation.

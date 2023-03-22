@@ -398,11 +398,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			builder.rpcValidationInspector.Start(ctx)
-			<-builder.rpcValidationInspector.Ready()
-			ready()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// routing system is created here, because it needs to be created during the node startup.
 			routingSystem, err := builder.buildRouting(ctx, h)
 			if err != nil {

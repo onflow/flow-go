@@ -13,9 +13,10 @@ import (
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
-	options      []pubsub.Option
-	scoreTracer  p2p.PeerScoreTracer
-	pubsubTracer p2p.PubSubTracer
+	options                []pubsub.Option
+	scoreTracer            p2p.PeerScoreTracer
+	pubsubTracer           p2p.PubSubTracer
+	rpcValidationInspector p2p.GossipSubRPCInspector
 }
 
 var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)
@@ -48,6 +49,10 @@ func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.Basic
 	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
 }
 
+func (g *GossipSubAdapterConfig) WithRPCValidationInspector(inspector p2p.GossipSubRPCInspector) {
+	g.rpcValidationInspector = inspector
+}
+
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 	g.pubsubTracer = tracer
 	g.options = append(g.options, pubsub.WithRawTracer(tracer))
@@ -59,6 +64,10 @@ func (g *GossipSubAdapterConfig) ScoreTracer() p2p.PeerScoreTracer {
 
 func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
 	return g.pubsubTracer
+}
+
+func (g *GossipSubAdapterConfig) RPCValidationInspector() p2p.GossipSubRPCInspector {
+	return g.rpcValidationInspector
 }
 
 func (g *GossipSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {

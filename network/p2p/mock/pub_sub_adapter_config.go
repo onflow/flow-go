@@ -14,14 +14,19 @@ type PubSubAdapterConfig struct {
 	mock.Mock
 }
 
-// WithAppSpecificRpcInspector provides a mock function with given fields: inspector
-func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.BasicGossipSubRPCInspector) {
-	_m.Called(inspector)
+// WithAppSpecificRpcInspector provides a mock function with given fields: _a0
+func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(_a0 p2p.BasicGossipSubRPCInspector) {
+	_m.Called(_a0)
 }
 
 // WithMessageIdFunction provides a mock function with given fields: f
 func (_m *PubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	_m.Called(f)
+}
+
+// WithRPCValidationInspector provides a mock function with given fields: _a0
+func (_m *PubSubAdapterConfig) WithRPCValidationInspector(_a0 p2p.GossipSubRPCInspector) {
+	_m.Called(_a0)
 }
 
 // WithRoutingDiscovery provides a mock function with given fields: _a0
