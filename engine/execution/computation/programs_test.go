@@ -135,7 +135,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -246,7 +247,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)

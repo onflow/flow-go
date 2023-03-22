@@ -701,7 +701,8 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		logger,
 		ledgerCommiter,
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)

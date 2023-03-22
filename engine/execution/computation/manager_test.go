@@ -139,7 +139,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -518,9 +519,9 @@ func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.Vie
 }
 
 func (p *PanickingVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -559,9 +560,9 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 }
 
 func (l *LongRunningVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -777,6 +778,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
+		nil,
 	)
 	require.NoError(t, err)
 
