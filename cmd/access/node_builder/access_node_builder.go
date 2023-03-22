@@ -1090,7 +1090,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			collector := metrics.GossipSubRPCInspectorQueueMetricFactory(builder.MetricsRegisterer)
 			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 		}
-		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := cmd.GossipSubRPCInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, heroStoreOpts...)
+		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := p2pbuilder.GossipSubRPCInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, heroStoreOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
 		}

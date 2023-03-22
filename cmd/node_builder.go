@@ -203,7 +203,7 @@ type NetworkConfig struct {
 	GossipSubRPCInspectorNotificationCacheSize uint32
 	GossipSubRPCInspectorCacheSize             uint32
 	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
-	GossipSubRPCValidationConfigs              *GossipSubRPCValidationConfigs
+	GossipSubRPCValidationConfigs              *p2pbuilder.GossipSubRPCValidationConfigs
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -219,15 +219,6 @@ type UnicastRateLimitersConfig struct {
 	BandwidthRateLimit int
 	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
 	BandwidthBurstLimit int
-}
-
-// GossipSubRPCValidationConfigs validation limits used for gossipsub RPC control message inspection.
-type GossipSubRPCValidationConfigs struct {
-	NumberOfWorkers int
-	// GraftLimits GRAFT control message validation limits.
-	GraftLimits map[string]int
-	// PruneLimits PRUNE control message validation limits.
-	PruneLimits map[string]int
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -310,7 +301,7 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubRPCValidationConfigs: &GossipSubRPCValidationConfigs{
+			GossipSubRPCValidationConfigs: &p2pbuilder.GossipSubRPCValidationConfigs{
 				NumberOfWorkers: validation.DefaultNumberOfWorkers,
 				GraftLimits: map[string]int{
 					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
