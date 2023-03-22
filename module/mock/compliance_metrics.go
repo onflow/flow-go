@@ -62,6 +62,11 @@ func (_m *ComplianceMetrics) EpochEmergencyFallbackTriggered() {
 	_m.Called()
 }
 
+// EpochTransitionHeight provides a mock function with given fields: height
+func (_m *ComplianceMetrics) EpochTransitionHeight(height uint64) {
+	_m.Called(height)
+}
+
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)
