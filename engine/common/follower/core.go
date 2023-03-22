@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -39,7 +41,6 @@ type Core struct {
 	mempoolMetrics      module.MempoolMetrics
 	config              compliance.Config
 	tracer              module.Tracer
-	headers             storage.Headers
 	pendingCache        *cache.Cache
 	pendingTree         *pending_tree.PendingTree
 	cleaner             storage.Cleaner
@@ -47,13 +48,13 @@ type Core struct {
 	follower            module.HotStuffFollower
 	validator           hotstuff.Validator
 	sync                module.BlockRequester
-	certifiedBlocksChan chan<- CertifiedBlocks
+	certifiedBlocksChan chan CertifiedBlocks // delivers batches of certified blocks to main core worker
+	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
 func NewCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	cleaner storage.Cleaner,
-	headers storage.Headers,
 	payloads storage.Payloads,
 	state protocol.FollowerState,
 	pending module.PendingBlockBuffer,
@@ -65,17 +66,18 @@ func NewCore(log zerolog.Logger,
 	metricsCollector := metrics.NewNoopCollector()
 	onEquivocation := func(block, otherBlock *flow.Block) {}
 	c := &Core{
-		log:            log.With().Str("engine", "follower_core").Logger(),
-		mempoolMetrics: mempoolMetrics,
-		cleaner:        cleaner,
-		headers:        headers,
-		state:          state,
-		pendingCache:   cache.NewCache(log, 1000, metricsCollector, onEquivocation),
-		follower:       follower,
-		validator:      validator,
-		sync:           sync,
-		tracer:         tracer,
-		config:         compliance.DefaultConfig(),
+		log:                 log.With().Str("engine", "follower_core").Logger(),
+		mempoolMetrics:      mempoolMetrics,
+		cleaner:             cleaner,
+		state:               state,
+		pendingCache:        cache.NewCache(log, 1000, metricsCollector, onEquivocation),
+		follower:            follower,
+		validator:           validator,
+		sync:                sync,
+		tracer:              tracer,
+		config:              compliance.DefaultConfig(),
+		certifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
+		finalizedBlocksChan: make(chan *flow.Header, 10),
 	}
 
 	for _, apply := range opts {
@@ -232,6 +234,30 @@ func (c *Core) OnBlockBatch(originID flow.Identifier, batch []*flow.Block) error
 	return nil
 }
 
+// processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
+// Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
+func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	doneSignal := ctx.Done()
+	for {
+		select {
+		case <-doneSignal:
+			return
+		case finalized := <-c.finalizedBlocksChan:
+			err := c.processFinalizedBlock(finalized) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		case blocks := <-c.certifiedBlocksChan:
+			err := c.processCertifiedBlocks(blocks) // no errors expected during normal operations
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
+	}
+}
+
 // processBlockAndDescendants processes `proposal` and its pendingCache descendants recursively.
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
@@ -307,25 +333,19 @@ func (c *Core) processBlockAndDescendants(ctx context.Context, proposal *flow.Bl
 	return nil
 }
 
-// PruneUpToView performs pruning of core follower state.
-// Effectively this prunes cache of pendingCache blocks and sets a new lower limit for incoming blocks.
-// Concurrency safe.
-func (c *Core) PruneUpToView(view uint64) {
-	panic("implement me")
-}
-
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block.
-// Is NOT concurrency safe, has to be used by the same goroutine as OnCertifiedBlocks.
-// OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
-func (c *Core) OnFinalizedBlock(final *flow.Header) error {
-	panic("implement me")
+// Is NOT concurrency safe, has to be used by the same goroutine as processCertifiedBlocks.
+// OnFinalizedBlock and processCertifiedBlocks MUST be sequentially ordered.
+func (c *Core) OnFinalizedBlock(final *flow.Header) {
+	c.pendingCache.PruneUpToView(final.View)
+	c.finalizedBlocksChan <- final
 }
 
-// OnCertifiedBlocks processes batch of certified blocks by applying them to tree of certified blocks.
+// processCertifiedBlocks processes batch of certified blocks by applying them to tree of certified blocks.
 // As result of this operation we might extend protocol state.
 // Is NOT concurrency safe, has to be used by the same goroutine as OnFinalizedBlock.
-// OnFinalizedBlock and OnCertifiedBlocks MUST be sequentially ordered.
-func (c *Core) OnCertifiedBlocks(blocks CertifiedBlocks) error {
+// OnFinalizedBlock and processCertifiedBlocks MUST be sequentially ordered.
+func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
 	for _, certifiedBlock := range blocks {
 		err := c.state.ExtendCertified(context.Background(), certifiedBlock.Block, certifiedBlock.QC)
 		if err != nil {
@@ -341,4 +361,8 @@ func (c *Core) OnCertifiedBlocks(blocks CertifiedBlocks) error {
 		c.follower.SubmitProposal(hotstuffProposal)
 	}
 	return nil
+}
+
+func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
+	panic("implement me")
 }

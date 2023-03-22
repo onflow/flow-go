@@ -1,8 +1,8 @@
 package follower
 
 import (
+	"errors"
 	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -57,19 +57,17 @@ type CertifiedBlocks []pending_tree.CertifiedBlock
 // Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
-	log                     zerolog.Logger
-	me                      module.Local
-	engMetrics              module.EngineMetrics
-	con                     network.Conduit
-	channel                 channels.Channel
-	headers                 storage.Headers
-	pendingBlocks           *fifoqueue.FifoQueue        // queue for processing inbound blocks
-	pendingBlocksNotifier   engine.Notifier             // notifies that new blocks are ready to be processed
-	finalizedBlockTracker   *tracker.NewestBlockTracker // tracks the latest finalization block
-	finalizedBlockNotifier  engine.Notifier             // notifies when the latest finalized block changes
-	coreCertifiedBlocksChan chan CertifiedBlocks        // delivers batches of certified blocks to main core worker
-	coreFinalizedBlocksChan chan *flow.Header           // delivers finalized blocks to main core worker.
-	core                    *Core                       // performs actual processing of incoming messages.
+	log                    zerolog.Logger
+	me                     module.Local
+	engMetrics             module.EngineMetrics
+	con                    network.Conduit
+	channel                channels.Channel
+	headers                storage.Headers
+	pendingBlocks          *fifoqueue.FifoQueue        // queue for processing inbound blocks
+	pendingBlocksNotifier  engine.Notifier             // notifies that new blocks are ready to be processed
+	finalizedBlockTracker  *tracker.NewestBlockTracker // tracks the latest finalization block
+	finalizedBlockNotifier engine.Notifier             // notifies when the latest finalized block changes
+	core                   *Core                       // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -90,22 +88,18 @@ func New(
 	}
 
 	e := &Engine{
-		log:                     log.With().Str("engine", "follower").Logger(),
-		me:                      me,
-		engMetrics:              engMetrics,
-		channel:                 channels.ReceiveBlocks,
-		pendingBlocks:           pendingBlocks,
-		pendingBlocksNotifier:   engine.NewNotifier(),
-		core:                    core,
-		coreCertifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
-		coreFinalizedBlocksChan: make(chan *flow.Header, 10),
+		log:                   log.With().Str("engine", "follower").Logger(),
+		me:                    me,
+		engMetrics:            engMetrics,
+		channel:               channels.ReceiveBlocks,
+		pendingBlocks:         pendingBlocks,
+		pendingBlocksNotifier: engine.NewNotifier(),
+		core:                  core,
 	}
 
 	for _, apply := range opts {
 		apply(e)
 	}
-
-	e.core.certifiedBlocksChan = e.coreCertifiedBlocksChan
 
 	con, err := net.Register(e.channel, e)
 	if err != nil {
@@ -114,8 +108,7 @@ func New(
 	e.con = con
 
 	cmBuilder := component.NewComponentManagerBuilder().
-		AddWorker(e.finalizationProcessingLoop).
-		AddWorker(e.processCoreSeqEvents)
+		AddWorker(e.finalizationProcessingLoop)
 
 	for i := 0; i < defaultBlockProcessingWorkers; i++ {
 		cmBuilder.AddWorker(e.processBlocksLoop)
@@ -190,30 +183,6 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-// processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
-// Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
-func (e *Engine) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	doneSignal := ctx.Done()
-	for {
-		select {
-		case <-doneSignal:
-			return
-		case finalized := <-e.coreFinalizedBlocksChan:
-			err := e.core.OnFinalizedBlock(finalized) // no errors expected during normal operations
-			if err != nil {
-				ctx.Throw(err)
-			}
-		case blocks := <-e.coreCertifiedBlocksChan:
-			err := e.core.OnCertifiedBlocks(blocks) // no errors expected during normal operations
-			if err != nil {
-				ctx.Throw(err)
-			}
-		}
-	}
-}
-
 // processQueuedBlocks processes any available messages until the message queue is empty.
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
@@ -229,15 +198,32 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
-			// NOTE: this loop might need tweaking, we might want to check channels that were passed as arguments more often.
-			blocks := make([]*flow.Block, 0, len(batch.Message))
-			for _, block := range batch.Message {
-				blocks = append(blocks, block.Block.ToInternal())
-			}
-			err := e.core.OnBlockBatch(batch.OriginID, blocks)
+			blocks, err := e.validateAndFilterBatch(batch)
 			if err != nil {
-				return fmt.Errorf("could not handle block proposal: %w", err)
+				return fmt.Errorf("could not validate batch: %w", err)
 			}
+
+			if len(blocks) < 1 {
+				continue
+			}
+
+			parentID := blocks[0].ID()
+			indexOfLastConnected := 0
+			for i := 1; i < len(blocks); i++ {
+				if blocks[i].Header.ParentID != parentID {
+					err = e.core.OnBlockBatch(batch.OriginID, blocks[indexOfLastConnected:i])
+					if err != nil {
+						return fmt.Errorf("could not process batch: %w", err)
+					}
+					indexOfLastConnected = i
+				}
+			}
+
+			err = e.core.OnBlockBatch(batch.OriginID, blocks[indexOfLastConnected:])
+			if err != nil {
+				return fmt.Errorf("could not process batch: %w", err)
+			}
+
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
@@ -246,6 +232,52 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		// for the next incoming message to arrive.
 		return nil
 	}
+}
+
+// validateAndFilterBatch
+func (e *Engine) validateAndFilterBatch(msg flow.Slashable[[]*messages.BlockProposal]) ([]*flow.Block, error) {
+	latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
+	filtered := make([]*flow.Block, 0, len(msg.Message))
+
+	for _, extBlock := range msg.Message {
+		block := extBlock.Block.ToInternal()
+		// skip blocks that are already finalized
+		if block.Header.View < latestFinalizedView {
+			continue
+		}
+
+		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		// skip block if it's already in cache
+		if b := e.core.pendingCache.Peek(hotstuffProposal.Block.BlockID); b != nil {
+			continue
+		}
+
+		err := e.core.validator.ValidateProposal(hotstuffProposal)
+		if err != nil {
+			if model.IsInvalidBlockError(err) {
+				// TODO potential slashing
+				e.log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+				continue
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We have received a proposal, but we don't know the epoch its view is within.
+				// We know:
+				//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
+				//  - if we then see this for the child, one of two things must have happened:
+				//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+				//      -> in this case we can disregard the block
+				//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
+				//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+				//      -> in this case, the network has encountered a critical failure
+				//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
+				e.log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+				continue
+			}
+			return nil, fmt.Errorf("unexpected error validating proposal: %w", err)
+		}
+		filtered = append(filtered, block)
+	}
+	return filtered, nil
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
@@ -264,8 +296,7 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			if err != nil { // no expected errors
 				ctx.Throw(err)
 			}
-			e.core.PruneUpToView(finalHeader.View)
-			e.coreFinalizedBlocksChan <- finalHeader
+			e.core.OnFinalizedBlock(finalHeader)
 		}
 	}
 }
