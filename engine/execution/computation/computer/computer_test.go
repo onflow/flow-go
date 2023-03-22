@@ -657,12 +657,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
 		}
 
+		sEvents := result.AllServiceEvents()
 		// all events should have been collected
-		require.Len(t, result.ServiceEvents, 2)
+		require.Len(t, sEvents, 2)
 
 		// events are ordered
-		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0][0].Type))
-		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[0][1].Type))
+
+		require.Equal(t, serviceEventA.EventType.ID(), string(sEvents[0].Type))
+		require.Equal(t, serviceEventB.EventType.ID(), string(sEvents[1].Type))
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 	})
