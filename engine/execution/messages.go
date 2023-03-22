@@ -126,6 +126,7 @@ func NewEmptyAttestationResults(
 		EventsHashes:       make([]flow.Identifier, 0, numCollections),
 		Chunks:             make([]*flow.Chunk, 0, numCollections),
 		ChunkDataPacks:     make([]*flow.ChunkDataPack, 0, numCollections),
+		EndState:           *block.StartState,
 		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: make(
