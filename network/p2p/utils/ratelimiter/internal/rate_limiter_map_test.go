@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter/internal"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter/internal"
 )
 
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
