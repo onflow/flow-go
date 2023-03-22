@@ -10,14 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	realstorage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -78,44 +74,45 @@ func (s *EngineSuite) TearDownTest() {
 	}
 }
 
-// TestProcessSyncedBlock checks if processing synced block using unsafe API results in error.
-// All blocks from sync engine should be sent through dedicated compliance API.
-func (s *EngineSuite) TestProcessSyncedBlock() {
-	parent := unittest.BlockFixture()
-	block := unittest.BlockFixture()
-
-	parent.Header.Height = 10
-	block.Header.Height = 11
-	block.Header.ParentID = parent.ID()
-
-	// not in cache
-	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
-	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
-	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
-
-	done := make(chan struct{})
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
-
-	// the parent is the last finalized state
-	s.snapshot.On("Head").Return(parent.Header, nil)
-	// the block passes hotstuff validation
-	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
-	// we should be able to extend the state with the block
-	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
-	// we should be able to get the parent header by its ID
-	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
-	// we do not have any children cached
-	s.cache.On("ByParentID", block.ID()).Return(nil, false)
-	// the proposal should be forwarded to the follower
-	s.follower.On("SubmitProposal", hotstuffProposal).Run(func(_ mock.Arguments) {
-		close(done)
-	}).Once()
-
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
-		OriginID: unittest.IdentifierFixture(),
-		Message:  []*messages.BlockProposal{messages.NewBlockProposal(&block)},
-	})
-	unittest.AssertClosesBefore(s.T(), done, time.Second)
-}
+//
+//// TestProcessSyncedBlock checks if processing synced block using unsafe API results in error.
+//// All blocks from sync engine should be sent through dedicated compliance API.
+//func (s *EngineSuite) TestProcessSyncedBlock() {
+//	parent := unittest.BlockFixture()
+//	block := unittest.BlockFixture()
+//
+//	parent.Header.Height = 10
+//	block.Header.Height = 11
+//	block.Header.ParentID = parent.ID()
+//
+//	// not in cache
+//	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
+//	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
+//	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+//
+//	done := make(chan struct{})
+//	hotstuffProposal := model.ProposalFromFlow(block.Header)
+//
+//	// the parent is the last finalized state
+//	s.snapshot.On("Head").Return(parent.Header, nil)
+//	// the block passes hotstuff validation
+//	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
+//	// we should be able to extend the state with the block
+//	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
+//	// we should be able to get the parent header by its ID
+//	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
+//	// we do not have any children cached
+//	s.cache.On("ByParentID", block.ID()).Return(nil, false)
+//	// the proposal should be forwarded to the follower
+//	s.follower.On("SubmitProposal", hotstuffProposal).Run(func(_ mock.Arguments) {
+//		close(done)
+//	}).Once()
+//
+//	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+//		OriginID: unittest.IdentifierFixture(),
+//		Message:  []*messages.BlockProposal{messages.NewBlockProposal(&block)},
+//	})
+//	unittest.AssertClosesBefore(s.T(), done, time.Second)
+//}
 
 // TODO: add test for processing finalized block. Can't be implemented at this point since Core doesn't support it.

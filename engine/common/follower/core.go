@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
 )
 
@@ -42,7 +41,6 @@ type Core struct {
 	tracer              module.Tracer
 	pendingCache        *cache.Cache
 	pendingTree         *pending_tree.PendingTree
-	cleaner             storage.Cleaner
 	state               protocol.FollowerState
 	follower            module.HotStuffFollower
 	validator           hotstuff.Validator
@@ -55,7 +53,6 @@ var _ common.FollowerCore = (*Core)(nil)
 
 func NewCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
-	cleaner storage.Cleaner,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
@@ -67,7 +64,6 @@ func NewCore(log zerolog.Logger,
 	c := &Core{
 		log:                 log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics:      mempoolMetrics,
-		cleaner:             cleaner,
 		state:               state,
 		pendingCache:        cache.NewCache(log, 1000, metricsCollector, onEquivocation),
 		follower:            follower,
@@ -219,7 +215,7 @@ func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
 func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
 	certifiedBlocks, err := c.pendingTree.FinalizeFork(finalized)
 	if err != nil {
-		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View)
+		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View, err)
 	}
 	err = c.processCertifiedBlocks(certifiedBlocks)
 	if err != nil {
