@@ -143,37 +143,53 @@ func NewControlMsgValidationInspector(
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
-		lg := c.logger.With().
-			Str("peer_id", from.String()).
-			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
 		validationConfig, ok := c.config.getCtrlMsgValidationConfig(ctrlMsgType)
 		if !ok {
-			lg.Trace().Msg("validation configuration for control type does not exists skipping")
+			c.logger.Trace().
+				Str("peer_id", from.String()).
+				Str("ctrl_msg_type", string(ctrlMsgType)).
+				Msg("validation configuration for control type does not exists skipping")
 			continue
 		}
-		count := c.getCtrlMsgCount(ctrlMsgType, control)
-		// if Count greater than discard threshold drop message and penalize
-		if count > validationConfig.DiscardThreshold {
-			discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
-			lg.Warn().
-				Err(discardThresholdErr).
-				Uint64("ctrl_msg_count", count).
-				Uint64("upper_threshold", discardThresholdErr.discardThreshold).
-				Bool(logging.KeySuspicious, true).
-				Msg("rejecting rpc control message")
-			err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, ctrlMsgType, count, discardThresholdErr))
-			if err != nil {
-				lg.Error().
-					Err(err).
-					Bool(logging.KeySuspicious, true).
-					Msg("failed to distribute invalid control message notification")
-				return err
-			}
-			return discardThresholdErr
+
+		// mandatory blocking pre-processing of RPC to check discard threshold.
+		err := c.blockingPreprocessingRpc(from, validationConfig, control)
+		if err != nil {
+			return err
 		}
 
 		// queue further async inspection
 		c.requestMsgInspection(NewInspectMsgRequest(from, validationConfig, control))
+	}
+
+	return nil
+}
+
+// blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
+func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	lg := c.logger.With().
+		Str("peer_id", from.String()).
+		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
+
+	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
+	// if Count greater than discard threshold drop message and penalize
+	if count > validationConfig.DiscardThreshold {
+		discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
+		lg.Warn().
+			Err(discardThresholdErr).
+			Uint64("ctrl_msg_count", count).
+			Uint64("upper_threshold", discardThresholdErr.discardThreshold).
+			Bool(logging.KeySuspicious, true).
+			Msg("rejecting rpc control message")
+		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, discardThresholdErr))
+		if err != nil {
+			lg.Error().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("failed to distribute invalid control message notification")
+			return err
+		}
+		return discardThresholdErr
 	}
 
 	return nil
