@@ -110,6 +110,21 @@ func New(
 	cmBuilder := component.NewComponentManagerBuilder().
 		AddWorker(e.finalizationProcessingLoop)
 
+	cmBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// start internal component
+		e.core.Start(ctx)
+		// wait for it to be ready
+		<-e.core.Ready()
+
+		// report that we are ready to process events
+		ready()
+
+		// wait for shutdown to be commenced
+		<-ctx.Done()
+		// wait for core to shut down
+		<-e.core.Done()
+	})
+
 	for i := 0; i < defaultBlockProcessingWorkers; i++ {
 		cmBuilder.AddWorker(e.processBlocksLoop)
 	}
