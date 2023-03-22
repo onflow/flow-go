@@ -1,0 +1,87 @@
+# This workflow is used to build and push one-off images for specific node types. This is useful
+# when deploying hotfixes or any time a change is not needed for all node roles.
+name: Build Node Docker Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: 'Git tag/commit'
+        required: true
+      docker_tag:
+        type: string
+        description: 'Docker tag'
+        required: true
+      # GHA doesn't support multi-selects, so simulating it with one boolean for each option
+      build_access:
+        type: boolean
+        description: 'Access'
+        required: false
+      build_collection:
+        type: boolean
+        description: 'Collection'
+        required: false
+      build_consensus:
+        type: boolean
+        description: 'Consensus'
+        required: false
+      build_execution:
+        type: boolean
+        description: 'Execution'
+        required: false
+      build_verification:
+        type: boolean
+        description: 'Verification'
+        required: false
+      build_observer:
+        type: boolean
+        description: 'Observer'
+        required: false
+      include_without_netgo:
+        type: boolean
+        description: 'Build `without_netgo` images'
+        required: false
+
+jobs:
+  docker-push:
+    name: Push to container registry
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [access, collection, consensus, execution, verification, observer]
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.19'
+    - name: Checkout repo
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ inputs.tag }}
+    - name: Build relic
+      run: make crypto_setup_gopath
+    # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
+    # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
+    - name: Docker login
+      uses: docker/login-action@v1
+      with:
+        registry: gcr.io
+        username: _json_key
+        password: ${{ secrets.GCR_SERVICE_KEY }}
+
+    - name: Build/Push ${{ matrix.role }} images
+      if: ${{ (inputs.build_access && matrix.role == 'access') ||
+              (inputs.build_collection && matrix.role == 'collection') ||
+              (inputs.build_consensus && matrix.role == 'consensus') ||
+              (inputs.build_execution && matrix.role == 'execution') ||
+              (inputs.build_verification && matrix.role == 'verification') ||
+              (inputs.build_observer && matrix.role == 'observer') }}
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
+      run: |
+        make docker-build-${{ matrix.role }} docker-push-${{ matrix.role }}
+        if [[ "${{ inputs.include_without_netgo }}" = "true" ]]; then
+          make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo
+        fi

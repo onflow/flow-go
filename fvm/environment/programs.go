@@ -68,12 +68,6 @@ func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
-	// TODO: check why this exists and try to remove.
-	// ignore empty locations
-	if location == nil {
-		return nil, nil
-	}
-
 	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
 	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
 	if err != nil {
