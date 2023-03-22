@@ -73,6 +73,8 @@ type Replicas interface {
 	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// CAUTION: DO NOT use this method for validating block proposals.
+	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 	//
 	// Returns the following expected errors for invalid inputs:
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
@@ -82,6 +84,9 @@ type Replicas interface {
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
+	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
+	//
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	//

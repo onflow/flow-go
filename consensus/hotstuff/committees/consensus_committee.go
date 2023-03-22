@@ -187,13 +187,14 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	return com, nil
 }
 
-// Identities returns the identities of all authorized consensus participants at the given block.
+// IdentitiesByBlock returns the identities of all authorized consensus participants at the given block.
 // The order of the identities is the canonical order.
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
 	return il, err
 }
 
+// IdentityByBlock returns the identity of the node with the given node ID at the given block.
 func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
@@ -210,6 +211,8 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 
 // IdentitiesByEpoch returns the committee identities in the epoch which contains
 // the given view.
+// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 //
 // Error returns:
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
@@ -225,6 +228,8 @@ func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 
 // IdentityByEpoch returns the identity for the given node ID, in the epoch which
 // contains the given view.
+// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 //
 // Error returns:
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
