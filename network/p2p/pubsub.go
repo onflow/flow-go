@@ -54,7 +54,7 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspector(BasicGossipSubRPCInspector)
+	WithAppSpecificRpcInspector(GossipSubAppSpecificRpcInspector)
 	WithRPCValidationInspector(GossipSubRPCInspector)
 	WithTracer(t PubSubTracer)
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
@@ -68,14 +68,14 @@ type PubSubAdapterConfig interface {
 //   - be non-blocking
 type GossipSubRPCInspector interface {
 	component.Component
-	BasicGossipSubRPCInspector
+	GossipSubAppSpecificRpcInspector
 }
 
-// BasicGossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// GossipSubAppSpecificRpcInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
-type BasicGossipSubRPCInspector interface {
+type GossipSubAppSpecificRpcInspector interface {
 	// Inspect inspects an incoming RPC message. This callback func is invoked
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.

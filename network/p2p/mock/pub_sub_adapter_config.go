@@ -15,7 +15,7 @@ type PubSubAdapterConfig struct {
 }
 
 // WithAppSpecificRpcInspector provides a mock function with given fields: _a0
-func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(_a0 p2p.BasicGossipSubRPCInspector) {
+func (_m *PubSubAdapterConfig) WithAppSpecificRpcInspector(_a0 p2p.GossipSubAppSpecificRpcInspector) {
 	_m.Called(_a0)
 }
 

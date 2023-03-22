@@ -14,26 +14,26 @@ import (
 // individual inspector will be invoked synchronously.
 type AggregateRPCInspector struct {
 	lock       sync.RWMutex
-	inspectors []p2p.BasicGossipSubRPCInspector
+	inspectors []p2p.GossipSubAppSpecificRpcInspector
 }
 
-var _ p2p.BasicGossipSubRPCInspector = (*AggregateRPCInspector)(nil)
+var _ p2p.GossipSubAppSpecificRpcInspector = (*AggregateRPCInspector)(nil)
 
 // NewAggregateRPCInspector returns new aggregate RPC inspector.
 func NewAggregateRPCInspector() *AggregateRPCInspector {
 	return &AggregateRPCInspector{
-		inspectors: make([]p2p.BasicGossipSubRPCInspector, 0),
+		inspectors: make([]p2p.GossipSubAppSpecificRpcInspector, 0),
 	}
 }
 
 // AddInspector adds a new inspector to the list of inspectors.
-func (a *AggregateRPCInspector) AddInspector(inspector p2p.BasicGossipSubRPCInspector) {
+func (a *AggregateRPCInspector) AddInspector(inspector p2p.GossipSubAppSpecificRpcInspector) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.inspectors = append(a.inspectors, inspector)
 }
 
-// Inspect func with the p2p.BasicGossipSubRPCInspector func signature that will invoke all the configured inspectors.
+// Inspect func with the p2p.GossipSubAppSpecificRpcInspector func signature that will invoke all the configured inspectors.
 func (a *AggregateRPCInspector) Inspect(peerID peer.ID, rpc *pubsub.RPC) error {
 	a.lock.RLock()
 	defer a.lock.RUnlock()

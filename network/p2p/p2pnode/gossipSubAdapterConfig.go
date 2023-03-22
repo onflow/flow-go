@@ -45,7 +45,7 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	}))
 }
 
-func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.BasicGossipSubRPCInspector) {
+func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.GossipSubAppSpecificRpcInspector) {
 	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
 }
 

@@ -82,7 +82,7 @@ func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 	// CorruptPubSub does not support score options. This is a no-op.
 }
 
-func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ p2p.BasicGossipSubRPCInspector) {
+func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ p2p.GossipSubAppSpecificRpcInspector) {
 	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
 }
 
