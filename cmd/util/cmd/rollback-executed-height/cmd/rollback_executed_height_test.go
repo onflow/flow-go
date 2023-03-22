@@ -86,13 +86,17 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		computationResult := &execution.ComputationResult{
-			ExecutableBlock:    executableBlock,
-			EndState:           endState,
-			ChunkDataPacks:     cdp,
-			Events:             []flow.EventsList{blockEvents.Events},
-			ServiceEvents:      se.Events,
-			TransactionResults: tes,
-			ExecutionReceipt:   executionReceipt,
+			ExecutableBlock: executableBlock,
+			ExecutionResults: &execution.ExecutionResults{
+				Events:             []flow.EventsList{blockEvents.Events},
+				ServiceEvents:      []flow.EventsList{se.Events},
+				TransactionResults: tes,
+			},
+			AttestationResults: &execution.AttestationResults{
+				EndState:       endState,
+				ChunkDataPacks: cdp,
+			},
+			ExecutionReceipt: executionReceipt,
 		}
 
 		// save execution results
@@ -231,13 +235,17 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		require.NoError(t, err)
 
 		computationResult := &execution.ComputationResult{
-			ExecutableBlock:    executableBlock,
-			EndState:           endState,
-			ChunkDataPacks:     cdp,
-			Events:             []flow.EventsList{blockEvents.Events},
-			ServiceEvents:      se.Events,
-			TransactionResults: tes,
-			ExecutionReceipt:   executionReceipt,
+			ExecutableBlock: executableBlock,
+			ExecutionResults: &execution.ExecutionResults{
+				Events:             []flow.EventsList{blockEvents.Events},
+				ServiceEvents:      []flow.EventsList{se.Events},
+				TransactionResults: tes,
+			},
+			AttestationResults: &execution.AttestationResults{
+				EndState:       endState,
+				ChunkDataPacks: cdp,
+			},
+			ExecutionReceipt: executionReceipt,
 		}
 
 		// save execution results
@@ -296,13 +304,17 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		require.NoError(t, err)
 
 		computationResult2 := &execution.ComputationResult{
-			ExecutableBlock:    executableBlock,
-			EndState:           endState2,
-			ChunkDataPacks:     cdp2,
-			Events:             []flow.EventsList{blockEvents.Events},
-			ServiceEvents:      se.Events,
-			TransactionResults: tes,
-			ExecutionReceipt:   executionReceipt2,
+			ExecutableBlock: executableBlock,
+			ExecutionResults: &execution.ExecutionResults{
+				Events:             []flow.EventsList{blockEvents.Events},
+				ServiceEvents:      []flow.EventsList{se.Events},
+				TransactionResults: tes,
+			},
+			AttestationResults: &execution.AttestationResults{
+				EndState:       endState2,
+				ChunkDataPacks: cdp2,
+			},
+			ExecutionReceipt: executionReceipt2,
 		}
 
 		// re execute result
