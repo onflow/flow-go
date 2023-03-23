@@ -519,9 +519,9 @@ func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.Vie
 }
 
 func (p *PanickingVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -560,9 +560,9 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 }
 
 func (l *LongRunningVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
