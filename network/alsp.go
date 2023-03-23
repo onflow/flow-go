@@ -12,6 +12,10 @@ import (
 // The misbehavior is used to penalize the misbehaving node at the protocol level.
 type Misbehavior string
 
+func (m Misbehavior) String() string {
+	return string(m)
+}
+
 const (
 	// StaleMessage is a misbehavior that is reported when an engine receives a message that is deemed stale based on the
 	// local view of the engine.
@@ -159,5 +163,9 @@ type MisbehaviorReporter interface {
 }
 
 type MisbehaviorReportManager interface {
+	// HandleReportedMisbehavior handles the misbehavior report that is sent by the networking layer.
+	// The implementation of this function should penalize the misbehaving node and report the node to be
+	// disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+	// The implementation of this function should be thread-safe and non-blocking.
 	HandleReportedMisbehavior(channels.Channel, *MisbehaviorReport)
 }
