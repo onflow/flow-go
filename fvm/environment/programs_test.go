@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
@@ -71,7 +72,7 @@ func Test_Programs(t *testing.T) {
 
 		pub contract B {
 			pub fun hello(): String {
-       		return "hello from B but also ".concat(A.hello())
+       			return "hello from B but also ".concat(A.hello())
     		}
 		}
 	`
@@ -81,44 +82,10 @@ func Test_Programs(t *testing.T) {
 
 		pub contract C {
 			pub fun hello(): String {
-	   		return "hello from C, ".concat(B.hello())
+	   			return "hello from C, ".concat(B.hello())
 			}
 		}
 	`
-
-	callTx := func(name string, address flow.Address) *flow.TransactionBody {
-
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
-			import %s from %s
-			transaction {
-              prepare() {
-                log(%s.hello())
-              }
-            }`, name, address.HexWithPrefix(), name)),
-		)
-	}
-
-	contractDeployTx := func(name, code string, address flow.Address) *flow.TransactionBody {
-		encoded := hex.EncodeToString([]byte(code))
-
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.contracts.add(name: "%s", code: "%s".decodeHex())
-              }
-            }`, name, encoded)),
-		).AddAuthorizer(address)
-	}
-
-	updateContractTx := func(name, code string, address flow.Address) *flow.TransactionBody {
-		encoded := hex.EncodeToString([]byte(code))
-
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`transaction {
-             prepare(signer: AuthAccount) {
-               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
-             }
-           }`, name, encoded)),
-		).AddAuthorizer(address)
-	}
 
 	mainView := delta.NewDeltaView(nil)
 
@@ -579,6 +546,277 @@ func Test_Programs(t *testing.T) {
 	})
 }
 
+func Test_ProgramsDoubleCounting(t *testing.T) {
+
+	addressA := flow.HexToAddress("0a")
+	addressB := flow.HexToAddress("0b")
+	addressC := flow.HexToAddress("0c")
+
+	contractALocation := common.AddressLocation{
+		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Name:    "A",
+	}
+	contractA2Location := common.AddressLocation{
+		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Name:    "A2",
+	}
+
+	contractBLocation := common.AddressLocation{
+		Address: common.MustBytesToAddress(addressB.Bytes()),
+		Name:    "B",
+	}
+
+	contractCLocation := common.AddressLocation{
+		Address: common.MustBytesToAddress(addressC.Bytes()),
+		Name:    "C",
+	}
+
+	contractACode := `
+		pub contract A {
+			pub fun hello(): String {
+        		return "hello from A"
+    		}
+		}
+	`
+
+	contractA2Code := `
+		pub contract A2 {
+			pub fun hello(): String {
+        		return "hello from A2"
+    		}
+		}
+	`
+
+	contractBCode := `
+		import 0xa
+
+		pub contract B {
+			pub fun hello(): String {
+       			return "hello from B but also ".concat(A.hello())
+    		}
+		}
+	`
+
+	contractCCode := `
+		import B from 0xb
+		import A from 0xa
+
+		pub contract C {
+			pub fun hello(): String {
+	   			return "hello from C, ".concat(B.hello())
+			}
+		}
+	`
+
+	mainView := delta.NewDeltaView(nil)
+
+	vm := fvm.NewVirtualMachine()
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+
+	accounts := environment.NewAccounts(
+		storage.SerialTransaction{
+			NestedTransaction: state.NewTransactionState(
+				mainView,
+				state.DefaultParameters()),
+		})
+
+	err := accounts.Create(nil, addressA)
+	require.NoError(t, err)
+
+	err = accounts.Create(nil, addressB)
+	require.NoError(t, err)
+
+	err = accounts.Create(nil, addressC)
+	require.NoError(t, err)
+
+	// err = stm.
+	require.NoError(t, err)
+
+	fmt.Printf("Account created\n")
+
+	metrics := &metricsReporter{}
+	context := fvm.NewContext(
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithCadenceLogging(true),
+		fvm.WithDerivedBlockData(derivedBlockData),
+		fvm.WithMetricsReporter(metrics))
+
+	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
+
+		view := delta.NewDeltaView(state.NewPeekerStorageSnapshot(mainView))
+
+		// deploy contract A
+		procContractA := fvm.Transaction(
+			contractDeployTx("A", contractACode, addressA),
+			derivedBlockData.NextTxIndexForTestingOnly())
+		err = vm.Run(context, procContractA, view)
+		require.NoError(t, err)
+		require.NoError(t, procContractA.Err)
+
+		// deploy contract B
+		procContractB := fvm.Transaction(
+			contractDeployTx("B", contractBCode, addressB),
+			derivedBlockData.NextTxIndexForTestingOnly())
+		err = vm.Run(context, procContractB, view)
+		require.NoError(t, err)
+		require.NoError(t, procContractB.Err)
+
+		// deploy contract C
+		procContractC := fvm.Transaction(
+			contractDeployTx("C", contractCCode, addressC),
+			derivedBlockData.NextTxIndexForTestingOnly())
+		err = vm.Run(context, procContractC, view)
+		require.NoError(t, err)
+		require.NoError(t, procContractC.Err)
+
+		// deploy contract A2 last to clear any cache so far
+		procContractA2 := fvm.Transaction(
+			contractDeployTx("A2", contractA2Code, addressA),
+			derivedBlockData.NextTxIndexForTestingOnly())
+		err = vm.Run(context, procContractA2, view)
+		require.NoError(t, err)
+		require.NoError(t, procContractA2.Err)
+
+		// merge it back
+		err = mainView.Merge(view.Finalize())
+		require.NoError(t, err)
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.Nil(t, entryA)
+		require.Nil(t, entryA2)
+		require.Nil(t, entryB)
+		require.Nil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 0, cached)
+	})
+
+	callC := func() {
+		view := delta.NewDeltaView(state.NewPeekerStorageSnapshot(mainView))
+
+		procCallC := fvm.Transaction(
+			flow.NewTransactionBody().SetScript(
+				[]byte(
+					`
+					import A from 0xa
+					import B from 0xb
+					import C from 0xc
+					transaction {
+						prepare() {
+							log(C.hello())
+						}
+					}`,
+				)),
+			derivedBlockData.NextTxIndexForTestingOnly())
+
+		err = vm.Run(context, procCallC, view)
+		require.NoError(t, err)
+		require.NoError(t, procCallC.Err)
+
+		require.Equal(t, uint(
+			1+ // import A
+				3+ // import B (import A, import A2)
+				4, // import C (import B (3), import A (already imported in this scope))
+		), procCallC.ComputationIntensities[environment.ComputationKindGetCode])
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2) // loaded due to "*" import
+		require.NotNil(t, entryB)
+		require.NotNil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 4, cached)
+
+		err = mainView.Merge(view.Finalize())
+		require.NoError(t, err)
+	}
+
+	t.Run("Call C", func(t *testing.T) {
+		metrics.Reset()
+		callC()
+
+		// miss A because loading transaction
+		// hit A because loading B because loading transaction
+		// miss A2 because loading B because loading transaction
+		// miss B because loading transaction
+		// hit B because loading C because loading transaction
+		// hit A because loading C because loading transaction
+		// miss C because loading transaction
+		//
+		// hit C because interpreting transaction
+		// hit B because interpreting C because interpreting transaction
+		// hit A because interpreting B because interpreting C because interpreting transaction
+		// hit A2 because interpreting B because interpreting C because interpreting transaction
+		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, 4, metrics.CacheMisses)
+	})
+
+	t.Run("Call C Again", func(t *testing.T) {
+		metrics.Reset()
+		callC()
+
+		// hit A because loading transaction
+		// hit B because loading transaction
+		// hit C because loading transaction
+		//
+		// hit C because interpreting transaction
+		// hit B because interpreting C because interpreting transaction
+		// hit A because interpreting B because interpreting C because interpreting transaction
+		// hit A2 because interpreting B because interpreting C because interpreting transaction
+		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, 0, metrics.CacheMisses)
+	})
+
+}
+
+func callTx(name string, address flow.Address) *flow.TransactionBody {
+
+	return flow.NewTransactionBody().SetScript(
+		[]byte(fmt.Sprintf(`
+			import %s from %s
+			transaction {
+              prepare() {
+                log(%s.hello())
+              }
+            }`, name, address.HexWithPrefix(), name)),
+	)
+}
+
+func contractDeployTx(name, code string, address flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(code))
+
+	return flow.NewTransactionBody().SetScript(
+		[]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
+              }
+            }`, name, encoded)),
+	).AddAuthorizer(address)
+}
+
+func updateContractTx(name, code string, address flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(code))
+
+	return flow.NewTransactionBody().SetScript([]byte(
+		fmt.Sprintf(`transaction {
+             prepare(signer: AuthAccount) {
+               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+             }
+           }`, name, encoded)),
+	).AddAuthorizer(address)
+}
+
 // compareViews compares views using only data that matters (ie. two different hasher instances
 // trips the library comparison, even if actual SPoCKs are the same)
 func compareViews(t *testing.T, a, b *delta.View) {
@@ -586,3 +824,31 @@ func compareViews(t *testing.T, a, b *delta.View) {
 	require.Equal(t, a.Interactions(), b.Interactions())
 	require.Equal(t, a.SpockSecret(), b.SpockSecret())
 }
+
+type metricsReporter struct {
+	CacheHits   int
+	CacheMisses int
+}
+
+func (m *metricsReporter) RuntimeTransactionParsed(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeTransactionChecked(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeTransactionInterpreted(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
+
+func (m *metricsReporter) RuntimeTransactionProgramsCacheMiss() {
+	m.CacheMisses++
+}
+
+func (m *metricsReporter) RuntimeTransactionProgramsCacheHit() {
+	m.CacheHits++
+}
+
+func (m *metricsReporter) Reset() {
+	m.CacheHits = 0
+	m.CacheMisses = 0
+}
+
+var _ environment.MetricsReporter = (*metricsReporter)(nil)

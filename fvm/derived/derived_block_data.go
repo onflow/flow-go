@@ -18,6 +18,7 @@ type DerivedTransaction interface {
 		*Program,
 		error,
 	)
+	GetProgram(location common.AddressLocation) (*Program, bool)
 
 	GetMeterParamOverrides(
 		txnState state.NestedTransaction,
@@ -183,6 +184,19 @@ func (transaction *DerivedTransactionData) GetOrComputeProgram(
 		txState,
 		addressLocation,
 		programComputer)
+}
+
+// GetProgram returns the program for the given address location.
+// This does NOT apply reads/metering to any nested transaction.
+// Use with caution!
+func (transaction *DerivedTransactionData) GetProgram(
+	location common.AddressLocation,
+) (
+	*Program,
+	bool,
+) {
+	program, _, ok := transaction.programs.get(location)
+	return program, ok
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(

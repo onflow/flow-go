@@ -94,6 +94,24 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
+	if programs.dependencyStack.top().ContainsLocation(location) {
+		// this dependency has already been seen in the current stack/scope
+		// this means that it is safe to just fetch it and not reapply
+		// state/metering changes
+		program, ok := programs.txnState.GetProgram(location)
+		if !ok {
+			// program should be in the cache, if it is not,
+			// this means there is an implementation error
+			return nil, errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("expected program missing"+
+					" in cache for location: %s", location))
+		}
+		programs.dependencyStack.add(program.Dependencies)
+		programs.cacheHit()
+
+		return program.Program, nil
+	}
+
 	loader := newProgramLoader(load, programs.dependencyStack, location)
 	program, err := programs.txnState.GetOrComputeProgram(
 		programs.txnState,
@@ -201,12 +219,17 @@ func (loader *programLoader) Compute(
 		// This should never happen, as the program loader is only called once per
 		// program. The same loader is never reused. This is only here to make
 		// this more apparent.
-		panic("program loader called twice")
+		return nil,
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("program loader called twice"))
 	}
+
 	if loader.location != location {
 		// This should never happen, as the program loader constructed specifically
 		// to load one location once. This is only a sanity check.
-		panic("program loader called with unexpected location")
+		return nil,
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("program loader called with unexpected location"))
 	}
 
 	loader.called = true
@@ -339,7 +362,9 @@ func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, e
 	if len(s.trackers) <= 1 {
 		return nil,
 			derived.NewProgramDependencies(),
-			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("cannot pop the programs" +
+					" dependency stack, because it is empty"))
 	}
 
 	// pop the last tracker
@@ -353,4 +378,15 @@ func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, e
 	s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
 
 	return tracker.location, tracker.dependencies, nil
+}
+
+// top returns the last dependencies on the stack without pop-ing them.
+func (s *dependencyStack) top() derived.ProgramDependencies {
+	l := len(s.trackers)
+	if l == 0 {
+		// This cannot happen, as the root of the stack is always present.
+		panic("Dependency stack unexpectedly empty")
+	}
+
+	return s.trackers[len(s.trackers)-1].dependencies
 }
