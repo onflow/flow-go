@@ -35,7 +35,9 @@ type Snapshot struct {
 
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
-func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
+// newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
+// CAUTION: This function does not check whether the reference block exists.
+func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,

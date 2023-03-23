@@ -139,6 +139,20 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.retrieveTx(blockID)(tx)
 }
 
+func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
+	// if the block is in the cache, return true
+	if ok := h.cache.Exists(blockID); ok {
+		return ok, nil
+	}
+	// otherwise, check badger store
+	var exists bool
+	err := h.db.View(operation.BlockExists(blockID, &exists))
+	if err != nil {
+		return false, fmt.Errorf("could not check existence: %w", err)
+	}
+	return exists, nil
+}
+
 // BlockIDByHeight the block ID that is finalized at the given height. It is an optimized version
 // of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no finalized block is known at given height.

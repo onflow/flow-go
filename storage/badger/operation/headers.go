@@ -27,6 +27,12 @@ func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
+// BlockExists checks whether the block exists in the database.
+// No errors are expected.
+func BlockExists(blockID flow.Identifier, blockExists *bool) func(*badger.Txn) error {
+	return exists(makePrefix(codeHeader, blockID), blockExists)
+}
+
 func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutedBlock), blockID)
 }

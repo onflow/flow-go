@@ -274,6 +274,43 @@ func TestRetrieveUnencodeable(t *testing.T) {
 	})
 }
 
+func TestExists(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("non-existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			var _exists bool
+			err := db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
+
+		t.Run("existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.True(t, _exists)
+		})
+
+		t.Run("removed key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			// insert, then remove the key
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+			err = db.Update(remove(key))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
+	})
+}
+
 func TestLookup(t *testing.T) {
 	expected := []flow.Identifier{
 		{0x01},

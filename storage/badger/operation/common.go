@@ -264,6 +264,27 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
+// exists returns true if a key exists in the database.
+// No errors are expected during normal operation.
+func exists(key []byte, keyExists *bool) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		_, err := tx.Get(key)
+		if err != nil {
+			// the key does not exist in the database
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				*keyExists = false
+				return nil
+			}
+			// exception while checking for the key
+			return fmt.Errorf("could not load data: %w", err)
+		}
+
+		// the key does exist in the database
+		*keyExists = true
+		return nil
+	}
+}
+
 // checkFunc is called during key iteration through the badger DB in order to
 // check whether we should process the given key-value pair. It can be used to
 // avoid loading the value if its not of interest, as well as storing the key
