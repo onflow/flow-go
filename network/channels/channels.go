@@ -322,7 +322,7 @@ func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 		return err
 	}
 	if sporkID != expectedSporkID {
-		return fmt.Errorf("invalid topic wrong spork ID %s the current spork ID is %s", sporkID, expectedSporkID)
+		return fmt.Errorf("invalid topic: wrong spork ID %s the current spork ID is %s", sporkID, expectedSporkID)
 	}
 
 	return nil
