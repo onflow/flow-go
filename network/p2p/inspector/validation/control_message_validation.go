@@ -146,19 +146,24 @@ func NewControlMsgValidationInspector(
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
+		lg := c.logger.With().
+			Str("peer_id", from.String()).
+			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
 		validationConfig, ok := c.config.getCtrlMsgValidationConfig(ctrlMsgType)
 		if !ok {
-			c.logger.Trace().
-				Str("peer_id", from.String()).
-				Str("ctrl_msg_type", string(ctrlMsgType)).
-				Msg("validation configuration for control type does not exists skipping")
+			lg.Trace().Msg("validation configuration for control type does not exists skipping")
 			continue
 		}
 
 		// mandatory blocking pre-processing of RPC to check discard threshold.
 		err := c.blockingPreprocessingRpc(from, validationConfig, control)
 		if err != nil {
-			return fmt.Errorf("could not pre-process rpc, aborting")
+			lg.Error().
+				Err(err).
+				Str("peer_id", from.String()).
+				Str("ctrl_msg_type", string(ctrlMsgType)).
+				Msg("could not pre-process rpc, aborting")
+			return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
 		}
 
 		// queue further async inspection
