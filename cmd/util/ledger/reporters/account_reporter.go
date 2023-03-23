@@ -1,7 +1,6 @@
 package reporters
 
 import (
-	"context"
 	"fmt"
 	goRuntime "runtime"
 	"sync"
@@ -15,10 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -132,8 +129,6 @@ type balanceProcessor struct {
 	balanceScript   []byte
 	momentsScript   []byte
 
-	accounts environment.Accounts
-
 	rwa        ReportWriter
 	rwc        ReportWriter
 	logger     zerolog.Logger
@@ -146,38 +141,18 @@ func NewBalanceReporter(
 	snapshot state.StorageSnapshot,
 ) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithMemoryAndInteractionLimitsDisabled(),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithMemoryAndInteractionLimitsDisabled())
 
-	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	view := delta.NewDeltaView(snapshot)
-	txnState := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			view,
-			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxnData,
-	}
-
-	accounts := environment.NewAccounts(txnState)
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		txnState)
+		snapshot)
 
 	return &balanceProcessor{
 		vm:              vm,
 		ctx:             ctx,
 		storageSnapshot: snapshot,
-		accounts:        accounts,
 		env:             env,
 	}
 }
@@ -243,7 +218,9 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		return
 	}
 
-	u, err := c.storageUsed(address)
+	runtimeAddress := common.MustBytesToAddress(address.Bytes())
+
+	u, err := c.env.GetStorageUsed(runtimeAddress)
 	if err != nil {
 		c.logger.
 			Err(err).
@@ -317,7 +294,7 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		IsDapper:       dapper,
 	})
 
-	contracts, err := c.accounts.GetContractNames(address)
+	contracts, err := c.env.GetAccountContractNames(runtimeAddress)
 	if err != nil {
 		c.logger.
 			Err(err).
@@ -391,10 +368,6 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		m = output.Value.(cadence.Int).Int()
 	}
 	return m, nil
-}
-
-func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
-	return c.accounts.GetStorageUsed(address)
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
