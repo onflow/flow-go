@@ -39,8 +39,8 @@ func TestKeyListSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
@@ -353,7 +353,7 @@ func TestKeyListSignature(t *testing.T) {
 
 	testForHash(signatureAlgorithm{
 		"BLS_BLS12_381",
-		crypto.KeyGenSeedMinLenBLSBLS12381,
+		crypto.KeyGenSeedMinLen,
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
@@ -374,9 +374,9 @@ func TestBLSMultiSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"BLS_BLS12_381", crypto.KeyGenSeedMinLen, crypto.BLSBLS12381},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 	BLSSignatureAlgorithm := signatureAlgorithms[0]
 

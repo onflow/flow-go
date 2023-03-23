@@ -1894,7 +1894,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
-				seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+				seed := make([]byte, crypto.KeyGenSeedMinLen)
 				_, _ = rand.Read(seed)
 
 				privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)

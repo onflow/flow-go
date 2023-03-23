@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -169,7 +170,7 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 
 // GenerateAccountPrivateKey generates a private key.
 func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
