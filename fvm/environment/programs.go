@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -60,6 +59,13 @@ func NewPrograms(
 	}
 }
 
+// Reset resets the program cache.
+// this is called if the transactions happy path fails.
+func (programs *Programs) Reset() {
+	programs.nonAddressPrograms = make(map[common.Location]*interpreter.Program)
+	programs.dependencyStack = newDependencyStack()
+}
+
 // GetOrLoadProgram gets the program from the cache,
 // or loads it (by calling load) if it is not in the cache.
 // When loading a program, this method will be re-entered
@@ -101,7 +107,7 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// Add dependencies to the stack.
 	// This is only really needed if loader was not called,
 	// but there is no harm in doing it always.
-	programs.dependencyStack.addDependencies(program.Dependencies)
+	programs.dependencyStack.add(program.Dependencies)
 
 	if loader.Called() {
 		programs.cacheMiss()
@@ -246,7 +252,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, derived.NewProgramDependencies(), err
 	}
 
 	if stackLocation != address {
@@ -259,7 +265,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 		//   - set(B): pops B
 		//   - set(A): pops A
 		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return nil, nil, fmt.Errorf(
+		return nil, derived.NewProgramDependencies(), fmt.Errorf(
 			"cannot set program. Popped dependencies are for an unexpeced address"+
 				" (expected %s, got %s)", address, stackLocation)
 	}
@@ -278,7 +284,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 //     (because A also depends on everything B depends on)
 //   - set(A): pop A, getting all the collected dependencies for A
 type dependencyTracker struct {
-	location     common.AddressLocation
+	location     common.Location
 	dependencies derived.ProgramDependencies
 }
 
@@ -289,18 +295,27 @@ type dependencyStack struct {
 }
 
 func newDependencyStack() *dependencyStack {
-	return &dependencyStack{
+	stack := &dependencyStack{
 		trackers: make([]dependencyTracker, 0),
 	}
+
+	// The root of the stack is the program (script/transaction) that is being executed.
+	// At the end of the transaction execution, this will hold all the dependencies
+	// of the script/transaction.
+	//
+	// The root of the stack should never be popped.
+	stack.push(common.StringLocation("^ProgramDependencyStackRoot$"))
+
+	return stack
 }
 
 // push a new location to track dependencies for.
 // it is assumed that the dependencies will be loaded before the program is set and pop is called.
-func (s *dependencyStack) push(loc common.AddressLocation) {
-	dependencies := make(derived.ProgramDependencies, 1)
+func (s *dependencyStack) push(loc common.Location) {
+	dependencies := derived.NewProgramDependencies()
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
+	dependencies.Add(loc)
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,
@@ -308,23 +323,22 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	})
 }
 
-// addDependencies adds dependencies to the current dependency tracker
-func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependencies) {
+// add adds dependencies to the current dependency tracker
+func (s *dependencyStack) add(dependencies derived.ProgramDependencies) {
 	l := len(s.trackers)
 	if l == 0 {
-		// stack is empty.
-		// This is expected if loading a program that is already cached.
-		return
+		// This cannot happen, as the root of the stack is always present.
+		panic("Dependency stack unexpectedly empty")
 	}
 
 	s.trackers[l-1].dependencies.Merge(dependencies)
 }
 
 // pop the last dependencies on the stack and return them.
-func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependencies, error) {
-	if len(s.trackers) == 0 {
-		return common.AddressLocation{},
-			nil,
+func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, error) {
+	if len(s.trackers) <= 1 {
+		return nil,
+			derived.NewProgramDependencies(),
 			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
 	}
 
@@ -332,14 +346,11 @@ func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependen
 	tracker := s.trackers[len(s.trackers)-1]
 	s.trackers = s.trackers[:len(s.trackers)-1]
 
-	// there are more trackers in the stack.
-	// add the dependencies of the popped tracker to the parent tracker
+	// Add the dependencies of the popped tracker to the parent tracker
 	// This is an optimisation to avoid having to iterate through the entire stack
 	// everytime a dependency is pushed or added, instead we add the popped dependencies to the new top of the stack.
 	// (because if C depends on B which depends on A, A's dependencies include C).
-	if len(s.trackers) > 0 {
-		s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
-	}
+	s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
 
 	return tracker.location, tracker.dependencies, nil
 }

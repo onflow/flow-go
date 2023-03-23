@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type DerivedTransaction interface {
@@ -36,21 +35,6 @@ type DerivedTransactionCommitter interface {
 
 	Validate() error
 	Commit() error
-}
-
-// ProgramDependencies are the programs' addresses used by this program.
-type ProgramDependencies map[flow.Address]struct{}
-
-// AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(address flow.Address) {
-	d[address] = struct{}{}
-}
-
-// Merge merges current dependencies with other dependencies.
-func (d ProgramDependencies) Merge(other ProgramDependencies) {
-	for address := range other {
-		d[address] = struct{}{}
-	}
 }
 
 type Program struct {
