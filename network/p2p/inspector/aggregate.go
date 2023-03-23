@@ -11,13 +11,11 @@ import (
 // AggregateRPCInspector gossip sub RPC inspector that combines multiple RPC inspectors into a single inspector. Each
 // individual inspector will be invoked synchronously.
 type AggregateRPCInspector struct {
-	inspectors []p2p.GossipSubAppSpecificRpcInspector
+	inspectors []p2p.GossipSubRPCInspector
 }
 
-var _ p2p.GossipSubAppSpecificRpcInspector = (*AggregateRPCInspector)(nil)
-
 // NewAggregateRPCInspector returns new aggregate RPC inspector.
-func NewAggregateRPCInspector(inspectors ...p2p.GossipSubAppSpecificRpcInspector) *AggregateRPCInspector {
+func NewAggregateRPCInspector(inspectors ...p2p.GossipSubRPCInspector) *AggregateRPCInspector {
 	return &AggregateRPCInspector{
 		inspectors: inspectors,
 	}

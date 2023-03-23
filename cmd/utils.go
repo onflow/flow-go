@@ -87,7 +87,7 @@ func BuildGossipsubRPCValidationInspectorNotificationDisseminator(size uint32, m
 	return distributor.DefaultGossipSubInspectorNotificationDistributor(logger, heroStoreOpts...)
 }
 
-func BuildGossipsubRPCValidationInspectorHeroStoreOpts(size uint32, metricsRegistry prometheus.Registerer, logger zerolog.Logger, metricsEnabled bool) []queue.HeroStoreConfigOption {
+func BuildGossipsubRPCValidationInspectorHeroStoreOpts(size uint32, metricsRegistry prometheus.Registerer, metricsEnabled bool) []queue.HeroStoreConfigOption {
 	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
 	if metricsEnabled {
 		collector := metrics.GossipSubRPCInspectorQueueMetricFactory(metricsRegistry)

@@ -178,7 +178,6 @@ type LibP2PNodeBuilder struct {
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
-	rpcValidationInspector    p2p.GossipSubRPCInspector
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -297,7 +296,6 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 
 func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubValidationInspector(inspector)
-	builder.rpcValidationInspector = inspector
 	return builder
 }
 

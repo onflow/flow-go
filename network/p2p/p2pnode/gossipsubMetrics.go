@@ -3,6 +3,7 @@ package p2pnode
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -14,6 +15,8 @@ type GossipSubControlMessageMetrics struct {
 	metrics module.GossipSubRouterMetrics
 	logger  zerolog.Logger
 }
+
+var _ p2p.GossipSubControlMetricsObserver = (*GossipSubControlMessageMetrics)(nil)
 
 func NewGossipSubControlMessageMetrics(metrics module.GossipSubRouterMetrics, logger zerolog.Logger) *GossipSubControlMessageMetrics {
 	return &GossipSubControlMessageMetrics{

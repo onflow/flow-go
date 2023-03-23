@@ -3,14 +3,17 @@ package inspector
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // ControlMsgMetricsInspector a  GossipSub RPC inspector that will observe incoming RPC's and collect metrics related to control messages.
 type ControlMsgMetricsInspector struct {
-	metrics *p2pnode.GossipSubControlMessageMetrics
+	component.Component
+	metrics p2p.GossipSubControlMetricsObserver
 }
+
+var _ p2p.GossipSubRPCInspector = (*ControlMsgMetricsInspector)(nil)
 
 func (c *ControlMsgMetricsInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	c.metrics.ObserveRPC(from, rpc)
@@ -18,8 +21,9 @@ func (c *ControlMsgMetricsInspector) Inspect(from peer.ID, rpc *pubsub.RPC) erro
 }
 
 // NewControlMsgMetricsInspector returns a new *ControlMsgMetricsInspector
-func NewControlMsgMetricsInspector(metrics *p2pnode.GossipSubControlMessageMetrics) *ControlMsgMetricsInspector {
+func NewControlMsgMetricsInspector(metrics p2p.GossipSubControlMetricsObserver) *ControlMsgMetricsInspector {
 	return &ControlMsgMetricsInspector{
-		metrics: metrics,
+		Component: component.NewComponentManagerBuilder().Build(),
+		metrics:   metrics,
 	}
 }

@@ -67,15 +67,16 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		})
 	}
 
-	if rpcValidationInspector := gossipSubConfig.RPCValidationInspector(); rpcValidationInspector != nil {
+	for _, inspector := range gossipSubConfig.RPCInspectors() {
+		rpcInspector := inspector
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			a.logger.Debug().Str("component", "gossipsub_rpc_validation_inspector").Msg("starting rpc validation inspector")
-			rpcValidationInspector.Start(ctx)
-			a.logger.Debug().Str("component", "gossipsub_rpc_validation_inspector").Msg("rpc validation inspector started")
+			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("starting rpc inspector")
+			rpcInspector.Start(ctx)
+			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("rpc inspector started")
 
-			<-rpcValidationInspector.Done()
-			a.logger.Debug().Str("component", "gossipsub_rpc_validation_inspector").Msg("rpc validation inspector stopped")
+			<-rpcInspector.Done()
+			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("rpc inspector stopped")
 		})
 	}
 

@@ -83,7 +83,6 @@ type ControlMsgValidationInspector struct {
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubAppSpecificRpcInspector = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
 func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgRequest {

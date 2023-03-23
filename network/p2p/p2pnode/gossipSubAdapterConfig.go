@@ -8,12 +8,14 @@ import (
 	discoveryrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/inspector"
 )
 
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
 	options                []pubsub.Option
+	inspectors             []p2p.GossipSubRPCInspector
 	scoreTracer            p2p.PeerScoreTracer
 	pubsubTracer           p2p.PubSubTracer
 	rpcValidationInspector p2p.GossipSubRPCInspector
@@ -45,12 +47,10 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	}))
 }
 
-func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspector(inspector p2p.GossipSubAppSpecificRpcInspector) {
-	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
-}
-
-func (g *GossipSubAdapterConfig) WithRPCValidationInspector(inspector p2p.GossipSubRPCInspector) {
-	g.rpcValidationInspector = inspector
+func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspectors(inspectors ...p2p.GossipSubRPCInspector) {
+	g.inspectors = inspectors
+	aggregator := inspector.NewAggregateRPCInspector(inspectors...)
+	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(aggregator.Inspect))
 }
 
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
@@ -66,8 +66,8 @@ func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
 	return g.pubsubTracer
 }
 
-func (g *GossipSubAdapterConfig) RPCValidationInspector() p2p.GossipSubRPCInspector {
-	return g.rpcValidationInspector
+func (g *GossipSubAdapterConfig) RPCInspectors() []p2p.GossipSubRPCInspector {
+	return g.inspectors
 }
 
 func (g *GossipSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {
