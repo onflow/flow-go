@@ -8,6 +8,11 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
+const (
+	// rpcInspectorComponentName the rpc inspector component name.
+	rpcInspectorComponentName = "gossipsub_rpc_metrics_observer_inspector"
+)
+
 // ControlMsgMetricsInspector a  GossipSub RPC inspector that will observe incoming RPC's and collect metrics related to control messages.
 type ControlMsgMetricsInspector struct {
 	component.Component
@@ -19,6 +24,11 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgMetricsInspector)(nil)
 func (c *ControlMsgMetricsInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	c.metrics.ObserveRPC(from, rpc)
 	return nil
+}
+
+// Name returns the name of the rpc inspector.
+func (c *ControlMsgMetricsInspector) Name() string {
+	return rpcInspectorComponentName
 }
 
 // NewControlMsgMetricsInspector returns a new *ControlMsgMetricsInspector

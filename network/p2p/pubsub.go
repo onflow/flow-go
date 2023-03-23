@@ -73,6 +73,9 @@ type GossipSubControlMetricsObserver interface {
 type GossipSubRPCInspector interface {
 	component.Component
 
+	// Name returns the name of the rpc inspector.
+	Name() string
+
 	// Inspect inspects an incoming RPC message. This callback func is invoked
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.

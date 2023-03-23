@@ -25,6 +25,8 @@ const (
 	DefaultNumberOfWorkers = 5
 	// DefaultControlMsgValidationInspectorQueueCacheSize is the default size of the inspect message queue.
 	DefaultControlMsgValidationInspectorQueueCacheSize = 100
+	// rpcInspectorComponentName the rpc inspector component name.
+	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
 )
 
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
@@ -170,6 +172,11 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	}
 
 	return nil
+}
+
+// Name returns the name of the rpc inspector.
+func (c *ControlMsgValidationInspector) Name() string {
+	return rpcInspectorComponentName
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.

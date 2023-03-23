@@ -46,6 +46,20 @@ func (_m *GossipSubRPCInspector) Inspect(_a0 peer.ID, _a1 *pubsub.RPC) error {
 	return r0
 }
 
+// Name provides a mock function with given fields:
+func (_m *GossipSubRPCInspector) Name() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // Ready provides a mock function with given fields:
 func (_m *GossipSubRPCInspector) Ready() <-chan struct{} {
 	ret := _m.Called()

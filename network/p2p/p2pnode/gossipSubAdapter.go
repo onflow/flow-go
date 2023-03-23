@@ -71,12 +71,13 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		rpcInspector := inspector
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("starting rpc inspector")
+			componentName := rpcInspector.Name()
+			a.logger.Debug().Str("component", componentName).Msg("starting rpc inspector")
 			rpcInspector.Start(ctx)
-			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("rpc inspector started")
+			a.logger.Debug().Str("component", componentName).Msg("rpc inspector started")
 
 			<-rpcInspector.Done()
-			a.logger.Debug().Str("component", "gossipsub_rpc_inspector").Msg("rpc inspector stopped")
+			a.logger.Debug().Str("component", componentName).Msg("rpc inspector stopped")
 		})
 	}
 
