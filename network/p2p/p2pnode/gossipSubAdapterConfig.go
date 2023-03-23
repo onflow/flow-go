@@ -14,11 +14,10 @@ import (
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
-	options                []pubsub.Option
-	inspectors             []p2p.GossipSubRPCInspector
-	scoreTracer            p2p.PeerScoreTracer
-	pubsubTracer           p2p.PubSubTracer
-	rpcValidationInspector p2p.GossipSubRPCInspector
+	options      []pubsub.Option
+	inspectors   []p2p.GossipSubRPCInspector
+	scoreTracer  p2p.PeerScoreTracer
+	pubsubTracer p2p.PubSubTracer
 }
 
 var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)

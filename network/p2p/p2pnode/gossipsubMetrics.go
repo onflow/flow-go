@@ -3,10 +3,10 @@ package p2pnode
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // GossipSubControlMessageMetrics is a metrics and observability wrapper component for the incoming RPCs to a

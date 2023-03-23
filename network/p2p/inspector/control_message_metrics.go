@@ -3,6 +3,7 @@ package inspector
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/p2p"
 )
