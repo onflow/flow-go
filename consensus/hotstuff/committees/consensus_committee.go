@@ -189,12 +189,15 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 // IdentitiesByBlock returns the identities of all authorized consensus participants at the given block.
 // The order of the identities is the canonical order.
+// No errors are expected during normal operation.
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
 	return il, err
 }
 
 // IdentityByBlock returns the identity of the node with the given node ID at the given block.
+// ERROR conditions:
+//   - model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {

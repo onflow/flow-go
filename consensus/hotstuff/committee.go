@@ -117,7 +117,7 @@ type DynamicCommittee interface {
 	//   * contains no duplicates.
 	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
-	// TODO - do we need this, if we are only checking a single proposer ID?
+	// No errors are expected during normal operation.
 	IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// IdentityByBlock returns the full Identity for specified HotStuff participant.
