@@ -158,7 +158,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		// mandatory blocking pre-processing of RPC to check discard threshold.
 		err := c.blockingPreprocessingRpc(from, validationConfig, control)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not pre-process rpc, aborting")
 		}
 
 		// queue further async inspection
