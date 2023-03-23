@@ -92,27 +92,29 @@ spec:
       volumes:
         - name: node-info-priv-json
           secret: 
-            secretName: {{ $v.nodeId }}.node-info.priv.json
+            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.node-info.priv.json
 
         - name: node-info-pub-json
           secret: 
-            secretName: node-infos.pub.json
+            secretName: {{ $.Values.commit }}.node-infos.pub.json
 
         - name: root-block-json
           secret: 
-            secretName: root-block.json
+            secretName: {{ $.Values.commit }}.root-block.json
 
         - name: root-protocol-state-snapshot-json
           secret: 
-            secretName: root-protocol-state-snapshot.json
+            secretName: {{ $.Values.commit }}.root-protocol-state-snapshot.json
 
         - name: secretsdb-key
           secret: 
-            secretName: {{ $v.nodeId }}.secretsdb-key
+            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.secretsdb-key
 
   volumeClaimTemplates:
     - metadata:
         name: data
+        labels:
+          project: {{ $.Values.commit }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:

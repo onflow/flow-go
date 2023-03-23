@@ -10,8 +10,6 @@ ifeq ($(strip $(FLOW_GO_TAG)),)
 	$(eval FLOW_GO_TAG=$(BRANCH_NAME))
 endif
 
-
-
 # default value of the Docker base registry URL which can be overriden when invoking the Makefile
 DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 
@@ -75,20 +73,20 @@ clean-gen-helm:
 	rm -f template-data.json
 
 k8s-secrets-create:
-	bash ./create-secrets.sh
+	bash ./create-secrets.sh ${PROJECT_NAME} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${NAMESPACE} ./flow --set commit="${PROJECT_NAME}" --debug --namespace ${NAMESPACE}
+	helm upgrade --install -f ./values.yml ${PROJECT_NAME} ./flow --set commit="${PROJECT_NAME}" --debug --namespace ${NAMESPACE}
 
 k8s-delete:
-	helm delete ${NAMESPACE} --namespace ${NAMESPACE}
-	kubectl delete pvc -l service=flow --namespace ${NAMESPACE}
+	helm delete ${PROJECT_NAME} --namespace ${NAMESPACE}
+	kubectl delete pvc -l project=${PROJECT_NAME} --namespace ${NAMESPACE}
 
 k8s-delete-secrets:
-	kubectl delete secrets -l service=flow  --namespace ${NAMESPACE}
+	kubectl delete secrets -l project=${PROJECT_NAME} --namespace ${NAMESPACE}
 
-k8s-expose-locally:
-	kubectl port-forward service/access1 9000:9000 --namespace ${NAMESPACE}
+k8s-expose-locally: validate
+	kubectl port-forward service/access1-${PROJECT_NAME} 9000:9000 --namespace ${NAMESPACE}
 
 k8s-pod-health:
 	kubectl get pods
@@ -99,8 +97,7 @@ k8s-test-network-accessibility:
 
 clone-flow: clean-flow 
 	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone --depth 1 --branch $(FLOW_GO_TAG) https://github.com/onflow/flow-go.git
+	git clone --depth 1 --branch $(FLOW_GO_TAG) https://github.com/onflow/flow-go.git --single-branch
 	
-
 clean-flow:
 	rm -rf flow-go
