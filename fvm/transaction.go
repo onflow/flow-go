@@ -1,8 +1,8 @@
 package fvm
 
 import (
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -87,6 +87,6 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() logical.Time {
+	return logical.Time(proc.TxIndex)
 }
