@@ -15,22 +15,6 @@ type EngineProcessFunc func(channels.Channel, flow.Identifier, interface{}) erro
 type PublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
 
 // Conduit represents a mock conduit.
-type Conduit struct {
-	mocknetwork.Conduit
-	net     *Network
-	channel channels.Channel
-}
-
-var _ network.Conduit = (*Conduit)(nil)
-
-// Publish sends a message on this mock network, invoking any callback that has
-// been specified. This will panic if no callback is found.
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
-	if c.net.publishFunc != nil {
-		return c.net.publishFunc(c.channel, event, targetIDs...)
-	}
-	panic("Publish called but no callback function was found.")
-}
 
 // Network represents a mock network. The implementation is not concurrency-safe.
 type Network struct {
