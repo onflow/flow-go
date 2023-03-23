@@ -129,4 +129,13 @@ func NewMisbehaviorReport(reason Misbehavior, opts ...MisbehaviorReportOpt) (*Mi
 	return m, nil
 }
 
+// MisbehaviorReporter is an interface that is used to report misbehavior of a node.
+// The misbehavior is reported to the networking layer to penalize the misbehaving node.
+type MisbehaviorReporter interface {
+	// ReportMisbehavior reports the misbehavior of a node on sending a message to the current node that appears valid
+	// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+	// The misbehavior is reported to the networking layer to penalize the misbehaving node.
+	ReportMisbehavior(*MisbehaviorReport)
+}
+
 
