@@ -306,7 +306,7 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	channel, ok := ChannelFromTopic(topic)
 	if !ok {
-		return fmt.Errorf("invalid topic failed to get channel from topic")
+		return fmt.Errorf("invalid topic: failed to get channel from topic")
 	}
 	err := IsValidFlowChannel(channel)
 	if err != nil {
