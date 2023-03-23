@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -20,10 +23,11 @@ type DefaultConduitFactory struct {
 	misbehaviorManager network.MisbehaviorReportManager
 }
 
-func NewDefaultConduitFactory(misbehaviorManager network.MisbehaviorReportManager) *DefaultConduitFactory {
+func NewDefaultConduitFactory(logger zerolog.Logger) *DefaultConduitFactory {
 	d := &DefaultConduitFactory{
-		misbehaviorManager: misbehaviorManager,
+		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger),
 	}
+	
 	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

@@ -398,7 +398,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
+		cf := conduit.NewDefaultConduitFactory(fnb.Logger)
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})

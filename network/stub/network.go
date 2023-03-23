@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Network is a mocked Network layer made for testing engine's behavior.
@@ -52,7 +53,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		engines:        make(map[channels.Channel]network.MessageProcessor),
 		seenEventIDs:   make(map[string]struct{}),
 		qCD:            make(chan struct{}),
-		conduitFactory: conduit.NewDefaultConduitFactory(),
+		conduitFactory: conduit.NewDefaultConduitFactory(unittest.Logger()),
 	}
 
 	for _, opt := range opts {
