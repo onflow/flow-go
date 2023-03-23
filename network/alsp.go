@@ -77,6 +77,11 @@ const (
 	minimumDecayValue = 1
 )
 
+// MisbehaviorReport is a report that is sent to the networking layer to penalize the misbehaving node.
+// The penalty is a value that is deducted from the overall penalty of the misbehaving node. The penalty is
+// decayed at each decay interval. If the overall penalty of the misbehaving node drops below the disallow-listing
+// threshold, the node is reported to be disallow-listed by the networking layer, i.e., existing connections to the
+// node are closed and the node is no longer allowed to connect till its penalty is decayed back to zero.
 type MisbehaviorReport struct {
 	reason  Misbehavior
 	penalty int
@@ -104,6 +109,7 @@ func WithPenaltyAmplification(v int) MisbehaviorReportOpt {
 // If no options are provided, the default penalty value is used.
 // The returned error by this function indicates that the report is not created. In BFT setup, the returned error
 // should be treated as a fatal error.
+// The default penalty value is 0.01 * misbehaviorDisallowListingThreshold = -86.4
 func NewMisbehaviorReport(reason Misbehavior, opts ...MisbehaviorReportOpt) (*MisbehaviorReport, error) {
 	m := &MisbehaviorReport{
 		reason:  reason,
