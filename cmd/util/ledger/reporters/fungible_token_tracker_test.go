@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -49,12 +48,10 @@ func TestFungibleTokenTracker(t *testing.T) {
 		reporters.NewStorageSnapshotFromPayload(payloads))
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithDerivedBlockData(derivedBlockData),
 	}
 	ctx := fvm.NewContext(opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
@@ -103,7 +100,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		SetScript(deployingTestContractScript).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+	tx := fvm.Transaction(txBody, 0)
 	snapshot, output, err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
@@ -132,7 +129,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+	tx = fvm.Transaction(txBody, 0)
 	snapshot, output, err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
