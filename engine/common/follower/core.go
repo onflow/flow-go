@@ -95,6 +95,12 @@ func NewCore(log zerolog.Logger,
 	return c, nil
 }
 
+// OnBlockRange performs processing batches of connected blocks. Input batch has to be sequentially ordered forming a chain.
+// Submitting batch with invalid order results in error, such batch will be discarded and exception will be returned.
+// Effectively this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
+// processing if they were certified.
+// No errors expected during normal operations.
+// This function is safe to use in concurrent environment.
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
 	if len(batch) < 1 {
 		return nil
@@ -151,6 +157,10 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 	}
 
 	log.Debug().Msgf("processing range resulted in %d certified blocks", len(certifiedBatch))
+
+	if len(certifiedBatch) < 1 {
+		return nil
+	}
 
 	// in-case we have already stopped our worker we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
@@ -237,6 +247,11 @@ func (c *Core) extendCertifiedBlocks(connectedBlocks CertifiedBlocks) error {
 	return nil
 }
 
+// processFinalizedBlock processes new finalized block by applying to the PendingTree.
+// Potentially PendingTree can resolve blocks that previously were not connected. Those blocks will be applied to the
+// protocol state, resulting in extending length of chain.
+// Is NOT concurrency safe, has to be used by internal goroutine.
+// No errors expected during normal operations.
 func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
 	connectedBlocks, err := c.pendingTree.FinalizeFork(finalized)
 	if err != nil {
@@ -249,6 +264,9 @@ func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
 	return nil
 }
 
+// rangeToCertifiedBlocks transform batch of connected blocks and a QC that certifies last block to a range of
+// certified and connected blocks.
+// Pure function.
 func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) CertifiedBlocks {
 	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
 	for i := 0; i < len(certifiedRange); i++ {

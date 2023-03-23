@@ -17,8 +17,10 @@ type FollowerCore interface {
 	// The originID parameter identifies the node that sent the batch of blocks.
 	// The connectedRange parameter contains the blocks, they must form a sequence of connected blocks.
 	// No errors are expected during normal operations.
+	// This function is safe to use in concurrent environment.
 	OnBlockRange(originID flow.Identifier, connectedRange []*flow.Block) error
 	// OnFinalizedBlock is called when a new block is finalized by Hotstuff.
 	// FollowerCore updates can update its local state using this information.
+	// This function is safe to use in concurrent environment.
 	OnFinalizedBlock(finalized *flow.Header)
 }
