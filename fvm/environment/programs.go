@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -101,7 +100,7 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// Add dependencies to the stack.
 	// This is only really needed if loader was not called,
 	// but there is no harm in doing it always.
-	programs.dependencyStack.addDependencies(program.Dependencies)
+	programs.dependencyStack.add(program.Dependencies)
 
 	if loader.Called() {
 		programs.cacheMiss()
@@ -246,7 +245,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, derived.NewProgramDependencies(), err
 	}
 
 	if stackLocation != address {
@@ -259,7 +258,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 		//   - set(B): pops B
 		//   - set(A): pops A
 		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return nil, nil, fmt.Errorf(
+		return nil, derived.NewProgramDependencies(), fmt.Errorf(
 			"cannot set program. Popped dependencies are for an unexpeced address"+
 				" (expected %s, got %s)", address, stackLocation)
 	}
@@ -278,7 +277,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 //     (because A also depends on everything B depends on)
 //   - set(A): pop A, getting all the collected dependencies for A
 type dependencyTracker struct {
-	location     common.AddressLocation
+	location     common.Location
 	dependencies derived.ProgramDependencies
 }
 
@@ -296,11 +295,11 @@ func newDependencyStack() *dependencyStack {
 
 // push a new location to track dependencies for.
 // it is assumed that the dependencies will be loaded before the program is set and pop is called.
-func (s *dependencyStack) push(loc common.AddressLocation) {
-	dependencies := make(derived.ProgramDependencies, 1)
+func (s *dependencyStack) push(loc common.Location) {
+	dependencies := derived.NewProgramDependencies()
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
+	dependencies.Add(loc)
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,
@@ -308,8 +307,8 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	})
 }
 
-// addDependencies adds dependencies to the current dependency tracker
-func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependencies) {
+// add adds dependencies to the current dependency tracker
+func (s *dependencyStack) add(dependencies derived.ProgramDependencies) {
 	l := len(s.trackers)
 	if l == 0 {
 		// stack is empty.
@@ -321,10 +320,10 @@ func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependenci
 }
 
 // pop the last dependencies on the stack and return them.
-func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependencies, error) {
+func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, error) {
 	if len(s.trackers) == 0 {
-		return common.AddressLocation{},
-			nil,
+		return nil,
+			derived.NewProgramDependencies(),
 			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
 	}
 
