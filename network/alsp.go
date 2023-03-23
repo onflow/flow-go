@@ -78,6 +78,10 @@ const (
 )
 
 // MisbehaviorReport is a report that is sent to the networking layer to penalize the misbehaving node.
+// A MisbehaviorReport reports the misbehavior of a node on sending a message to the current node that appears valid
+// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+//
+// A MisbehaviorReport consists of a reason and a penalty. The reason is a string that describes the misbehavior.
 // The penalty is a value that is deducted from the overall penalty of the misbehaving node. The penalty is
 // decayed at each decay interval. If the overall penalty of the misbehaving node drops below the disallow-listing
 // threshold, the node is reported to be disallow-listed by the networking layer, i.e., existing connections to the
@@ -124,3 +128,5 @@ func NewMisbehaviorReport(reason Misbehavior, opts ...MisbehaviorReportOpt) (*Mi
 
 	return m, nil
 }
+
+
