@@ -114,6 +114,8 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: data
+        labels:
+          project: {{ $.Values.commit }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
