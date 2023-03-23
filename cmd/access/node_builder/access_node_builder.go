@@ -67,7 +67,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -698,8 +697,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		heroStoreOpts := p2pbuilder.HeroStoreOpts(builder.DisallowListNotificationCacheSize, metrics.GossipSubRPCInspectorQueueMetricFactory(builder.MetricsRegisterer))
-		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
+		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -1080,12 +1078,12 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		heroStoreOpts := p2pbuilder.HeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, metrics.GossipSubRPCInspectorQueueMetricFactory(builder.MetricsRegisterer))
-		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := p2pbuilder.GossipSubRPCInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, heroStoreOpts...)
+		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}
-		builder.GossipSubInspectorNotifDistributor = gossipSubInspectorNotifDistributor
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,

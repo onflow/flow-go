@@ -301,6 +301,26 @@ func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.
 	return builder
 }
 
+// buildRouting creates a new routing system factory for a libp2p node using the provided host.
+// It returns the newly created routing system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - h: a libp2p host.Host object used to initialize the routing system.
+//
+// Returns:
+// - routing.Routing: a routing system for the libp2p node.
+// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
+	routingSystem, err := builder.routingFactory(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
+	}
+	return routingSystem, nil
+}
+
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	if builder.routingFactory == nil {
@@ -564,22 +584,39 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	return builder, nil
 }
 
-// buildRouting creates a new routing system factory for a libp2p node using the provided host.
-// It returns the newly created routing system and any errors encountered during its creation.
-//
-// Arguments:
-// - ctx: a context.Context object used to manage the lifecycle of the node.
-// - h: a libp2p host.Host object used to initialize the routing system.
-//
-// Returns:
-// - routing.Routing: a routing system for the libp2p node.
-// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
-// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
-// and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
-	routingSystem, err := builder.routingFactory(ctx, h)
+// BuildGossipSubRPCValidationInspector helper that sets up the gossipsub RPC validation inspector.
+func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
+	sporkId flow.Identifier,
+	validationConfigs *GossipSubRPCValidationConfigs,
+	distributor p2p.GossipSubInspectorNotificationDistributor,
+	heroStoreOpts ...queue.HeroStoreConfigOption,
+) (*validation.ControlMsgValidationInspector, error) {
+	controlMsgRPCInspectorCfg, err := gossipSubRPCValidationInspectorConfig(validationConfigs, heroStoreOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-	return routingSystem, nil
+	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, distributor)
+	return rpcValidationInspector, nil
+}
+
+// gossipSubRPCValidationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
+func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
+	// setup rpc validation configuration for each control message type
+	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
+	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validationConfigs.PruneLimits)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
+
+	// setup gossip sub RPC control message inspector config
+	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
+		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts: opts,
+		GraftValidationCfg:  graftValidationCfg,
+		PruneValidationCfg:  pruneValidationCfg,
+	}
+	return controlMsgRPCInspectorCfg, nil
 }

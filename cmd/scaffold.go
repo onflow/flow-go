@@ -3,12 +3,10 @@ package cmd
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -16,7 +14,6 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -31,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -52,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -68,12 +63,10 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	sutil "github.com/onflow/flow-go/storage/util"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -377,13 +370,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		// setup gossip sub RPC control message inspector config
-		heroStoreOpts := p2pbuilder.HeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, metrics.GossipSubRPCInspectorQueueMetricFactory(fnb.MetricsRegisterer))
-		rpcValidationInspector, gossipSubInspectorNotifDistributor, err := p2pbuilder.GossipSubRPCInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, heroStoreOpts...)
+		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
+		heroStoreOpts := BuildGossipsubRPCValidationInspectorHeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, fnb.GossipSubInspectorNotifDistributor, heroStoreOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}
-		fnb.GossipSubInspectorNotifDistributor = gossipSubInspectorNotifDistributor
 
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
@@ -1011,8 +1003,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		heroStoreOpts := p2pbuilder.HeroStoreOpts(fnb.DisallowListNotificationCacheSize, metrics.DisallowListNotificationQueueMetricFactory(fnb.MetricsRegisterer))
-		fnb.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(fnb.Logger, heroStoreOpts...)
+		fnb.NodeDisallowListDistributor = BuildDisallowListNotificationDisseminator(fnb.DisallowListNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -1855,54 +1846,4 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 		}
 	}
 	return nil
-}
-
-// loadRootProtocolSnapshot loads the root protocol snapshot from disk
-func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
-	path := filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot)
-	data, err := io.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not read root snapshot (path=%s): %w", path, err)
-	}
-
-	var snapshot inmem.EncodableSnapshot
-	err = json.Unmarshal(data, &snapshot)
-	if err != nil {
-		return nil, err
-	}
-
-	return inmem.SnapshotFromEncodable(snapshot), nil
-}
-
-// LoadPrivateNodeInfo the private info for this node from disk (e.g., private staking/network keys).
-func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
-	data, err := io.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not read private node info (path=%s): %w", path, err)
-	}
-	var info bootstrap.NodeInfoPriv
-	err = json.Unmarshal(data, &info)
-	return &info, err
-}
-
-// loadSecretsEncryptionKey loads the encryption key for the secrets database.
-// If the file does not exist, returns os.ErrNotExist.
-func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) {
-	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, myID))
-	data, err := io.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not read secrets db encryption key (path=%s): %w", path, err)
-	}
-	return data, nil
-}
-
-func rateLimiterPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
-	return func(p peer.ID) error {
-		if rateLimiter.IsRateLimited(p) {
-			return fmt.Errorf("peer is rate limited")
-		}
-
-		return nil
-	}
 }
