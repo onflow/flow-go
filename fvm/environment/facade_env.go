@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
@@ -155,6 +156,34 @@ func NewScriptEnvironment(
 			NestedTransaction:           nestedTxn,
 			DerivedTransactionCommitter: derivedTxn,
 		})
+}
+
+// This is mainly used by command line tools, the emulator, and cadence tools
+// testing.
+func NewScriptEnvironmentFromStorageSnapshot(
+	params EnvironmentParams,
+	storageSnapshot state.StorageSnapshot,
+) *facadeEnvironment {
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		derived.EndOfBlockExecutionTime,
+		derived.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
+
+	txn := storage.SerialTransaction{
+		NestedTransaction: state.NewTransactionState(
+			delta.NewDeltaView(storageSnapshot),
+			state.DefaultParameters()),
+		DerivedTransactionCommitter: derivedTxn,
+	}
+
+	return NewScriptEnv(
+		context.Background(),
+		tracing.NewTracerSpan(),
+		params,
+		txn)
 }
 
 func NewScriptEnv(
